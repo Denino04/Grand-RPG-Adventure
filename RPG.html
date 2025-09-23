@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text RPG Adventure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a; /* Dark background for the whole page */
+        }
+        .font-medieval {
+            font-family: 'MedievalSharp', cursive;
+        }
+        /* Custom scrollbar for a better look */
+        #game-log::-webkit-scrollbar {
+            width: 8px;
+        }
+        #game-log::-webkit-scrollbar-track {
+            background: #2d3748;
+        }
+        #game-log::-webkit-scrollbar-thumb {
+            background-color: #718096;
+            border-radius: 4px;
+        }
+        .btn {
+            @apply px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 shadow-md;
+        }
+        .btn-primary {
+            @apply bg-slate-600 hover:bg-slate-500 border-b-4 border-slate-800 hover:border-slate-700;
+        }
+        .btn-action {
+            @apply bg-red-700 hover:bg-red-600 border-b-4 border-red-900 hover:border-red-800;
+        }
+        .btn-magic {
+            @apply bg-purple-700 hover:bg-purple-600 border-b-4 border-purple-900 hover:border-purple-800;
+        }
+        .btn-item {
+             @apply bg-green-700 hover:bg-green-600 border-b-4 border-green-900 hover:border-green-800;
+        }
+        .progress-bar-bg {
+            @apply w-full bg-gray-700 rounded-full h-5 overflow-hidden;
+        }
+        .progress-bar {
+            @apply h-5 rounded-full transition-all duration-300 flex items-center justify-center;
+        }
+        .progress-bar-text {
+            @apply text-xs font-bold text-white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+        }
+        .hp-bar { @apply bg-red-600; }
+        .mp-bar { @apply bg-blue-600; }
+        .xp-bar { @apply bg-yellow-500; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <div id="start-screen" class="text-center">
+        <h1 class="font-medieval text-6xl text-yellow-400 mb-4">Chronicles of the Void</h1>
+        <p class="mb-8 text-lg text-gray-400">Enter your hero's name to begin your journey.</p>
+        <input type="text" id="player-name-input" class="bg-gray-800 border border-gray-600 text-white text-center text-lg rounded-lg px-4 py-2 mb-4 w-64 focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="e.g., Eldrin">
+        <button id="start-game-btn" class="btn btn-primary text-xl px-8 py-3">Begin Adventure</button>
+        <button id="load-game-btn" class="btn btn-primary text-xl px-8 py-3 mt-4 hidden">Load Saved Game</button>
+    </div>
+
+    <div id="game-container" class="w-full max-w-4xl mx-auto bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-6 hidden">
+        
+        <!-- Player Stats Header -->
+        <div id="stats-view" class="mb-4 p-4 bg-slate-900 rounded-lg grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-4 text-sm">
+            <!-- Vitals Column -->
+            <div class="space-y-3">
+                <div>
+                    <p class="font-bold text-gray-300 mb-1">HP</p>
+                    <div class="progress-bar-bg">
+                        <div id="player-hp-bar" class="progress-bar hp-bar" style="width: 100%;">
+                            <span id="player-hp-text" class="progress-bar-text">50 / 50</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <p class="font-bold text-gray-300 mb-1">MP</p>
+                    <div class="progress-bar-bg">
+                        <div id="player-mp-bar" class="progress-bar mp-bar" style="width: 100%;">
+                             <span id="player-mp-text" class="progress-bar-text">20 / 20</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Player Info Column -->
+            <div class="space-y-3">
+                 <div>
+                    <p id="player-name" class="font-bold text-yellow-400 text-lg">Player</p>
+                    <div class="flex justify-between">
+                        <p>Level: <span id="player-level">1</span></p>
+                        <p>Gold: <span id="player-gold">100</span> G</p>
+                    </div>
+                </div>
+                <div>
+                    <p class="font-bold text-gray-300 mb-1">XP</p>
+                    <div class="progress-bar-bg">
+                        <div id="player-xp-bar" class="progress-bar xp-bar" style="width: 0%;">
+                             <span id="player-xp-text" class="progress-bar-text">0 / 100</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Equipment Column -->
+            <div class="bg-slate-800 p-3 rounded-lg">
+                 <h3 class="font-bold text-yellow-400 mb-2 text-center">Equipment</h3>
+                 <div id="equipment-display" class="text-xs space-y-1">
+                    <p>Weapon: <span id="equipped-weapon"></span></p>
+                    <p>Armor: <span id="equipped-armor"></span></p>
+                 </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div id="main-view" class="min-h-[250px] bg-slate-900/50 p-6 rounded-lg mb-4 flex flex-col justify-center items-center">
+            <!-- Game content is dynamically inserted here -->
+        </div>
+
+        <!-- Game Log -->
+        <div class="bg-black/30 rounded-lg p-4 h-48 overflow-y-auto" id="game-log">
+            <!-- Log messages are added here -->
+        </div>
+    </div>
+
+<script>
+// --- GAME DATA ------------------------------------------------------------------
+const WEAPONS = {
+    'fists': {name: 'Fists', damage: [1, 4], price: 0},
+    'dagger': {name: 'Dagger', damage: [2, 4], price: 25},
+    'rusty_sword': {name: 'Rusty Sword', damage: [1, 8], price: 40},
+    'steel_longsword': {name: 'Steel Longsword', damage: [2, 6], price: 150},
+    'obsidian_axe': {name: 'Obsidian Axe', damage: [1, 10], price: 120},
+    'masterwork_spear': {name: 'Masterwork Spear', damage: [2, 8], price: 500}
+};
+const ARMOR = {
+    'rags': {name: 'Tattered Rags', defense: 0, price: 0},
+    'leather_armor': {name: 'Leather Armor', defense: 2, price: 50},
+    'chainmail': {name: 'Chainmail', defense: 4, price: 200},
+    'steel_plate': {name: 'Steel Plate', defense: 6, price: 600}
+};
+const ITEMS = {
+    'health_potion': {name: 'Health Potion', type: 'healing', amount: 20, price: 30},
+    'mana_potion': {name: 'Mana Potion', type: 'mana_restore', amount: 20, price: 40},
+    'goblin_ear': {name: 'Goblin Ear', type: 'junk', price: 5},
+    'wolf_pelt': {name: 'Wolf Pelt', type: 'junk', price: 12}
+};
+const MAGIC = {
+    'fireball': {name: 'Fireball', damage: [2, 6], cost: 10, price: 100, description: 'Hurls a ball of fire at an enemy.'},
+    'lightning_bolt': {name: 'Lightning Bolt', damage: [1, 8], cost: 15, price: 250, description: 'Calls down a bolt of lightning.'},
+    'heal': {name: 'Heal', healing: [2, 8], cost: 20, price: 150, description: 'Mends wounds with soothing magic.'}
+};
+const MONSTER_SPECIES = {
+    'goblin': { name: 'Goblin', base_hp: 20, base_strength: 3, base_xp: 25, base_gold: 10, loot_table: {'health_potion': 0.1, 'goblin_ear': 0.5, 'dagger': 0.05} },
+    'dire_wolf': { name: 'Dire Wolf', base_hp: 35, base_strength: 5, base_xp: 40, base_gold: 15, loot_table: {'health_potion': 0.15, 'wolf_pelt': 0.4} },
+    'orc_berserker': { name: 'Orc Berserker', base_hp: 60, base_strength: 8, base_xp: 75, base_gold: 30, loot_table: {'health_potion': 0.2, 'obsidian_axe': 0.1} }
+};
+const MONSTER_RARITY = {
+    'common': {name: 'Common', multiplier: 1.0, damage: [1, 4], loot_chance_mod: 1.0, ability: null},
+    'uncommon': {name: 'Uncommon', multiplier: 1.2, damage: [1, 6], loot_chance_mod: 1.5, ability: null},
+    'rare': {name: 'Rare', multiplier: 1.5, damage: [2, 6], loot_chance_mod: 2.0, ability: null},
+    'epic': {name: 'Epic', multiplier: 2.0, damage: [2, 8], loot_chance_mod: 2.5, ability: 'double_strike'},
+    'legendary': {name: 'Legendary', multiplier: 2.5, damage: [3, 6], loot_chance_mod: 3.0, ability: 'life_drain'}
+};
+const SHOP_INVENTORY = ['health_potion', 'mana_potion', 'dagger', 'leather_armor'];
+const BLACKSMITH_INVENTORY = ['steel_longsword', 'chainmail', 'masterwork_spear', 'steel_plate', 'flaming_sword', 'vampiric_dagger', 'mana_robe'];
+
+// --- New Magical Equipment ---
+WEAPONS['flaming_sword'] = {name: 'Flaming Sword', damage: [2, 6], price: 700, effect: { type: 'fire_damage', damage: [1, 6] }};
+WEAPONS['vampiric_dagger'] = {name: 'Vampiric Dagger', damage: [2, 4], price: 600, effect: { type: 'lifesteal', amount: 0.5 }}; // 50% of physical damage dealt
+ARMOR['mana_robe'] = {name: 'Robe of the Apprentice', defense: 1, price: 400, effect: { type: 'mp_regen', amount: 3 }};
+
+
+// --- GAME STATE & CLASSES -------------------------------------------------------
+let player;
+let currentEnemy;
+let gameState = { 
+    currentView: 'main_menu',
+    isPlayerTurn: true 
+};
+
+// --- UTILITY FUNCTIONS ---
+const $ = (selector) => document.querySelector(selector);
+const logElement = $('#game-log');
+const mainView = $('#main-view');
+
+function rollDice(numDice, sides) {
+    let total = 0;
+    for (let i = 0; i < numDice; i++) {
+        total += Math.floor(Math.random() * sides) + 1;
+    }
+    return total;
+}
+
+function addToLog(message, color = 'text-gray-300') {
+    const p = document.createElement('p');
+    p.innerHTML = message;
+    p.className = `mb-1 ${color}`;
+    logElement.appendChild(p);
+    logElement.scrollTop = logElement.scrollHeight; // Auto-scroll to bottom
+}
+
+function getItemDetails(itemKey) {
+    if (itemKey in ITEMS) return ITEMS[itemKey];
+    if (itemKey in WEAPONS) return WEAPONS[itemKey];
+    if (itemKey in ARMOR) return ARMOR[itemKey];
+    return null;
+}
+
+// --- CLASSES ---
+class Entity {
+    constructor(name, hp, strength) {
+        this.name = name;
+        this.maxHp = hp;
+        this.hp = hp;
+        this.strength = strength;
+    }
+    isAlive() { return this.hp > 0; }
+}
+
+class Player extends Entity {
+    constructor(name) {
+        super(name, 50, 5);
+        this.gold = 100;
+        this.level = 1;
+        this.xp = 0;
+        this.xpToNextLevel = 100;
+        this.mp = 20;
+        this.maxMp = 20;
+        this.intelligence = 5;
+        this.equippedWeapon = WEAPONS['rusty_sword'];
+        this.equippedArmor = ARMOR['rags'];
+        this.inventory = {
+            items: { 'health_potion': 2 },
+            weapons: ['rusty_sword'],
+            armor: ['rags']
+        };
+        this.spells = ['fireball', 'heal'];
+    }
+
+    addToInventory(itemKey, quantity = 1, verbose = true) {
+        const details = getItemDetails(itemKey);
+        if (!details) return;
+
+        if (verbose) addToLog(`You received: <span class="font-bold text-yellow-300">${details.name}</span>!`, 'text-green-400');
+
+        if (itemKey in ITEMS) {
+            this.inventory.items[itemKey] = (this.inventory.items[itemKey] || 0) + quantity;
+        } else {
+            const category = itemKey in WEAPONS ? 'weapons' : 'armor';
+            if (!this.inventory[category].includes(itemKey)) {
+                this.inventory[category].push(itemKey);
+            }
+        }
+    }
+    
+    gainXp(amount) {
+        this.xp += amount;
+        addToLog(`You gained <span class="font-bold">${amount}</span> XP!`, 'text-yellow-400');
+        if (this.xp >= this.xpToNextLevel) this.levelUp();
+        updateStatsView();
+    }
+
+    levelUp() {
+        this.level++;
+        this.xp -= this.xpToNextLevel;
+        this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.5);
+        this.maxHp += 10;
+        this.hp = this.maxHp;
+        this.maxMp += 5;
+        this.mp = this.maxMp;
+        this.strength += 2;
+        this.intelligence += 2;
+        addToLog(`*** LEVEL UP! You are now level ${this.level}! ***`, 'text-yellow-200 font-bold text-lg');
+    }
+
+    takeDamage(damage) {
+        const finalDamage = Math.max(0, damage - this.equippedArmor.defense);
+        this.hp -= finalDamage;
+        addToLog(`You take <span class="font-bold text-red-400">${finalDamage}</span> damage.`);
+        updateStatsView();
+    }
+}
+
+class Enemy extends Entity {
+     constructor(speciesData, rarityData, playerLevel) {
+        const multiplier = rarityData.multiplier + (playerLevel * 0.1);
+        const finalHp = Math.floor(speciesData.base_hp * multiplier);
+        const finalStrength = Math.floor(speciesData.base_strength * multiplier);
+        super(`${rarityData.name} ${speciesData.name}`, finalHp, finalStrength);
+        
+        this.damage = rarityData.damage;
+        this.ability = rarityData.ability;
+        this.xpReward = Math.floor(speciesData.base_xp * multiplier);
+        this.goldReward = Math.floor(speciesData.base_gold * multiplier);
+        this.lootTable = speciesData.loot_table;
+        this.lootChanceMod = rarityData.loot_chance_mod;
+    }
+
+    attack(target) {
+        addToLog(`${this.name} attacks ${target.name}!`);
+        this._performAttack(target);
+
+        if (this.ability === 'double_strike' && Math.random() < 0.33) {
+            addToLog(`${this.name}'s fury lets it attack again!`, 'text-red-500 font-bold');
+            setTimeout(() => this._performAttack(target), 500);
+        }
+    }
+
+    _performAttack(target) {
+        const totalDamage = rollDice(...this.damage) + this.strength;
+        target.takeDamage(totalDamage);
+
+        if (this.ability === 'life_drain') {
+            const drainAmount = Math.floor(totalDamage / 2);
+            this.hp = Math.min(this.maxHp, this.hp + drainAmount);
+            addToLog(`${this.name} drains <span class="font-bold text-green-400">${drainAmount}</span> HP!`);
+            renderBattle();
+        }
+    }
+
+    takeDamage(damage) {
+        this.hp -= damage;
+    }
+}
+
+function generateEnemy() {
+    const speciesKey = Object.keys(MONSTER_SPECIES)[Math.floor(Math.random() * Object.keys(MONSTER_SPECIES).length)];
+    const rarityKeys = Object.keys(MONSTER_RARITY);
+    const weights = [60, 25, 10, 4, 1];
+    const chosenRarityKey = choices(rarityKeys, weights);
+    
+    currentEnemy = new Enemy(MONSTER_SPECIES[speciesKey], MONSTER_RARITY[chosenRarityKey], player.level);
+}
+// Helper for weighted random choices
+function choices(population, weights) {
+    let totalWeight = weights.reduce((acc, w) => acc + w, 0);
+    let randomNum = Math.random() * totalWeight;
+    for (let i = 0; i < population.length; i++) {
+        if (randomNum < weights[i]) return population[i];
+        randomNum -= weights[i];
+    }
+}
+
+// --- UI RENDERING FUNCTIONS ----------------------------------------------------
+function updateStatsView() {
+    $('#player-name').textContent = player.name;
+    $('#player-level').textContent = player.level;
+    $('#player-gold').textContent = player.gold;
+    
+    $('#player-hp-text').textContent = `${player.hp} / ${player.maxHp}`;
+    $('#player-mp-text').textContent = `${player.mp} / ${player.maxMp}`;
+    $('#player-xp-text').textContent = `${player.xp} / ${player.xpToNextLevel}`;
+
+    $('#player-hp-bar').style.width = `${Math.max(0, player.hp / player.maxHp * 100)}%`;
+    $('#player-mp-bar').style.width = `${Math.max(0, player.mp / player.maxMp * 100)}%`;
+    $('#player-xp-bar').style.width = `${Math.max(0, player.xp / player.xpToNextLevel * 100)}%`;
+
+    // Update equipment display
+    const weapon = player.equippedWeapon;
+    const armor = player.equippedArmor;
+    $('#equipped-weapon').textContent = `${weapon.name} (${weapon.damage[0]}d${weapon.damage[1]})`;
+    $('#equipped-armor').textContent = `${armor.name} (Def: ${armor.defense})`;
+}
+
+function render(html) {
+    mainView.innerHTML = html;
+}
+
+function renderMainMenu() {
+    gameState.currentView = 'main_menu';
+    saveGame(); // Auto-save when returning to the main menu
+    render(`
+        <h2 class="font-medieval text-3xl mb-4 text-center">What would you like to do?</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <button onclick="startBattle()" class="btn btn-primary">Enter the Wilderness</button>
+            <button onclick="renderTown()" class="btn btn-primary">Go to Town</button>
+            <button onclick="renderInventory()" class="btn btn-primary">Manage Inventory</button>
+            <button onclick="saveGame(true)" class="btn btn-primary">Save Game</button>
+        </div>
+    `);
+}
+
+function renderTown() {
+    gameState.currentView = 'town';
+    render(`
+        <h2 class="font-medieval text-3xl mb-4 text-center">You are in town.</h2>
+        <div class="grid grid-cols-2 gap-4">
+            <button onclick="renderShop('store')" class="btn btn-primary w-full">General Store</button>
+            <button onclick="renderShop('blacksmith')" class="btn btn-primary w-full">Blacksmith</button>
+            <button onclick="renderMagicShop()" class="btn btn-primary w-full">Magic Shop</button>
+            <button onclick="renderInn()" class="btn btn-primary w-full">The Inn</button>
+            <button onclick="renderMainMenu()" class="btn btn-primary col-span-2">Leave Town</button>
+        </div>
+    `);
+}
+
+function renderInn() {
+     gameState.currentView = 'inn';
+     const cost = 10 * player.level;
+     render(`
+        <h2 class="font-medieval text-3xl mb-4 text-center">The Weary Traveler Inn</h2>
+        <p class="mb-4 text-center">A night's rest costs ${cost} G. You will be fully restored.</p>
+        <div class="flex gap-4">
+             <button onclick="restAtInn(${cost})" class="btn btn-primary" ${player.gold < cost ? 'disabled' : ''}>Rest for the night</button>
+             <button onclick="renderTown()" class="btn btn-primary">Leave</button>
+        </div>
+        ${player.gold < cost ? '<p class="text-red-400 mt-2">You cannot afford a room.</p>' : ''}
+     `);
+}
+
+function restAtInn(cost) {
+    player.gold -= cost;
+    addToLog(`You pay <span class="font-bold">${cost} G</span> for a room.`, 'text-yellow-400');
+    if (Math.random() < 0.1) {
+        addToLog(`You are ambushed in your sleep!`, 'text-red-500 font-bold');
+        setTimeout(startBattle, 2000);
+    } else {
+        player.hp = player.maxHp;
+        player.mp = player.maxMp;
+        addToLog(`You wake up feeling refreshed.`, 'text-green-400 font-bold');
+        updateStatsView();
+        setTimeout(renderTown, 2000);
+    }
+}
+
+function renderMagicShop() {
+    gameState.currentView = 'magic_shop';
+    let learnableSpells = Object.keys(MAGIC).filter(key => !player.spells.includes(key));
+    
+    let spellsHtml = learnableSpells.map(key => {
+        const details = MAGIC[key];
+        return `
+            <div class="p-3 bg-slate-800 rounded">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-medieval text-lg text-purple-300">${details.name}</h3>
+                    <div>
+                        <span class="text-yellow-400 font-semibold mr-4">${details.price} G</span>
+                        <button onclick="learnSpell('${key}')" class="btn btn-magic text-sm py-1 px-3" ${player.gold < details.price ? 'disabled' : ''}>Learn</button>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-400 mt-1">${details.description}</p>
+            </div>
+        `;
+    }).join('');
+
+    if (learnableSpells.length === 0) {
+        spellsHtml = `<p class="text-center text-gray-400">You have learned all available spells.</p>`;
+    }
+
+    render(`
+        <div class="w-full">
+            <h2 class="font-medieval text-3xl mb-4 text-center">Whispering Grimoire</h2>
+            <p class="text-center text-gray-400 mb-4">Learn new spells to aid you in your journey.</p>
+            <div class="space-y-3 mb-4 max-h-48 overflow-y-auto">${spellsHtml}</div>
+            <div class="flex justify-center gap-4">
+                <button onclick="renderTown()" class="btn btn-primary">Back to Town</button>
+            </div>
+        </div>
+    `);
+}
+
+function learnSpell(spellKey) {
+    const details = MAGIC[spellKey];
+    if (player.gold >= details.price) {
+        player.gold -= details.price;
+        player.spells.push(spellKey);
+        addToLog(`You have learned the spell: <span class="font-bold text-purple-300">${details.name}</span>!`, 'text-green-400');
+        updateStatsView();
+        renderMagicShop();
+    }
+}
+
+function renderShop(type) {
+    gameState.currentView = type === 'store' ? 'shop' : 'blacksmith';
+    const inventory = type === 'store' ? SHOP_INVENTORY : BLACKSMITH_INVENTORY;
+    const title = type === 'store' ? 'General Store' : 'Clanging Hammer Blacksmith';
+    let itemsHtml = inventory.map(key => {
+        const details = getItemDetails(key);
+        return `
+            <div class="flex justify-between items-center p-2 bg-slate-800 rounded">
+                <span>${details.name}</span>
+                <div>
+                    <span class="text-yellow-400 font-semibold mr-4">${details.price} G</span>
+                    <button onclick="buyItem('${key}')" class="btn btn-primary text-sm py-1 px-3" ${player.gold < details.price ? 'disabled' : ''}>Buy</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    render(`
+        <div class="w-full">
+            <h2 class="font-medieval text-3xl mb-4 text-center">${title}</h2>
+            <div class="space-y-2 mb-4 max-h-48 overflow-y-auto">${itemsHtml}</div>
+            <div class="flex justify-center gap-4">
+                ${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}
+                <button onclick="renderTown()" class="btn btn-primary">Back to Town</button>
+            </div>
+        </div>
+    `);
+}
+
+function buyItem(itemKey) {
+    const details = getItemDetails(itemKey);
+    if (player.gold >= details.price) {
+        player.gold -= details.price;
+        player.addToInventory(itemKey, 1, false);
+        addToLog(`You bought a ${details.name} for ${details.price} G.`, 'text-yellow-400');
+        updateStatsView();
+        renderShop(gameState.currentView); // Re-render to update disabled states
+    }
+}
+
+function renderSell() {
+    gameState.currentView = 'sell';
+    let sellableHtml = '';
+    const itemMap = {};
+    let itemIndex = 0;
+
+    // Collate all sellable items
+    for (const category in player.inventory) {
+        if (category === 'items') {
+            for (const key in player.inventory.items) {
+                const details = ITEMS[key];
+                if (details.price > 0) {
+                    itemMap[itemIndex] = {key, category, count: player.inventory.items[key]};
+                    itemIndex++;
+                }
+            }
+        } else {
+            for (const key of player.inventory[category]) {
+                const details = getItemDetails(key);
+                if (details.price > 0) {
+                     itemMap[itemIndex] = {key, category, count: 1};
+                     itemIndex++;
+                }
+            }
+        }
+    }
+    
+    for (let i = 0; i < itemIndex; i++) {
+        const item = itemMap[i];
+        const details = getItemDetails(item.key);
+        const sellPrice = Math.floor(details.price / 2);
+        const countStr = item.category === 'items' ? `(x${item.count})` : '';
+        sellableHtml += `
+            <div class="flex justify-between items-center p-2 bg-slate-800 rounded">
+                <span>${details.name} ${countStr}</span>
+                <div>
+                    <span class="text-yellow-400 font-semibold mr-4">${sellPrice} G</span>
+                    <button onclick="sellItem(${i})" class="btn btn-primary text-sm py-1 px-3">Sell</button>
+                </div>
+            </div>
+        `;
+    }
+
+    if (!sellableHtml) sellableHtml = `<p class="text-center text-gray-400">You have nothing to sell.</p>`;
+
+    render(`
+        <div class="w-full">
+            <h2 class="font-medieval text-3xl mb-4 text-center">Sell Items</h2>
+            <div class="space-y-2 mb-4 max-h-48 overflow-y-auto">${sellableHtml}</div>
+            <div class="flex justify-center">
+                 <button onclick="renderShop('store')" class="btn btn-primary">Back to Shop</button>
+            </div>
+        </div>
+    `);
+    
+    // Attach sellItem function to window scope
+    window.sellItem = (index) => {
+        const item = itemMap[index];
+        const details = getItemDetails(item.key);
+        const sellPrice = Math.floor(details.price / 2);
+        player.gold += sellPrice;
+        
+        if (item.category === 'items') {
+            player.inventory.items[item.key]--;
+            if (player.inventory.items[item.key] === 0) delete player.inventory.items[item.key];
+        } else {
+            player.inventory[item.category] = player.inventory[item.category].filter(k => k !== item.key);
+        }
+        
+        addToLog(`You sold a ${details.name} for ${sellPrice} G.`, 'text-yellow-400');
+        updateStatsView();
+        renderSell(); // Re-render the sell screen
+    };
+}
+
+
+function renderInventory() {
+    gameState.currentView = 'inventory';
+    const renderList = (category, title) => {
+        const list = category === 'items' ? Object.keys(player.inventory.items) : player.inventory[category];
+        if (list.length === 0) return '';
+        let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${title}</h3><div class="space-y-2">`;
+        html += list.map(key => {
+            const details = getItemDetails(key);
+            const countStr = category === 'items' ? `(x${player.inventory.items[key]})` : '';
+            
+            const isEquipped = (category === 'weapons' && WEAPONS[key] === player.equippedWeapon) || (category === 'armor' && ARMOR[key] === player.equippedArmor);
+            const equippedText = isEquipped ? '<span class="text-green-400 font-bold ml-2">[Equipped]</span>' : '';
+
+            let buttonHtml = '';
+            if (category === 'items' && details.type !== 'junk') {
+                buttonHtml = `<button onclick="useItem('${key}')" class="btn btn-item text-sm py-1 px-3">Use</button>`;
+            } else if (category !== 'items' && !isEquipped) {
+                 buttonHtml = `<button onclick="equipItem('${key}')" class="btn btn-primary text-sm py-1 px-3">Equip</button>`;
+            }
+            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded"><span>${details.name} ${countStr} ${equippedText}</span>${buttonHtml}</div>`;
+        }).join('');
+        html += `</div>`;
+        return html;
+    };
+
+    const renderSpellbook = () => {
+        let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-purple-300">Spellbook</h3><div class="space-y-2">`;
+        if (player.spells.length === 0) {
+            html += `<p class="text-gray-400">You have not learned any spells.</p>`;
+        } else {
+            html += player.spells.map(key => {
+                const details = MAGIC[key];
+                return `
+                    <div class="p-2 bg-slate-800 rounded">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-purple-200">${details.name}</span>
+                            <span class="text-blue-400">${details.cost} MP</span>
+                        </div>
+                        <p class="text-sm text-gray-400 mt-1">${details.description}</p>
+                    </div>
+                `;
+            }).join('');
+        }
+        html += `</div>`;
+        return html;
+    };
+
+    render(`
+        <div class="w-full text-left">
+            <h2 class="font-medieval text-3xl mb-4 text-center">Inventory & Spells</h2>
+            <div class="max-h-64 overflow-y-auto pr-2">
+                ${renderSpellbook()}
+                ${renderList('items', 'Items')}
+                ${renderList('weapons', 'Weapons')}
+                ${renderList('armor', 'Armor')}
+            </div>
+            <div class="text-center mt-4">
+                <button onclick="renderMainMenu()" class="btn btn-primary">Back</button>
+            </div>
+        </div>
+    `);
+}
+
+function useItem(itemKey, inBattle = false) {
+    const details = ITEMS[itemKey];
+    if (details.type === 'healing') {
+        player.hp = Math.min(player.maxHp, player.hp + details.amount);
+    } else if (details.type === 'mana_restore') {
+        player.mp = Math.min(player.maxMp, player.mp + details.amount);
+    }
+    player.inventory.items[itemKey]--;
+    if (player.inventory.items[itemKey] === 0) delete player.inventory.items[itemKey];
+    addToLog(`You used a <span class="font-bold text-green-300">${details.name}</span>.`);
+    updateStatsView();
+    if (!inBattle) renderInventory();
+}
+
+function equipItem(itemKey) {
+    if (itemKey in WEAPONS) player.equippedWeapon = WEAPONS[itemKey];
+    if (itemKey in ARMOR) player.equippedArmor = ARMOR[itemKey];
+    addToLog(`You equipped the <span class="font-bold text-cyan-300">${getItemDetails(itemKey).name}</span>.`);
+    updateStatsView(); // Update the main stats bar immediately
+    renderInventory();
+}
+
+// --- BATTLE FUNCTIONS --------------------------------------------------------
+function startBattle() {
+    generateEnemy();
+    gameState.currentView = 'battle';
+    addToLog(`A wild <span class="font-bold text-red-400">${currentEnemy.name}</span> appears!`);
+    renderBattle();
+}
+
+function renderBattle() {
+     if (!currentEnemy || !currentEnemy.isAlive()) return;
+     const enemyHpPercent = Math.max(0, currentEnemy.hp / currentEnemy.maxHp * 100);
+     render(`
+        <div class="w-full text-center">
+            <h2 class="font-medieval text-4xl mb-2 text-red-400">${currentEnemy.name}</h2>
+            <div class="progress-bar-bg mb-4 mx-auto w-1/2">
+                <div class="progress-bar hp-bar" style="width: ${enemyHpPercent}%;"></div>
+            </div>
+            <p>${currentEnemy.hp} / ${currentEnemy.maxHp} HP</p>
+            <div id="battle-actions" class="flex justify-center gap-4 mt-8">
+                <button onclick="battleAction('attack')" class="btn btn-action w-32">Attack</button>
+                <button onclick="battleAction('magic')" class="btn btn-magic w-32">Magic</button>
+                <button onclick="battleAction('item')" class="btn btn-item w-32">Item</button>
+                <button onclick="battleAction('flee')" class="btn btn-primary w-32">Flee</button>
+            </div>
+        </div>
+     `);
+}
+
+function battleAction(type) {
+    if (!gameState.isPlayerTurn) return; // Prevents spamming actions
+    gameState.isPlayerTurn = false; // Player's turn is now over
+
+    $('#battle-actions').classList.add('hidden'); // Disable buttons during turn
+    
+    switch (type) {
+        case 'attack':
+            const weapon = player.equippedWeapon;
+            const damage = rollDice(...weapon.damage) + player.strength;
+            currentEnemy.takeDamage(damage);
+            addToLog(`You attack with ${weapon.name}, dealing <span class="font-bold text-yellow-300">${damage}</span> physical damage.`);
+
+            // Handle weapon effects
+            if (weapon.effect) {
+                if (weapon.effect.type === 'fire_damage') {
+                    const fireDamage = rollDice(...weapon.effect.damage);
+                    currentEnemy.takeDamage(fireDamage);
+                    addToLog(`The blade burns for an extra <span class="font-bold text-orange-400">${fireDamage}</span> fire damage.`);
+                }
+                if (weapon.effect.type === 'lifesteal') {
+                    const healedAmount = Math.floor(damage * weapon.effect.amount);
+                    if (healedAmount > 0) {
+                        player.hp = Math.min(player.maxHp, player.hp + healedAmount);
+                        addToLog(`You drain <span class="font-bold text-green-400">${healedAmount}</span> HP from the attack.`);
+                        updateStatsView();
+                    }
+                }
+            }
+            
+            checkBattleStatus();
+            break;
+        case 'magic':
+            // For now, hardcode fireball. A sub-menu would be an improvement.
+            const spell = MAGIC.fireball;
+            if (player.mp >= spell.cost) {
+                player.mp -= spell.cost;
+                const magicDamage = rollDice(...spell.damage) + player.intelligence;
+                currentEnemy.takeDamage(magicDamage);
+                addToLog(`You cast Fireball for <span class="font-bold text-purple-400">${magicDamage}</span> damage.`, 'text-purple-300');
+            } else {
+                addToLog(`Not enough MP to cast Fireball!`);
+            }
+            checkBattleStatus();
+            break;
+        case 'item':
+            // Simple item usage for now
+            if (player.inventory.items['health_potion'] > 0) {
+                 useItem('health_potion', true);
+            } else {
+                addToLog(`You have no health potions!`);
+            }
+             checkBattleStatus();
+            break;
+        case 'flee':
+            if (Math.random() > 0.3) {
+                addToLog(`You successfully escaped!`, 'text-green-400');
+                setTimeout(renderMainMenu, 1500);
+            } else {
+                addToLog(`You failed to escape!`, 'text-red-400');
+                enemyTurn();
+            }
+            break;
+    }
+}
+
+function checkBattleStatus() {
+    renderBattle(); // Re-render to show enemy health update
+    if (!currentEnemy.isAlive()) {
+        // Victory
+        addToLog(`You have defeated the ${currentEnemy.name}!`, 'text-green-400 font-bold');
+        player.gainXp(currentEnemy.xpReward);
+        player.gold += currentEnemy.goldReward;
+        addToLog(`You found <span class="font-bold">${currentEnemy.goldReward}</span> G.`, 'text-yellow-400');
+        
+        // Loot drops
+        for (const item in currentEnemy.lootTable) {
+            if (Math.random() < (currentEnemy.lootTable[item] * currentEnemy.lootChanceMod)) {
+                player.addToInventory(item);
+            }
+        }
+        
+        updateStatsView();
+        setTimeout(renderMainMenu, 3000);
+    } else {
+        // Enemy's turn after a delay
+        setTimeout(enemyTurn, 1000);
+    }
+}
+
+function handleEndOfTurnEffects() {
+    // Handle armor effects
+    if (player.equippedArmor.effect) {
+        if (player.equippedArmor.effect.type === 'mp_regen') {
+            const manaGained = player.equippedArmor.effect.amount;
+            if (player.mp < player.maxMp) {
+                player.mp = Math.min(player.maxMp, player.mp + manaGained);
+                addToLog(`Your robes hum, restoring <span class="font-bold text-blue-400">${manaGained}</span> MP.`, 'text-blue-300');
+                updateStatsView();
+            }
+        }
+    }
+}
+
+function enemyTurn() {
+    if (!currentEnemy.isAlive()) return;
+    
+    // Player's end-of-turn effects trigger before the enemy attacks
+    handleEndOfTurnEffects();
+
+    setTimeout(() => {
+        currentEnemy.attack(player);
+        if (!player.isAlive()) {
+            // Defeat
+            render(`<h1 class="font-medieval text-6xl text-red-600 animate-pulse">You Have Died</h1>`);
+            addToLog(`You were defeated by the ${currentEnemy.name}...`, 'text-red-600 font-bold');
+            localStorage.removeItem('rpgSaveData'); // Delete save on death
+            
+            // Return to start screen after a delay
+            setTimeout(() => {
+                $('#game-container').classList.add('hidden');
+                $('#start-screen').classList.remove('hidden');
+                $('#player-name-input').value = ''; // Clear name input
+                logElement.innerHTML = ''; // Clear the log
+            }, 3000);
+
+        } else {
+            $('#battle-actions').classList.remove('hidden');
+            gameState.isPlayerTurn = true; // It's the player's turn again
+        }
+    }, 600); // Reduced enemy response time
+}
+
+// --- SAVE/LOAD FUNCTIONS ----------------------------------------------------
+function saveGame(manual = false) {
+    if (!player) return;
+    try {
+        const saveData = JSON.stringify(player);
+        localStorage.setItem('rpgSaveData', saveData);
+        if (manual) {
+            addToLog('Game Saved!', 'text-green-400 font-bold');
+        }
+    } catch (error) {
+        console.error("Could not save game:", error);
+        addToLog('Error: Could not save game.', 'text-red-500');
+    }
+}
+
+function loadGame() {
+    const savedData = localStorage.getItem('rpgSaveData');
+    if (savedData) {
+        try {
+            const parsedData = JSON.parse(savedData);
+            player = new Player(parsedData.name); // Create new instance to get methods
+            Object.assign(player, parsedData); // Apply all saved properties
+            
+            $('#start-screen').classList.add('hidden');
+            $('#game-container').classList.remove('hidden');
+            
+            addToLog(`Welcome back, ${player.name}! Your adventure continues.`);
+            updateStatsView();
+            renderMainMenu();
+            return true;
+        } catch (error) {
+            console.error("Could not load game:", error);
+            localStorage.removeItem('rpgSaveData'); // Clear corrupted data
+            return false;
+        }
+    }
+    return false;
+}
+
+
+// --- INITIALIZATION ------------------------------------------------------------
+function initGame(playerName) {
+    $('#start-screen').classList.add('hidden');
+    $('#game-container').classList.remove('hidden');
+
+    player = new Player(playerName);
+    addToLog(`Welcome, ${playerName}! Your adventure begins.`);
+    updateStatsView();
+    renderMainMenu();
+}
+
+$('#start-game-btn').addEventListener('click', () => {
+    const name = $('#player-name-input').value.trim();
+    if (name) {
+        initGame(name);
+    } else {
+        $('#player-name-input').classList.add('border-red-500');
+    }
+});
+$('#player-name-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') $('#start-game-btn').click();
+});
+
+// Check for save file on page load
+window.addEventListener('load', () => {
+    if (localStorage.getItem('rpgSaveData')) {
+        $('#load-game-btn').classList.remove('hidden');
+        $('#load-game-btn').addEventListener('click', loadGame);
+    }
+});
+</script>
+
+</body>
+</html>
+
