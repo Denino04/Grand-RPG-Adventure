@@ -57,7 +57,14 @@
         <button id="load-game-btn" class="btn btn-primary text-xl px-8 py-3 mt-4 hidden">Load Saved Game</button>
     </div>
 
-    <div id="game-container" class="w-full max-w-4xl mx-auto bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-6 hidden">
+    <div id="game-container" class="relative w-full max-w-4xl mx-auto bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-6 hidden">
+        
+        <!-- Exit Button -->
+        <button onclick="exitGame()" title="Save and Exit" class="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-red-600 rounded-full transition-colors duration-200">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
         
         <!-- Player Stats Header -->
         <div id="stats-view" class="mb-4 p-4 bg-slate-900 rounded-lg grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-4 text-sm">
@@ -238,8 +245,28 @@ function updateStatsView() {
 function render(html) { mainView.innerHTML = html; }
 
 function renderMainMenu() {
-    gameState.currentView = 'main_menu'; saveGame();
-    render(`<h2 class="font-medieval text-3xl mb-4 text-center">What would you like to do?</h2><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><button onclick="startBattle()" class="btn btn-primary">Enter the Wilderness</button><button onclick="renderTown()" class="btn btn-primary">Go to Town</button><button onclick="renderInventory()" class="btn btn-primary">Manage Inventory</button><button onclick="saveGame(true)" class="btn btn-primary">Save Game</button></div>`);
+    gameState.currentView = 'main_menu';
+    saveGame();
+    render(`
+        <h2 class="font-medieval text-3xl mb-4 text-center">What would you like to do?</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button onclick="startBattle()" class="btn btn-primary">Enter the Wilderness</button>
+            <button onclick="renderTown()" class="btn btn-primary">Go to Town</button>
+            <button onclick="renderInventory()" class="btn btn-primary">Manage Inventory</button>
+            <button onclick="saveGame(true)" class="btn btn-primary">Save Game</button>
+        </div>
+    `);
+}
+
+function exitGame() {
+    addToLog('Saving your progress...');
+    saveGame();
+    setTimeout(() => {
+        $('#game-container').classList.add('hidden');
+        $('#start-screen').classList.remove('hidden');
+        logElement.innerHTML = ''; // Clear the log for the next session
+        $('#load-game-btn').classList.remove('hidden'); // Ensure load button is visible
+    }, 1000);
 }
 
 function renderTown() {
