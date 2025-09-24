@@ -382,7 +382,12 @@ function loadGame() { const savedData = localStorage.getItem('rpgSaveData'); if 
 function initGame(playerName) { $('#start-screen').classList.add('hidden'); $('#game-container').classList.remove('hidden'); player = new Player(playerName); addToLog(`Welcome, ${playerName}! Your adventure begins.`); updateStatsView(); renderMainMenu(); }
 $('#start-game-btn').addEventListener('click', () => { const name = $('#player-name-input').value.trim(); if (name) { initGame(name); } else { $('#player-name-input').classList.add('border-red-500'); } });
 $('#player-name-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') $('#start-game-btn').click(); });
-window.addEventListener('load', () => { if (localStorage.getItem('rpgSaveData')) { $('#load-game-btn').classList.remove('hidden'); $('#load-game-btn').addEventListener('click', loadGame); } });
+window.addEventListener('load', () => { 
+    $('#load-game-btn').addEventListener('click', loadGame); 
+    if (localStorage.getItem('rpgSaveData')) { 
+        $('#load-game-btn').classList.remove('hidden'); 
+    } 
+});
 </script>
 
 </body>
