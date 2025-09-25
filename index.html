@@ -9,58 +9,90 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-main: #1f2937;
+            --bg-secondary: #111827;
+            --bg-log: rgba(0, 0, 0, 0.3);
+            --bg-tooltip: #111827;
+            --border-main: #374151;
+            --text-main: #d1d5db;
+            --text-accent: #fcd34d;
+            --btn-primary-bg: #475569;
+            --btn-primary-bg-hover: #64748b;
+            --btn-primary-border: #1e293b;
+            --btn-primary-border-hover: #334155;
+            --btn-action-bg: #dc2626;
+            --btn-action-bg-hover: #ef4444;
+            --btn-action-border: #991b1b;
+            --btn-action-border-hover: #b91c1c;
+            --btn-magic-bg: #9333ea;
+            --btn-magic-bg-hover: #a855f7;
+            --btn-magic-border: #6b21a8;
+            --btn-magic-border-hover: #7e22ce;
+            --btn-item-bg: #16a34a;
+            --btn-item-bg-hover: #22c55e;
+            --btn-item-border: #15803d;
+            --btn-item-border-hover: #16a34a;
+            --btn-flee-bg: #6b7280;
+            --btn-flee-bg-hover: #4b5563;
+            --btn-flee-border: #374151;
+            --btn-flee-border-hover: #1f2937;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #1a1a1a; /* Dark background for the whole page */
+            background-color: #1a1a1a;
         }
         .font-medieval {
             font-family: 'MedievalSharp', cursive;
         }
-        /* Custom scrollbar for a better look */
-        #game-log::-webkit-scrollbar {
-            width: 8px;
-        }
-        #game-log::-webkit-scrollbar-track {
-            background: #2d3748;
-        }
-        #game-log::-webkit-scrollbar-thumb {
-            background-color: #718096;
-            border-radius: 4px;
-        }
-        .btn {
-            @apply px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 shadow-md;
-        }
-        .btn:disabled {
-            @apply bg-gray-500 border-gray-700 cursor-not-allowed;
-        }
+        #game-container { background-color: var(--bg-main); border-color: var(--border-main); }
+        #stats-view, .bg-slate-800 { background-color: var(--bg-secondary); }
+        #main-view { background-color: color-mix(in srgb, var(--bg-secondary) 50%, transparent); }
+        #game-log { background-color: var(--bg-log); color: var(--text-main); }
+        #tooltip { background-color: var(--bg-tooltip); border-color: var(--border-main); }
+        #player-name, .text-yellow-300 { color: var(--text-accent); }
+        .text-gray-200 { color: var(--text-main); }
+
+        #game-log::-webkit-scrollbar { width: 8px; }
+        #game-log::-webkit-scrollbar-track { background: #2d3748; }
+        #game-log::-webkit-scrollbar-thumb { background-color: #718096; border-radius: 4px; }
+        .inventory-scrollbar::-webkit-scrollbar { width: 10px; }
+        .inventory-scrollbar::-webkit-scrollbar-track { background: #1a202c; border-radius: 5px; }
+        .inventory-scrollbar::-webkit-scrollbar-thumb { background-color: #a0aec0; border-radius: 5px; border: 2px solid #1a202c; }
+        .inventory-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #cbd5e0; }
+
+        .btn { @apply px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 shadow-md border-b-4; }
+        .btn:disabled { @apply bg-gray-500 border-gray-700 cursor-not-allowed opacity-60; }
+        
         .btn-primary {
-            @apply bg-slate-600 hover:bg-slate-500 border-b-4 border-slate-800 hover:border-slate-700;
+            background-color: transparent;
+            border-color: transparent;
+            box-shadow: none;
         }
-        .btn-action {
-            @apply bg-red-700 hover:bg-red-600 border-b-4 border-red-900 hover:border-red-800;
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--bg-secondary);
+            border-color: transparent; /* Keep border transparent on hover */
         }
-        .btn-magic {
-            @apply bg-purple-700 hover:bg-purple-600 border-b-4 border-purple-900 hover:border-purple-800;
+        .btn-primary:disabled {
+             background-color: transparent;
+             border-color: transparent;
+             opacity: 0.5;
         }
-        .btn-item {
-             @apply bg-green-700 hover:bg-green-600 border-b-4 border-green-900 hover:border-green-800;
-        }
-        /* Stylized scrollbar for inventory */
-        .inventory-scrollbar::-webkit-scrollbar {
-            width: 10px;
-        }
-        .inventory-scrollbar::-webkit-scrollbar-track {
-            background: #1a202c; /* A darker gray */
-            border-radius: 5px;
-        }
-        .inventory-scrollbar::-webkit-scrollbar-thumb {
-            background-color: #a0aec0; /* A lighter gray */
-            border-radius: 5px;
-            border: 2px solid #1a202c; /* Padding around thumb */
-        }
-        .inventory-scrollbar::-webkit-scrollbar-thumb:hover {
-            background-color: #cbd5e0; /* Even lighter on hover */
-        }
+        
+        .btn-action { background-color: var(--btn-action-bg); border-color: var(--btn-action-border); }
+        .btn-action:hover:not(:disabled) { background-color: var(--btn-action-bg-hover); border-color: var(--btn-action-border-hover); }
+        
+        .btn-magic { background-color: var(--btn-magic-bg); border-color: var(--btn-magic-border); }
+        .btn-magic:hover:not(:disabled) { background-color: var(--btn-magic-bg-hover); border-color: var(--btn-magic-border-hover); }
+        
+        .btn-item { background-color: var(--btn-item-bg); border-color: var(--btn-item-border); }
+        .btn-item:hover:not(:disabled) { background-color: var(--btn-item-bg-hover); border-color: var(--btn-item-border-hover); }
+
+        .btn-flee { background-color: var(--btn-flee-bg); border-color: var(--btn-flee-border); }
+        .btn-flee:hover:not(:disabled) { background-color: var(--btn-flee-bg-hover); border-color: var(--btn-flee-border-hover); }
+
+        #tooltip { position: fixed; display: none; z-index: 100; pointer-events: none; transition: opacity 0.2s; }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
@@ -75,7 +107,7 @@
     </div>
 
     <!-- Main Game Container -->
-    <div id="game-container" class="relative w-full max-w-4xl mx-auto bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-6 hidden">
+    <div id="game-container" class="relative w-full max-w-4xl mx-auto rounded-2xl shadow-2xl border p-6 hidden">
         
         <button onclick="exitGame()" title="Save and Exit" class="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-red-600 rounded-full transition-colors duration-200">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -83,7 +115,7 @@
             </svg>
         </button>
         
-        <div id="stats-view" class="mb-4 p-4 bg-slate-900 rounded-lg grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-4 text-sm">
+        <div id="stats-view" class="mb-4 p-4 rounded-lg grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-4 text-sm">
             <div class="lg:col-span-2 space-y-2">
                  <div class="flex justify-between items-start">
                     <div>
@@ -100,7 +132,7 @@
             </div>
             <div class="bg-slate-800 p-3 rounded-lg lg:col-span-1">
                  <div class="flex justify-center items-center mb-2">
-                     <h3 class="font-bold text-yellow-400 text-center">Equipment</h3>
+                     <h3 id="equipment-title" class="font-bold text-yellow-400 text-center">Equipment</h3>
                      <button onclick="renderInventory()" title="Open Inventory" class="ml-4 p-1 bg-slate-700 hover:bg-slate-600 rounded-full transition-colors duration-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
@@ -116,7 +148,7 @@
             </div>
         </div>
 
-        <div id="main-view" class="min-h-[250px] bg-slate-900/50 p-6 rounded-lg mb-4 flex flex-col justify-center items-center">
+        <div id="main-view" class="min-h-[250px] p-6 rounded-lg mb-4 flex flex-col justify-center items-center">
             <!-- Game content is dynamically inserted here -->
         </div>
 
@@ -125,13 +157,19 @@
         </div>
     </div>
 
+    <!-- Tooltip Element -->
+    <div id="tooltip" class="absolute border rounded-lg p-3 text-sm shadow-lg max-w-xs">
+        <!-- Tooltip content is injected here -->
+    </div>
+
+
     <!-- UI TEMPLATES -->
     <div id="game-templates" class="hidden">
         
         <template id="template-main-menu">
             <h2 class="font-medieval text-3xl mb-4 text-center">What would you like to do?</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button onclick="startBattle()" class="btn btn-primary">Enter the Wilderness</button>
+                <button onclick="renderWildernessMenu()" class="btn btn-primary">Enter the Wilderness</button>
                 <button onclick="renderTown()" class="btn btn-primary">Go to Town</button>
                 <button onclick="saveGame(true)" class="btn btn-primary">Save Game</button>
             </div>
@@ -154,10 +192,10 @@
                 <h2 class="font-medieval text-4xl mb-2 text-red-400" data-id="enemy-name">Enemy Name</h2>
                 <p class="mb-4" data-id="enemy-hp">HP / MaxHP</p>
                 <div id="battle-actions" class="flex justify-center gap-4 mt-8">
-                    <button onclick="battleAction('attack')" class="btn btn-action w-32">Attack</button>
-                    <button onclick="battleAction('magic')" class="btn btn-magic w-32">Magic</button>
-                    <button onclick="battleAction('item')" class="btn btn-item w-32">Item</button>
-                    <button onclick="battleAction('flee')" class="btn btn-primary w-32">Flee</button>
+                    <button onclick="battleAction('attack')" class="btn btn-action w-28 rounded-full">Attack</button>
+                    <button onclick="battleAction('magic')" class="btn btn-magic w-28 rounded-full">Magic</button>
+                    <button onclick="battleAction('item')" class="btn btn-item w-28 rounded-full">Item</button>
+                    <button onclick="battleAction('flee')" class="btn btn-flee w-28 rounded-full">Flee</button>
                 </div>
             </div>
         </template>
@@ -173,8 +211,66 @@
 // --- GAME STATE & CLASSES -------------------------------------------------------
 let player;
 let currentEnemy;
-let gameState = { currentView: 'main_menu', isPlayerTurn: true };
+let gameState = { currentView: 'main_menu', isPlayerTurn: true, currentBiome: null };
 let lastViewBeforeInventory = 'main_menu';
+let activeTooltipItem = null;
+
+const PALETTES = {
+    'default': {
+        '--bg-main': '#1f2937', '--bg-secondary': '#111827', '--bg-log': 'rgba(0,0,0,0.3)', '--bg-tooltip': '#111827',
+        '--border-main': '#374151', '--text-main': '#d1d5db', '--text-accent': '#fcd34d',
+        '--btn-primary-bg': '#475569', '--btn-primary-bg-hover': '#64748b', '--btn-primary-border': '#1e293b', '--btn-primary-border-hover': '#334155',
+        '--btn-action-bg': '#dc2626', '--btn-action-bg-hover': '#ef4444', '--btn-action-border': '#991b1b', '--btn-action-border-hover': '#b91c1c',
+        '--btn-magic-bg': '#9333ea', '--btn-magic-bg-hover': '#a855f7', '--btn-magic-border': '#6b21a8', '--btn-magic-border-hover': '#7e22ce',
+        '--btn-item-bg': '#16a34a', '--btn-item-bg-hover': '#22c55e', '--btn-item-border': '#15803d', '--btn-item-border-hover': '#16a34a',
+        '--btn-flee-bg': '#6b7280', '--btn-flee-bg-hover': '#4b5563', '--btn-flee-border': '#374151', '--btn-flee-border-hover': '#1f2937',
+    },
+    'town': {
+        '--bg-main': '#44403c', '--bg-secondary': '#292524', '--bg-log': 'rgba(20,10,0,0.3)', '--bg-tooltip': '#292524',
+        '--border-main': '#57534e', '--text-main': '#e7e5e4', '--text-accent': '#f59e0b',
+        '--btn-primary-bg': '#a16207', '--btn-primary-bg-hover': '#b45309', '--btn-primary-border': '#713f12', '--btn-primary-border-hover': '#854d0e',
+        '--btn-action-bg': '#dc2626', '--btn-action-bg-hover': '#ef4444', '--btn-action-border': '#991b1b', '--btn-action-border-hover': '#b91c1c',
+        '--btn-magic-bg': '#9333ea', '--btn-magic-bg-hover': '#a855f7', '--btn-magic-border': '#6b21a8', '--btn-magic-border-hover': '#7e22ce',
+        '--btn-item-bg': '#16a34a', '--btn-item-bg-hover': '#22c55e', '--btn-item-border': '#15803d', '--btn-item-border-hover': '#16a34a',
+        '--btn-flee-bg': '#78716c', '--btn-flee-bg-hover': '#a8a29e', '--btn-flee-border': '#57534e', '--btn-flee-border-hover': '#44403c',
+    },
+    'forest': {
+        '--bg-main': '#14532d', '--bg-secondary': '#064e3b', '--bg-log': 'rgba(0,10,5,0.3)', '--bg-tooltip': '#064e3b',
+        '--border-main': '#065f46', '--text-main': '#d1fae5', '--text-accent': '#a3e635',
+        '--btn-primary-bg': '#059669', '--btn-primary-bg-hover': '#047857', '--btn-primary-border': '#065f46', '--btn-primary-border-hover': '#064e3b',
+        '--btn-action-bg': '#dc2626', '--btn-action-bg-hover': '#ef4444', '--btn-action-border': '#991b1b', '--btn-action-border-hover': '#b91c1c',
+        '--btn-magic-bg': '#9333ea', '--btn-magic-bg-hover': '#a855f7', '--btn-magic-border': '#6b21a8', '--btn-magic-border-hover': '#7e22ce',
+        '--btn-item-bg': '#ca8a04', '--btn-item-bg-hover': '#eab308', '--btn-item-border': '#854d0e', '--btn-item-border-hover': '#a16207',
+        '--btn-flee-bg': '#78350f', '--btn-flee-bg-hover': '#92400e', '--btn-flee-border': '#451a03', '--btn-flee-border-hover': '#78350f',
+    },
+    'cave': {
+        '--bg-main': '#262626', '--bg-secondary': '#171717', '--bg-log': 'rgba(0,0,0,0.5)', '--bg-tooltip': '#171717',
+        '--border-main': '#404040', '--text-main': '#a3a3a3', '--text-accent': '#eab308',
+        '--btn-primary-bg': '#525252', '--btn-primary-bg-hover': '#737373', '--btn-primary-border': '#262626', '--btn-primary-border-hover': '#404040',
+        '--btn-action-bg': '#ef4444', '--btn-action-bg-hover': '#f87171', '--btn-action-border': '#b91c1c', '--btn-action-border-hover': '#dc2626',
+        '--btn-magic-bg': '#a855f7', '--btn-magic-bg-hover': '#c084fc', '--btn-magic-border': '#7e22ce', '--btn-magic-border-hover': '#9333ea',
+        '--btn-item-bg': '#16a34a', '--btn-item-bg-hover': '#22c55e', '--btn-item-border': '#15803d', '--btn-item-border-hover': '#16a34a',
+        '--btn-flee-bg': '#57534e', '--btn-flee-bg-hover': '#78716c', '--btn-flee-border': '#292524', '--btn-flee-border-hover': '#44403c',
+    },
+    'mountain': {
+        '--bg-main': '#075985', '--bg-secondary': '#0c4a6e', '--bg-log': 'rgba(0,5,20,0.3)', '--bg-tooltip': '#0c4a6e',
+        '--border-main': '#0369a1', '--text-main': '#e0f2fe', '--text-accent': '#f0f9ff',
+        '--btn-primary-bg': '#0ea5e9', '--btn-primary-bg-hover': '#38bdf8', '--btn-primary-border': '#0369a1', '--btn-primary-border-hover': '#075985',
+        '--btn-action-bg': '#f43f5e', '--btn-action-bg-hover': '#fb7185', '--btn-action-border': '#be123c', '--btn-action-border-hover': '#e11d48',
+        '--btn-magic-bg': '#a21caf', '--btn-magic-bg-hover': '#d946ef', '--btn-magic-border': '#86198f', '--btn-magic-border-hover': '#a21caf',
+        '--btn-item-bg': '#14b8a6', '--btn-item-bg-hover': '#2dd4bf', '--btn-item-border': '#0f766e', '--btn-item-border-hover': '#14b8a6',
+        '--btn-flee-bg': '#64748b', '--btn-flee-bg-hover': '#94a3b8', '--btn-flee-border': '#334155', '--btn-flee-border-hover': '#475569',
+    },
+};
+
+function applyTheme(themeName = 'default') {
+    const palette = PALETTES[themeName];
+    if (!palette) return;
+    for (const key in palette) {
+        document.documentElement.style.setProperty(key, palette[key]);
+    }
+}
+
 
 // --- UTILITY FUNCTIONS ---
 const $ = (selector) => document.querySelector(selector);
@@ -182,9 +278,63 @@ const logElement = $('#game-log');
 const mainView = $('#main-view');
 
 function rollDice(numDice, sides) { let total = 0; for (let i = 0; i < numDice; i++) { total += Math.floor(Math.random() * sides) + 1; } return total; }
-function addToLog(message, color = 'text-gray-300') { const p = document.createElement('p'); p.innerHTML = message; p.className = `mb-1 ${color}`; logElement.appendChild(p); logElement.scrollTop = logElement.scrollHeight; }
-function getItemDetails(itemKey) { if (itemKey in ITEMS) return ITEMS[itemKey]; if (itemKey in WEAPONS) return WEAPONS[itemKey]; if (itemKey in ARMOR) return ARMOR[itemKey]; if (itemKey in SHIELDS) return SHIELDS[itemKey]; if (itemKey in LURES) return LURES[itemKey]; return null; }
+function addToLog(message, colorClass = '') { const p = document.createElement('p'); p.innerHTML = message; p.className = `mb-1 ${colorClass}`; logElement.appendChild(p); logElement.scrollTop = logElement.scrollHeight; }
+function getItemDetails(itemKey) { if (itemKey in ITEMS) return ITEMS[itemKey]; if (itemKey in WEAPONS) return WEAPONS[itemKey]; if (itemKey in ARMOR) return ARMOR[itemKey]; if (itemKey in SHIELDS) return SHIELDS[itemKey]; if (itemKey in LURES) return LURES[itemKey]; if (itemKey in MAGIC) return MAGIC[itemKey]; return null; }
 function render(viewElement) { mainView.innerHTML = ''; mainView.appendChild(viewElement); }
+
+// --- TOOLTIP FUNCTIONS ---
+function showTooltip(itemKey, event) {
+    const tooltipElement = $('#tooltip');
+    if (event.type === 'click' && tooltipElement.style.display === 'block' && activeTooltipItem === itemKey) {
+        hideTooltip();
+        return;
+    }
+    
+    const details = getItemDetails(itemKey);
+    if (!details) return;
+
+    let content = `<h4 class="font-bold mb-1" style="color: var(--text-accent);">${details.name}</h4>`;
+    
+    if (details.damage) content += `<p>Damage: ${details.damage[0]}d${details.damage[1]}</p>`;
+    if (details.defense) content += `<p>Defense: ${details.defense}</p>`;
+    if (details.blockChance > 0) content += `<p>Block Chance: ${Math.round(details.blockChance * 100)}%</p>`;
+    if (details.amount) content += `<p class="text-green-400">Heals: ${details.amount} HP</p>`;
+    if (details.type === 'mana_restore') content += `<p class="text-blue-400">Restores: ${details.amount} MP</p>`;
+    if (details.cost) content += `<p class="text-blue-400">MP Cost: ${details.cost}</p>`;
+    if (details.healing) content += `<p class="text-green-400">Healing: ${details.healing[0]}d${details.healing[1]}</p>`;
+    if (details.uses) {
+        const currentUses = player.inventory.lureUses[itemKey] !== undefined ? player.inventory.lureUses[itemKey] : details.uses;
+        content += `<p class="text-purple-300">Uses: ${currentUses}/${details.uses}</p>`;
+    }
+    if (details.description) content += `<p class="text-gray-400 mt-2 text-sm"><em>${details.description}</em></p>`;
+    if (details.effect) {
+        content += `<p class="mt-2 font-semibold text-cyan-300">Effect:</p>`
+        if (details.effect.type === 'fire_damage') content += `<p class="text-orange-400 text-sm">+${details.effect.damage[0]}d${details.effect.damage[1]} Fire Damage</p>`;
+        if (details.effect.type === 'lifesteal') content += `<p class="text-red-400 text-sm">Lifesteal (${details.effect.amount * 100}%)</p>`;
+        if (details.effect.type === 'mp_regen') content += `<p class="text-blue-400 text-sm">+${details.effect.amount} MP per turn</p>`;
+    }
+
+    tooltipElement.innerHTML = content;
+    tooltipElement.style.display = 'block';
+    activeTooltipItem = itemKey;
+
+    let x = event.clientX + 15;
+    let y = event.clientY + 15;
+    if (x + tooltipElement.offsetWidth > window.innerWidth) {
+        x = event.clientX - tooltipElement.offsetWidth - 15;
+    }
+    if (y + tooltipElement.offsetHeight > window.innerHeight) {
+        y = event.clientY - tooltipElement.offsetHeight - 15;
+    }
+    tooltipElement.style.left = `${x}px`;
+    tooltipElement.style.top = `${y}px`;
+}
+
+function hideTooltip() {
+    $('#tooltip').style.display = 'none';
+    activeTooltipItem = null;
+}
+
 
 // --- CLASSES ---
 class Entity {
@@ -214,7 +364,7 @@ class Player extends Entity {
     }
     addToInventory(itemKey, quantity = 1, verbose = true) {
         const details = getItemDetails(itemKey); if (!details) return;
-        if (verbose) addToLog(`You received: <span class="font-bold text-yellow-300">${details.name}</span>!`, 'text-green-400');
+        if (verbose) addToLog(`You received: <span class="font-bold" style="color: var(--text-accent);">${details.name}</span>!`, 'text-green-400');
         
         const category = itemKey in WEAPONS ? 'weapons' : 
                          (itemKey in ARMOR ? 'armor' : 
@@ -228,7 +378,6 @@ class Player extends Entity {
                 this.inventory[category].push(itemKey); 
             } 
             if (category === 'lures' && details.uses) {
-                // When buying or finding a lure, set its uses.
                 this.inventory.lureUses[itemKey] = details.uses;
             }
         }
@@ -263,7 +412,7 @@ class Enemy extends Entity {
     }
     _performAttack(target) {
         const totalDamage = rollDice(...this.damage) + this.strength; target.takeDamage(totalDamage);
-        if (this.ability === 'life_drain') { const drainAmount = Math.floor(totalDamage / 2); this.hp = Math.min(this.maxHp, this.hp + drainAmount); addToLog(`${this.name} drains <span class="font-bold text-green-400">${drainAmount}</span> HP!`); }
+        if (this.ability === 'life_drain') { const drainAmount = Math.floor(totalDamage / 2); this.hp = Math.min(this.maxHp, this.hp + drainAmount); addToLog(`You drains <span class="font-bold text-green-400">${drainAmount}</span> HP!`); }
     }
     takeDamage(damage) { 
         this.hp -= damage;
@@ -274,16 +423,12 @@ class Enemy extends Entity {
 }
 
 function generateEnemy() {
-    // Lure Logic
     const lure = player.equippedLure;
     const lureKey = Object.keys(LURES).find(key => LURES[key] === lure);
     let speciesKey;
-
-    if (lureKey && lure.lureTarget && Math.random() < 0.6) { // 60% chance for lure to work
+    if (lureKey !== 'no_lure' && lure.lureTarget && player.inventory.lureUses[lureKey] > 0 && Math.random() < 0.6) {
         speciesKey = lure.lureTarget;
         addToLog(`Your ${lure.name} attracts a creature!`, 'text-purple-300');
-        
-        // Consume a use
         player.inventory.lureUses[lureKey]--;
         const remainingUses = player.inventory.lureUses[lureKey];
         if (remainingUses <= 0) {
@@ -295,22 +440,21 @@ function generateEnemy() {
             addToLog(`It has ${remainingUses} uses left.`);
         }
         updateStatsView();
-
     } else {
-        const monsterKeys = Object.keys(MONSTER_SPECIES);
-        speciesKey = monsterKeys[Math.floor(Math.random() * monsterKeys.length)];
+        const biomeData = BIOMES[gameState.currentBiome];
+        const monsterPool = Object.keys(biomeData.monsters);
+        const monsterWeights = Object.values(biomeData.monsters);
+        speciesKey = choices(monsterPool, monsterWeights);
     }
 
-    // Level-Scaled Rarity Logic
     const rarityKeys = Object.keys(MONSTER_RARITY);
-    let weights = [60, 25, 10, 4, 1]; // Base weights
+    let weights = [60, 25, 10, 4, 1];
     const levelModifier = Math.floor(player.level / 2);
     weights[0] = Math.max(10, 60 - levelModifier * 4); 
     weights[1] = Math.max(15, 25 - levelModifier * 2);
     weights[2] += levelModifier * 2; 
     weights[3] += levelModifier * 1.5;
     weights[4] += levelModifier * 1;  
-
     const chosenRarityKey = choices(rarityKeys, weights);
     currentEnemy = new Enemy(MONSTER_SPECIES[speciesKey], MONSTER_RARITY[chosenRarityKey], player.level);
 }
@@ -327,16 +471,23 @@ function choices(population, weights) {
 // --- UI RENDERING FUNCTIONS ----------------------------------------------------
 function updateStatsView() {
     if (!player) return;
-    $('#player-name').textContent = player.name; $('#player-level').textContent = player.level; $('#player-gold').textContent = player.gold;
-    $('#player-hp-text').textContent = `${player.hp} / ${player.maxHp}`; $('#player-mp-text').textContent = `${player.mp} / ${player.maxMp}`; $('#player-xp-text').textContent = `${player.xp} / ${player.xpToNextLevel}`;
+    $('#player-name').textContent = player.name; 
+    $('#player-level').textContent = player.level; 
+    $('#player-gold').textContent = player.gold;
+    $('#player-hp-text').textContent = `${player.hp} / ${player.maxHp}`; 
+    $('#player-mp-text').textContent = `${player.mp} / ${player.maxMp}`; 
+    $('#player-xp-text').textContent = `${player.xp} / ${player.xpToNextLevel}`;
+    
     const weapon = player.equippedWeapon; 
     const armor = player.equippedArmor;
     const shield = player.equippedShield;
     const lure = player.equippedLure;
+    
     $('#equipped-weapon').textContent = `${weapon.name} (${weapon.damage[0]}d${weapon.damage[1]})`; 
     $('#equipped-armor').textContent = `${armor.name} (Def: ${armor.defense})`;
     $('#equipped-shield').textContent = `${shield.name} (Def: ${shield.defense}, Block: ${Math.round(shield.blockChance * 100)}%)`;
     $('#equipped-lure').textContent = lure.name;
+    
     const questTrackerEl = $('#quest-tracker');
     if (player.activeQuest) {
         const quest = QUESTS[player.activeQuest]; let progress = player.questProgress;
@@ -356,11 +507,13 @@ function returnFromInventory() {
         case 'blacksmith': renderShop('blacksmith'); break;
         case 'sell': renderSell(); break;
         case 'battle': renderBattle('main'); break;
+        case 'wilderness': renderWildernessMenu(); break;
         default: renderMainMenu();
     }
 }
 
 function renderMainMenu() {
+    applyTheme('default');
     lastViewBeforeInventory = 'main_menu';
     gameState.currentView = 'main_menu';
     saveGame();
@@ -376,10 +529,50 @@ function exitGame() {
         $('#start-screen').classList.remove('hidden');
         logElement.innerHTML = ''; // Clear the log for the next session
         $('#load-game-btn').classList.remove('hidden'); // Ensure load button is visible
+        applyTheme('default');
     }, 1000);
 }
 
+function renderWildernessMenu() {
+    applyTheme('default');
+    lastViewBeforeInventory = 'wilderness';
+    gameState.currentView = 'wilderness';
+    let html = `<div class="w-full">
+        <h2 class="font-medieval text-3xl mb-4 text-center">Choose a Biome to Explore</h2>
+        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`;
+
+    for (const key in BIOMES) {
+        const biome = BIOMES[key];
+        const isUnlocked = player.level >= biome.level_requirement;
+        html += `
+            <div class="p-4 bg-slate-800 rounded-lg ${!isUnlocked ? 'opacity-50' : ''}">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-yellow-300 text-lg">${biome.name}</h3>
+                        <p class="text-sm text-gray-400 mt-1">${biome.description}</p>
+                    </div>
+                    ${isUnlocked 
+                        ? `<button onclick="startBattle('${key}')" class="btn btn-primary ml-4">Explore</button>` 
+                        : `<div class="text-right ml-4">
+                               <p class="font-bold text-red-400">Locked</p>
+                               <p class="text-xs text-gray-500">Requires Level ${biome.level_requirement}</p>
+                           </div>`
+                    }
+                </div>
+            </div>`;
+    }
+
+    html += `</div>
+        <div class="text-center mt-4"><button onclick="renderMainMenu()" class="btn btn-primary">Back</button></div>
+    </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+
 function renderTown() {
+    applyTheme('town');
     lastViewBeforeInventory = 'town';
     gameState.currentView = 'town';
     const template = document.getElementById('template-town');
@@ -393,7 +586,17 @@ function renderQuestBoard() {
     if (player.activeQuest) {
         const quest = QUESTS[player.activeQuest]; let progress = player.questProgress;
         if (quest.type === 'fetch') { progress = player.inventory.items[quest.target] || 0; }
-        html += `<div class="p-4 bg-slate-800 rounded-lg text-center"><h3 class="font-bold text-yellow-300">${quest.title} (Active)</h3><p class="text-gray-400 my-2">${quest.description}</p><p>Progress: ${progress} / ${quest.required}</p><p>Reward: ${quest.reward.xp} XP, ${quest.reward.gold} G</p><button onclick="completeQuest()" class="btn btn-primary mt-4" ${progress < quest.required ? 'disabled' : ''}>Complete Quest</button></div>`;
+        const penalty = 15 * player.level;
+        html += `<div class="p-4 bg-slate-800 rounded-lg text-center">
+                    <h3 class="font-bold text-yellow-300">${quest.title} (Active)</h3>
+                    <p class="text-gray-400 my-2">${quest.description}</p>
+                    <p>Progress: ${progress} / ${quest.required}</p>
+                    <p>Reward: ${quest.reward.xp} XP, ${quest.reward.gold} G</p>
+                    <div class="mt-4 flex justify-center gap-4">
+                        <button onclick="completeQuest()" class="btn btn-primary" ${progress < quest.required ? 'disabled' : ''}>Complete Quest</button>
+                        <button onclick="cancelQuest()" class="btn btn-action">Cancel (Fee: ${penalty} G)</button>
+                    </div>
+                </div>`;
     } else {
         html += `<p class="text-center mb-4">Pick a quest to undertake.</p>`;
         const availableQuests = Object.keys(QUESTS); const offeredQuests = availableQuests.sort(() => 0.5 - Math.random()).slice(0, 3);
@@ -407,13 +610,33 @@ function renderQuestBoard() {
     render(container);
 }
 
-function acceptQuest(questKey) { if (!player.activeQuest) { player.activeQuest = questKey; player.questProgress = 0; addToLog(`New quest accepted: <span class="font-bold text-yellow-300">${QUESTS[questKey].title}</span>!`); updateStatsView(); renderQuestBoard(); } else { addToLog(`You already have an active quest!`); } }
+function acceptQuest(questKey) { if (!player.activeQuest) { player.activeQuest = questKey; player.questProgress = 0; addToLog(`New quest accepted: <span class="font-bold" style="color: var(--text-accent);">${QUESTS[questKey].title}</span>!`); updateStatsView(); renderQuestBoard(); } else { addToLog(`You already have an active quest!`); } }
 function completeQuest() {
     if (!player.activeQuest) return; const quest = QUESTS[player.activeQuest];
     if (quest.type === 'fetch') { player.inventory.items[quest.target] -= quest.required; if (player.inventory.items[quest.target] <= 0) { delete player.inventory.items[quest.target]; } }
     addToLog(`Quest Complete: <span class="font-bold text-green-400">${quest.title}</span>!`);
     player.gainXp(quest.reward.xp); player.gold += quest.reward.gold; addToLog(`You received ${quest.reward.gold} G.`, 'text-yellow-400');
     player.activeQuest = null; player.questProgress = 0; updateStatsView(); renderQuestBoard();
+}
+
+function cancelQuest() {
+    if (!player.activeQuest) return;
+    const penalty = 15 * player.level;
+
+    if (player.gold < penalty) {
+        addToLog(`You cannot afford the ${penalty} G fee to cancel the quest.`, 'text-red-400');
+        return;
+    }
+
+    const quest = QUESTS[player.activeQuest];
+    player.gold -= penalty;
+    addToLog(`You paid a ${penalty} G fee and abandoned the quest: <span class="font-bold text-yellow-300">${quest.title}</span>.`, 'text-red-400');
+    
+    player.activeQuest = null;
+    player.questProgress = 0;
+    
+    updateStatsView();
+    renderQuestBoard();
 }
 
 function renderInn() { 
@@ -425,14 +648,14 @@ function renderInn() {
     container.innerHTML = html;
     render(container);
 }
-function restAtInn(cost) { player.gold -= cost; addToLog(`You pay <span class="font-bold">${cost} G</span> for a room.`, 'text-yellow-400'); if (Math.random() < 0.1) { addToLog(`You are ambushed in your sleep!`, 'text-red-500 font-bold'); setTimeout(startBattle, 2000); } else { player.hp = player.maxHp; player.mp = player.maxMp; addToLog(`You wake up feeling refreshed.`, 'text-green-400 font-bold'); updateStatsView(); setTimeout(renderTown, 2000); } }
+function restAtInn(cost) { player.gold -= cost; addToLog(`You pay <span class="font-bold">${cost} G</span> for a room.`, 'text-yellow-400'); if (Math.random() < 0.1) { addToLog(`You are ambushed in your sleep!`, 'text-red-500 font-bold'); setTimeout(() => startBattle(gameState.currentBiome || 'forest'), 2000); } else { player.hp = player.maxHp; player.mp = player.maxMp; addToLog(`You wake up feeling refreshed.`, 'text-green-400 font-bold'); updateStatsView(); setTimeout(renderTown, 2000); } }
 
 function renderMagicShop() { 
     lastViewBeforeInventory = 'magic_shop';
     gameState.currentView = 'magic_shop'; 
     let learnableSpells = Object.keys(MAGIC).filter(key => !player.spells.includes(key)); 
     let spellsHtml = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
-    spellsHtml += learnableSpells.map(key => { const details = MAGIC[key]; return `<div class="p-3 bg-slate-800 rounded"><div class="flex justify-between items-center"><h3 class="font-medieval text-lg text-purple-300">${details.name}</h3><div><span class="text-yellow-400 font-semibold mr-4">${details.price} G</span><button onclick="learnSpell('${key}')" class="btn btn-magic text-sm py-1 px-3" ${player.gold < details.price ? 'disabled' : ''}>Learn</button></div></div><p class="text-sm text-gray-400 mt-1">${details.description}</p></div>`; }).join(''); 
+    spellsHtml += learnableSpells.map(key => { const details = MAGIC[key]; return `<div class="p-3 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><div class="flex justify-between items-center"><h3 class="font-medieval text-lg text-purple-300">${details.name}</h3><div><span class="text-yellow-400 font-semibold mr-4">${details.price} G</span><button onclick="learnSpell('${key}')" class="btn btn-magic text-sm py-1 px-3" ${player.gold < details.price ? 'disabled' : ''}>Learn</button></div></div><p class="text-sm text-gray-400 mt-1">${details.description}</p></div>`; }).join(''); 
     spellsHtml += '</div>';
     if (learnableSpells.length === 0) { spellsHtml = `<p class="text-center text-gray-400">You have learned all available spells.</p>`; } 
     let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">Whispering Grimoire</h2><p class="text-center text-gray-400 mb-4">Learn new spells to aid you in your journey.</p><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${spellsHtml}</div><div class="flex justify-center gap-4 mt-4"><button onclick="renderTown()" class="btn btn-primary">Back to Town</button></div></div>`;
@@ -454,7 +677,7 @@ function renderShop(type) {
         itemsHtml += inventory[category].map(key => {
             const details = getItemDetails(key);
             if (!details) return '';
-            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${details.price} G</span><button onclick="buyItem('${key}')" class="btn btn-primary text-sm py-1 px-3" ${player.gold < details.price ? 'disabled' : ''}>Buy</button></div></div>`;
+            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${details.price} G</span><button onclick="buyItem('${key}')" class="btn btn-primary text-sm py-1 px-3" ${player.gold < details.price ? 'disabled' : ''}>Buy</button></div></div>`;
         }).join('');
         itemsHtml += '</div>';
     }
@@ -471,16 +694,49 @@ function renderSell() {
     let sellableHtml = ''; 
     const itemMap = {}; 
     let itemIndex = 0; 
-    for (const category in player.inventory) { if (category === 'items' || category === 'lures') { for (const key in player.inventory[category]) { const details = getItemDetails(key); if (details && details.price > 0) { itemMap[itemIndex] = {key, category, count: player.inventory[category][key]}; itemIndex++; } } } else { for (const key of player.inventory[category]) { const details = getItemDetails(key); if (details && details.price > 0) { itemMap[itemIndex] = {key, category, count: 1}; itemIndex++; } } } } 
+    
+    if (player.inventory.items) {
+        for (const itemKey in player.inventory.items) {
+            const details = getItemDetails(itemKey);
+            if (details && details.price > 0) {
+                for (let i = 0; i < player.inventory.items[itemKey]; i++) {
+                     itemMap[itemIndex] = { key: itemKey, category: 'items', count: player.inventory.items[itemKey] };
+                     itemIndex++;
+                }
+            }
+        }
+    }
+    const equippableCategories = ['weapons', 'armor', 'shields', 'lures'];
+    for (const category of equippableCategories) {
+        if (player.inventory[category]) {
+            for (const itemKey of player.inventory[category]) {
+                const details = getItemDetails(itemKey);
+                if (details && details.price > 0) {
+                    itemMap[itemIndex] = { key: itemKey, category: category, count: 1 };
+                    itemIndex++;
+                }
+            }
+        }
+    }
     
     if (itemIndex > 0) {
+        let displayedItems = {};
         sellableHtml += `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">`;
-        for (let i = 0; i < itemIndex; i++) { 
-            const item = itemMap[i]; 
-            const details = getItemDetails(item.key); 
-            const sellPrice = Math.floor(details.price / 2); 
-            const countStr = item.category === 'items' ? `(x${item.count})` : ''; 
-            sellableHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded"><span>${details.name} ${countStr}</span><div><span class="text-yellow-400 font-semibold mr-4">${sellPrice} G</span><button onclick="sellItem(${i})" class="btn btn-primary text-sm py-1 px-3">Sell</button></div></div>`; 
+        for (let i = 0; i < itemIndex; i++) {
+            const item = itemMap[i];
+            const details = getItemDetails(item.key);
+            const sellPrice = Math.floor(details.price / 2);
+            
+            const itemHtml = `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${item.key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${item.key}', event)"><span>${details.name} ${item.category === 'items' ? `(x${item.count})` : ''}</span><div><span class="text-yellow-400 font-semibold mr-4">${sellPrice} G</span><button onclick="sellItem(${i})" class="btn btn-primary text-sm py-1 px-3">Sell</button></div></div>`;
+
+            if (item.category === 'items') {
+                if (!displayedItems[item.key]) {
+                    sellableHtml += itemHtml;
+                    displayedItems[item.key] = true;
+                }
+            } else {
+                 sellableHtml += itemHtml;
+            }
         } 
         sellableHtml += `</div>`;
     } else {
@@ -491,7 +747,32 @@ function renderSell() {
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
-    window.sellItem = (index) => { const item = itemMap[index]; const details = getItemDetails(item.key); const sellPrice = Math.floor(details.price / 2); player.gold += sellPrice; if (item.category === 'items') { player.inventory.items[item.key]--; if (player.inventory.items[item.key] === 0) delete player.inventory.items[item.key]; } else { player.inventory[item.category] = player.inventory[item.category].filter(k => k !== item.key); } addToLog(`You sold a ${details.name} for ${sellPrice} G.`, 'text-yellow-400'); updateStatsView(); renderSell(); }; 
+
+    window.sellItem = (index) => { 
+        const item = itemMap[index]; 
+        const details = getItemDetails(item.key); 
+        const sellPrice = Math.floor(details.price / 2); 
+        player.gold += sellPrice; 
+        
+        if (item.category === 'items') { 
+            player.inventory.items[item.key]--; 
+            if (player.inventory.items[item.key] === 0) {
+                delete player.inventory.items[item.key]; 
+            }
+        } else { 
+            const itemIndexToRemove = player.inventory[item.category].indexOf(item.key);
+            if (itemIndexToRemove > -1) {
+                player.inventory[item.category].splice(itemIndexToRemove, 1);
+            }
+            if (item.category === 'lures') {
+                delete player.inventory.lureUses[item.key];
+            }
+        } 
+        
+        addToLog(`You sold a ${details.name} for ${sellPrice} G.`, 'text-yellow-400'); 
+        updateStatsView(); 
+        renderSell(); 
+    }; 
 }
 function renderInventory() { 
     gameState.currentView = 'inventory'; 
@@ -517,11 +798,11 @@ function renderInventory() {
             let buttonHtml = ''; 
             if (category === 'items' && details.type !== 'junk') { buttonHtml = `<button onclick="useItem('${key}')" class="btn btn-item text-sm py-1 px-3">Use</button>`; } 
             else if (category !== 'items' && !isEquipped) { buttonHtml = `<button onclick="equipItem('${key}')" class="btn btn-primary text-sm py-1 px-3">Equip</button>`; } 
-            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded"><span>${details.name} ${countStr} ${equippedText}</span>${buttonHtml}</div>`; }).join(''); 
+            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr} ${equippedText}</span>${buttonHtml}</div>`; }).join(''); 
             html += `</div>`; 
             return html; 
     }; 
-    const renderSpellbook = () => { let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-purple-300">Spellbook</h3><div class="space-y-2">`; if (player.spells.length === 0) { html += `<p class="text-gray-400">You have not learned any spells.</p>`; } else { html += player.spells.map(key => { const details = MAGIC[key]; return `<div class="p-2 bg-slate-800 rounded"><div class="flex justify-between items-center"><span class="font-bold text-purple-200">${details.name}</span><span class="text-blue-400">${details.cost} MP</span></div><p class="text-sm text-gray-400 mt-1">${details.description}</p></div>`; }).join(''); } html += `</div>`; return html; }; 
+    const renderSpellbook = () => { let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-purple-300">Spellbook</h3><div class="space-y-2">`; if (player.spells.length === 0) { html += `<p class="text-gray-400">You have not learned any spells.</p>`; } else { html += player.spells.map(key => { const details = MAGIC[key]; return `<div class="p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><div class="flex justify-between items-center"><span class="font-bold text-purple-200">${details.name}</span><span class="text-blue-400">${details.cost} MP</span></div><p class="text-sm text-gray-400 mt-1">${details.description}</p></div>`; }).join(''); } html += `</div>`; return html; }; 
     let html = `
         <div class="w-full text-left">
             <h2 class="font-medieval text-3xl mb-4 text-center">Inventory & Spells</h2>
@@ -545,7 +826,33 @@ function renderInventory() {
     container.innerHTML = html;
     render(container);
 }
-function useItem(itemKey, inBattle = false) { const details = ITEMS[itemKey]; if (details.type === 'healing') { player.hp = Math.min(player.maxHp, player.hp + details.amount); } else if (details.type === 'mana_restore') { player.mp = Math.min(player.maxMp, player.mp + details.amount); } player.inventory.items[itemKey]--; if (player.inventory.items[itemKey] === 0) delete player.inventory.items[itemKey]; addToLog(`You used a <span class="font-bold text-green-300">${details.name}</span>.`); updateStatsView(); if (!inBattle) renderInventory(); }
+function useItem(itemKey, inBattle = false) {
+    if (!player.inventory.items[itemKey] || player.inventory.items[itemKey] < 1) {
+        addToLog("You don't have that item!", 'text-red-400');
+        if (inBattle) {
+            renderBattle('item');
+        } else {
+            renderInventory();
+        }
+        return false;
+    }
+    const details = ITEMS[itemKey];
+    if (details.type === 'healing') {
+        player.hp = Math.min(player.maxHp, player.hp + details.amount);
+    } else if (details.type === 'mana_restore') {
+        player.mp = Math.min(player.maxMp, player.mp + details.amount);
+    }
+    player.inventory.items[itemKey]--;
+    addToLog(`You used a <span class="font-bold text-green-300">${details.name}</span>.`);
+    if (player.inventory.items[itemKey] <= 0) {
+        delete player.inventory.items[itemKey];
+    }
+    updateStatsView();
+    if (!inBattle) {
+        renderInventory();
+    }
+    return true;
+}
 function equipItem(itemKey) { 
     if (itemKey in WEAPONS) player.equippedWeapon = WEAPONS[itemKey]; 
     if (itemKey in ARMOR) player.equippedArmor = ARMOR[itemKey]; 
@@ -557,12 +864,17 @@ function equipItem(itemKey) {
 }
 
 // --- BATTLE FUNCTIONS ---
-function startBattle() { 
+function startBattle(biomeKey) { 
     gameState.isPlayerTurn = true; 
+    gameState.currentBiome = biomeKey;
+    const biome = BIOMES[biomeKey];
+    if (biome && biome.theme) {
+        applyTheme(biome.theme);
+    }
     generateEnemy(); 
     lastViewBeforeInventory = 'battle';
     gameState.currentView = 'battle'; 
-    addToLog(`A wild <span class="font-bold text-red-400">${currentEnemy.name}</span> appears!`); 
+    addToLog(`A wild <span class="font-bold text-red-400">${currentEnemy.name}</span> from the ${BIOMES[biomeKey].name} appears!`); 
     renderBattle(); 
 }
 
@@ -575,13 +887,13 @@ function renderBattle(subView = 'main') {
         view.querySelector('[data-id="enemy-hp"]').textContent = `${currentEnemy.hp} / ${currentEnemy.maxHp} HP`;
         render(view);
      } else if (subView === 'magic') {
-        let spellsHtml = player.spells.map(key => { const spell = MAGIC[key]; const canCast = player.mp >= spell.cost; return `<button onclick="castSpell('${key}')" class="btn btn-magic w-full text-left" ${!canCast ? 'disabled' : ''}><div class="flex justify-between"><span>${spell.name}</span><span>${spell.cost} MP</span></div></button>`; }).join('');
+        let spellsHtml = player.spells.map(key => { const spell = MAGIC[key]; const canCast = player.mp >= spell.cost; return `<button onclick="castSpell('${key}')" class="btn btn-magic w-full text-left" ${!canCast ? 'disabled' : ''} onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"><div class="flex justify-between"><span>${spell.name}</span><span>${spell.cost} MP</span></div></button>`; }).join('');
         let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Cast a Spell</h2><div class="grid grid-cols-2 gap-2 mb-4">${spellsHtml}</div><button onclick="renderBattle('main')" class="btn btn-primary">Back</button>`;
         const container = document.createElement('div');
         container.innerHTML = html;
         render(container);
      } else if (subView === 'item') {
-        let itemsHtml = Object.keys(player.inventory.items).filter(key => ITEMS[key].type !== 'junk').map(key => { const item = ITEMS[key]; const count = player.inventory.items[key]; return `<button onclick="useItemInBattle('${key}')" class="btn btn-item w-full text-left"><div class="flex justify-between"><span>${item.name}</span><span>x${count}</span></div></button>`; }).join('');
+        let itemsHtml = Object.keys(player.inventory.items).filter(key => ITEMS[key].type !== 'junk').map(key => { const item = ITEMS[key]; const count = player.inventory.items[key]; return `<button onclick="useItemInBattle('${key}')" class="btn btn-item w-full text-left" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"><div class="flex justify-between"><span>${item.name}</span><span>x${count}</span></div></button>`; }).join('');
         if (!itemsHtml) { itemsHtml = `<p class="text-gray-400 text-center col-span-2">You have no usable items.</p>`; }
         let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Use an Item</h2><div class="grid grid-cols-2 gap-2 mb-4">${itemsHtml}</div><button onclick="renderBattle('main')" class="btn btn-primary">Back</button>`;
         const container = document.createElement('div');
@@ -590,7 +902,14 @@ function renderBattle(subView = 'main') {
      }
 }
 function castSpell(spellKey) {
-    gameState.isPlayerTurn = false; const spell = MAGIC[spellKey]; player.mp -= spell.cost; updateStatsView();
+    const spell = MAGIC[spellKey];
+    if (player.mp < spell.cost) {
+        addToLog(`Not enough MP to cast ${spell.name}!`, 'text-blue-400');
+        return;
+    }
+    gameState.isPlayerTurn = false; 
+    player.mp -= spell.cost; 
+    updateStatsView();
     addToLog(`You cast ${spell.name}!`, 'text-purple-300');
     switch(spell.type) {
         case 'damage': const magicDamage = rollDice(...spell.damage) + player.intelligence; currentEnemy.takeDamage(magicDamage); addToLog(`It deals <span class="font-bold text-purple-400">${magicDamage}</span> damage.`); break;
@@ -598,7 +917,13 @@ function castSpell(spellKey) {
     }
     checkBattleStatus();
 }
-function useItemInBattle(itemKey) { gameState.isPlayerTurn = false; useItem(itemKey, true); checkBattleStatus(); }
+function useItemInBattle(itemKey) {
+    const success = useItem(itemKey, true);
+    if (success) {
+        gameState.isPlayerTurn = false;
+        checkBattleStatus();
+    }
+}
 function battleAction(type) {
     if (!gameState.isPlayerTurn) return;
     $('#battle-actions')?.classList.add('hidden');
@@ -615,7 +940,7 @@ function battleAction(type) {
         case 'item': renderBattle('item'); break;
         case 'flee':
             gameState.isPlayerTurn = false;
-            if (Math.random() > 0.3) { addToLog(`You successfully escaped!`, 'text-green-400'); setTimeout(renderMainMenu, 1500); }
+            if (Math.random() > 0.2) { addToLog(`You successfully escaped!`, 'text-green-400'); setTimeout(renderMainMenu, 1500); }
             else { addToLog(`You failed to escape!`, 'text-red-400'); enemyTurn(); }
             break;
     }
@@ -655,8 +980,8 @@ function enemyTurn() {
     }, 400);
 }
 function saveGame(manual = false) { if (!player) return; try { const saveData = JSON.stringify(player); localStorage.setItem('rpgSaveData', saveData); if (manual) { addToLog('Game Saved!', 'text-green-400 font-bold'); } } catch (error) { console.error("Could not save game:", error); } }
-function loadGame() { const savedData = localStorage.getItem('rpgSaveData'); if (savedData) { try { const parsedData = JSON.parse(savedData); player = new Player(parsedData.name); Object.assign(player, parsedData); $('#start-screen').classList.add('hidden'); $('#game-container').classList.remove('hidden'); addToLog(`Welcome back, ${player.name}!`); updateStatsView(); renderMainMenu(); } catch (error) { console.error("Could not load game:", error); localStorage.removeItem('rpgSaveData'); } } }
-function initGame(playerName) { $('#start-screen').classList.add('hidden'); $('#game-container').classList.remove('hidden'); player = new Player(playerName); addToLog(`Welcome, ${playerName}! Your adventure begins.`); updateStatsView(); renderMainMenu(); }
+function loadGame() { const savedData = localStorage.getItem('rpgSaveData'); if (savedData) { try { const parsedData = JSON.parse(savedData); player = new Player(parsedData.name); Object.assign(player, parsedData); $('#start-screen').classList.add('hidden'); $('#game-container').classList.remove('hidden'); addToLog(`Welcome back, ${player.name}!`); applyTheme('default'); updateStatsView(); renderMainMenu(); } catch (error) { console.error("Could not load game:", error); localStorage.removeItem('rpgSaveData'); } } }
+function initGame(playerName) { $('#start-screen').classList.add('hidden'); $('#game-container').classList.remove('hidden'); player = new Player(playerName); addToLog(`Welcome, ${playerName}! Your adventure begins.`); applyTheme('default'); updateStatsView(); renderMainMenu(); }
 $('#start-game-btn').addEventListener('click', () => { const name = $('#player-name-input').value.trim(); if (name) { initGame(name); } else { $('#player-name-input').classList.add('border-red-500'); } });
 $('#player-name-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') $('#start-game-btn').click(); });
 window.addEventListener('load', () => { 

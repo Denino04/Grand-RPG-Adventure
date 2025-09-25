@@ -1,23 +1,24 @@
-// --- GAME DATA ------------------------------------------------------------------
-
 const BIOMES = {
     'forest': {
         name: 'Whispering Forest',
         level_requirement: 1,
         description: 'A dense forest teeming with common beasts. Relatively safe for new adventurers.',
-        monsters: { 'goblin': 50, 'dire_wolf': 40, 'orc_berserker': 10 }
+        monsters: { 'goblin': 49, 'dire_wolf': 40, 'cave_spider': 10, 'dragon': 1 },
+        theme: 'forest'
     },
     'cave': {
         name: 'Shadowy Cave',
         level_requirement: 5,
         description: 'A dark, damp cave system, home to unsavory characters and creatures of the dark.',
-        monsters: { 'bandit': 50, 'giant_rat': 40, 'cave_spider': 10 }
+        monsters: { 'bandit': 49, 'giant_rat': 40, 'orc_berserker': 10, 'dragon': 1 },
+        theme: 'cave'
     },
     'mountain': {
         name: 'Dragon\'s Peak',
         level_requirement: 10,
         description: 'The treacherous peaks of the mountain, where only the strongest creatures survive. Rumors speak of a great beast at its summit.',
-        monsters: { 'orc_berserker': 40, 'cave_spider': 30, 'bandit': 29, 'dragon': 1 }
+        monsters: { 'orc_berserker': 40, 'cave_spider': 30, 'bandit': 20, 'dragon': 10 },
+        theme: 'mountain'
     }
 };
 
