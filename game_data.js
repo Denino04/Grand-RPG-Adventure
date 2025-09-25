@@ -100,7 +100,7 @@ const BLACKSMITH_INVENTORY = {
     'Shields': ['iron_kite_shield', 'tower_greatshield']
 };
 
-WEAPONS['flaming_sword'] = {name: 'Flaming Sword', damage: [2, 6], price: 700, effect: { type: 'fire_damage', damage: [2, 4] }};
+WEAPONS['flaming_sword'] = {name: 'Flaming Sword', damage: [2, 8], price: 700, effect: { type: 'fire_damage', damage: [2, 4] }};
 WEAPONS['vampiric_dagger'] = {name: 'Vampiric Dagger', damage: [2, 4], price: 600, effect: { type: 'lifesteal', amount: 0.25 }};
 ARMOR['mana_robe'] = {name: 'Robe of the Apprentice', defense: 1, price: 400, effect: { type: 'mp_regen', amount: 3 }};
 
