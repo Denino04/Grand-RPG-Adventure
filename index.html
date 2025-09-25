@@ -99,9 +99,9 @@
 
     <!-- Start Screen -->
     <div id="start-screen" class="text-center">
-        <h1 class="font-medieval text-6xl text-yellow-400 mb-4">Chronicles of the Void</h1>
+        <h1 class="font-medieval text-6xl text-yellow-400 mb-4">Chronicles of the Cocytus</h1>
         <p class="mb-8 text-lg text-gray-400">Enter your hero's name to begin your journey.</p>
-        <input type="text" id="player-name-input" class="bg-gray-800 border border-gray-600 text-white text-center text-lg rounded-lg px-4 py-2 mb-4 w-64 focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="e.g., Eldrin">
+        <input type="text" id="player-name-input" class="bg-gray-800 border border-gray-600 text-white text-center text-lg rounded-lg px-4 py-2 mb-4 w-64 focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="e.g., Grand Alter">
         <button id="start-game-btn" class="btn btn-primary text-xl px-8 py-3">Begin Adventure</button>
         <button id="load-game-btn" class="btn btn-primary text-xl px-8 py-3 mt-4 hidden">Load Saved Game</button>
     </div>
@@ -497,6 +497,7 @@ function updateStatsView() {
 }
 
 function returnFromInventory() {
+    hideTooltip();
     switch (lastViewBeforeInventory) {
         case 'main_menu': renderMainMenu(); break;
         case 'town': renderTown(); break;
@@ -513,6 +514,7 @@ function returnFromInventory() {
 }
 
 function renderMainMenu() {
+    hideTooltip();
     applyTheme('default');
     lastViewBeforeInventory = 'main_menu';
     gameState.currentView = 'main_menu';
@@ -522,6 +524,7 @@ function renderMainMenu() {
 }
 
 function exitGame() {
+    hideTooltip();
     addToLog('Saving your progress...');
     saveGame();
     setTimeout(() => {
@@ -534,6 +537,7 @@ function exitGame() {
 }
 
 function renderWildernessMenu() {
+    hideTooltip();
     applyTheme('default');
     lastViewBeforeInventory = 'wilderness';
     gameState.currentView = 'wilderness';
@@ -572,6 +576,7 @@ function renderWildernessMenu() {
 
 
 function renderTown() {
+    hideTooltip();
     applyTheme('town');
     lastViewBeforeInventory = 'town';
     gameState.currentView = 'town';
@@ -580,6 +585,7 @@ function renderTown() {
 }
 
 function renderQuestBoard() {
+    hideTooltip();
     lastViewBeforeInventory = 'quest_board';
     gameState.currentView = 'quest_board'; 
     let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">Quest Board</h2>`;
@@ -640,6 +646,7 @@ function cancelQuest() {
 }
 
 function renderInn() { 
+    hideTooltip();
     lastViewBeforeInventory = 'inn';
     gameState.currentView = 'inn'; 
     const cost = 10 * player.level; 
@@ -651,6 +658,7 @@ function renderInn() {
 function restAtInn(cost) { player.gold -= cost; addToLog(`You pay <span class="font-bold">${cost} G</span> for a room.`, 'text-yellow-400'); if (Math.random() < 0.1) { addToLog(`You are ambushed in your sleep!`, 'text-red-500 font-bold'); setTimeout(() => startBattle(gameState.currentBiome || 'forest'), 2000); } else { player.hp = player.maxHp; player.mp = player.maxMp; addToLog(`You wake up feeling refreshed.`, 'text-green-400 font-bold'); updateStatsView(); setTimeout(renderTown, 2000); } }
 
 function renderMagicShop() { 
+    hideTooltip();
     lastViewBeforeInventory = 'magic_shop';
     gameState.currentView = 'magic_shop'; 
     let learnableSpells = Object.keys(MAGIC).filter(key => !player.spells.includes(key)); 
@@ -666,6 +674,7 @@ function renderMagicShop() {
 function learnSpell(spellKey) { const details = MAGIC[spellKey]; if (player.gold >= details.price) { player.gold -= details.price; player.spells.push(spellKey); addToLog(`You have learned the spell: <span class="font-bold text-purple-300">${details.name}</span>!`, 'text-green-400'); updateStatsView(); renderMagicShop(); } }
 
 function renderShop(type) {
+    hideTooltip();
     lastViewBeforeInventory = type === 'store' ? 'shop' : 'blacksmith';
     gameState.currentView = type === 'store' ? 'shop' : 'blacksmith';
     const inventory = type === 'store' ? SHOP_INVENTORY : BLACKSMITH_INVENTORY;
@@ -689,6 +698,7 @@ function renderShop(type) {
 
 function buyItem(itemKey) { const details = getItemDetails(itemKey); if (player.gold >= details.price) { player.gold -= details.price; player.addToInventory(itemKey, 1, false); addToLog(`You bought a ${details.name} for ${details.price} G.`, 'text-yellow-400'); updateStatsView(); renderShop(gameState.currentView); } }
 function renderSell() { 
+    hideTooltip();
     lastViewBeforeInventory = 'sell';
     gameState.currentView = 'sell'; 
     let sellableHtml = ''; 
@@ -775,6 +785,7 @@ function renderSell() {
     }; 
 }
 function renderInventory() { 
+    hideTooltip();
     gameState.currentView = 'inventory'; 
     const renderList = (category, title) => { 
         const list = category === 'items' ? Object.keys(player.inventory.items) : player.inventory[category]; 
@@ -865,6 +876,7 @@ function equipItem(itemKey) {
 
 // --- BATTLE FUNCTIONS ---
 function startBattle(biomeKey) { 
+    hideTooltip();
     gameState.isPlayerTurn = true; 
     gameState.currentBiome = biomeKey;
     const biome = BIOMES[biomeKey];
@@ -879,6 +891,7 @@ function startBattle(biomeKey) {
 }
 
 function renderBattle(subView = 'main') {
+    hideTooltip();
      if (!currentEnemy || !currentEnemy.isAlive()) return;
      if (subView === 'main') {
         const template = document.getElementById('template-battle');
@@ -947,6 +960,7 @@ function battleAction(type) {
 }
 function checkBattleStatus() {
     if (!currentEnemy.isAlive()) {
+        hideTooltip();
         if (player.activeQuest) { const quest = QUESTS[player.activeQuest]; if (quest.type === 'extermination' && quest.target === currentEnemy.speciesData.name.toLowerCase().replace(/ /g, '_')) { player.questProgress++; addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300'); updateStatsView(); } }
         addToLog(`You have defeated the ${currentEnemy.name}!`, 'text-green-400 font-bold');
         player.gainXp(currentEnemy.xpReward); player.gold += currentEnemy.goldReward;
@@ -963,6 +977,7 @@ function enemyTurn() {
     setTimeout(() => {
         currentEnemy.attack(player);
         if (!player.isAlive()) {
+            hideTooltip();
             const template = document.getElementById('template-death');
             render(template.content.cloneNode(true));
             addToLog(`You were defeated by the ${currentEnemy.name}...`, 'text-red-600 font-bold'); 
@@ -980,8 +995,36 @@ function enemyTurn() {
     }, 400);
 }
 function saveGame(manual = false) { if (!player) return; try { const saveData = JSON.stringify(player); localStorage.setItem('rpgSaveData', saveData); if (manual) { addToLog('Game Saved!', 'text-green-400 font-bold'); } } catch (error) { console.error("Could not save game:", error); } }
-function loadGame() { const savedData = localStorage.getItem('rpgSaveData'); if (savedData) { try { const parsedData = JSON.parse(savedData); player = new Player(parsedData.name); Object.assign(player, parsedData); $('#start-screen').classList.add('hidden'); $('#game-container').classList.remove('hidden'); addToLog(`Welcome back, ${player.name}!`); applyTheme('default'); updateStatsView(); renderMainMenu(); } catch (error) { console.error("Could not load game:", error); localStorage.removeItem('rpgSaveData'); } } }
-function initGame(playerName) { $('#start-screen').classList.add('hidden'); $('#game-container').classList.remove('hidden'); player = new Player(playerName); addToLog(`Welcome, ${playerName}! Your adventure begins.`); applyTheme('default'); updateStatsView(); renderMainMenu(); }
+function loadGame() { 
+    const savedData = localStorage.getItem('rpgSaveData'); 
+    if (savedData) { 
+        try { 
+            hideTooltip();
+            const parsedData = JSON.parse(savedData); 
+            player = new Player(parsedData.name); 
+            Object.assign(player, parsedData); 
+            $('#start-screen').classList.add('hidden'); 
+            $('#game-container').classList.remove('hidden'); 
+            addToLog(`Welcome back, ${player.name}!`); 
+            applyTheme('default'); 
+            updateStatsView(); 
+            renderMainMenu(); 
+        } catch (error) { 
+            console.error("Could not load game:", error); 
+            localStorage.removeItem('rpgSaveData'); 
+        } 
+    } 
+}
+function initGame(playerName) { 
+    hideTooltip();
+    $('#start-screen').classList.add('hidden'); 
+    $('#game-container').classList.remove('hidden'); 
+    player = new Player(playerName); 
+    addToLog(`Welcome, ${playerName}! Your adventure begins.`); 
+    applyTheme('default'); 
+    updateStatsView(); 
+    renderMainMenu(); 
+}
 $('#start-game-btn').addEventListener('click', () => { const name = $('#player-name-input').value.trim(); if (name) { initGame(name); } else { $('#player-name-input').classList.add('border-red-500'); } });
 $('#player-name-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') $('#start-game-btn').click(); });
 window.addEventListener('load', () => { 
