@@ -87,7 +87,7 @@ const QUESTS = {
     'wolf_hunt': { title: 'Wolf Hunt', type: 'extermination', target: 'dire_wolf', required: 3, reward: { xp: 150, gold: 75 }, description: 'Kill 3 Dire Wolves.' },
     'rat_infestation': { title: 'Rat Infestation', type: 'extermination', target: 'giant_rat', required: 5, reward: { xp: 50, gold: 25 }, description: 'Kill 5 Giant Rats.' },
     'bandit_cave': { title: 'Bandit Cave', type: 'extermination', target: 'bandit', required: 10, reward: {xp: 200, gold: 100}, description: 'Eliminate 10 Bandits.'},
-    'dragon_slayer': { title: 'Dragon Slayer', type: 'fetch', target: 'dragon_scale', required: 3, reward: {xp: 1000, gold: 250}, description: 'Slay the flying serpent and acquire its scales.'}
+    'dragon_slayer': { title: 'Dragon Slayer', type: 'extermination', target: 'dragon', required: 3, reward: {xp: 1000, gold: 250}, description: 'Slay the Flying Terrors and bathe in the glory.'}
 };
 const SHOP_INVENTORY = {
     'Potions & Items': ['health_potion', 'mana_potion', 'superior_health_potion'],
