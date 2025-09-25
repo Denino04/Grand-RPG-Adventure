@@ -373,10 +373,8 @@ class Player extends Entity {
 
         if (category === 'items') { 
             this.inventory.items[itemKey] = (this.inventory.items[itemKey] || 0) + quantity; 
-        } else { 
-            if (!this.inventory[category].includes(itemKey)) { 
-                this.inventory[category].push(itemKey); 
-            } 
+        } else {
+            this.inventory[category].push(itemKey);
             if (category === 'lures' && details.uses) {
                 this.inventory.lureUses[itemKey] = details.uses;
             }
@@ -586,6 +584,9 @@ function renderTown() {
 
 function renderQuestBoard() {
     hideTooltip();
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
     lastViewBeforeInventory = 'quest_board';
     gameState.currentView = 'quest_board'; 
     let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">Quest Board</h2>`;
@@ -614,6 +615,9 @@ function renderQuestBoard() {
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
 }
 
 function acceptQuest(questKey) { if (!player.activeQuest) { player.activeQuest = questKey; player.questProgress = 0; addToLog(`New quest accepted: <span class="font-bold" style="color: var(--text-accent);">${QUESTS[questKey].title}</span>!`); updateStatsView(); renderQuestBoard(); } else { addToLog(`You already have an active quest!`); } }
@@ -659,6 +663,9 @@ function restAtInn(cost) { player.gold -= cost; addToLog(`You pay <span class="f
 
 function renderMagicShop() { 
     hideTooltip();
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
     lastViewBeforeInventory = 'magic_shop';
     gameState.currentView = 'magic_shop'; 
     let learnableSpells = Object.keys(MAGIC).filter(key => !player.spells.includes(key)); 
@@ -670,11 +677,17 @@ function renderMagicShop() {
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
 }
 function learnSpell(spellKey) { const details = MAGIC[spellKey]; if (player.gold >= details.price) { player.gold -= details.price; player.spells.push(spellKey); addToLog(`You have learned the spell: <span class="font-bold text-purple-300">${details.name}</span>!`, 'text-green-400'); updateStatsView(); renderMagicShop(); } }
 
 function renderShop(type) {
     hideTooltip();
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
     lastViewBeforeInventory = type === 'store' ? 'shop' : 'blacksmith';
     gameState.currentView = type === 'store' ? 'shop' : 'blacksmith';
     const inventory = type === 'store' ? SHOP_INVENTORY : BLACKSMITH_INVENTORY;
@@ -686,7 +699,7 @@ function renderShop(type) {
         itemsHtml += inventory[category].map(key => {
             const details = getItemDetails(key);
             if (!details) return '';
-            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${details.price} G</span><button onclick="buyItem('${key}')" class="btn btn-primary text-sm py-1 px-3" ${player.gold < details.price ? 'disabled' : ''}>Buy</button></div></div>`;
+            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${details.price} G</span><button onclick="buyItem('${key}', '${type}')" class="btn btn-primary text-sm py-1 px-3" ${player.gold < details.price ? 'disabled' : ''}>Buy</button></div></div>`;
         }).join('');
         itemsHtml += '</div>';
     }
@@ -694,11 +707,26 @@ function renderShop(type) {
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
 }
 
-function buyItem(itemKey) { const details = getItemDetails(itemKey); if (player.gold >= details.price) { player.gold -= details.price; player.addToInventory(itemKey, 1, false); addToLog(`You bought a ${details.name} for ${details.price} G.`, 'text-yellow-400'); updateStatsView(); renderShop(gameState.currentView); } }
+function buyItem(itemKey, shopType) { 
+    const details = getItemDetails(itemKey); 
+    if (player.gold >= details.price) { 
+        player.gold -= details.price; 
+        player.addToInventory(itemKey, 1, false); 
+        addToLog(`You bought a ${details.name} for ${details.price} G.`, 'text-yellow-400'); 
+        updateStatsView(); 
+        renderShop(shopType); 
+    } 
+}
 function renderSell() { 
     hideTooltip();
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
     lastViewBeforeInventory = 'sell';
     gameState.currentView = 'sell'; 
     let sellableHtml = ''; 
@@ -709,10 +737,8 @@ function renderSell() {
         for (const itemKey in player.inventory.items) {
             const details = getItemDetails(itemKey);
             if (details && details.price > 0) {
-                for (let i = 0; i < player.inventory.items[itemKey]; i++) {
-                     itemMap[itemIndex] = { key: itemKey, category: 'items', count: player.inventory.items[itemKey] };
-                     itemIndex++;
-                }
+                itemMap[itemIndex] = { key: itemKey, category: 'items', count: player.inventory.items[itemKey] };
+                itemIndex++;
             }
         }
     }
@@ -732,21 +758,23 @@ function renderSell() {
     if (itemIndex > 0) {
         let displayedItems = {};
         sellableHtml += `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">`;
-        for (let i = 0; i < itemIndex; i++) {
-            const item = itemMap[i];
+        let mappedIndex = 0;
+        for (const key in itemMap) {
+            const item = itemMap[key];
             const details = getItemDetails(item.key);
             const sellPrice = Math.floor(details.price / 2);
             
-            const itemHtml = `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${item.key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${item.key}', event)"><span>${details.name} ${item.category === 'items' ? `(x${item.count})` : ''}</span><div><span class="text-yellow-400 font-semibold mr-4">${sellPrice} G</span><button onclick="sellItem(${i})" class="btn btn-primary text-sm py-1 px-3">Sell</button></div></div>`;
-
+            const itemHtml = `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${item.key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${item.key}', event)"><span>${details.name} ${item.category === 'items' ? `(x${item.count})` : ''}</span><div><span class="text-yellow-400 font-semibold mr-4">${sellPrice} G</span><button onclick="sellItem(${mappedIndex})" class="btn btn-primary text-sm py-1 px-3">Sell</button></div></div>`;
+            
             if (item.category === 'items') {
                 if (!displayedItems[item.key]) {
-                    sellableHtml += itemHtml;
+                    sellableHtml += itemHtml.replace(`sellItem(${mappedIndex})`, `sellItem('${item.key}', 'items', ${item.count})`);
                     displayedItems[item.key] = true;
                 }
             } else {
-                 sellableHtml += itemHtml;
+                 sellableHtml += itemHtml.replace(`sellItem(${mappedIndex})`, `sellItem('${item.key}', '${item.category}', 1)`);
             }
+            mappedIndex++;
         } 
         sellableHtml += `</div>`;
     } else {
@@ -758,24 +786,26 @@ function renderSell() {
     container.innerHTML = html;
     render(container);
 
-    window.sellItem = (index) => { 
-        const item = itemMap[index]; 
-        const details = getItemDetails(item.key); 
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
+
+    window.sellItem = (itemKey, category, count) => {
+        const details = getItemDetails(itemKey); 
         const sellPrice = Math.floor(details.price / 2); 
         player.gold += sellPrice; 
         
-        if (item.category === 'items') { 
-            player.inventory.items[item.key]--; 
-            if (player.inventory.items[item.key] === 0) {
-                delete player.inventory.items[item.key]; 
+        if (category === 'items') { 
+            player.inventory.items[itemKey]--; 
+            if (player.inventory.items[itemKey] === 0) {
+                delete player.inventory.items[itemKey]; 
             }
         } else { 
-            const itemIndexToRemove = player.inventory[item.category].indexOf(item.key);
+            const itemIndexToRemove = player.inventory[category].indexOf(itemKey);
             if (itemIndexToRemove > -1) {
-                player.inventory[item.category].splice(itemIndexToRemove, 1);
+                player.inventory[category].splice(itemIndexToRemove, 1);
             }
-            if (item.category === 'lures') {
-                delete player.inventory.lureUses[item.key];
+            if (category === 'lures') {
+                delete player.inventory.lureUses[itemKey];
             }
         } 
         
@@ -786,19 +816,40 @@ function renderSell() {
 }
 function renderInventory() { 
     hideTooltip();
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
     gameState.currentView = 'inventory'; 
     const renderList = (category, title) => { 
-        const list = category === 'items' ? Object.keys(player.inventory.items) : player.inventory[category]; 
+        let list;
+        let itemCounts = {};
+
+        if (category === 'items') {
+            list = Object.keys(player.inventory.items);
+        } else {
+            player.inventory[category].forEach(key => {
+                itemCounts[key] = (itemCounts[key] || 0) + 1;
+            });
+            list = Object.keys(itemCounts);
+        }
+        
         if (!list || list.length === 0) return ''; 
+        
         let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${title}</h3><div class="space-y-2">`; 
         html += list.map(key => { 
             const details = getItemDetails(key); 
             let countStr = '';
+
             if (category === 'items') {
                 countStr = `(x${player.inventory.items[key]})`;
-            } else if (category === 'lures' && details.uses) {
-                const currentUses = player.inventory.lureUses[key] || 0;
-                countStr = `<span class="text-xs text-gray-400 ml-2">(${currentUses}/${details.uses} uses)</span>`;
+            } else {
+                 if (itemCounts[key] > 1) {
+                    countStr = `(x${itemCounts[key]})`;
+                }
+                if (category === 'lures' && details.uses) {
+                    const currentUses = player.inventory.lureUses[key] || 0;
+                    countStr += `<span class="text-xs text-gray-400 ml-2">(${currentUses}/${details.uses} uses)</span>`;
+                }
             }
 
             const isEquipped = (category === 'weapons' && WEAPONS[key] === player.equippedWeapon) || 
@@ -836,6 +887,9 @@ function renderInventory() {
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
 }
 function useItem(itemKey, inBattle = false) {
     if (!player.inventory.items[itemKey] || player.inventory.items[itemKey] < 1) {
