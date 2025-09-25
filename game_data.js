@@ -31,9 +31,9 @@ const ITEMS = {
 };
 const LURES = {
     'no_lure': { name: 'None', price: 0, description: 'No lure equipped.' },
-    'goblin_scent_gland': { name: 'Goblin Scent Gland', price: 150, description: 'The potent smell seems to attract goblins.', lureTarget: 'goblin', uses: 5 },
-    'bandit_coin': { name: 'Gilded Coin', price: 200, description: 'A shiny coin that seems to attract the greedy eyes of bandits.', lureTarget: 'bandit', uses: 3 },
-    'wolf_musk': { name: 'Wolf Musk', price: 175, description: 'A strong musk that draws in nearby wolves.', lureTarget: 'dire_wolf', uses: 5 }
+    'goblin_scent_gland': { name: 'Goblin Scent Gland', price: 50, description: 'The potent smell seems to attract goblins.', lureTarget: 'goblin', uses: 5 },
+    'bandit_coin': { name: 'Gilded Coin', price: 80, description: 'A shiny coin that seems to attract the greedy eyes of bandits.', lureTarget: 'bandit', uses: 3 },
+    'wolf_musk': { name: 'Wolf Musk', price: 70, description: 'A strong musk that draws in nearby wolves.', lureTarget: 'dire_wolf', uses: 5 }
 };
 const MAGIC = {
     'fireball': {name: 'Fireball', type:'damage', damage: [2, 6], cost: 10, price: 100, description: 'Hurls a ball of fire at an enemy.'},
