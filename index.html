@@ -104,6 +104,10 @@
         <input type="text" id="player-name-input" class="bg-gray-800 border border-gray-600 text-white text-center text-lg rounded-lg px-4 py-2 mb-4 w-64 focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="e.g., Grand Alter">
         <button id="start-game-btn" class="btn btn-primary text-xl px-8 py-3">Begin Adventure</button>
         <button id="load-game-btn" class="btn btn-primary text-xl px-8 py-3 mt-4 hidden">Load Saved Game</button>
+        <div class="mt-4">
+             <input type="text" id="import-save-input" class="bg-gray-800 border border-gray-600 text-white text-center text-sm rounded-lg px-3 py-1 w-64 focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="Paste Save Data...">
+             <button id="import-save-btn" class="btn btn-primary text-sm px-4 py-1">Import Save</button>
+        </div>
     </div>
 
     <!-- Main Game Container -->
@@ -172,6 +176,7 @@
                 <button onclick="renderWildernessMenu()" class="btn btn-primary">Enter the Wilderness</button>
                 <button onclick="renderTown()" class="btn btn-primary">Go to Town</button>
                 <button onclick="saveGame(true)" class="btn btn-primary">Save Game</button>
+                <button onclick="exportSave()" class="btn btn-primary">Export Save</button>
             </div>
         </template>
 
@@ -281,6 +286,8 @@ function rollDice(numDice, sides) { let total = 0; for (let i = 0; i < numDice; 
 function addToLog(message, colorClass = '') { const p = document.createElement('p'); p.innerHTML = message; p.className = `mb-1 ${colorClass}`; logElement.appendChild(p); logElement.scrollTop = logElement.scrollHeight; }
 function getItemDetails(itemKey) { if (itemKey in ITEMS) return ITEMS[itemKey]; if (itemKey in WEAPONS) return WEAPONS[itemKey]; if (itemKey in ARMOR) return ARMOR[itemKey]; if (itemKey in SHIELDS) return SHIELDS[itemKey]; if (itemKey in LURES) return LURES[itemKey]; if (itemKey in MAGIC) return MAGIC[itemKey]; return null; }
 function render(viewElement) { mainView.innerHTML = ''; mainView.appendChild(viewElement); }
+function generateSaveKey() { return 'rpg_' + Math.random().toString(36).substr(2, 9); }
+
 
 // --- TOOLTIP FUNCTIONS ---
 function showTooltip(itemKey, event) {
@@ -348,6 +355,7 @@ class Player extends Entity {
         super(name, 50, 5);
         this.gold = 100; this.level = 1; this.xp = 0; this.xpToNextLevel = 100;
         this.mp = 20; this.maxMp = 20; this.intelligence = 5;
+        this.saveKey = null; // Will be assigned on new game or import
         this.equippedWeapon = WEAPONS['rusty_sword'];
         this.equippedArmor = ARMOR['rags'];
         this.equippedShield = SHIELDS['no_shield'];
@@ -546,7 +554,7 @@ function exitGame() {
         $('#game-container').classList.add('hidden');
         $('#start-screen').classList.remove('hidden');
         logElement.innerHTML = ''; // Clear the log for the next session
-        $('#load-game-btn').classList.remove('hidden'); // Ensure load button is visible
+        updateLoadGameButtonVisibility();
         applyTheme('default');
     }, 1000);
 }
@@ -1048,7 +1056,6 @@ function checkBattleStatus() {
     if (!currentEnemy.isAlive()) {
         hideTooltip();
         
-        // Check for Legacy Quest progress
         if (player.activeLegacyQuest && currentEnemy.rarityData.name === 'Legendary') {
             const legacyQuest = LEGACY_QUESTS[player.activeLegacyQuest];
             const speciesKey = Object.keys(MONSTER_SPECIES).find(key => MONSTER_SPECIES[key].name === currentEnemy.speciesData.name);
@@ -1095,12 +1102,21 @@ function enemyTurn() {
             const template = document.getElementById('template-death');
             render(template.content.cloneNode(true));
             addToLog(`You were defeated by the ${currentEnemy.name}...`, 'text-red-600 font-bold'); 
-            localStorage.removeItem('rpgSaveData');
+            
+            const saveKeys = JSON.parse(localStorage.getItem('rpgSaveKeys') || '[]');
+            const keyIndex = saveKeys.indexOf(player.saveKey);
+            if (keyIndex > -1) {
+                saveKeys.splice(keyIndex, 1);
+            }
+            localStorage.setItem('rpgSaveKeys', JSON.stringify(saveKeys));
+            localStorage.removeItem(`rpgSaveData_${player.saveKey}`);
+
             setTimeout(() => { 
                 $('#game-container').classList.add('hidden'); 
                 $('#start-screen').classList.remove('hidden'); 
                 $('#player-name-input').value = ''; 
                 logElement.innerHTML = ''; 
+                updateLoadGameButtonVisibility();
             }, 3000);
         } else { 
             $('#battle-actions')?.classList.remove('hidden'); 
@@ -1108,15 +1124,89 @@ function enemyTurn() {
         }
     }, 400);
 }
-function saveGame(manual = false) { if (!player) return; try { const saveData = JSON.stringify(player); localStorage.setItem('rpgSaveData', saveData); if (manual) { addToLog('Game Saved!', 'text-green-400 font-bold'); } } catch (error) { console.error("Could not save game:", error); } }
-function loadGame() { 
-    const savedData = localStorage.getItem('rpgSaveData'); 
+
+function saveGame(manual = false) { 
+    if (!player || !player.saveKey) return; 
+    try { 
+        const saveData = JSON.stringify(player); 
+        localStorage.setItem(`rpgSaveData_${player.saveKey}`, saveData); 
+
+        const saveKeys = JSON.parse(localStorage.getItem('rpgSaveKeys') || '[]');
+        if (!saveKeys.includes(player.saveKey)) {
+            saveKeys.push(player.saveKey);
+            localStorage.setItem('rpgSaveKeys', JSON.stringify(saveKeys));
+        }
+
+        if (manual) { 
+            addToLog('Game Saved!', 'text-green-400 font-bold'); 
+        } 
+    } catch (error) { 
+        console.error("Could not save game:", error); 
+    } 
+}
+
+function renderLoadMenu() {
+    hideTooltip();
+    const saveKeys = JSON.parse(localStorage.getItem('rpgSaveKeys') || '[]');
+    let html = `<div class="w-full text-center">
+        <h2 class="font-medieval text-3xl mb-4 text-center">Load Character</h2>
+        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`;
+    
+    if (saveKeys.length === 0) {
+        html += `<p class="text-gray-400">No saved games found.</p>`;
+    } else {
+        saveKeys.forEach(key => {
+            const savedData = localStorage.getItem(`rpgSaveData_${key}`);
+            if (savedData) {
+                const charData = JSON.parse(savedData);
+                html += `
+                    <div class="p-3 bg-slate-800 rounded-lg flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-yellow-300">${charData.name}</p>
+                            <p class="text-sm text-gray-400">Level ${charData.level}</p>
+                        </div>
+                        <div>
+                            <button onclick="loadGameFromKey('${key}')" class="btn btn-primary text-sm py-1 px-3">Load</button>
+                            <button onclick="deleteSave('${key}')" class="btn btn-action text-sm py-1 px-3 ml-2">Delete</button>
+                        </div>
+                    </div>`;
+            }
+        });
+    }
+
+    html += `</div>
+        <div class="text-center mt-4">
+            <button onclick="showStartScreen()" class="btn btn-primary">Back</button>
+        </div>
+    </div>`;
+
+    $('#start-screen').classList.add('hidden');
+    $('#game-container').classList.remove('hidden');
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+function deleteSave(saveKey) {
+     const saveKeys = JSON.parse(localStorage.getItem('rpgSaveKeys') || '[]');
+     const keyIndex = saveKeys.indexOf(saveKey);
+     if (keyIndex > -1) {
+         saveKeys.splice(keyIndex, 1);
+     }
+     localStorage.setItem('rpgSaveKeys', JSON.stringify(saveKeys));
+     localStorage.removeItem(`rpgSaveData_${saveKey}`);
+     renderLoadMenu();
+     updateLoadGameButtonVisibility();
+}
+
+
+function loadGameFromKey(saveKey) { 
+    const savedData = localStorage.getItem(`rpgSaveData_${saveKey}`); 
     if (savedData) { 
         try { 
-            hideTooltip();
             const parsedData = JSON.parse(savedData); 
             player = new Player(parsedData.name); 
-            Object.assign(player, parsedData);
+            Object.assign(player, parsedData); 
 
             if (!player.activeLegacyQuest) {
                 assignLegacyQuest();
@@ -1130,10 +1220,21 @@ function loadGame() {
             renderMainMenu(); 
         } catch (error) { 
             console.error("Could not load game:", error); 
-            localStorage.removeItem('rpgSaveData'); 
         } 
-    } 
+    } else {
+        alert("Save file not found!");
+        showStartScreen();
+    }
 }
+
+function showStartScreen() {
+    $('#game-container').classList.add('hidden');
+    $('#start-screen').classList.remove('hidden');
+    logElement.innerHTML = '';
+    player = null;
+    updateLoadGameButtonVisibility();
+}
+
 
 function assignLegacyQuest() {
     const questKey = 'collector_of_legend';
@@ -1150,23 +1251,89 @@ function initGame(playerName) {
     $('#start-screen').classList.add('hidden'); 
     $('#game-container').classList.remove('hidden'); 
     player = new Player(playerName); 
+    player.saveKey = generateSaveKey();
     assignLegacyQuest();
     addToLog(`Welcome, ${playerName}! Your adventure begins.`); 
     applyTheme('default'); 
     updateStatsView(); 
+    saveGame();
     renderMainMenu(); 
 }
+
+function updateLoadGameButtonVisibility() {
+    const saveKeys = JSON.parse(localStorage.getItem('rpgSaveKeys') || '[]');
+    if (saveKeys.length > 0) {
+        $('#load-game-btn').classList.remove('hidden');
+    } else {
+        $('#load-game-btn').classList.add('hidden');
+    }
+}
+
+function exportSave() {
+    if (!player) return;
+    try {
+        const saveDataString = JSON.stringify(player);
+        const base64Save = btoa(saveDataString);
+        navigator.clipboard.writeText(base64Save).then(() => {
+            addToLog('Save data copied to clipboard!', 'text-green-400');
+        }, (err) => {
+            addToLog('Failed to copy save data.', 'text-red-400');
+            console.error('Could not copy text: ', err);
+        });
+    } catch (error) {
+        addToLog('Could not export save data.', 'text-red-400');
+        console.error('Export failed:', error);
+    }
+}
+
+function importSave(saveString) {
+    try {
+        const jsonString = atob(saveString);
+        const parsedData = JSON.parse(jsonString);
+
+        if (!parsedData || !parsedData.name || !parsedData.hp) {
+            throw new Error("Invalid save data format.");
+        }
+
+        player = new Player(parsedData.name);
+        Object.assign(player, parsedData);
+        player.saveKey = generateSaveKey(); // Assign a new key for this browser's local storage
+
+        if (!player.activeLegacyQuest) {
+            assignLegacyQuest();
+        }
+
+        $('#start-screen').classList.add('hidden');
+        $('#game-container').classList.remove('hidden');
+        logElement.innerHTML = '';
+        addToLog(`Successfully imported character: ${player.name}!`);
+        applyTheme('default');
+        updateStatsView();
+        saveGame(); // Save the imported character to this browser's local storage
+        renderMainMenu();
+
+    } catch (error) {
+        console.error("Could not load game from key:", error);
+        alert("Failed to import save. The key might be invalid or corrupted.");
+    }
+}
+
+
 $('#start-game-btn').addEventListener('click', () => { const name = $('#player-name-input').value.trim(); if (name) { initGame(name); } else { $('#player-name-input').classList.add('border-red-500'); } });
 $('#player-name-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') $('#start-game-btn').click(); });
-window.addEventListener('load', () => { 
-    $('#load-game-btn').addEventListener('click', loadGame); 
-    if (localStorage.getItem('rpgSaveData')) { 
-        $('#load-game-btn').classList.remove('hidden'); 
-    } 
+
+$('#import-save-btn').addEventListener('click', () => {
+    const saveString = $('#import-save-input').value.trim();
+    if (saveString) {
+        importSave(saveString);
+    }
 });
-window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+
+window.addEventListener('load', () => { 
+    $('#load-game-btn').addEventListener('click', renderLoadMenu); 
+    updateLoadGameButtonVisibility();
+});
 </script>
-<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
 
