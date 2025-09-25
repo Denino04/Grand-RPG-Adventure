@@ -1,4 +1,26 @@
 // --- GAME DATA ------------------------------------------------------------------
+
+const BIOMES = {
+    'forest': {
+        name: 'Whispering Forest',
+        level_requirement: 1,
+        description: 'A dense forest teeming with common beasts. Relatively safe for new adventurers.',
+        monsters: { 'goblin': 50, 'dire_wolf': 40, 'orc_berserker': 10 }
+    },
+    'cave': {
+        name: 'Shadowy Cave',
+        level_requirement: 5,
+        description: 'A dark, damp cave system, home to unsavory characters and creatures of the dark.',
+        monsters: { 'bandit': 50, 'giant_rat': 40, 'cave_spider': 10 }
+    },
+    'mountain': {
+        name: 'Dragon\'s Peak',
+        level_requirement: 10,
+        description: 'The treacherous peaks of the mountain, where only the strongest creatures survive. Rumors speak of a great beast at its summit.',
+        monsters: { 'orc_berserker': 40, 'cave_spider': 30, 'bandit': 29, 'dragon': 1 }
+    }
+};
+
 const WEAPONS = {
     'fists': {name: 'Fists', damage: [1, 4], price: 0},
     'dagger': {name: 'Dagger', damage: [2, 4], price: 25},
@@ -27,7 +49,8 @@ const ITEMS = {
     'goblin_ear': {name: 'Goblin Ear', type: 'junk', price: 5},
     'wolf_pelt': {name: 'Wolf Pelt', type: 'junk', price: 12},
     'rat_tail': {name: 'Rat Tail', type: 'junk', price: 2},
-    'spider_venom': {name: 'Spider Venom', type: 'junk', price: 10}
+    'spider_venom': {name: 'Spider Venom', type: 'junk', price: 10},
+    'dragon_scale': {name: 'Dragon Scale', type: 'junk', price: 50}
 };
 const LURES = {
     'no_lure': { name: 'None', price: 0, description: 'No lure equipped.' },
@@ -45,10 +68,11 @@ const MAGIC = {
 const MONSTER_SPECIES = {
     'goblin': { name: 'Goblin', base_hp: 20, base_strength: 3, base_xp: 25, base_gold: 10, loot_table: {'health_potion': 0.1, 'goblin_ear': 0.5, 'dagger': 0.05} },
     'dire_wolf': { name: 'Dire Wolf', base_hp: 35, base_strength: 5, base_xp: 40, base_gold: 15, loot_table: {'health_potion': 0.15, 'wolf_pelt': 0.4} },
-    'orc_berserker': { name: 'Orc Berserker', base_hp: 60, base_strength: 8, base_xp: 75, base_gold: 30, loot_table: {'health_potion': 0.2, 'obsidian_axe': 0.1} },
+    'orc_berserker': { name: 'Orc Berserker', base_hp: 40, base_strength: 6, base_xp: 50, base_gold: 20, loot_table: {'health_potion': 0.2, 'obsidian_axe': 0.1} },
     'giant_rat': { name: 'Giant Rat', base_hp: 15, base_strength: 2, base_xp: 10, base_gold: 5, loot_table: {'rat_tail': 0.6} },
     'cave_spider': { name: 'Cave Spider', base_hp: 25, base_strength: 4, base_xp: 30, base_gold: 12, loot_table: {'spider_venom': 0.3} },
-    'bandit': { name: 'Bandit', base_hp: 30, base_strength: 8, base_xp: 50, base_gold: 20, loot_table: {'health_potion': 0.25, 'dagger': 0.2, 'leather_armor': 0.1} }
+    'bandit': { name: 'Bandit', base_hp: 30, base_strength: 8, base_xp: 50, base_gold: 20, loot_table: {'health_potion': 0.25, 'dagger': 0.2, 'leather_armor': 0.1} },
+    'dragon': { name: 'Dragon', base_hp: 100, base_strength: 10, base_xp: 150, base_gold: 100, loot_table: {'dragon_scale': 0.1, 'health_potion': 0.5, 'superior_health_potion': 0.1, 'flaming_sword': 0.2} }
 };
 const MONSTER_RARITY = {
     'common': {name: 'Common', multiplier: 1.0, damage: [1, 4], loot_chance_mod: 1.0, ability: null},
@@ -77,3 +101,4 @@ const BLACKSMITH_INVENTORY = {
 WEAPONS['flaming_sword'] = {name: 'Flaming Sword', damage: [2, 6], price: 700, effect: { type: 'fire_damage', damage: [1, 6] }};
 WEAPONS['vampiric_dagger'] = {name: 'Vampiric Dagger', damage: [2, 4], price: 600, effect: { type: 'lifesteal', amount: 0.5 }};
 ARMOR['mana_robe'] = {name: 'Robe of the Apprentice', defense: 1, price: 400, effect: { type: 'mp_regen', amount: 3 }};
+
