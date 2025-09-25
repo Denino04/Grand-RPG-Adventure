@@ -29,7 +29,8 @@ const WEAPONS = {
     'rusty_sword': {name: 'Rusty Sword', damage: [1, 6], price: 40},
     'steel_longsword': {name: 'Steel Longsword', damage: [2, 6], price: 150},
     'obsidian_axe': {name: 'Obsidian Axe', damage: [1, 12], price: 120},
-    'masterwork_spear': {name: 'Masterwork Spear', damage: [2, 8], price: 500}
+    'masterwork_spear': {name: 'Masterwork Spear', damage: [2, 8], price: 500},
+    'legend_slayer': {name: 'Legend Slayer', damage: [4, 8], price: 10000, effect: { type: 'bonus_vs_legendary', amount: 1.5 }}
 };
 const SHIELDS = {
     'no_shield': {name: 'None', defense: 0, blockChance: 0, price: 0},
@@ -86,9 +87,19 @@ const QUESTS = {
     'goblin_ears': { title: 'Goblin Menace', type: 'fetch', target: 'goblin_ear', required: 5, reward: { xp: 100, gold: 50 }, description: 'Collect 5 Goblin Ears.' },
     'wolf_hunt': { title: 'Wolf Hunt', type: 'extermination', target: 'dire_wolf', required: 3, reward: { xp: 150, gold: 75 }, description: 'Kill 3 Dire Wolves.' },
     'rat_infestation': { title: 'Rat Infestation', type: 'extermination', target: 'giant_rat', required: 5, reward: { xp: 50, gold: 25 }, description: 'Kill 5 Giant Rats.' },
-    'bandit_cave': { title: 'Bandit Cave', type: 'extermination', target: 'bandit', required: 10, reward: {xp: 200, gold: 100}, description: 'Eliminate 10 Bandits.'},
-    'dragon_slayer': { title: 'Dragon Slayer', type: 'extermination', target: 'dragon', required: 3, reward: {xp: 1000, gold: 250}, description: 'Slay the Flying Terrors and bathe in the glory.'}
+    'bandit_cave': { title: 'Bandit Cave', type: 'extermination', target: 'bandit', required: 10, reward: {xp: 200, gold: 100}, description: 'Eliminate 10 Bandits.'}
 };
+
+const LEGACY_QUESTS = {
+    'collector_of_legend': {
+        title: 'Collector of Legend',
+        type: 'legacy_extermination',
+        targets: Object.keys(MONSTER_SPECIES),
+        reward: { xp: 5000, gold: 10000, item: 'legend_slayer' },
+        description: 'Defeat a legendary version of every creature in the land.'
+    }
+};
+
 const SHOP_INVENTORY = {
     'Potions & Items': ['health_potion', 'mana_potion', 'superior_health_potion'],
     'Gear': ['dagger', 'leather_armor', 'wooden_shield'],
@@ -100,7 +111,7 @@ const BLACKSMITH_INVENTORY = {
     'Shields': ['iron_kite_shield', 'tower_greatshield']
 };
 
-WEAPONS['flaming_sword'] = {name: 'Flaming Sword', damage: [2, 8], price: 700, effect: { type: 'fire_damage', damage: [2, 4] }};
-WEAPONS['vampiric_dagger'] = {name: 'Vampiric Dagger', damage: [2, 4], price: 600, effect: { type: 'lifesteal', amount: 0.25 }};
+WEAPONS['flaming_sword'] = {name: 'Flaming Sword', damage: [2, 6], price: 700, effect: { type: 'fire_damage', damage: [1, 6] }};
+WEAPONS['vampiric_dagger'] = {name: 'Vampiric Dagger', damage: [2, 4], price: 600, effect: { type: 'lifesteal', amount: 0.5 }};
 ARMOR['mana_robe'] = {name: 'Robe of the Apprentice', defense: 1, price: 400, effect: { type: 'mp_regen', amount: 3 }};
 

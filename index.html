@@ -128,7 +128,7 @@
                         <p class="text-blue-400">MP: <span id="player-mp-text">20 / 20</span></p>
                     </div>
                  </div>
-                 <div id="quest-tracker" class="text-xs text-amber-300 h-4 mt-1"></div>
+                 <div id="quest-tracker" class="text-xs text-amber-300 min-h-[1rem] mt-1"></div>
             </div>
             <div class="bg-slate-800 p-3 rounded-lg lg:col-span-1">
                  <div class="flex justify-center items-center mb-2">
@@ -312,6 +312,7 @@ function showTooltip(itemKey, event) {
         if (details.effect.type === 'fire_damage') content += `<p class="text-orange-400 text-sm">+${details.effect.damage[0]}d${details.effect.damage[1]} Fire Damage</p>`;
         if (details.effect.type === 'lifesteal') content += `<p class="text-red-400 text-sm">Lifesteal (${details.effect.amount * 100}%)</p>`;
         if (details.effect.type === 'mp_regen') content += `<p class="text-blue-400 text-sm">+${details.effect.amount} MP per turn</p>`;
+        if (details.effect.type === 'bonus_vs_legendary') content += `<p class="text-yellow-400 text-sm">${details.effect.amount * 100}% Damage to Legendary foes</p>`;
     }
 
     tooltipElement.innerHTML = content;
@@ -360,7 +361,10 @@ class Player extends Entity {
             lureUses: {} 
         };
         this.spells = ['fireball', 'heal'];
-        this.activeQuest = null; this.questProgress = 0;
+        this.activeQuest = null; 
+        this.questProgress = 0;
+        this.activeLegacyQuest = null;
+        this.legacyQuestProgress = {};
     }
     addToInventory(itemKey, quantity = 1, verbose = true) {
         const details = getItemDetails(itemKey); if (!details) return;
@@ -402,7 +406,9 @@ class Enemy extends Entity {
         super(`${rarityData.name} ${speciesData.name}`, Math.floor(speciesData.base_hp * multiplier), Math.floor(speciesData.base_strength * multiplier));
         this.damage = rarityData.damage; this.ability = rarityData.ability;
         this.xpReward = Math.floor(speciesData.base_xp * multiplier); this.goldReward = Math.floor(speciesData.base_gold * multiplier);
-        this.lootTable = speciesData.loot_table; this.lootChanceMod = rarityData.loot_chance_mod; this.speciesData = speciesData;
+        this.lootTable = speciesData.loot_table; this.lootChanceMod = rarityData.loot_chance_mod; 
+        this.speciesData = speciesData;
+        this.rarityData = rarityData;
     }
     attack(target) {
         addToLog(`${this.name} attacks ${target.name}!`); this._performAttack(target);
@@ -487,11 +493,22 @@ function updateStatsView() {
     $('#equipped-lure').textContent = lure.name;
     
     const questTrackerEl = $('#quest-tracker');
+    let questHtml = '';
     if (player.activeQuest) {
         const quest = QUESTS[player.activeQuest]; let progress = player.questProgress;
         if (quest.type === 'fetch') { progress = player.inventory.items[quest.target] || 0; }
-        questTrackerEl.innerHTML = `<strong>Quest:</strong> ${quest.title} (${progress} / ${quest.required})`;
-    } else { questTrackerEl.innerHTML = ''; }
+        questHtml += `<strong>Quest:</strong> ${quest.title} (${progress} / ${quest.required})`;
+    }
+
+    if (player.activeLegacyQuest) {
+        const legacyQuest = LEGACY_QUESTS[player.activeLegacyQuest];
+        const progress = Object.values(player.legacyQuestProgress).filter(v => v).length;
+        const total = legacyQuest.targets.length;
+        if(questHtml !== '') questHtml += '<br>';
+        questHtml += `<strong class="text-yellow-200">Legacy:</strong> ${legacyQuest.title} (${progress} / ${total})`;
+    }
+
+    questTrackerEl.innerHTML = questHtml;
 }
 
 function returnFromInventory() {
@@ -979,7 +996,15 @@ function castSpell(spellKey) {
     updateStatsView();
     addToLog(`You cast ${spell.name}!`, 'text-purple-300');
     switch(spell.type) {
-        case 'damage': const magicDamage = rollDice(...spell.damage) + player.intelligence; currentEnemy.takeDamage(magicDamage); addToLog(`It deals <span class="font-bold text-purple-400">${magicDamage}</span> damage.`); break;
+        case 'damage': 
+            let magicDamage = rollDice(...spell.damage) + player.intelligence;
+            if (player.equippedWeapon.effect && player.equippedWeapon.effect.type === 'bonus_vs_legendary' && currentEnemy.rarityData.name === 'Legendary') {
+                magicDamage = Math.floor(magicDamage * player.equippedWeapon.effect.amount);
+                addToLog(`Your weapon glows, amplifying the spell's power!`, 'text-yellow-300');
+            }
+            currentEnemy.takeDamage(magicDamage); 
+            addToLog(`It deals <span class="font-bold text-purple-400">${magicDamage}</span> damage.`); 
+            break;
         case 'healing': const healAmount = rollDice(...spell.healing) + player.intelligence; player.hp = Math.min(player.maxHp, player.hp + healAmount); addToLog(`You recover <span class="font-bold text-green-400">${healAmount}</span> HP.`); updateStatsView(); break;
     }
     checkBattleStatus();
@@ -996,7 +1021,14 @@ function battleAction(type) {
     $('#battle-actions')?.classList.add('hidden');
     switch (type) {
         case 'attack':
-            gameState.isPlayerTurn = false; const weapon = player.equippedWeapon; const damage = rollDice(...weapon.damage) + player.strength; currentEnemy.takeDamage(damage);
+            gameState.isPlayerTurn = false; 
+            const weapon = player.equippedWeapon; 
+            let damage = rollDice(...weapon.damage) + player.strength;
+            if (weapon.effect && weapon.effect.type === 'bonus_vs_legendary' && currentEnemy.rarityData.name === 'Legendary') {
+                damage = Math.floor(damage * weapon.effect.amount);
+                addToLog(`Your weapon flares with power against a legendary foe!`, 'text-yellow-300');
+            }
+            currentEnemy.takeDamage(damage);
             addToLog(`You attack with ${weapon.name}, dealing <span class="font-bold text-yellow-300">${damage}</span> physical damage.`);
             if (weapon.effect) {
                 if (weapon.effect.type === 'fire_damage') { const fireDamage = rollDice(...weapon.effect.damage); currentEnemy.takeDamage(fireDamage); addToLog(`The blade burns for an extra <span class="font-bold text-orange-400">${fireDamage}</span> fire damage.`); }
@@ -1015,6 +1047,18 @@ function battleAction(type) {
 function checkBattleStatus() {
     if (!currentEnemy.isAlive()) {
         hideTooltip();
+        
+        // Check for Legacy Quest progress
+        if (player.activeLegacyQuest && currentEnemy.rarityData.name === 'Legendary') {
+            const legacyQuest = LEGACY_QUESTS[player.activeLegacyQuest];
+            const speciesKey = Object.keys(MONSTER_SPECIES).find(key => MONSTER_SPECIES[key].name === currentEnemy.speciesData.name);
+            if (player.legacyQuestProgress[speciesKey] === false) {
+                player.legacyQuestProgress[speciesKey] = true;
+                addToLog(`You have defeated a Legendary ${currentEnemy.speciesData.name}! Progress made on "${legacyQuest.title}".`, 'text-yellow-200 font-bold');
+                checkLegacyQuestCompletion();
+            }
+        }
+
         if (player.activeQuest) { const quest = QUESTS[player.activeQuest]; if (quest.type === 'extermination' && quest.target === currentEnemy.speciesData.name.toLowerCase().replace(/ /g, '_')) { player.questProgress++; addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300'); updateStatsView(); } }
         addToLog(`You have defeated the ${currentEnemy.name}!`, 'text-green-400 font-bold');
         player.gainXp(currentEnemy.xpReward); player.gold += currentEnemy.goldReward;
@@ -1025,6 +1069,22 @@ function checkBattleStatus() {
         setTimeout(enemyTurn, 400);
     }
 }
+function checkLegacyQuestCompletion() {
+    const quest = LEGACY_QUESTS[player.activeLegacyQuest];
+    const allDefeated = quest.targets.every(targetKey => player.legacyQuestProgress[targetKey]);
+    if (allDefeated) {
+        addToLog(`*** LEGACY QUEST COMPLETE: ${quest.title}! ***`, 'text-yellow-200 font-bold text-lg');
+        player.gainXp(quest.reward.xp);
+        player.gold += quest.reward.gold;
+        addToLog(`You received ${quest.reward.gold} G.`, 'text-yellow-400');
+        if (quest.reward.item) {
+            player.addToInventory(quest.reward.item);
+        }
+        player.activeLegacyQuest = null;
+        updateStatsView();
+    }
+}
+
 function handleEndOfTurnEffects() { if (player.equippedArmor.effect) { if (player.equippedArmor.effect.type === 'mp_regen') { const manaGained = player.equippedArmor.effect.amount; if (player.mp < player.maxMp) { player.mp = Math.min(player.maxMp, player.mp + manaGained); addToLog(`Your robes hum, restoring <span class="font-bold text-blue-400">${manaGained}</span> MP.`, 'text-blue-300'); updateStatsView(); } } } }
 function enemyTurn() {
     if (!currentEnemy.isAlive()) return; handleEndOfTurnEffects();
@@ -1056,7 +1116,12 @@ function loadGame() {
             hideTooltip();
             const parsedData = JSON.parse(savedData); 
             player = new Player(parsedData.name); 
-            Object.assign(player, parsedData); 
+            Object.assign(player, parsedData);
+
+            if (!player.activeLegacyQuest) {
+                assignLegacyQuest();
+            }
+
             $('#start-screen').classList.add('hidden'); 
             $('#game-container').classList.remove('hidden'); 
             addToLog(`Welcome back, ${player.name}!`); 
@@ -1069,11 +1134,23 @@ function loadGame() {
         } 
     } 
 }
+
+function assignLegacyQuest() {
+    const questKey = 'collector_of_legend';
+    player.activeLegacyQuest = questKey;
+    player.legacyQuestProgress = {};
+    const quest = LEGACY_QUESTS[questKey];
+    quest.targets.forEach(targetKey => {
+        player.legacyQuestProgress[targetKey] = false;
+    });
+}
+
 function initGame(playerName) { 
     hideTooltip();
     $('#start-screen').classList.add('hidden'); 
     $('#game-container').classList.remove('hidden'); 
     player = new Player(playerName); 
+    assignLegacyQuest();
     addToLog(`Welcome, ${playerName}! Your adventure begins.`); 
     applyTheme('default'); 
     updateStatsView(); 
