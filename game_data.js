@@ -85,7 +85,7 @@ const MONSTER_RARITY = {
 };
 const QUESTS = {
     'goblin_ears': { title: 'Goblin Menace', type: 'fetch', target: 'goblin_ear', required: 5, reward: { xp: 100, gold: 50 }, description: 'Collect 5 Goblin Ears.' },
-    'wolf_hunt': { title: 'Wolf Hunt', type: 'extermination', target: 'dire_wolf', required: 5, reward: { xp: 150, gold: 75 }, description: 'Kill 3 Dire Wolves.' },
+    'wolf_hunt': { title: 'Wolf Hunt', type: 'extermination', target: 'dire_wolf', required: 5, reward: { xp: 150, gold: 75 }, description: 'Kill 5 Dire Wolves.' },
     'rat_infestation': { title: 'Rat Infestation', type: 'extermination', target: 'giant_rat', required: 5, reward: { xp: 50, gold: 25 }, description: 'Kill 5 Giant Rats.' },
     'bandit_cave': { title: 'Bandit Cave', type: 'extermination', target: 'bandit', required: 10, reward: {xp: 200, gold: 100}, description: 'Eliminate 10 Bandits.'}
 };
