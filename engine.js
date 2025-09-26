@@ -53,8 +53,8 @@ class Entity {
 
 class Player extends Entity {
     constructor(name) {
-        super(name, 5000, 500);
-        this.gold = 10000; this.level = 100; this.xp = 0; this.xpToNextLevel = 100;
+        super(name, 50, 5);
+        this.gold = 100; this.level = 1; this.xp = 0; this.xpToNextLevel = 100;
         this.mp = 20; this.maxMp = 20; this.intelligence = 5;
         this.saveKey = null; // Will be assigned on new game
         this.seed = null; // Will be assigned on new game for consistent randomization
