@@ -296,6 +296,18 @@ function showStartScreen() {
     applyTheme('default');
 }
 
+function exitGame() {
+    addToLog('Saving your progress...');
+    saveGame();
+    setTimeout(() => {
+        $('#game-wrapper').classList.add('hidden');
+        $('#start-screen-wrapper').classList.remove('hidden');
+        logElement.innerHTML = ''; // Clear the log for the next session
+        updateLoadGameButtonVisibility();
+        applyTheme('default');
+    }, 1000);
+}
+
 function updateLoadGameButtonVisibility() {
     const saveKeys = JSON.parse(localStorage.getItem('rpgSaveKeys') || '[]');
     if (saveKeys.length > 0) {
