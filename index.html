@@ -424,7 +424,7 @@ class Enemy extends Entity {
     }
     _performAttack(target) {
         const totalDamage = rollDice(...this.damage) + this.strength; target.takeDamage(totalDamage);
-        if (this.ability === 'life_drain') { const drainAmount = Math.floor(totalDamage / 2); this.hp = Math.min(this.maxHp, this.hp + drainAmount); addToLog(`You drains <span class="font-bold text-green-400">${drainAmount}</span> HP!`); }
+        if (this.ability === 'life_drain') { const drainAmount = Math.floor(totalDamage / 2); this.hp = Math.min(this.maxHp, this.hp + drainAmount); addToLog(`${this.name} drains <span class="font-bold text-green-400">${drainAmount}</span> HP!`); }
     }
     takeDamage(damage) { 
         this.hp -= damage;
