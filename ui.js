@@ -6,7 +6,11 @@ const mainView = $('#main-view');
 function rollDice(numDice, sides) { let total = 0; for (let i = 0; i < numDice; i++) { total += Math.floor(Math.random() * sides) + 1; } return total; }
 function addToLog(message, colorClass = '') { const p = document.createElement('p'); p.innerHTML = message; p.className = `mb-1 ${colorClass}`; logElement.appendChild(p); logElement.scrollTop = logElement.scrollHeight; }
 function getItemDetails(itemKey) { if (itemKey in ITEMS) return ITEMS[itemKey]; if (itemKey in WEAPONS) return WEAPONS[itemKey]; if (itemKey in ARMOR) return ARMOR[itemKey]; if (itemKey in SHIELDS) return SHIELDS[itemKey]; if (itemKey in LURES) return LURES[itemKey]; if (itemKey in MAGIC) return MAGIC[itemKey]; return null; }
-function render(viewElement) { mainView.innerHTML = ''; mainView.appendChild(viewElement); }
+function render(viewElement) { 
+    hideTooltip();
+    mainView.innerHTML = ''; 
+    mainView.appendChild(viewElement); 
+}
 
 // --- THEME & PALETTES ---
 const PALETTES = {
