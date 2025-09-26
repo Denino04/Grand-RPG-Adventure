@@ -200,9 +200,6 @@ function returnFromInventory() {
     switch (lastViewBeforeInventory) {
         case 'main_menu': renderMainMenu(); break;
         case 'town': renderTown(); break;
-        case 'town_market': renderTownDistrict('market'); break;
-        case 'town_hall': renderTownDistrict('hall'); break;
-        case 'town_residential': renderTownDistrict('residential'); break;
         case 'quest_board': renderQuestBoard(); break;
         case 'inn': renderInn(); break;
         case 'magic_shop': renderMagicShop(); break;
@@ -284,34 +281,6 @@ function renderTown() {
     gameState.currentView = 'town';
     const template = document.getElementById('template-town');
     render(template.content.cloneNode(true));
-}
-
-function renderTownDistrict(district) {
-    let templateId = '';
-    let viewKey = '';
-    switch(district) {
-        case 'market':
-            templateId = 'template-market-district';
-            viewKey = 'town_market';
-            break;
-        case 'hall':
-            templateId = 'template-hall-district';
-            viewKey = 'town_hall';
-            break;
-        case 'residential':
-            templateId = 'template-residential-district';
-            viewKey = 'town_residential';
-            break;
-        default:
-            renderTown(); // Go back if district is unknown
-            return;
-    }
-    lastViewBeforeInventory = viewKey;
-    gameState.currentView = viewKey;
-    const template = document.getElementById(templateId);
-    if(template) {
-        render(template.content.cloneNode(true));
-    }
 }
 
 function renderQuestBoard() {
@@ -453,7 +422,7 @@ function renderShop(type) {
             gameState.currentView = 'blacksmith';
             break;
         case 'black_market':
-            inventory = BLACK_MARKET_INVENTORY;
+            inventory = { ...BLACK_MARKET_INVENTORY, 'Seasonal Wares': player.blackMarketStock.seasonal };
             title = 'Black Market';
             lastViewBeforeInventory = 'black_market';
             gameState.currentView = 'black_market';
@@ -463,16 +432,18 @@ function renderShop(type) {
 
     let itemsHtml = '';
     for (const category in inventory) {
+        if (inventory[category].length === 0) continue;
         itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
         itemsHtml += '<div class="space-y-2">';
         inventory[category].forEach(key => {
             const details = getItemDetails(key);
             if (!details) return;
-            itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${details.price} G</span><button onclick="buyItem('${key}', '${type}')" class="btn btn-primary text-sm py-1 px-3" ${player.gold < details.price ? 'disabled' : ''}>Buy</button></div></div>`;
+            const price = Math.floor(details.price * (type === 'black_market' ? 1.5 : 1)); // 50% markup for black market
+            itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${price} G</span><button onclick="buyItem('${key}', '${type}', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button></div></div>`;
         });
         itemsHtml += '</div>';
     }
-    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderTownDistrict('market')" class="btn btn-primary">Back to Market</button></div></div>`;
+    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderTown()" class="btn btn-primary">Back to Town</button></div></div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -825,3 +796,4 @@ function renderGraveyard() {
     container.innerHTML = html;
     render(container);
 }
+
