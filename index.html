@@ -58,7 +58,6 @@
             <div class="bg-slate-800 p-3 rounded-lg lg:col-span-1">
                  <div class="flex justify-center items-center mb-2">
                      <h3 id="equipment-title" class="font-bold text-yellow-400 text-center">Equipment</h3>
-                     <!-- BUGFIX: Added ID to inventory button for disabling during combat -->
                      <button id="inventory-btn" onclick="renderInventory()" title="Open Inventory" class="ml-4 p-1 bg-slate-700 hover:bg-slate-600 rounded-full transition-colors duration-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
@@ -74,7 +73,7 @@
             </div>
         </div>
 
-        <div id="main-view" class="min-h-[250px] p-6 rounded-lg mb-4 flex flex-col justify-center items-center">
+        <div id="main-view" class="min-h-[450px] p-6 rounded-lg mb-4 flex flex-col justify-center items-center">
             <!-- Game content is dynamically inserted here -->
         </div>
 
@@ -103,16 +102,26 @@
         </template>
 
         <template id="template-town">
-            <h2 class="font-medieval text-3xl mb-4 text-center">You are in town.</h2>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <button onclick="renderShop('store')" class="btn btn-primary w-full">General Store</button>
-                <button onclick="renderShop('blacksmith')" class="btn btn-primary w-full">Blacksmith</button>
-                <button onclick="renderShop('black_market')" class="btn btn-primary w-full">Black Market</button>
-                <button onclick="renderMagicShop()" class="btn btn-primary w-full">Magic Shop</button>
-                <button onclick="renderAlchemist()" class="btn btn-primary w-full">Alchemist</button>
-                <button onclick="renderQuestBoard()" class="btn btn-primary w-full">Quest Board</button>
-                <button onclick="renderInn()" class="btn btn-primary w-full">The Inn</button>
-                <button onclick="renderMainMenu()" class="btn btn-primary col-span-2 md:col-span-3">Leave Town</button>
+             <div class="flex flex-col items-center justify-center w-full">
+                <h2 class="font-medieval text-3xl mb-8 text-center">You are in town.</h2>
+                <div class="flex flex-col items-center gap-4">
+                    <div class="flex justify-center flex-wrap gap-4">
+                        <button onclick="renderShop('store')" class="btn btn-primary w-40">General Store</button>
+                        <button onclick="renderShop('blacksmith')" class="btn btn-primary w-40">Blacksmith</button>
+                        <button onclick="renderShop('black_market')" class="btn btn-primary w-40">Black Market</button>
+                    </div>
+                    <div class="flex justify-center flex-wrap gap-4">
+                        <button onclick="renderMagicShop()" class="btn btn-primary w-40">Magic Shop</button>
+                        <button onclick="renderAlchemist()" class="btn btn-primary w-40">Alchemist</button>
+                        <button onclick="renderQuestBoard()" class="btn btn-primary w-40">Quest Board</button>
+                    </div>
+                     <div class="flex justify-center flex-wrap gap-4">
+                        <button onclick="renderInn()" class="btn btn-primary w-40">The Inn</button>
+                    </div>
+                    <div class="flex justify-center flex-wrap gap-4 mt-4">
+                         <button onclick="renderMainMenu()" class="btn btn-action w-40">Leave Town</button>
+                    </div>
+                </div>
             </div>
         </template>
         
@@ -143,3 +152,4 @@
 <script src="/_vercel/insights/script.js"></script>
 </body>
 </html>
+

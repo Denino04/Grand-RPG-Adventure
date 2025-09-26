@@ -324,6 +324,9 @@ const ALCHEMY_RECIPES = {
     'brew_cleanse': { output: 'cleansing_potion', ingredients: { 'unicorn_horn_fragment': 1 }, cost: 100 },
     'brew_health': { output: 'health_potion', ingredients: { 'slime_glob': 2 }, cost: 10 },
     'brew_mana': { output: 'mana_potion', ingredients: { 'slime_glob': 2 }, cost: 15 },
+};
+
+const BLACKSMITH_RECIPES = {
     'brew_purifying_shield': { output: 'purifying_crystal_shield', ingredients: { 'unicorn_horn_fragment': 5 }, cost: 1500 },
     'brew_exa_reflector': { output: 'exa_reflector', ingredients: { 'soul_armor_shard': 1 }, cost: 2500 },
     'craft_soul_steel': { output: 'soul_steel_armor', ingredients: { 'soul_armor_shard': 5, 'adamantine_armor': 1 }, cost: 5000},

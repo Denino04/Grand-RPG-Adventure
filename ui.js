@@ -84,15 +84,11 @@ function showTooltip(itemKey, event) {
     
     if (details.damage) content += `<p>Damage: ${details.damage[0]}d${details.damage[1]}</p>`;
     if (details.defense) content += `<p>Defense: ${details.defense}</p>`;
-    // BUGFIX (Dodge Display): This section now correctly shows dodge chance in tooltips.
     if (details.blockChance > 0) content += `<p>Block Chance: ${Math.round(details.blockChance * 100)}%</p>`;
     if (details.effect?.type === 'dodge') content += `<p>Dodge Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
     if (details.effect?.type === 'parry') content += `<p>Parry Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
-
     if (details.amount) content += `<p class="text-green-400">Heals: ${details.amount} HP</p>`;
     if (details.type === 'mana_restore') content += `<p class="text-blue-400">Restores: ${details.amount} MP</p>`;
-    if (details.type === 'buff') content += `<p class="text-yellow-300">Effect: ${details.description.split('.')[1]}</p>`;
-    if (details.type === 'cleanse') content += `<p class="text-cyan-300">Effect: ${details.description.split('.')[1]}</p>`;
     if (details.cost) content += `<p class="text-blue-400">MP Cost: ${details.cost}</p>`;
     if (details.healing) content += `<p class="text-green-400">Healing: ${details.healing[0]}d${details.healing[1]}</p>`;
     if (details.uses) {
@@ -100,22 +96,32 @@ function showTooltip(itemKey, event) {
     }
     content += `<p class="text-gray-400 mt-2 text-sm"><em>${details.description}</em></p>`;
     
-    if (details.effect) {
+    if (details.effect || details.type === 'buff' || details.type === 'cleanse') {
         content += `<p class="mt-2 font-semibold text-cyan-300">Special Properties:</p><ul class="list-disc list-inside text-sm">`
-        if (details.effect.type === 'fire_damage') content += `<li>Deals an extra ${details.effect.damage[0]}d${details.effect.damage[1]} Fire Damage.</li>`;
-        if (details.effect.type === 'lightning_damage') content += `<li>Deals an extra ${details.effect.damage[0]}d${details.effect.damage[1]} Lightning Damage.</li>`;
-        if (details.effect.type === 'lifesteal') content += `<li>Heals for ${details.effect.amount * 100}% of damage dealt.</li>`;
-        if (details.effect.type === 'crit') content += `<li>${details.effect.chance * 100}% chance to deal ${details.effect.multiplier}x damage.</li>`;
-        if (details.effect.type === 'ignore_defense') content += `<li>Ignores ${details.effect.amount * 100}% of enemy defense.</li>`;
-        if (details.effect.type === 'ranged') content += `<li>Ranged: Causes enemies to have a ${details.effect.chance * 100}% chance to miss.</li>`;
-        if (details.effect.petrify_chance) content += `<li>${details.effect.petrify_chance * 100}% chance to Petrify for ${details.effect.duration} turn.</li>`;
-        if (details.effect.type === 'paralyze') content += `<li>${details.effect.chance * 100}% chance to Paralyze for ${details.effect.duration} turn.</li>`;
-        if (details.effect.type === 'parry') content += `<li>Grants a chance to parry, negating damage and launching a counter-attack.</li>`;
-        if (details.effect.type === 'dodge') content += `<li>${details.effect.chance * 100}% chance to completely evade an attack.</li>`;
-        if (details.effect.type === 'debuff_resist') content += `<li>${details.effect.chance * 100}% chance to resist negative status effects.</li>`;
-        if (details.effect.type === 'reflect') content += `<li>Reflects ${details.effect.amount * 100}% of pre-mitigation damage back to the attacker.</li>`;
-        if (details.effect.bonus_vs_dragon) content += `<li>Deals ${details.effect.bonus_vs_dragon * 100}% damage to Dragons.</li>`;
-        if (details.effect.revive) content += `<li>Revives the user to 50% HP upon death. (Once per lifetime)</li>`;
+        if (details.effect?.type === 'fire_damage') content += `<li>Deals an extra ${details.effect.damage[0]}d${details.effect.damage[1]} Fire Damage.</li>`;
+        if (details.effect?.type === 'lightning_damage') content += `<li>Deals an extra ${details.effect.damage[0]}d${details.effect.damage[1]} Lightning Damage.</li>`;
+        if (details.effect?.type === 'lifesteal') content += `<li>Heals for ${details.effect.amount * 100}% of damage dealt.</li>`;
+        if (details.effect?.type === 'crit') content += `<li>${details.effect.chance * 100}% chance to deal ${details.effect.multiplier}x damage.</li>`;
+        if (details.effect?.type === 'ignore_defense') content += `<li>Ignores ${details.effect.amount * 100}% of enemy defense.</li>`;
+        if (details.effect?.type === 'ranged') content += `<li>Ranged: Causes enemies to have a ${details.effect.chance * 100}% chance to miss.</li>`;
+        if (details.effect?.petrify_chance) content += `<li>${details.effect.petrify_chance * 100}% chance to Petrify for ${details.effect.duration} turn.</li>`;
+        if (details.effect?.type === 'paralyze') content += `<li>${details.effect.chance * 100}% chance to Paralyze for ${details.effect.duration} turn.</li>`;
+        if (details.effect?.type === 'parry') content += `<li>Grants a chance to parry, negating damage and launching a counter-attack.</li>`;
+        if (details.effect?.type === 'dodge') content += `<li>${details.effect.chance * 100}% chance to completely evade an attack.</li>`;
+        if (details.effect?.type === 'debuff_resist') content += `<li>${details.effect.chance * 100}% chance to resist negative status effects.</li>`;
+        if (details.effect?.type === 'reflect') content += `<li>Reflects ${details.effect.amount * 100}% of pre-mitigation damage back to the attacker.</li>`;
+        if (details.effect?.bonus_vs_dragon) content += `<li>Deals ${details.effect.bonus_vs_dragon * 100}% damage to Dragons.</li>`;
+        if (details.effect?.revive) content += `<li>Revives the user to 50% HP upon death. (Once per lifetime)</li>`;
+        if (details.type === 'buff') {
+            let effectText = `Increases ${details.effect.type} by ${ (details.effect.multiplier - 1) * 100}% for ${details.effect.duration} turns.`;
+            if (details.effect.type === 'stonehide') {
+                 effectText = `Increases defense by ${ (details.effect.multiplier - 1) * 100}% for ${details.effect.duration} turns.`;
+            }
+            content += `<li>${effectText}</li>`;
+        }
+        if (details.type === 'cleanse') {
+            content += `<li>Removes all negative status effects.</li>`;
+        }
         content += `</ul>`
     }
 
@@ -158,7 +164,6 @@ function updateStatsView() {
     
     $('#equipped-weapon').textContent = `${weapon.name} (${weapon.damage[0]}d${weapon.damage[1]})`; 
     
-    // BUGFIX (Dodge Display): Rewrote this to be more robust and show multiple stats like Dodge.
     let armorStats = [`Def: ${armor.defense}`];
     if (armor.blockChance > 0) {
         armorStats.push(`Block: ${Math.round(armor.blockChance * 100)}%`);
@@ -236,7 +241,7 @@ function renderMainMenu() {
     applyTheme('default');
     lastViewBeforeInventory = 'main_menu';
     gameState.currentView = 'main_menu';
-    $('#inventory-btn').disabled = false; // Ensure inventory is available
+    $('#inventory-btn').disabled = false;
     saveGame();
     const template = document.getElementById('template-main-menu');
     render(template.content.cloneNode(true));
@@ -298,8 +303,44 @@ function renderTown() {
     applyTheme('town');
     lastViewBeforeInventory = 'town';
     gameState.currentView = 'town';
-    const template = document.getElementById('template-town');
-    render(template.content.cloneNode(true));
+    
+    const container = document.createElement('div');
+    container.className = 'flex flex-col items-center justify-center w-full';
+
+    const title = document.createElement('h2');
+    title.className = 'font-medieval text-3xl mb-8 text-center';
+    title.textContent = 'You are in town.';
+    container.appendChild(title);
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'flex flex-col items-center gap-4';
+
+    const locations = [
+        [{ name: 'General Store', action: "renderShop('store')" }, { name: 'Blacksmith', action: "renderShop('blacksmith')" }, { name: 'Black Market', action: "renderShop('black_market')" }],
+        [{ name: 'Magic Shop', action: "renderMagicShop()" }, { name: 'Alchemist', action: "renderAlchemist()" }, { name: 'Quest Board', action: "renderQuestBoard()" }],
+        [{ name: 'The Inn', action: "renderInn()" }, { name: 'Enchanter', action: "addToLog('The Enchanter is under renovation. Please check back later.', 'text-gray-400')" }, { name: "Witch's Coven", action: "addToLog('The Witch\\'s Coven is currently brewing potions. Please check back later.', 'text-gray-400')" }],
+        [{ name: 'Leave Town', action: "renderMainMenu()", isAction: true }]
+    ];
+
+    locations.forEach(row => {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'flex justify-center flex-wrap gap-4';
+        if (row[0].isAction) {
+            rowDiv.classList.add('mt-4');
+        }
+
+        row.forEach(loc => {
+            const button = document.createElement('button');
+            button.className = loc.isAction ? 'btn btn-action w-40' : 'btn btn-primary w-40';
+            button.textContent = loc.name;
+            button.setAttribute('onclick', loc.action);
+            rowDiv.appendChild(button);
+        });
+        buttonContainer.appendChild(rowDiv);
+    });
+
+    container.appendChild(buttonContainer);
+    render(container);
 }
 
 function renderQuestBoard() {
@@ -364,7 +405,6 @@ function renderQuestBoard() {
             }
         }
         
-        // BUGFIX (Quest Spam): This filter correctly prevents quests already taken today from appearing.
         availableQuests = availableQuests.filter(quest => !player.questsTakenToday.includes(quest.key));
 
         const rng = seededRandom(player.seed); // Use the player's seed for consistent quest offerings
@@ -425,6 +465,11 @@ function renderMagicShop() {
 }
 
 function renderShop(type) {
+    if (type === 'blacksmith') {
+        renderBlacksmithMenu();
+        return;
+    }
+
     const scrollable = mainView.querySelector('.inventory-scrollbar');
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
 
@@ -436,12 +481,6 @@ function renderShop(type) {
             title = 'General Store';
             lastViewBeforeInventory = 'shop';
             gameState.currentView = 'shop';
-            break;
-        case 'blacksmith':
-            inventory = BLACKSMITH_INVENTORY;
-            title = 'Clanging Hammer Blacksmith';
-            lastViewBeforeInventory = 'blacksmith';
-            gameState.currentView = 'blacksmith';
             break;
         case 'black_market':
             inventory = { ...BLACK_MARKET_INVENTORY, 'Seasonal Wares': player.blackMarketStock.seasonal };
@@ -466,6 +505,116 @@ function renderShop(type) {
         itemsHtml += '</div>';
     }
     let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderTown()" class="btn btn-primary">Back to Town</button></div></div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
+}
+
+function renderBlacksmithMenu() {
+    lastViewBeforeInventory = 'blacksmith';
+    gameState.currentView = 'blacksmith';
+
+    let html = `
+        <div class="w-full text-center">
+            <h2 class="font-medieval text-3xl mb-4 text-center">Clanging Hammer Blacksmith</h2>
+            <p class="mb-6">The heat of the forge is immense. What do you need?</p>
+            <div class="flex justify-center gap-4">
+                <button onclick="renderBlacksmithBuy()" class="btn btn-primary">Buy Equipment</button>
+                <button onclick="renderBlacksmithCraft()" class="btn btn-primary">Craft Equipment</button>
+                <button onclick="renderTown()" class="btn btn-primary">Back to Town</button>
+            </div>
+        </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+function renderBlacksmithBuy() {
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+    
+    let itemsHtml = '';
+    for (const category in BLACKSMITH_INVENTORY) {
+        if (BLACKSMITH_INVENTORY[category].length === 0) continue;
+        itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
+        itemsHtml += '<div class="space-y-2">';
+        BLACKSMITH_INVENTORY[category].forEach(key => {
+            const details = getItemDetails(key);
+            if (!details) return;
+            const price = details.price;
+            itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${price} G</span><button onclick="buyItem('${key}', 'blacksmith', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button></div></div>`;
+        });
+        itemsHtml += '</div>';
+    }
+    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">Buy Equipment</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4"><button onclick="renderBlacksmithMenu()" class="btn btn-primary">Back</button></div></div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
+}
+
+function renderBlacksmithCraft() {
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
+    let recipesHtml = '';
+    for (const recipeKey in BLACKSMITH_RECIPES) {
+        const recipe = BLACKSMITH_RECIPES[recipeKey];
+        const productDetails = getItemDetails(recipe.output);
+        
+        let hasIngredients = true;
+        let ingredientsList = [];
+        for (const ingredientKey in recipe.ingredients) {
+            const requiredAmount = recipe.ingredients[ingredientKey];
+            
+            let playerAmount = 0;
+            if (ITEMS[ingredientKey]) {
+                 playerAmount = player.inventory.items[ingredientKey] || 0;
+            } else if (ARMOR[ingredientKey]) {
+                playerAmount = player.inventory.armor.filter(i => i === ingredientKey).length;
+            }
+
+            if (playerAmount < requiredAmount) {
+                hasIngredients = false;
+            }
+            const ingredientDetails = getItemDetails(ingredientKey);
+            ingredientsList.push(`<span onmouseover="showTooltip('${ingredientKey}', event)" onmouseout="hideTooltip()">${requiredAmount}x ${ingredientDetails.name}</span>`);
+        }
+
+        const canAfford = player.gold >= recipe.cost;
+        const canCraft = hasIngredients && canAfford;
+
+        recipesHtml += `
+            <div class="p-3 bg-slate-800 rounded-lg">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${recipe.output}', event)" onmouseout="hideTooltip()">${productDetails.name}</h3>
+                    <button onclick="craftGear('${recipeKey}')" class="btn btn-primary text-sm py-1 px-3" ${!canCraft ? 'disabled' : ''}>Forge</button>
+                </div>
+                <div class="text-sm text-gray-400 mt-1">
+                    <p>Requires: ${ingredientsList.join(', ')}</p>
+                    <p>Cost: <span class="text-yellow-400">${recipe.cost} G</span></p>
+                </div>
+            </div>`;
+    }
+
+    if (!recipesHtml) {
+        recipesHtml = `<p class="text-center text-gray-400">You don't have any schematics to forge.</p>`;
+    }
+
+    let html = `
+        <div class="w-full">
+            <h2 class="font-medieval text-3xl mb-4 text-center">Crafting Schematics</h2>
+            <p class="text-center text-gray-400 mb-4">Forge powerful gear from rare materials.</p>
+            <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">${recipesHtml}</div>
+            <div class="text-center mt-4">
+                <button onclick="renderBlacksmithMenu()" class="btn btn-primary">Back</button>
+            </div>
+        </div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -637,13 +786,10 @@ function renderAlchemist() {
 }
 
 function renderInventory() {
-    // BUGFIX (Inventory Abuse): This check prevents opening the main inventory during combat.
-    // The button is also now disabled as a primary measure.
     if (gameState.currentView === 'battle') {
-        addToLog("You cannot access your full inventory during combat! Use the 'Item' battle command instead.", 'text-red-400');
+        addToLog("You cannot access your full inventory during combat! Use the 'Item' command instead.", 'text-red-400');
         return;
     }
-
     const scrollables = mainView.querySelectorAll('.inventory-scrollbar');
     const scrollPositions = Array.from(scrollables).map(el => el.scrollTop);
 
@@ -796,7 +942,6 @@ function renderBattle(subView = 'main', actionData = null) {
      }
 }
 
-// FEATURE (Continue Battle): This menu now appears after every victory.
 function renderPostBattleMenu() {
     const biomeKey = gameState.currentBiome;
     if (!biomeKey) { // Safety check
@@ -848,3 +993,4 @@ function renderGraveyard() {
     container.innerHTML = html;
     render(container);
 }
+

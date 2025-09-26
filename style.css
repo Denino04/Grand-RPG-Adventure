@@ -104,3 +104,4 @@ body {
 .btn-flee:hover:not(:disabled) { background-color: var(--btn-flee-bg-hover); border-color: var(--btn-flee-border-hover); }
 
 #tooltip { position: fixed; display: none; z-index: 100; pointer-events: none; transition: opacity 0.2s; }
+
