@@ -1,0 +1,106 @@
+:root {
+    --bg-main: #1f2937;
+    --bg-secondary: #111827;
+    --bg-log: rgba(0, 0, 0, 0.3);
+    --bg-tooltip: #111827;
+    --border-main: #374151;
+    --text-main: #d1d5db;
+    --text-accent: #fcd34d;
+    --btn-primary-bg: #475569;
+    --btn-primary-bg-hover: #64748b;
+    --btn-primary-border: #1e293b;
+    --btn-primary-border-hover: #334155;
+    --btn-action-bg: #dc2626;
+    --btn-action-bg-hover: #ef4444;
+    --btn-action-border: #991b1b;
+    --btn-action-border-hover: #b91c1c;
+    --btn-magic-bg: #9333ea;
+    --btn-magic-bg-hover: #a855f7;
+    --btn-magic-border: #6b21a8;
+    --btn-magic-border-hover: #7e22ce;
+    --btn-item-bg: #16a34a;
+    --btn-item-bg-hover: #22c55e;
+    --btn-item-border: #15803d;
+    --btn-item-border-hover: #16a34a;
+    --btn-flee-bg: #6b7280;
+    --btn-flee-bg-hover: #4b5563;
+    --btn-flee-border: #374151;
+    --btn-flee-border-hover: #1f2937;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #1a1a1a;
+}
+.font-medieval {
+    font-family: 'MedievalSharp', cursive;
+}
+#game-container { background-color: var(--bg-main); border-color: var(--border-main); }
+#stats-view, .bg-slate-800 { background-color: var(--bg-secondary); }
+#main-view { background-color: color-mix(in srgb, var(--bg-secondary) 50%, transparent); }
+#game-log { background-color: var(--bg-log); color: var(--text-main); }
+#tooltip { background-color: var(--bg-tooltip); border-color: var(--border-main); }
+#player-name, .text-yellow-300 { color: var(--text-accent); }
+.text-gray-200 { color: var(--text-main); }
+
+#game-log::-webkit-scrollbar { width: 8px; }
+#game-log::-webkit-scrollbar-track { background: #2d3748; }
+#game-log::-webkit-scrollbar-thumb { background-color: #718096; border-radius: 4px; }
+.inventory-scrollbar::-webkit-scrollbar { width: 10px; }
+.inventory-scrollbar::-webkit-scrollbar-track { background: #1a202c; border-radius: 5px; }
+.inventory-scrollbar::-webkit-scrollbar-thumb { background-color: #a0aec0; border-radius: 5px; border: 2px solid #1a202c; }
+.inventory-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #cbd5e0; }
+
+.btn {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    color: white;
+    transition: all 0.2s;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    border-bottom-width: 4px;
+}
+.btn:disabled {
+    background-color: #6b7280;
+    border-color: #374151;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn-primary {
+    background-color: var(--btn-primary-bg);
+    border-color: var(--btn-primary-border);
+}
+.btn-primary:hover:not(:disabled) {
+    background-color: var(--btn-primary-bg-hover);
+    border-color: var(--btn-primary-border-hover);
+}
+
+#start-screen .btn-primary {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+}
+#start-screen .btn-primary:hover:not(:disabled) {
+    background-color: var(--bg-secondary);
+    border-color: transparent; /* Keep border transparent on hover */
+}
+#start-screen .btn-primary:disabled {
+     background-color: transparent;
+     border-color: transparent;
+     opacity: 0.5;
+}
+
+.btn-action { background-color: var(--btn-action-bg); border-color: var(--btn-action-border); }
+.btn-action:hover:not(:disabled) { background-color: var(--btn-action-bg-hover); border-color: var(--btn-action-border-hover); }
+
+.btn-magic { background-color: var(--btn-magic-bg); border-color: var(--btn-magic-border); }
+.btn-magic:hover:not(:disabled) { background-color: var(--btn-magic-bg-hover); border-color: var(--btn-magic-border-hover); }
+
+.btn-item { background-color: var(--btn-item-bg); border-color: var(--btn-item-border); }
+.btn-item:hover:not(:disabled) { background-color: var(--btn-item-bg-hover); border-color: var(--btn-item-border-hover); }
+
+.btn-flee { background-color: var(--btn-flee-bg); border-color: var(--btn-flee-border); }
+.btn-flee:hover:not(:disabled) { background-color: var(--btn-flee-bg-hover); border-color: var(--btn-flee-border-hover); }
+
+#tooltip { position: fixed; display: none; z-index: 100; pointer-events: none; transition: opacity 0.2s; }
