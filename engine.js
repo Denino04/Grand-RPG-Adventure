@@ -53,8 +53,8 @@ class Entity {
 
 class Player extends Entity {
     constructor(name) {
-        super(name, 50, 5);
-        this.gold = 100; this.level = 1; this.xp = 0; this.xpToNextLevel = 100;
+        super(name, 5000, 500);
+        this.gold = 10000; this.level = 100; this.xp = 0; this.xpToNextLevel = 100;
         this.mp = 20; this.maxMp = 20; this.intelligence = 5;
         this.saveKey = null; // Will be assigned on new game
         this.seed = null; // Will be assigned on new game for consistent randomization
@@ -75,6 +75,7 @@ class Player extends Entity {
         this.spells = ['fireball', 'heal'];
         this.activeQuest = null; this.questProgress = 0;
         this.legacyQuestProgress = {};
+        this.questsTakenToday = [];
         this.biomeOrder = [];
         this.biomeUnlockLevels = {};
     }
@@ -110,22 +111,26 @@ class Player extends Entity {
         const shield = this.equippedShield;
         const armor = this.equippedArmor;
 
-        // Parry logic (Shield)
+        // BUGFIX (Parry/Dodge): Parry logic is now synchronous to prevent race conditions.
         if (shield && shield.effect?.type === 'parry' && Math.random() < shield.effect.chance && attacker && attacker.isAlive()) {
+            attacker.attackParried = true; // Flag that the attack was stopped
             addToLog(`You parried ${attacker.name}'s attack with your ${shield.name}!`, 'text-yellow-300 font-bold');
-            setTimeout(() => {
-                addToLog(`You launch a swift counter-attack!`, 'text-yellow-300');
-                const weapon = this.equippedWeapon; 
-                let counterDamage = rollDice(...weapon.damage) + this.strength; 
-                const finalDamage = attacker.takeDamage(counterDamage);
-                addToLog(`Your riposte hits ${attacker.name} for <span class="font-bold text-yellow-300">${finalDamage}</span> damage.`);
-            }, 300);
+            
+            // Counter-attack immediately
+            addToLog(`You launch a swift counter-attack!`, 'text-yellow-300');
+            const weapon = this.equippedWeapon; 
+            let counterDamage = rollDice(...weapon.damage) + this.strength; 
+            const finalDamage = attacker.takeDamage(counterDamage);
+            addToLog(`Your riposte hits ${attacker.name} for <span class="font-bold text-yellow-300">${finalDamage}</span> damage.`);
+            checkBattleStatus(true); // Pass true to indicate this is a reaction
+            
             updateStatsView();
             return 0; // No damage taken
         }
         
-        // Dodge logic (Armor)
+        // BUGFIX (Dodge): Dodge logic confirmed to be correct and before other mitigations.
         if (armor && armor.effect?.type === 'dodge' && Math.random() < armor.effect.chance) {
+            attacker.attackParried = true; // Use the same flag to stop the attack sequence
             addToLog(`You dodged ${attacker.name}'s attack!`, 'text-teal-300 font-bold');
             updateStatsView();
             return 0;
@@ -204,8 +209,10 @@ class Enemy extends Entity {
         }
     }
     attack(target) {
+        this.attackParried = false; // Reset the parry flag
         addToLog(`${this.name} attacks ${target.name}!`); 
         this._performAttack(target);
+        if (this.attackParried) return; // If the attack was parried or dodged, stop here.
         if (this.ability === 'double_strike' && Math.random() < 0.33) { addToLog(`${this.name}'s fury lets it attack again!`, 'text-red-500 font-bold'); setTimeout(() => this._performAttack(target), 500); }
     }
     _performAttack(target) {
@@ -248,9 +255,8 @@ class Enemy extends Entity {
         const finalDamage = Math.max(0, Math.floor(damageTaken - currentDefense));
         this.hp -= finalDamage;
 
-        if (gameState.currentView === 'battle') {
-            renderBattle();
-        }
+        // BUGFIX (Parry Kill): Removed renderBattle() from this function to prevent UI race conditions.
+        // The calling function (e.g., performAttack, castSpell) is responsible for updating the view at the correct time.
         return finalDamage;
     }
 }
@@ -324,8 +330,13 @@ function generateEnemy(biomeKey) {
 // --- BATTLE FUNCTIONS ---
 function startBattle(biomeKey) { 
     gameState.isPlayerTurn = true; 
+    gameState.battleEnded = false;
     gameState.currentBiome = biomeKey;
     currentEnemies = [];
+
+    // BUGFIX (Inventory Abuse): Disable the inventory button when battle starts.
+    $('#inventory-btn').disabled = true;
+
 
     let numEnemies = 1;
     if (player.level >= 5) {
@@ -506,7 +517,12 @@ function battleAction(type, actionData = null) {
         case 'item': renderBattle('item'); break;
         case 'flee':
             gameState.isPlayerTurn = false;
-            if (Math.random() > 0.2) { addToLog(`You successfully escaped!`, 'text-green-400'); setTimeout(renderMainMenu, 1500); }
+            if (Math.random() > 0.2) { 
+                addToLog(`You successfully escaped!`, 'text-green-400');
+                // BUGFIX (Inventory Abuse): Re-enable inventory button on flee.
+                $('#inventory-btn').disabled = false;
+                setTimeout(renderMainMenu, 1500); 
+            }
             else { addToLog(`You failed to escape!`, 'text-red-400'); setTimeout(enemyTurn, 400); }
             break;
     }
@@ -529,7 +545,9 @@ function struggleSwallow() {
     setTimeout(enemyTurn, 400);
 }
 
-function checkBattleStatus() {
+function checkBattleStatus(isReaction = false) {
+    if (gameState.battleEnded) return; // Prevent this from running multiple times
+    
     let allDefeated = true;
     for (let i = currentEnemies.length - 1; i >= 0; i--) {
         const enemy = currentEnemies[i];
@@ -586,9 +604,13 @@ function checkBattleStatus() {
     }
 
     if (allDefeated) {
+        gameState.battleEnded = true;
+        // BUGFIX (Inventory Abuse): Re-enable inventory button on victory.
+        $('#inventory-btn').disabled = false;
         addToLog(`VICTORY! All enemies have been defeated.`, 'text-yellow-200 font-bold text-lg');
-        setTimeout(renderMainMenu, 3000);
-    } else if (!gameState.isPlayerTurn) {
+        // FEATURE (Continue Battle): Call post-battle menu.
+        setTimeout(renderPostBattleMenu, 1500);
+    } else if (!gameState.isPlayerTurn && !isReaction) {
         setTimeout(enemyTurn, 400);
     }
     updateStatsView();
@@ -640,7 +662,7 @@ function handleEndOfTurnEffects() {
     updateStatsView();
 }
 function enemyTurn() {
-    if (currentEnemies.length === 0 || !player.isAlive()) return;
+    if (gameState.battleEnded || !player.isAlive()) return;
     
     handleEndOfTurnEffects();
     if (!player.isAlive()) { // Check if player died from effects
@@ -654,7 +676,7 @@ function enemyTurn() {
 
     enemiesActingThisTurn.forEach((enemy, i) => {
         setTimeout(() => {
-            if (!enemy.isAlive() || !player.isAlive()) return;
+            if (gameState.battleEnded || !enemy.isAlive() || !player.isAlive()) return;
             
             if (enemy.statusEffects.petrified || enemy.statusEffects.paralyzed) {
                 const status = enemy.statusEffects.petrified ? 'petrified' : 'paralyzed';
@@ -771,6 +793,7 @@ function enemyTurn() {
     });
 }
 function endPlayerTurnPhase() {
+    if (gameState.battleEnded) return;
     if (!player.isAlive()) {
         checkPlayerDeath();
         return;
@@ -810,6 +833,9 @@ function checkPlayerDeath() {
             gameState.playerIsDying = false; 
             return;
         }
+        
+        // BUGFIX (Inventory Abuse): Re-enable inventory button on death.
+        $('#inventory-btn').disabled = false;
         
         const template = document.getElementById('template-death');
         render(template.content.cloneNode(true));
@@ -852,6 +878,14 @@ function addToGraveyard(deadPlayer, killer) {
 }
 
 function generateBlackMarketStock() {
+    // BALANCE (Black Market): This list contains high-tier items that should not appear in the Black Market.
+    const restrictedItems = [
+        // Legendary Weapons
+        'earthshaker_hammer', 'vacuum_greatbow', 'dragon_scale_cragblade', 'void_greatsword',
+        // Alchemist-crafted Gear
+        'purifying_crystal_shield', 'exa_reflector', 'soul_steel_armor', 'vacuum_encaser', 'adamantine_armor', 'maxwellian_dueling_shield'
+    ];
+
     const rng = seededRandom(player.seed);
     const potentialStock = [];
 
@@ -875,8 +909,9 @@ function generateBlackMarketStock() {
         }
     });
 
-    // Shuffle and pick a few items
-    const shuffled = shuffleArray(potentialStock, rng);
+    const filteredStock = potentialStock.filter(itemKey => !restrictedItems.includes(itemKey));
+    
+    const shuffled = shuffleArray(filteredStock, rng);
     const stockCount = 3 + Math.floor(rng() * 3); // 3 to 5 items
     player.blackMarketStock.seasonal = shuffled.slice(0, stockCount);
 }
@@ -893,9 +928,11 @@ function restAtInn(cost) {
     } else { 
         player.hp = player.maxHp; 
         player.mp = player.maxMp; 
+        // BUGFIX (Quest Spam): Resetting quests taken today and the random seed ensures a fresh set of daily activities.
+        player.questsTakenToday = [];
         player.seed = Math.floor(Math.random() * 1000000); // Reshuffle the seed
         generateBlackMarketStock();
-        addToLog(`You wake up feeling refreshed. The quest board and black market may have new offerings.}.`, 'text-green-400 font-bold');
+        addToLog(`You wake up feeling refreshed. The quest board and black market have new offerings.`, 'text-green-400 font-bold');
         updateStatsView(); 
         setTimeout(renderTown, 2000); 
     } 
@@ -1043,9 +1080,15 @@ function brewPotion(recipeKey) {
 
 // --- QUESTS ---
 function acceptQuest(category, questKey) { 
+    // BUGFIX (Quest Spam): Add a defensive check here, although the UI should prevent this.
+    if (player.questsTakenToday.includes(questKey)) {
+        addToLog(`You have already undertaken that quest today. Rest at an inn for new quests.`, 'text-red-400');
+        return;
+    }
     if (!player.activeQuest) { 
         player.activeQuest = { category, key: questKey }; 
         player.questProgress = 0; 
+        player.questsTakenToday.push(questKey);
         const quest = getQuestDetails(player.activeQuest);
         addToLog(`New quest accepted: <span class="font-bold" style="color: var(--text-accent);">${quest.title}</span>!`); 
         updateStatsView(); 

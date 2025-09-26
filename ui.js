@@ -84,8 +84,11 @@ function showTooltip(itemKey, event) {
     
     if (details.damage) content += `<p>Damage: ${details.damage[0]}d${details.damage[1]}</p>`;
     if (details.defense) content += `<p>Defense: ${details.defense}</p>`;
+    // BUGFIX (Dodge Display): This section now correctly shows dodge chance in tooltips.
     if (details.blockChance > 0) content += `<p>Block Chance: ${Math.round(details.blockChance * 100)}%</p>`;
+    if (details.effect?.type === 'dodge') content += `<p>Dodge Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
     if (details.effect?.type === 'parry') content += `<p>Parry Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
+
     if (details.amount) content += `<p class="text-green-400">Heals: ${details.amount} HP</p>`;
     if (details.type === 'mana_restore') content += `<p class="text-blue-400">Restores: ${details.amount} MP</p>`;
     if (details.type === 'buff') content += `<p class="text-yellow-300">Effect: ${details.description.split('.')[1]}</p>`;
@@ -108,6 +111,7 @@ function showTooltip(itemKey, event) {
         if (details.effect.petrify_chance) content += `<li>${details.effect.petrify_chance * 100}% chance to Petrify for ${details.effect.duration} turn.</li>`;
         if (details.effect.type === 'paralyze') content += `<li>${details.effect.chance * 100}% chance to Paralyze for ${details.effect.duration} turn.</li>`;
         if (details.effect.type === 'parry') content += `<li>Grants a chance to parry, negating damage and launching a counter-attack.</li>`;
+        if (details.effect.type === 'dodge') content += `<li>${details.effect.chance * 100}% chance to completely evade an attack.</li>`;
         if (details.effect.type === 'debuff_resist') content += `<li>${details.effect.chance * 100}% chance to resist negative status effects.</li>`;
         if (details.effect.type === 'reflect') content += `<li>Reflects ${details.effect.amount * 100}% of pre-mitigation damage back to the attacker.</li>`;
         if (details.effect.bonus_vs_dragon) content += `<li>Deals ${details.effect.bonus_vs_dragon * 100}% damage to Dragons.</li>`;
@@ -153,15 +157,25 @@ function updateStatsView() {
     const lure = LURES[player.equippedLure];
     
     $('#equipped-weapon').textContent = `${weapon.name} (${weapon.damage[0]}d${weapon.damage[1]})`; 
-    $('#equipped-armor').textContent = `${armor.name} (Def: ${armor.defense})`;
     
-    let shieldStatText = `(Def: ${shield.defense})`;
-    if (shield.blockChance > 0) {
-        shieldStatText = `(Def: ${shield.defense}, Block: ${Math.round(shield.blockChance * 100)}%)`;
-    } else if (shield.effect?.type === 'parry') {
-        shieldStatText = `(Def: ${shield.defense}, Parry: ${Math.round(shield.effect.chance * 100)}%)`;
+    // BUGFIX (Dodge Display): Rewrote this to be more robust and show multiple stats like Dodge.
+    let armorStats = [`Def: ${armor.defense}`];
+    if (armor.blockChance > 0) {
+        armorStats.push(`Block: ${Math.round(armor.blockChance * 100)}%`);
     }
-    $('#equipped-shield').textContent = `${shield.name} ${shieldStatText}`;
+    if (armor.effect?.type === 'dodge') {
+        armorStats.push(`Dodge: ${Math.round(armor.effect.chance * 100)}%`);
+    }
+    $('#equipped-armor').textContent = `${armor.name} (${armorStats.join(', ')})`;
+
+    let shieldStats = [`Def: ${shield.defense}`];
+    if (shield.blockChance > 0) {
+        shieldStats.push(`Block: ${Math.round(shield.blockChance * 100)}%`);
+    }
+    if (shield.effect?.type === 'parry') {
+        shieldStats.push(`Parry: ${Math.round(shield.effect.chance * 100)}%`);
+    }
+     $('#equipped-shield').textContent = `${shield.name} (${shieldStats.join(', ')})`;
 
     $('#equipped-lure').textContent = lure.name;
     
@@ -222,6 +236,7 @@ function renderMainMenu() {
     applyTheme('default');
     lastViewBeforeInventory = 'main_menu';
     gameState.currentView = 'main_menu';
+    $('#inventory-btn').disabled = false; // Ensure inventory is available
     saveGame();
     const template = document.getElementById('template-main-menu');
     render(template.content.cloneNode(true));
@@ -349,6 +364,9 @@ function renderQuestBoard() {
             }
         }
         
+        // BUGFIX (Quest Spam): This filter correctly prevents quests already taken today from appearing.
+        availableQuests = availableQuests.filter(quest => !player.questsTakenToday.includes(quest.key));
+
         const rng = seededRandom(player.seed); // Use the player's seed for consistent quest offerings
         const offeredQuests = shuffleArray(availableQuests, rng).slice(0, numQuestsToShow);
         
@@ -363,7 +381,7 @@ function renderQuestBoard() {
                          </div>`;
             }).join('');
         } else {
-            html += `<p class="text-center text-gray-400">No quests available for your level.</p>`;
+            html += `<p class="text-center text-gray-400">No new quests available. Rest at an Inn to see more.</p>`;
         }
         html += `</div>`;
     }
@@ -619,6 +637,13 @@ function renderAlchemist() {
 }
 
 function renderInventory() {
+    // BUGFIX (Inventory Abuse): This check prevents opening the main inventory during combat.
+    // The button is also now disabled as a primary measure.
+    if (gameState.currentView === 'battle') {
+        addToLog("You cannot access your full inventory during combat! Use the 'Item' battle command instead.", 'text-red-400');
+        return;
+    }
+
     const scrollables = mainView.querySelectorAll('.inventory-scrollbar');
     const scrollPositions = Array.from(scrollables).map(el => el.scrollTop);
 
@@ -703,7 +728,9 @@ function renderInventory() {
 }
 
 function renderBattle(subView = 'main', actionData = null) {
+     if (gameState.battleEnded) return;
      if (currentEnemies.length === 0 && subView !== 'item') return; // Allow item menu after battle
+
      if (subView === 'main') {
         const template = document.getElementById('template-battle');
         const view = template.content.cloneNode(true);
@@ -769,6 +796,27 @@ function renderBattle(subView = 'main', actionData = null) {
      }
 }
 
+// FEATURE (Continue Battle): This menu now appears after every victory.
+function renderPostBattleMenu() {
+    const biomeKey = gameState.currentBiome;
+    if (!biomeKey) { // Safety check
+        renderMainMenu();
+        return;
+    }
+    const biome = BIOMES[biomeKey];
+    let html = `<div class="text-center">
+        <h2 class="font-medieval text-3xl mb-4 text-yellow-200">Victory!</h2>
+        <p class="mb-6">You have cleared the area. What will you do next?</p>
+        <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
+            <button onclick="startBattle('${biomeKey}')" class="btn btn-primary w-full sm:w-auto">Continue Exploring ${biome.name}</button>
+            <button onclick="renderMainMenu()" class="btn btn-primary w-full sm:w-auto">Return to Menu</button>
+        </div>
+    </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
 function renderGraveyard() {
     const graveyard = JSON.parse(localStorage.getItem('rpgGraveyard') || '[]');
     let html = `<div class="w-full text-center">
@@ -800,4 +848,3 @@ function renderGraveyard() {
     container.innerHTML = html;
     render(container);
 }
-

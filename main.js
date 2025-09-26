@@ -164,6 +164,9 @@ function loadGameFromKey(saveKey) {
             if (!player.legacyQuestProgress) {
                 player.legacyQuestProgress = {};
             }
+            if (!player.questsTakenToday) {
+                player.questsTakenToday = [];
+            }
             if (!player.blackMarketStock) {
                 player.blackMarketStock = { seasonal: [] };
                 generateBlackMarketStock();
@@ -234,6 +237,9 @@ function importSave(saveString) {
         gameState.playerIsDying = false; 
         if (!player.legacyQuestProgress) {
             player.legacyQuestProgress = {};
+        }
+        if (!player.questsTakenToday) {
+            player.questsTakenToday = [];
         }
 
         // Compatibility fix for old save files with the old quest system

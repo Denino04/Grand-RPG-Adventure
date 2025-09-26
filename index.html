@@ -58,7 +58,8 @@
             <div class="bg-slate-800 p-3 rounded-lg lg:col-span-1">
                  <div class="flex justify-center items-center mb-2">
                      <h3 id="equipment-title" class="font-bold text-yellow-400 text-center">Equipment</h3>
-                     <button onclick="renderInventory()" title="Open Inventory" class="ml-4 p-1 bg-slate-700 hover:bg-slate-600 rounded-full transition-colors duration-200">
+                     <!-- BUGFIX: Added ID to inventory button for disabling during combat -->
+                     <button id="inventory-btn" onclick="renderInventory()" title="Open Inventory" class="ml-4 p-1 bg-slate-700 hover:bg-slate-600 rounded-full transition-colors duration-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
                         </svg>
@@ -139,7 +140,6 @@
 <script>
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
 </script>
-<script defer src="/_vercel/insights/script.js"></script>
+<script src="/_vercel/insights/script.js"></script>
 </body>
 </html>
-
