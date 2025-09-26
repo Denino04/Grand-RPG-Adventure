@@ -5,14 +5,14 @@ const BIOMES = {
         theme: 'forest',
         tier: 1,
         description: 'A dense forest where strange beasts and territorial humanoids roam.',
-        monsters: { 'rabid_rabbit': 40, 'goblin': 40, 'slime': 15, 'skeleton': 3, 'mountain_goliath': 1, 'livyatan': 1 },
+        monsters: { 'rabid_rabbit': 45, 'goblin': 45, 'slime': 10 },
     },
     'catacombs': {
         name: 'Sunken Catacombs',
         theme: 'cave',
         tier: 1,
         description: 'A dark, damp tomb where the dead and their grotesque guardians stir.',
-        monsters: { 'skeleton': 40, 'slime': 40, 'rabid_rabbit': 15, 'goblin': 3, 'dragon': 1, 'dullahan': 1 },
+        monsters: { 'skeleton': 50, 'slime': 40, 'rabid_rabbit': 10 },
     },
 
     // Tier 2
@@ -212,10 +212,10 @@ const MAGIC = {
 
 const MONSTER_SPECIES = {
     // Tier 1
-    'goblin': { key: 'goblin', name: 'Goblin', class: 'Humanoid', tier: 1, base_hp: 25, base_strength: 4, base_defense: 0, base_xp: 25, base_gold: 15, loot_table: {'health_potion': 0.1, 'goblin_ear': 0.5, 'dagger': 0.1, 'rusty_sword': 0.15, 'wooden_shield': 0.05} },
-    'rabid_rabbit': { key: 'rabid_rabbit', name: 'Rabid Rabbit', class: 'Beast', tier: 1, base_hp: 35, base_strength: 2, base_defense: 1, base_xp: 25, base_gold: 8, loot_table: {'rabbit_meat': 0.6} },
-    'slime': { key: 'slime', name: 'Slime', class: 'Monstrosity', tier: 1, base_hp: 30, base_strength: 3, base_defense: 3, base_xp: 22, base_gold: 10, loot_table: {'slime_glob': 0.5} },
-    'skeleton': { key: 'skeleton', name: 'Skeleton', class: 'Undead', tier: 1, base_hp: 20, base_strength: 4, base_defense: 2, base_xp: 20, base_gold: 10, loot_table: {'rusty_sword': 0.1, 'dagger': 0.05, 'wooden_shield': 0.05, 'iron_buckler': 0.03} },
+    'goblin': { key: 'goblin', name: 'Goblin', class: 'Humanoid', tier: 1, base_hp: 20, base_strength: 3, base_defense: 0, base_xp: 25, base_gold: 15, loot_table: {'health_potion': 0.1, 'goblin_ear': 0.5, 'dagger': 0.1, 'rusty_sword': 0.15, 'wooden_shield': 0.05} },
+    'rabid_rabbit': { key: 'rabid_rabbit', name: 'Rabid Rabbit', class: 'Beast', tier: 1, base_hp: 25, base_strength: 2, base_defense: 1, base_xp: 25, base_gold: 8, loot_table: {'rabbit_meat': 0.6} },
+    'slime': { key: 'slime', name: 'Slime', class: 'Monstrosity', tier: 1, base_hp: 28, base_strength: 2, base_defense: 2, base_xp: 22, base_gold: 10, loot_table: {'slime_glob': 0.5} },
+    'skeleton': { key: 'skeleton', name: 'Skeleton', class: 'Undead', tier: 1, base_hp: 18, base_strength: 3, base_defense: 2, base_xp: 20, base_gold: 10, loot_table: {'rusty_sword': 0.1, 'dagger': 0.05, 'wooden_shield': 0.05, 'iron_buckler': 0.03} },
     
     // Tier 2
     'bandit': { key: 'bandit', name: 'Bandit', class: 'Humanoid', tier: 2, base_hp: 45, base_strength: 8, base_defense: 3, base_xp: 50, base_gold: 30, loot_table: {'health_potion': 0.25, 'dagger': 0.15, 'rusty_sword': 0.1, 'steel_longsword': 0.05, 'iron_kite_shield': 0.05, 'iron_buckler': 0.05, 'padded_leather': 0.08, 'silenced_leather_armor': 0.02} },
@@ -230,16 +230,16 @@ const MONSTER_SPECIES = {
     'necromancer': { key: 'necromancer', name: 'Necromancer', class: 'Undead', tier: 3, ability: 'necromancy', base_hp: 60, base_strength: 8, base_defense: 2, base_xp: 100, base_gold: 60, loot_table: {'mana_potion': 0.2, 'vampiric_dagger': 0.02, 'assassin_cloak_armor': 0.02} },
     
     // Tier 4
-    'one_eyed_troll': { key: 'one_eyed_troll', name: 'One-Eyed Troll', class: 'Humanoid', tier: 4, ability: 'ultra_focus', base_hp: 120, base_strength: 18, base_defense: 6, base_xp: 200, base_gold: 100, loot_table: {'superior_health_potion': 0.2, 'obsidian_axe': 0.08, 'sunderers_battleaxe': 0.04, 'heavy_slabshield': 0.03, 'steel_plate_armor': 0.03} },
-    'unicorn': { key: 'unicorn', name: 'Unicorn', class: 'Beast', tier: 4, ability: 'healing', base_hp: 150, base_strength: 14, base_defense: 5, base_xp: 180, base_gold: 80, loot_table: {'unicorn_horn_fragment': 0.5, 'golden_greatbow': 0.05, 'obsidian_lamina': 0.02, 'purifying_crystal_shield': 0.02} },
-    'chimera': { key: 'chimera', name: 'Chimera', class: 'Monstrosity', tier: 4, ability: 'true_poison', base_hp: 130, base_strength: 16, base_defense: 8, base_xp: 250, base_gold: 120, loot_table: {'golden_greatbow': 0.03, 'eye_of_medusa': 0.03} },
-    'living_armor': { key: 'living_armor', name: 'Living Armor', class: 'Undead', tier: 4, ability: 'living_shield', base_hp: 100, base_strength: 15, base_defense: 12, base_xp: 220, base_gold: 110, loot_table: {'obsidian_axe': 0.05, 'masterwork_spear': 0.08, 'flaming_sword': 0.03, 'tower_greatshield': 0.05, 'exa_reflector': 0.01, 'soul_armor_shard': 0.1, 'steel_plate_armor': 0.05, 'adamantine_armor': 0.01} },
+    'one_eyed_troll': { key: 'one_eyed_troll', name: 'One-Eyed Troll', class: 'Humanoid', tier: 4, ability: 'ultra_focus', base_hp: 150, base_strength: 20, base_defense: 8, base_xp: 200, base_gold: 100, loot_table: {'superior_health_potion': 0.2, 'obsidian_axe': 0.08, 'sunderers_battleaxe': 0.04, 'heavy_slabshield': 0.03, 'steel_plate_armor': 0.03} },
+    'unicorn': { key: 'unicorn', name: 'Unicorn', class: 'Beast', tier: 4, ability: 'healing', base_hp: 170, base_strength: 15, base_defense: 5, base_xp: 180, base_gold: 80, loot_table: {'unicorn_horn_fragment': 0.5, 'golden_greatbow': 0.05, 'obsidian_lamina': 0.02, 'purifying_crystal_shield': 0.02} },
+    'chimera': { key: 'chimera', name: 'Chimera', class: 'Monstrosity', tier: 4, ability: 'true_poison', base_hp: 160, base_strength: 18, base_defense: 10, base_xp: 250, base_gold: 120, loot_table: {'golden_greatbow': 0.03, 'eye_of_medusa': 0.03} },
+    'living_armor': { key: 'living_armor', name: 'Living Armor', class: 'Undead', tier: 4, ability: 'living_shield', base_hp: 120, base_strength: 17, base_defense: 15, base_xp: 220, base_gold: 110, loot_table: {'obsidian_axe': 0.05, 'masterwork_spear': 0.08, 'flaming_sword': 0.03, 'tower_greatshield': 0.05, 'exa_reflector': 0.01, 'soul_armor_shard': 0.1, 'steel_plate_armor': 0.05, 'adamantine_armor': 0.01} },
     
     // Tier 5
-    'mountain_goliath': { key: 'mountain_goliath', name: 'Mountain Goliath', class: 'Humanoid', tier: 5, ability: 'earthshaker', base_hp: 250, base_strength: 25, base_defense: 10, base_xp: 500, base_gold: 250, loot_table: {'sunderers_battleaxe': 0.05, 'earthshaker_hammer': 0.01, 'heavy_slabshield': 0.02} },
-    'livyatan': { key: 'livyatan', name: 'Livyatan', class: 'Beast', tier: 5, ability: 'swallow', base_hp: 350, base_strength: 20, base_defense: 8, base_xp: 450, base_gold: 200, loot_table: {'vacuum_greatbow': 0.01, 'lightning_javelin': 0.05, 'livyatan_vacuum_lining': 0.2} },
-    'dragon': { key: 'dragon', name: 'Dragon', class: 'Monstrosity', tier: 5, ability: 'scorch_earth', base_hp: 300, base_strength: 22, base_defense: 15, base_xp: 600, base_gold: 300, loot_table: {'dragon_scale': 0.5, 'flaming_sword': 0.05, 'dragon_scale_cragblade': 0.01} },
-    'dullahan': { key: 'dullahan', name: 'Dullahan', class: 'Undead', tier: 5, ability: 'alive_again', base_hp: 200, base_strength: 24, base_defense: 12, base_xp: 550, base_gold: 280, loot_table: {'flaming_sword': 0.03, 'vampiric_dagger': 0.04, 'obsidian_lamina': 0.03, 'void_greatsword': 0.01, 'adamantine_armor': 0.02} }
+    'mountain_goliath': { key: 'mountain_goliath', name: 'Mountain Goliath', class: 'Humanoid', tier: 5, ability: 'earthshaker', base_hp: 300, base_strength: 28, base_defense: 12, base_xp: 500, base_gold: 250, loot_table: {'sunderers_battleaxe': 0.05, 'earthshaker_hammer': 0.01, 'heavy_slabshield': 0.02} },
+    'livyatan': { key: 'livyatan', name: 'Livyatan', class: 'Beast', tier: 5, ability: 'swallow', base_hp: 400, base_strength: 22, base_defense: 10, base_xp: 450, base_gold: 200, loot_table: {'vacuum_greatbow': 0.01, 'lightning_javelin': 0.05, 'livyatan_vacuum_lining': 0.2} },
+    'dragon': { key: 'dragon', name: 'Dragon', class: 'Monstrosity', tier: 5, ability: 'scorch_earth', base_hp: 350, base_strength: 25, base_defense: 18, base_xp: 600, base_gold: 300, loot_table: {'dragon_scale': 0.5, 'flaming_sword': 0.05, 'dragon_scale_cragblade': 0.01} },
+    'dullahan': { key: 'dullahan', name: 'Dullahan', class: 'Undead', tier: 5, ability: 'alive_again', base_hp: 250, base_strength: 26, base_defense: 14, base_xp: 550, base_gold: 280, loot_table: {'flaming_sword': 0.03, 'vampiric_dagger': 0.04, 'obsidian_lamina': 0.03, 'void_greatsword': 0.01, 'adamantine_armor': 0.02} }
 };
 
 const MONSTER_RARITY = {
