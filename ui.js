@@ -472,30 +472,6 @@ function renderShop(type) {
         });
         itemsHtml += '</div>';
     }
-    
-    if (type === 'black_market') {
-        itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-purple-300">Seasonal Stock</h3>`;
-        itemsHtml += '<p class="text-sm text-gray-400 mb-2">This stock changes when you rest at an inn.</p>';
-        itemsHtml += '<div class="space-y-2">';
-        if (player.blackMarketStock && player.blackMarketStock.seasonal && player.blackMarketStock.seasonal.length > 0) {
-            player.blackMarketStock.seasonal.forEach(key => {
-                const details = getItemDetails(key);
-                if (!details) return;
-                const seasonalPrice = Math.floor(details.price * 1.5);
-                itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded border-l-4 border-purple-500" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)">
-                                <span>${details.name}</span>
-                                <div>
-                                    <span class="text-yellow-400 font-semibold mr-4">${seasonalPrice} G</span>
-                                    <button onclick="buyItem('${key}', 'black_market', ${seasonalPrice})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < seasonalPrice ? 'disabled' : ''}>Buy</button>
-                                </div>
-                              </div>`;
-            });
-        } else {
-            itemsHtml += `<p class="text-gray-400">No special items in stock. Check back later.</p>`;
-        }
-        itemsHtml += '</div>';
-    }
-
     let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderTownDistrict('market')" class="btn btn-primary">Back to Market</button></div></div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
@@ -849,4 +825,3 @@ function renderGraveyard() {
     container.innerHTML = html;
     render(container);
 }
-

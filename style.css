@@ -36,13 +36,12 @@ body {
     font-family: 'MedievalSharp', cursive;
 }
 #game-container { background-color: var(--bg-main); border-color: var(--border-main); }
-#stats-view, #equipment-view, #quest-view, .bg-slate-800 { background-color: var(--bg-secondary); }
+#stats-view, .bg-slate-800 { background-color: var(--bg-secondary); }
+#main-view { background-color: color-mix(in srgb, var(--bg-secondary) 50%, transparent); }
 #game-log { background-color: var(--bg-log); color: var(--text-main); }
 #tooltip { background-color: var(--bg-tooltip); border-color: var(--border-main); }
 #player-name, .text-yellow-300 { color: var(--text-accent); }
 .text-gray-200 { color: var(--text-main); }
-.border-b, .border-t, .border-l, .border-r { border-color: var(--border-main); }
-
 
 #game-log::-webkit-scrollbar { width: 8px; }
 #game-log::-webkit-scrollbar-track { background: #2d3748; }

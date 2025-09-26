@@ -10,32 +10,42 @@
     <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gray-900 text-gray-200">
+<body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
 
-    <!-- Start Screen Wrapper -->
-    <div id="start-screen-wrapper" class="flex items-center justify-center min-h-screen p-4">
-        <div id="start-screen" class="text-center">
-            <h1 class="font-medieval text-6xl text-yellow-400 mb-4">Chronicles of Cocytus</h1>
-            <p class="mb-8 text-lg text-gray-400">Enter your hero's name to begin your journey.</p>
-            <input type="text" id="player-name-input" class="bg-gray-800 border border-gray-600 text-white text-center text-lg rounded-lg px-4 py-2 mb-4 w-64 focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="e.g., Grand Alter">
-            <div class="space-y-2">
-                <button id="start-game-btn" class="btn btn-primary text-xl px-8 py-3">Begin Adventure</button>
-                <button id="load-game-btn" class="btn btn-primary text-xl px-8 py-3 hidden">Load Saved Game</button>
-                <button id="graveyard-btn" class="btn btn-primary text-xl px-8 py-3 hidden">View Graveyard</button>
-            </div>
-            <div class="mt-4">
-                 <input type="text" id="import-save-input" class="bg-gray-800 border border-gray-600 text-white text-center text-sm rounded-lg px-3 py-1 w-64 focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="Paste Save Data...">
-                 <button id="import-save-btn" class="btn btn-primary text-sm px-4 py-1">Import Save</button>
-            </div>
+    <!-- Start Screen -->
+    <div id="start-screen" class="text-center">
+        <h1 class="font-medieval text-6xl text-yellow-400 mb-4">Chronicles of Cocytus</h1>
+        <p class="mb-8 text-lg text-gray-400">Enter your hero's name to begin your journey.</p>
+        <input type="text" id="player-name-input" class="bg-gray-800 border border-gray-600 text-white text-center text-lg rounded-lg px-4 py-2 mb-4 w-64 focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="e.g., Grand Alter">
+        <div class="space-y-2">
+            <button id="start-game-btn" class="btn btn-primary text-xl px-8 py-3">Begin Adventure</button>
+            <button id="load-game-btn" class="btn btn-primary text-xl px-8 py-3 hidden">Load Saved Game</button>
+            <button id="graveyard-btn" class="btn btn-primary text-xl px-8 py-3 hidden">View Graveyard</button>
+        </div>
+        <div class="mt-4">
+             <input type="text" id="import-save-input" class="bg-gray-800 border border-gray-600 text-white text-center text-sm rounded-lg px-3 py-1 w-64 focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="Paste Save Data...">
+             <button id="import-save-btn" class="btn btn-primary text-sm px-4 py-1">Import Save</button>
         </div>
     </div>
 
-    <!-- Game Wrapper -->
-    <div id="game-wrapper" class="hidden flex items-center justify-center min-h-screen p-4">
-        <div id="game-container" class="w-full max-w-6xl mx-auto h-[90vh] rounded-2xl shadow-2xl border flex flex-col lg:grid lg:grid-cols-3 lg:grid-rows-[auto,1fr] lg:gap-0">
-            
-            <!-- STATS (Top on mobile, top-right on desktop) -->
-            <div id="stats-container" class="order-1 lg:col-start-3 lg:row-start-1 p-4 border-b lg:border-l lg:border-b-0 flex-shrink-0">
+    <!-- Main Game Container -->
+    <div id="game-container" class="w-full max-w-6xl mx-auto h-[90vh] rounded-2xl shadow-2xl border hidden">
+        <div class="flex flex-col lg:flex-row h-full">
+
+            <!-- Left Column: Main View -->
+            <div id="main-view-container" class="w-full lg:w-2/3 h-full p-6 flex flex-col justify-center items-center relative">
+                <button onclick="exitGame()" title="Save and Exit" class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-red-600 rounded-full transition-colors duration-200 z-20">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <div id="main-view" class="w-full h-full flex flex-col justify-center items-center">
+                    <!-- Game content is dynamically inserted here -->
+                </div>
+            </div>
+
+            <!-- Right Column: Sidebar -->
+            <div id="sidebar-container" class="w-full lg:w-1/3 h-full flex flex-col p-4 border-l">
                 <!-- Stats View -->
                 <div id="stats-view" class="mb-4 p-4 rounded-lg text-sm">
                     <div class="flex justify-between items-start mb-2">
@@ -66,26 +76,12 @@
                 </div>
 
                 <!-- Quest Tracker -->
-                <div id="quest-view" class="p-4 rounded-lg text-sm">
+                <div id="quest-view" class="mb-4 p-4 rounded-lg text-sm">
                     <div id="quest-tracker" class="text-amber-300 h-4"></div>
                     <div id="legacy-quest-tracker" class="text-purple-300 h-4 mt-1"></div>
                 </div>
-            </div>
 
-            <!-- MAIN VIEW (Middle on mobile, left on desktop) -->
-            <div id="main-view-container" class="order-2 lg:col-span-2 lg:row-span-2 p-6 flex flex-col justify-center items-center relative flex-grow min-h-0">
-                <button onclick="exitGame()" title="Save and Exit" class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-red-600 rounded-full transition-colors duration-200 z-20">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-                <div id="main-view" class="w-full h-full flex flex-col justify-center items-center">
-                    <!-- Game content is dynamically inserted here -->
-                </div>
-            </div>
-
-            <!-- LOG (Bottom on mobile, bottom-right on desktop) -->
-            <div id="log-container" class="order-3 lg:col-start-3 lg:row-start-2 p-4 flex flex-col lg:border-l h-1/3 lg:h-auto flex-shrink-0 lg:flex-grow">
+                <!-- Game Log -->
                 <div id="game-log" class="flex-grow bg-black/30 rounded-lg p-4 overflow-y-auto">
                     <!-- Log messages are added here -->
                 </div>
@@ -168,11 +164,6 @@
 <script src="engine.js"></script>
 <script src="ui.js"></script>
 <script src="main.js"></script>
-<script>
-  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-</script>
-<script defer src="/_vercel/insights/script.js"></script>
 
 </body>
 </html>
-    
