@@ -7,15 +7,6 @@ function rollDice(numDice, sides) { let total = 0; for (let i = 0; i < numDice; 
 function addToLog(message, colorClass = '') { const p = document.createElement('p'); p.innerHTML = message; p.className = `mb-1 ${colorClass}`; logElement.appendChild(p); logElement.scrollTop = logElement.scrollHeight; }
 function getItemDetails(itemKey) { if (itemKey in ITEMS) return ITEMS[itemKey]; if (itemKey in WEAPONS) return WEAPONS[itemKey]; if (itemKey in ARMOR) return ARMOR[itemKey]; if (itemKey in SHIELDS) return SHIELDS[itemKey]; if (itemKey in LURES) return LURES[itemKey]; if (itemKey in MAGIC) return MAGIC[itemKey]; return null; }
 function render(viewElement) { mainView.innerHTML = ''; mainView.appendChild(viewElement); }
-function shuffleArray(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; } return array; }
-function choices(population, weights) { 
-    let totalWeight = weights.reduce((acc, w) => acc + w, 0); 
-    let randomNum = Math.random() * totalWeight; 
-    for (let i = 0; i < population.length; i++) { 
-        if (randomNum < weights[i]) return population[i]; 
-        randomNum -= weights[i]; 
-    } 
-}
 
 // --- THEME & PALETTES ---
 const PALETTES = {
@@ -90,6 +81,7 @@ function showTooltip(itemKey, event) {
     if (details.damage) content += `<p>Damage: ${details.damage[0]}d${details.damage[1]}</p>`;
     if (details.defense) content += `<p>Defense: ${details.defense}</p>`;
     if (details.blockChance > 0) content += `<p>Block Chance: ${Math.round(details.blockChance * 100)}%</p>`;
+    if (details.effect?.type === 'parry') content += `<p>Parry Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
     if (details.amount) content += `<p class="text-green-400">Heals: ${details.amount} HP</p>`;
     if (details.type === 'mana_restore') content += `<p class="text-blue-400">Restores: ${details.amount} MP</p>`;
     if (details.type === 'buff') content += `<p class="text-yellow-300">Effect: ${details.description.split('.')[1]}</p>`;
@@ -111,6 +103,9 @@ function showTooltip(itemKey, event) {
         if (details.effect.type === 'ranged') content += `<li>Ranged: Causes enemies to have a ${details.effect.chance * 100}% chance to miss.</li>`;
         if (details.effect.petrify_chance) content += `<li>${details.effect.petrify_chance * 100}% chance to Petrify for ${details.effect.duration} turn.</li>`;
         if (details.effect.type === 'paralyze') content += `<li>${details.effect.chance * 100}% chance to Paralyze for ${details.effect.duration} turn.</li>`;
+        if (details.effect.type === 'parry') content += `<li>Grants a chance to parry, negating damage and launching a counter-attack.</li>`;
+        if (details.effect.type === 'debuff_resist') content += `<li>${details.effect.chance * 100}% chance to resist negative status effects.</li>`;
+        if (details.effect.type === 'reflect') content += `<li>Reflects ${details.effect.amount * 100}% of pre-mitigation damage back to the attacker.</li>`;
         if (details.effect.bonus_vs_dragon) content += `<li>Deals ${details.effect.bonus_vs_dragon * 100}% damage to Dragons.</li>`;
         if (details.effect.revive) content += `<li>Revives the user to 50% HP upon death. (Once per lifetime)</li>`;
         content += `</ul>`
@@ -155,14 +150,43 @@ function updateStatsView() {
     
     $('#equipped-weapon').textContent = `${weapon.name} (${weapon.damage[0]}d${weapon.damage[1]})`; 
     $('#equipped-armor').textContent = `${armor.name} (Def: ${armor.defense})`;
-    $('#equipped-shield').textContent = `${shield.name} (Def: ${shield.defense}, Block: ${Math.round(shield.blockChance * 100)}%)`;
+    
+    let shieldStatText = `(Def: ${shield.defense})`;
+    if (shield.blockChance > 0) {
+        shieldStatText = `(Def: ${shield.defense}, Block: ${Math.round(shield.blockChance * 100)}%)`;
+    } else if (shield.effect?.type === 'parry') {
+        shieldStatText = `(Def: ${shield.defense}, Parry: ${Math.round(shield.effect.chance * 100)}%)`;
+    }
+    $('#equipped-shield').textContent = `${shield.name} ${shieldStatText}`;
+
     $('#equipped-lure').textContent = lure.name;
     
     const questTrackerEl = $('#quest-tracker');
     if (player.activeQuest) {
-        const quest = QUESTS[player.activeQuest]; let progress = player.questProgress;
-        if (quest.type === 'fetch') { progress = player.inventory.items[quest.target] || 0; }
-        questTrackerEl.innerHTML = `<strong>Quest:</strong> ${quest.title} (${progress} / ${quest.required})`;
+        const quest = getQuestDetails(player.activeQuest); 
+        if (quest) {
+            let progress = player.questProgress;
+            if (player.activeQuest.category === 'collection') { 
+                progress = 0;
+                const itemDetails = getItemDetails(quest.target);
+                if (itemDetails) {
+                    if (quest.target in ITEMS) {
+                         progress = player.inventory.items[quest.target] || 0;
+                    } else { // Equipment
+                        let category;
+                        if (quest.target in WEAPONS) category = 'weapons';
+                        else if (quest.target in ARMOR) category = 'armor';
+                        else if (quest.target in SHIELDS) category = 'shields';
+                        if(category) {
+                            progress = player.inventory[category].filter(item => item === quest.target).length;
+                        }
+                    }
+                }
+            }
+            questTrackerEl.innerHTML = `<strong>Quest:</strong> ${quest.title} (${progress} / ${quest.required})`;
+        } else {
+             questTrackerEl.innerHTML = '';
+        }
     } else { questTrackerEl.innerHTML = ''; }
 
     const legacyQuestTrackerEl = $('#legacy-quest-tracker');
@@ -176,11 +200,15 @@ function returnFromInventory() {
     switch (lastViewBeforeInventory) {
         case 'main_menu': renderMainMenu(); break;
         case 'town': renderTown(); break;
+        case 'town_market': renderTownDistrict('market'); break;
+        case 'town_hall': renderTownDistrict('hall'); break;
+        case 'town_residential': renderTownDistrict('residential'); break;
         case 'quest_board': renderQuestBoard(); break;
         case 'inn': renderInn(); break;
         case 'magic_shop': renderMagicShop(); break;
         case 'shop': renderShop('store'); break;
         case 'blacksmith': renderShop('blacksmith'); break;
+        case 'black_market': renderShop('black_market'); break;
         case 'alchemist': renderAlchemist(); break;
         case 'sell': renderSell(); break;
         case 'battle': renderBattle('main'); break;
@@ -258,16 +286,66 @@ function renderTown() {
     render(template.content.cloneNode(true));
 }
 
+function renderTownDistrict(district) {
+    let templateId = '';
+    let viewKey = '';
+    switch(district) {
+        case 'market':
+            templateId = 'template-market-district';
+            viewKey = 'town_market';
+            break;
+        case 'hall':
+            templateId = 'template-hall-district';
+            viewKey = 'town_hall';
+            break;
+        case 'residential':
+            templateId = 'template-residential-district';
+            viewKey = 'town_residential';
+            break;
+        default:
+            renderTown(); // Go back if district is unknown
+            return;
+    }
+    lastViewBeforeInventory = viewKey;
+    gameState.currentView = viewKey;
+    const template = document.getElementById(templateId);
+    if(template) {
+        render(template.content.cloneNode(true));
+    }
+}
+
 function renderQuestBoard() {
     const scrollable = mainView.querySelector('.inventory-scrollbar');
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
 
     lastViewBeforeInventory = 'quest_board';
-    gameState.currentView = 'quest_board'; 
+    gameState.currentView = 'quest_board';
     let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">Quest Board</h2>`;
+    
     if (player.activeQuest) {
-        const quest = QUESTS[player.activeQuest]; let progress = player.questProgress;
-        if (quest.type === 'fetch') { progress = player.inventory.items[quest.target] || 0; }
+        const quest = getQuestDetails(player.activeQuest);
+        let progress = player.questProgress;
+        let canComplete = progress >= quest.required;
+
+        if (player.activeQuest.category === 'collection') {
+            progress = 0;
+            const itemDetails = getItemDetails(quest.target);
+            if (itemDetails) {
+                 if (quest.target in ITEMS) {
+                     progress = player.inventory.items[quest.target] || 0;
+                } else { // Equipment
+                    let category;
+                    if (quest.target in WEAPONS) category = 'weapons';
+                    else if (quest.target in ARMOR) category = 'armor';
+                    else if (quest.target in SHIELDS) category = 'shields';
+                    if(category) {
+                        progress = player.inventory[category].filter(item => item === quest.target).length;
+                    }
+                }
+            }
+            canComplete = progress >= quest.required;
+        }
+
         const penalty = 15 * player.level;
         html += `<div class="p-4 bg-slate-800 rounded-lg text-center">
                     <h3 class="font-bold text-yellow-300">${quest.title} (Active)</h3>
@@ -275,15 +353,45 @@ function renderQuestBoard() {
                     <p>Progress: ${progress} / ${quest.required}</p>
                     <p>Reward: ${quest.reward.xp} XP, ${quest.reward.gold} G</p>
                     <div class="mt-4 flex justify-center gap-4">
-                        <button onclick="completeQuest()" class="btn btn-primary" ${progress < quest.required ? 'disabled' : ''}>Complete Quest</button>
+                        <button onclick="completeQuest()" class="btn btn-primary" ${!canComplete ? 'disabled' : ''}>Complete Quest</button>
                         <button onclick="cancelQuest()" class="btn btn-action">Cancel (Fee: ${penalty} G)</button>
                     </div>
                 </div>`;
     } else {
-        html += `<p class="text-center mb-4">Pick a quest to undertake.</p>`;
-        const availableQuests = Object.keys(QUESTS); const offeredQuests = availableQuests.sort(() => 0.5 - Math.random()).slice(0, 3);
+        html += `<p class="text-center mb-4">Choose a quest to undertake.</p>`;
+
+        // Determine number of quests to show based on player tier
+        const numQuestsToShow = 2 + player.playerTier;
+
+        // Gather and filter available quests
+        let availableQuests = [];
+        // Iterate through the flat QUESTS object
+        for (const questKey in QUESTS) {
+            const quest = QUESTS[questKey];
+            // Check if the quest tier is appropriate for the player
+            if (quest.tier <= player.playerTier) {
+                // Determine the quest category/type. Default to 'extermination' if not specified.
+                const category = quest.type || 'extermination';
+                availableQuests.push({ ...quest, category: category, key: questKey });
+            }
+        }
+        
+        const rng = seededRandom(player.seed); // Use the player's seed for consistent quest offerings
+        const offeredQuests = shuffleArray(availableQuests, rng).slice(0, numQuestsToShow);
+        
         html += `<div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`
-        html += offeredQuests.map(key => { const quest = QUESTS[key]; return `<div class="p-3 bg-slate-800 rounded-lg"><h3 class="font-bold text-yellow-300">${quest.title}</h3><p class="text-sm text-gray-400 my-1">${quest.description}</p><p class="text-sm">Reward: ${quest.reward.xp} XP, ${quest.reward.gold} G</p><button onclick="acceptQuest('${key}')" class="btn btn-primary mt-2 text-sm py-1 px-3">Accept</button></div>`; }).join('');
+        if (offeredQuests.length > 0) {
+            html += offeredQuests.map(quest => {
+                 return `<div class="p-3 bg-slate-800 rounded-lg">
+                            <h3 class="font-bold text-yellow-300">${quest.title} <span class="text-xs text-gray-400">(Tier ${quest.tier})</span></h3>
+                            <p class="text-sm text-gray-400 my-1">${quest.description}</p>
+                            <p class="text-sm">Reward: ${quest.reward.xp} XP, ${quest.reward.gold} G</p>
+                            <button onclick="acceptQuest('${quest.category}', '${quest.key}')" class="btn btn-primary mt-2 text-sm py-1 px-3">Accept</button>
+                         </div>`;
+            }).join('');
+        } else {
+            html += `<p class="text-center text-gray-400">No quests available for your level.</p>`;
+        }
         html += `</div>`;
     }
     html += `<div class="text-center mt-4"><button onclick="renderTown()" class="btn btn-primary">Back to Town</button></div></div>`; 
@@ -329,22 +437,42 @@ function renderShop(type) {
     const scrollable = mainView.querySelector('.inventory-scrollbar');
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
 
-    lastViewBeforeInventory = type === 'store' ? 'shop' : 'blacksmith';
-    gameState.currentView = type === 'store' ? 'shop' : 'blacksmith';
-    const inventory = type === 'store' ? SHOP_INVENTORY : BLACKSMITH_INVENTORY;
-    const title = type === 'store' ? 'General Store' : 'Clanging Hammer Blacksmith';
+    let inventory, title;
+
+    switch (type) {
+        case 'store':
+            inventory = SHOP_INVENTORY;
+            title = 'General Store';
+            lastViewBeforeInventory = 'shop';
+            gameState.currentView = 'shop';
+            break;
+        case 'blacksmith':
+            inventory = BLACKSMITH_INVENTORY;
+            title = 'Clanging Hammer Blacksmith';
+            lastViewBeforeInventory = 'blacksmith';
+            gameState.currentView = 'blacksmith';
+            break;
+        case 'black_market':
+            inventory = BLACK_MARKET_INVENTORY;
+            title = 'Black Market';
+            lastViewBeforeInventory = 'black_market';
+            gameState.currentView = 'black_market';
+            break;
+        default: return;
+    }
+
     let itemsHtml = '';
     for (const category in inventory) {
         itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
         itemsHtml += '<div class="space-y-2">';
-        itemsHtml += inventory[category].map(key => {
+        inventory[category].forEach(key => {
             const details = getItemDetails(key);
-            if (!details) return '';
-            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${details.price} G</span><button onclick="buyItem('${key}', '${type}')" class="btn btn-primary text-sm py-1 px-3" ${player.gold < details.price ? 'disabled' : ''}>Buy</button></div></div>`;
-        }).join('');
+            if (!details) return;
+            itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${details.price} G</span><button onclick="buyItem('${key}', '${type}')" class="btn btn-primary text-sm py-1 px-3" ${player.gold < details.price ? 'disabled' : ''}>Buy</button></div></div>`;
+        });
         itemsHtml += '</div>';
     }
-    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderTown()" class="btn btn-primary">Back to Town</button></div></div>`;
+    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderTownDistrict('market')" class="btn btn-primary">Back to Market</button></div></div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);

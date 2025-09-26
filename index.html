@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text RPG Adventure</title>
+    <title>Chronicles of Cocytus</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- Link to the external stylesheet -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
@@ -30,70 +29,74 @@
     </div>
 
     <!-- Main Game Container -->
-    <div id="game-container" class="relative w-full max-w-4xl mx-auto rounded-2xl shadow-2xl border p-6 hidden">
-        
-        <button onclick="exitGame()" title="Save and Exit" class="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-red-600 rounded-full transition-colors duration-200">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-        </button>
-        
-        <div id="stats-view" class="mb-4 p-4 rounded-lg grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-4 text-sm">
-            <div class="lg:col-span-2 space-y-2">
-                 <div class="flex justify-between items-start">
-                    <div>
-                        <p id="player-name" class="font-bold text-yellow-400 text-lg">Player</p>
-                        <p>Level: <span id="player-level">1</span> | Gold: <span id="player-gold">100</span> G</p>
-                        <p class="mt-2">XP: <span id="player-xp-text">0 / 100</span></p>
-                    </div>
-                    <div class="text-right font-semibold">
-                        <p class="text-red-400">HP: <span id="player-hp-text">50 / 50</span></p>
-                        <p class="text-blue-400">MP: <span id="player-mp-text">20 / 20</span></p>
-                    </div>
-                 </div>
-                 <div>
-                    <div id="quest-tracker" class="text-xs text-amber-300 h-4"></div>
-                    <div id="legacy-quest-tracker" class="text-xs text-purple-300 h-4 mt-1"></div>
-                 </div>
-            </div>
-            <div class="bg-slate-800 p-3 rounded-lg lg:col-span-1">
-                 <div class="flex justify-center items-center mb-2">
-                     <h3 id="equipment-title" class="font-bold text-yellow-400 text-center">Equipment</h3>
-                     <button onclick="renderInventory()" title="Open Inventory" class="ml-4 p-1 bg-slate-700 hover:bg-slate-600 rounded-full transition-colors duration-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                        </svg>
-                     </button>
-                 </div>
-                 <div id="equipment-display" class="text-xs space-y-1">
-                    <p>Weapon: <span id="equipped-weapon"></span></p>
-                    <p>Armor: <span id="equipped-armor"></span></p>
-                    <p>Shield: <span id="equipped-shield"></span></p>
-                    <p>Lure: <span id="equipped-lure"></span></p>
-                 </div>
-            </div>
-        </div>
+    <div id="game-container" class="w-full max-w-6xl mx-auto h-[90vh] rounded-2xl shadow-2xl border hidden">
+        <div class="flex flex-col lg:flex-row h-full">
 
-        <div id="main-view" class="min-h-[250px] p-6 rounded-lg mb-4 flex flex-col justify-center items-center">
-            <!-- Game content is dynamically inserted here -->
-        </div>
+            <!-- Left Column: Main View -->
+            <div id="main-view-container" class="w-full lg:w-2/3 h-full p-6 flex flex-col justify-center items-center relative">
+                <button onclick="exitGame()" title="Save and Exit" class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-red-600 rounded-full transition-colors duration-200 z-20">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <div id="main-view" class="w-full h-full flex flex-col justify-center items-center">
+                    <!-- Game content is dynamically inserted here -->
+                </div>
+            </div>
 
-        <div class="bg-black/30 rounded-lg p-4 h-48 overflow-y-auto" id="game-log">
-            <!-- Log messages are added here -->
+            <!-- Right Column: Sidebar -->
+            <div id="sidebar-container" class="w-full lg:w-1/3 h-full flex flex-col p-4 border-l">
+                <!-- Stats View -->
+                <div id="stats-view" class="mb-4 p-4 rounded-lg text-sm">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <p id="player-name" class="font-bold text-yellow-400 text-lg">Player</p>
+                            <p>Level: <span id="player-level">1</span> | Gold: <span id="player-gold">100</span> G</p>
+                        </div>
+                        <button onclick="renderInventory()" title="Open Inventory" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-full transition-colors duration-200">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                        </button>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="text-red-400 font-semibold">HP: <span id="player-hp-text">50 / 50</span></p>
+                        <p class="text-blue-400 font-semibold">MP: <span id="player-mp-text">20 / 20</span></p>
+                        <p>XP: <span id="player-xp-text">0 / 100</span></p>
+                    </div>
+                </div>
+
+                <!-- Equipment View -->
+                <div id="equipment-view" class="mb-4 p-4 rounded-lg">
+                    <h3 class="font-bold text-yellow-400 text-center mb-2">Equipment</h3>
+                    <div id="equipment-display" class="text-xs space-y-1">
+                       <p><strong>Weapon:</strong> <span id="equipped-weapon"></span></p>
+                       <p><strong>Armor:</strong> <span id="equipped-armor"></span></p>
+                       <p><strong>Shield:</strong> <span id="equipped-shield"></span></p>
+                       <p><strong>Lure:</strong> <span id="equipped-lure"></span></p>
+                    </div>
+                </div>
+
+                <!-- Quest Tracker -->
+                <div id="quest-view" class="mb-4 p-4 rounded-lg text-sm">
+                    <div id="quest-tracker" class="text-amber-300 h-4"></div>
+                    <div id="legacy-quest-tracker" class="text-purple-300 h-4 mt-1"></div>
+                </div>
+
+                <!-- Game Log -->
+                <div id="game-log" class="flex-grow bg-black/30 rounded-lg p-4 overflow-y-auto">
+                    <!-- Log messages are added here -->
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Tooltip Element -->
-    <div id="tooltip" class="absolute border rounded-lg p-3 text-sm shadow-lg max-w-xs">
-        <!-- Tooltip content is injected here -->
-    </div>
-
+    <div id="tooltip" class="absolute border rounded-lg p-3 text-sm shadow-lg max-w-xs"></div>
 
     <!-- UI TEMPLATES -->
     <div id="game-templates" class="hidden">
         
         <template id="template-main-menu">
-            <h2 class="font-medieval text-3xl mb-4 text-center">What would you like to do?</h2>
+            <h2 class="font-medieval text-3xl mb-4 text-center">Main Menu</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button onclick="renderWildernessMenu()" class="btn btn-primary">Enter the Wilderness</button>
                 <button onclick="renderTown()" class="btn btn-primary">Go to Town</button>
@@ -104,24 +107,49 @@
 
         <template id="template-town">
             <h2 class="font-medieval text-3xl mb-4 text-center">You are in town.</h2>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button onclick="renderTownDistrict('market')" class="btn btn-primary w-full">Market Square</button>
+                <button onclick="renderTownDistrict('hall')" class="btn btn-primary w-full">Town Hall</button>
+                <button onclick="renderTownDistrict('residential')" class="btn btn-primary w-full">Residential District</button>
+                <button onclick="renderMainMenu()" class="btn btn-primary col-span-1 md:col-span-3">Leave Town</button>
+            </div>
+        </template>
+
+        <template id="template-market-district">
+             <h2 class="font-medieval text-3xl mb-4 text-center">Market Square</h2>
+             <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <button onclick="renderShop('store')" class="btn btn-primary w-full">General Store</button>
                 <button onclick="renderShop('blacksmith')" class="btn btn-primary w-full">Blacksmith</button>
-                <button onclick="renderMagicShop()" class="btn btn-primary w-full">Magic Shop</button>
-                <button onclick="renderAlchemist()" class="btn btn-primary w-full">Alchemist</button>
+                <button onclick="renderShop('black_market')" class="btn btn-primary w-full">Black Market</button>
+                <button onclick="renderTown()" class="btn btn-primary col-span-2 md:col-span-3">Back to Town Square</button>
+            </div>
+        </template>
+
+        <template id="template-hall-district">
+             <h2 class="font-medieval text-3xl mb-4 text-center">Town Hall</h2>
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button onclick="renderQuestBoard()" class="btn btn-primary w-full">Quest Board</button>
+                <button onclick="renderTown()" class="btn btn-primary col-span-1 md:col-span-2">Back to Town Square</button>
+            </div>
+        </template>
+
+         <template id="template-residential-district">
+             <h2 class="font-medieval text-3xl mb-4 text-center">Residential District</h2>
+             <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <button onclick="renderAlchemist()" class="btn btn-primary w-full">Alchemist</button>
+                <button onclick="renderMagicShop()" class="btn btn-primary w-full">Magic Shop</button>
                 <button onclick="renderInn()" class="btn btn-primary w-full">The Inn</button>
-                <button onclick="renderMainMenu()" class="btn btn-primary col-span-2 md:col-span-3">Leave Town</button>
+                <button onclick="renderTown()" class="btn btn-primary col-span-2 md:col-span-3">Back to Town Square</button>
             </div>
         </template>
         
         <template id="template-battle">
             <div class="w-full text-center">
-                <div id="enemy-display" class="grid grid-cols-1 gap-4 mb-4">
+                <div id="enemy-display" class="grid grid-cols-3 gap-4 mb-8">
                     <!-- Enemy info will be populated here -->
                 </div>
                 <div id="battle-actions" class="flex justify-center gap-4 mt-8">
-                    <!-- Battle actions are populated by JS -->
+                    <!-- Battle buttons are inserted here -->
                 </div>
             </div>
         </template>
@@ -132,7 +160,6 @@
 
     </div>
 
-<!-- The order of these scripts is important! -->
 <script src="game_data.js"></script>
 <script src="engine.js"></script>
 <script src="ui.js"></script>

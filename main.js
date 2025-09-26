@@ -4,15 +4,19 @@ let currentEnemies = [];
 let gameState = { currentView: 'main_menu', isPlayerTurn: true, currentBiome: null, playerIsDying: false };
 let lastViewBeforeInventory = 'main_menu';
 let activeTooltipItem = null;
+let isDebugVisible = false;
 
 // --- INITIALIZATION ---
 function initGame(playerName) { 
     $('#start-screen').classList.add('hidden'); 
     $('#game-container').classList.remove('hidden'); 
     player = new Player(playerName); 
+    player.seed = Math.floor(Math.random() * 1000000); // Assign a random seed
     gameState.playerIsDying = false; 
     player.saveKey = generateSaveKey();
     generateRandomizedBiomeOrder();
+    generateBlackMarketStock();
+    updatePlayerTier();
     addToLog(`Welcome, ${playerName}! Your adventure begins.`); 
     applyTheme('default'); 
     updateStatsView(); 
@@ -21,6 +25,9 @@ function initGame(playerName) {
 }
 
 function generateRandomizedBiomeOrder() {
+    // Create a seeded random number generator for this character
+    const rng = seededRandom(player.seed);
+
     // Group biomes by tier
     const biomesByTier = {};
     for (const biomeKey in BIOMES) {
@@ -35,7 +42,7 @@ function generateRandomizedBiomeOrder() {
     player.biomeOrder = [];
     const sortedTiers = Object.keys(biomesByTier).sort((a, b) => a - b);
     for (const tier of sortedTiers) {
-        const shuffledBiomesInTier = shuffleArray(biomesByTier[tier]);
+        const shuffledBiomesInTier = shuffleArray(biomesByTier[tier], rng); // Use seeded shuffle
         player.biomeOrder.push(...shuffledBiomesInTier);
     }
 
@@ -55,6 +62,21 @@ function generateRandomizedBiomeOrder() {
             step = 0;
         }
     });
+}
+
+/**
+ * Calculates and updates the player's tier based on the highest unlocked biome.
+ */
+function updatePlayerTier() {
+    if (!player) return;
+    let maxTier = 0;
+    player.biomeOrder.forEach(biomeKey => {
+        const biome = BIOMES[biomeKey];
+        if (player.level >= player.biomeUnlockLevels[biomeKey]) {
+            maxTier = Math.max(maxTier, biome.tier);
+        }
+    });
+    player.playerTier = maxTier || 1;
 }
 
 
@@ -142,6 +164,10 @@ function loadGameFromKey(saveKey) {
             if (!player.legacyQuestProgress) {
                 player.legacyQuestProgress = {};
             }
+            if (!player.blackMarketStock) {
+                player.blackMarketStock = { seasonal: [] };
+                generateBlackMarketStock();
+            }
             gameState.playerIsDying = false; 
 
             // Compatibility fix for old save files with the old quest system
@@ -150,9 +176,16 @@ function loadGameFromKey(saveKey) {
                 player.questProgress = 0;
             }
 
+            // Compatibility for saves without a seed
+            if (!player.seed) {
+                player.seed = Math.floor(Math.random() * 1000000);
+            }
+
             if (!player.biomeOrder || player.biomeOrder.length === 0) {
                 generateRandomizedBiomeOrder();
             }
+            
+            updatePlayerTier(); // Calculate tier on load
 
             $('#start-screen').classList.add('hidden'); 
             $('#game-container').classList.remove('hidden'); 
@@ -209,12 +242,19 @@ function importSave(saveString) {
             player.questProgress = 0;
         }
 
+        // Compatibility for saves without a seed
+        if (!player.seed) {
+            player.seed = Math.floor(Math.random() * 1000000);
+        }
+
         if (!player.biomeOrder || player.biomeOrder.length === 0) {
             generateRandomizedBiomeOrder();
         }
         if (!player.specialWeaponStates) {
             player.specialWeaponStates = {};
         }
+
+        updatePlayerTier(); // Calculate tier on import
 
         $('#start-screen').classList.add('hidden');
         $('#game-container').classList.remove('hidden');
@@ -288,4 +328,3 @@ window.addEventListener('load', () => {
     $('#graveyard-btn').addEventListener('click', renderGraveyard); 
     updateLoadGameButtonVisibility();
 });
-

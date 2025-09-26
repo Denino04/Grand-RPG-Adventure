@@ -1,3 +1,50 @@
+/**
+ * Creates a seeded pseudo-random number generator.
+ * @param {number} seed The seed for the generator.
+ * @returns {function(): number} A function that returns a random number between 0 and 1.
+ */
+function seededRandom(seed) {
+    return function() {
+        var t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+}
+
+/**
+ * Shuffles an array in place using the Fisher-Yates algorithm.
+ * @param {Array} array The array to shuffle.
+ * @param {function(): number} [rng=Math.random] Optional random number generator.
+ * @returns {Array} The shuffled array.
+ */
+function shuffleArray(array, rng) { 
+    const randomFunc = rng || Math.random;
+    for (let i = array.length - 1; i > 0; i--) { 
+        const j = Math.floor(randomFunc() * (i + 1)); 
+        [array[i], array[j]] = [array[j], array[i]]; 
+    } 
+    return array; 
+}
+
+/**
+ * Selects a random element from a population based on weights.
+ * @param {Array} population The array of items to choose from.
+ * @param {Array<number>} weights The corresponding weights for each item.
+ * @param {function(): number} [rng=Math.random] Optional random number generator.
+ * @returns {*} The chosen item.
+ */
+function choices(population, weights, rng) { 
+    const randomFunc = rng || Math.random;
+    let totalWeight = weights.reduce((acc, w) => acc + w, 0); 
+    let randomNum = randomFunc() * totalWeight; 
+    for (let i = 0; i < population.length; i++) { 
+        if (randomNum < weights[i]) return population[i]; 
+        randomNum -= weights[i]; 
+    } 
+}
+
+
 // --- CLASSES ---
 class Entity {
     constructor(name, hp, strength) { this.name = name; this.maxHp = hp; this.hp = hp; this.strength = strength; this.statusEffects = {}; }
@@ -10,15 +57,18 @@ class Player extends Entity {
         this.gold = 100; this.level = 1; this.xp = 0; this.xpToNextLevel = 100;
         this.mp = 20; this.maxMp = 20; this.intelligence = 5;
         this.saveKey = null; // Will be assigned on new game
+        this.seed = null; // Will be assigned on new game for consistent randomization
+        this.playerTier = 1; // Highest unlocked biome tier
         this.specialWeaponStates = {};
+        this.blackMarketStock = { seasonal: [] };
         this.equippedWeapon = WEAPONS['rusty_sword'];
-        this.equippedArmor = ARMOR['rags'];
+        this.equippedArmor = ARMOR['travelers_garb'];
         this.equippedShield = SHIELDS['no_shield'];
         this.equippedLure = 'no_lure';
         this.inventory = { 
             items: { 'health_potion': 2 }, 
             weapons: ['rusty_sword'], 
-            armor: ['rags'], 
+            armor: ['travelers_garb'], 
             shields: ['no_shield'], 
             lures: { } 
         };
@@ -46,14 +96,50 @@ class Player extends Entity {
         }
     }
     gainXp(amount) { this.xp += amount; addToLog(`You gained <span class="font-bold">${amount}</span> XP!`, 'text-yellow-400'); if (this.xp >= this.xpToNextLevel) this.levelUp(); updateStatsView(); }
-    levelUp() { this.level++; this.xp -= this.xpToNextLevel; this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.5); this.maxHp += 10; this.hp = this.maxHp; this.maxMp += 5; this.mp = this.maxMp; this.strength += 2; this.intelligence += 2; addToLog(`*** LEVEL UP! You are now level ${this.level}! ***`, 'text-yellow-200 font-bold text-lg'); }
-    takeDamage(damage, ignoresDefense = false) { 
-        if (!ignoresDefense && this.equippedShield && Math.random() < this.equippedShield.blockChance) {
-            addToLog(`You blocked the attack with your ${this.equippedShield.name}!`, 'text-cyan-400 font-bold');
+    levelUp() { 
+        this.level++; 
+        this.xp -= this.xpToNextLevel; 
+        this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.5); 
+        this.maxHp += 10; this.hp = this.maxHp; 
+        this.maxMp += 5; this.mp = this.maxMp; 
+        this.strength += 2; this.intelligence += 2; 
+        addToLog(`*** LEVEL UP! You are now level ${this.level}! ***`, 'text-yellow-200 font-bold text-lg'); 
+        updatePlayerTier(); // Update the player's tier after leveling up
+    }
+    takeDamage(damage, ignoresDefense = false, attacker = null) { 
+        const shield = this.equippedShield;
+        const armor = this.equippedArmor;
+
+        // Parry logic (Shield)
+        if (shield && shield.effect?.type === 'parry' && Math.random() < shield.effect.chance && attacker && attacker.isAlive()) {
+            addToLog(`You parried ${attacker.name}'s attack with your ${shield.name}!`, 'text-yellow-300 font-bold');
+            setTimeout(() => {
+                addToLog(`You launch a swift counter-attack!`, 'text-yellow-300');
+                const weapon = this.equippedWeapon; 
+                let counterDamage = rollDice(...weapon.damage) + this.strength; 
+                const finalDamage = attacker.takeDamage(counterDamage);
+                addToLog(`Your riposte hits ${attacker.name} for <span class="font-bold text-yellow-300">${finalDamage}</span> damage.`);
+            }, 300);
+            updateStatsView();
+            return 0; // No damage taken
+        }
+        
+        // Dodge logic (Armor)
+        if (armor && armor.effect?.type === 'dodge' && Math.random() < armor.effect.chance) {
+            addToLog(`You dodged ${attacker.name}'s attack!`, 'text-teal-300 font-bold');
             updateStatsView();
             return 0;
         }
-        let totalDefense = ignoresDefense ? 0 : this.equippedArmor.defense + (this.equippedShield ? this.equippedShield.defense : 0);
+
+        // Block logic (Shield + Armor)
+        const totalBlockChance = (shield?.blockChance || 0) + (armor?.blockChance || 0);
+        if (!ignoresDefense && totalBlockChance > 0 && Math.random() < totalBlockChance) {
+            addToLog(`You blocked the attack!`, 'text-cyan-400 font-bold');
+            updateStatsView();
+            return 0;
+        }
+
+        let totalDefense = ignoresDefense ? 0 : this.equippedArmor.defense + (shield ? shield.defense : 0);
         if(this.statusEffects.stonehide) {
             totalDefense = Math.floor(totalDefense * this.statusEffects.stonehide.multiplier);
             addToLog(`Your stone-like skin absorbs the blow!`, `text-gray-400`);
@@ -65,6 +151,16 @@ class Player extends Entity {
         const finalDamage = Math.max(0, damage - totalDefense); 
         this.hp -= finalDamage; 
         addToLog(`You take <span class="font-bold text-red-400">${finalDamage}</span> damage.`); 
+
+        // Reflect logic
+        if (shield && shield.effect?.type === 'reflect' && attacker && attacker.isAlive()) {
+            const reflectedDamage = Math.floor(damage * shield.effect.amount);
+            if (reflectedDamage > 0) {
+                attacker.takeDamage(reflectedDamage);
+                addToLog(`Your ${shield.name} reflects <span class="font-bold text-orange-400">${reflectedDamage}</span> damage back at ${attacker.name}!`, 'text-orange-300');
+            }
+        }
+
         updateStatsView();
         return finalDamage;
     }
@@ -130,13 +226,12 @@ class Enemy extends Entity {
             addToLog(`${this.name}'s attack is amplified from within!`, 'text-red-600');
         }
         
-        let damageDealt = target.takeDamage(totalDamage, !!this.statusEffects.ultra_focus);
+        let damageDealt = target.takeDamage(totalDamage, !!this.statusEffects.ultra_focus, this);
 
         if (this.ability === 'life_drain') { const drainAmount = Math.floor(damageDealt / 2); this.hp = Math.min(this.maxHp, this.hp + drainAmount); addToLog(`${this.name} drains <span class="font-bold text-green-400">${drainAmount}</span> HP!`); }
         if (this.ability === 'earthshaker' && Math.random() < 0.3) {
             if (!target.statusEffects.paralyzed) {
-                target.statusEffects.paralyzed = { duration: 1 };
-                addToLog(`${this.name}'s mighty blow shakes the earth! You are paralyzed!`, 'text-orange-500 font-bold');
+                applyStatusEffect(target, 'paralyzed', { duration: 1 }, this.name);
             }
         }
     }
@@ -162,6 +257,52 @@ class Enemy extends Entity {
 
 
 // --- CORE LOGIC FUNCTIONS ---
+
+function getQuestDetails(questIdentifier) {
+    if (!questIdentifier || !questIdentifier.category || !questIdentifier.key) {
+        return null;
+    }
+    // The quest data structure is flat, not nested under categories in the object.
+    // This looks for the key directly in the QUESTS object.
+    return QUESTS[questIdentifier.key] || null;
+}
+
+function applyStatusEffect(target, effectType, effectData, sourceName) {
+    // Check for player's debuff resistance
+    if (target instanceof Player) {
+        const shield = target.equippedShield;
+        if (shield && shield.effect?.type === 'debuff_resist' && Math.random() < shield.effect.chance) {
+            addToLog(`Your ${shield.name} glows and resists the ${effectType} effect from ${sourceName}!`, 'text-cyan-300 font-bold');
+            return; // Effect resisted
+        }
+    }
+    
+    // Apply the effect
+    target.statusEffects[effectType] = effectData;
+    
+    // Log the effect
+    let message = '';
+    let color = 'text-red-400';
+    switch(effectType) {
+        case 'poison':
+             message = `You have been poisoned by ${sourceName}!`;
+             color = 'text-green-600'
+            break;
+        case 'petrified':
+            message = `${sourceName} gazes at you, turning your flesh to stone! You are petrified.`;
+            color = 'text-gray-400 font-bold';
+            break;
+        case 'paralyzed':
+            message = `${sourceName}'s mighty blow shakes the earth! You are paralyzed!`;
+            color = 'text-orange-500 font-bold';
+            break;
+        case 'swallowed':
+            message = `${sourceName} opens its massive maw and swallows you whole!`;
+            color = 'text-red-700 font-bold';
+            break;
+    }
+    addToLog(message, color);
+}
 
 function generateEnemy(biomeKey) {
     const biomeData = BIOMES[biomeKey];
@@ -430,9 +571,9 @@ function checkBattleStatus() {
                     } 
                 }
                 
-                if (player.activeQuest) { 
-                    const quest = QUESTS[player.activeQuest]; 
-                    if (quest.type === 'extermination' && quest.target === enemy.speciesData.key) { 
+                if (player.activeQuest && player.activeQuest.category === 'extermination') { 
+                    const quest = getQuestDetails(player.activeQuest); 
+                    if (quest && quest.target === enemy.speciesData.key) { 
                         player.questProgress++; 
                         addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300'); 
                     } 
@@ -452,7 +593,6 @@ function checkBattleStatus() {
     }
     updateStatsView();
 }
-
 function handleEndOfTurnEffects() {
     // Player effects
     const playerBuffs = ['strength', 'stonehide'];
@@ -479,7 +619,7 @@ function handleEndOfTurnEffects() {
     if (player.statusEffects.swallowed) {
         addToLog(`You are being digested inside the ${player.statusEffects.swallowed.by}!`, 'text-red-500');
         const digestDamage = rollDice(2, 6);
-        player.takeDamage(digestDamage, true);
+        player.takeDamage(digestDamage, true, player.statusEffects.swallowed.swallower);
     }
 
     // Enemy effects
@@ -499,7 +639,6 @@ function handleEndOfTurnEffects() {
 
     updateStatsView();
 }
-
 function enemyTurn() {
     if (currentEnemies.length === 0 || !player.isAlive()) return;
     
@@ -539,15 +678,13 @@ function enemyTurn() {
                     case 'poison_web':
                         if (!player.statusEffects.poison && Math.random() < 0.4) {
                             const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
-                            player.statusEffects.poison = { duration: 3, damage: [rarityDice * 2, 4] };
-                            addToLog(`${enemy.name} ensnares you in a poisonous web!`, 'text-green-600');
+                            applyStatusEffect(player, 'poison', { duration: 3, damage: [rarityDice * 2, 4] }, enemy.name);
                             usedAbility = true;
                         }
                         break;
                     case 'petrification':
                         if (!player.statusEffects.petrified && Math.random() < 0.25) {
-                            player.statusEffects.petrified = { duration: 1 };
-                             addToLog(`${enemy.name} gazes at you, turning your flesh to stone! You are petrified.`, 'text-gray-400 font-bold');
+                            applyStatusEffect(player, 'petrified', { duration: 1 }, enemy.name);
                              usedAbility = true;
                         }
                         break;
@@ -590,8 +727,7 @@ function enemyTurn() {
                     case 'true_poison':
                          if (!player.statusEffects.poison && Math.random() < 0.6) {
                             const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
-                            player.statusEffects.poison = { duration: 3, damage: [rarityDice * 3, 8] }; // Stronger poison
-                            addToLog(`${enemy.name} spews a vile, corrosive poison at you!`, 'text-green-700 font-bold');
+                            applyStatusEffect(player, 'poison', { duration: 3, damage: [rarityDice * 3, 8] }, enemy.name);
                             usedAbility = true;
                         }
                         break;
@@ -602,10 +738,9 @@ function enemyTurn() {
                             usedAbility = true;
                         }
                         break;
-                    case 'swallow':
+                        case 'swallow':
                         if (!player.statusEffects.swallowed && Math.random() < 0.25) {
-                            player.statusEffects.swallowed = { by: enemy.name, swallower: enemy, duration: Infinity };
-                            addToLog(`${enemy.name} opens its massive maw and swallows you whole!`, 'text-red-700 font-bold');
+                            applyStatusEffect(player, 'swallowed', { by: enemy.name, swallower: enemy, duration: Infinity }, enemy.name);
                             usedAbility = true;
                             renderBattle();
                         }
@@ -615,7 +750,7 @@ function enemyTurn() {
                             addToLog(`${enemy.name} unleashes a torrent of flame!`, 'text-orange-600 font-bold');
                             const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
                             const fireDamage = rollDice(rarityDice * 4, 8) + enemy.strength;
-                            player.takeDamage(fireDamage, true);
+                            player.takeDamage(fireDamage, true, enemy);
                             usedAbility = true;
                         }
                         break;
@@ -635,7 +770,6 @@ function enemyTurn() {
         }, i * turnDelay);
     });
 }
-
 function endPlayerTurnPhase() {
     if (!player.isAlive()) {
         checkPlayerDeath();
@@ -663,7 +797,6 @@ function endPlayerTurnPhase() {
         gameState.isPlayerTurn = true;
     }
 }
-
 function checkPlayerDeath() {
     if (!player.isAlive() && !gameState.playerIsDying) {
         gameState.playerIsDying = true;
@@ -718,6 +851,36 @@ function addToGraveyard(deadPlayer, killer) {
     localStorage.setItem('rpgGraveyard', JSON.stringify(graveyard));
 }
 
+function generateBlackMarketStock() {
+    const rng = seededRandom(player.seed);
+    const potentialStock = [];
+
+    // Add non-basic weapons
+    Object.keys(WEAPONS).forEach(key => {
+        if (WEAPONS[key].price > 50) potentialStock.push(key);
+    });
+    // Add non-basic armor
+    Object.keys(ARMOR).forEach(key => {
+        if (ARMOR[key].price > 50) potentialStock.push(key);
+    });
+    // Add non-basic shields
+    Object.keys(SHIELDS).forEach(key => {
+        if (SHIELDS[key].price > 50) potentialStock.push(key);
+    });
+    // Add non-junk/alchemy items
+    Object.keys(ITEMS).forEach(key => {
+        const item = ITEMS[key];
+        if (item.price > 0 && item.type !== 'junk' && item.type !== 'alchemy') {
+            potentialStock.push(key);
+        }
+    });
+
+    // Shuffle and pick a few items
+    const shuffled = shuffleArray(potentialStock, rng);
+    const stockCount = 3 + Math.floor(rng() * 3); // 3 to 5 items
+    player.blackMarketStock.seasonal = shuffled.slice(0, stockCount);
+}
+
 
 // --- PLAYER ACTIONS ---
 
@@ -730,7 +893,9 @@ function restAtInn(cost) {
     } else { 
         player.hp = player.maxHp; 
         player.mp = player.maxMp; 
-        addToLog(`You wake up feeling refreshed.`, 'text-green-400 font-bold'); 
+        player.seed = Math.floor(Math.random() * 1000000); // Reshuffle the seed
+        generateBlackMarketStock();
+        addToLog(`You wake up feeling refreshed. The quest board and black market may have new offerings.}.`, 'text-green-400 font-bold');
         updateStatsView(); 
         setTimeout(renderTown, 2000); 
     } 
@@ -747,17 +912,17 @@ function learnSpell(spellKey) {
     } 
 }
 
-function buyItem(itemKey, shopType) { 
+function buyItem(itemKey, shopType, priceOverride = null) { 
     const details = getItemDetails(itemKey); 
-    if (player.gold >= details.price) { 
-        player.gold -= details.price; 
+    const finalPrice = priceOverride !== null ? priceOverride : details.price;
+    if (player.gold >= finalPrice) { 
+        player.gold -= finalPrice; 
         player.addToInventory(itemKey, 1, false); 
-        addToLog(`You bought a ${details.name} for ${details.price} G.`, 'text-yellow-400'); 
+        addToLog(`You bought a ${details.name} for ${finalPrice} G.`, 'text-yellow-400'); 
         updateStatsView(); 
         renderShop(shopType); 
     } 
 }
-
 function useItem(itemKey, inBattle = false) {
     if (!player.inventory.items[itemKey] || player.inventory.items[itemKey] < 1) {
         addToLog("You don't have that item!", 'text-red-400');
@@ -799,7 +964,6 @@ function useItem(itemKey, inBattle = false) {
     }
     return true;
 }
-
 function equipItem(itemKey) { 
     if (itemKey in WEAPONS) player.equippedWeapon = WEAPONS[itemKey]; 
     if (itemKey in ARMOR) player.equippedArmor = ARMOR[itemKey]; 
@@ -816,7 +980,16 @@ function brewPotion(recipeKey) {
 
     let hasIngredients = true;
     for (const ingredientKey in recipe.ingredients) {
-        if ((player.inventory.items[ingredientKey] || 0) < recipe.ingredients[ingredientKey]) {
+        const requiredAmount = recipe.ingredients[ingredientKey];
+        
+        let playerAmount = 0;
+        if (ITEMS[ingredientKey]) {
+            playerAmount = player.inventory.items[ingredientKey] || 0;
+        } else if (ARMOR[ingredientKey]) {
+            playerAmount = player.inventory.armor.filter(i => i === ingredientKey).length;
+        }
+
+        if (playerAmount < requiredAmount) {
             hasIngredients = false;
             break;
         }
@@ -833,9 +1006,19 @@ function brewPotion(recipeKey) {
 
     // Deduct ingredients and gold
     for (const ingredientKey in recipe.ingredients) {
-        player.inventory.items[ingredientKey] -= recipe.ingredients[ingredientKey];
-        if (player.inventory.items[ingredientKey] <= 0) {
-            delete player.inventory.items[ingredientKey];
+        const requiredAmount = recipe.ingredients[ingredientKey];
+        if (ITEMS[ingredientKey]) {
+            player.inventory.items[ingredientKey] -= requiredAmount;
+            if (player.inventory.items[ingredientKey] <= 0) {
+                delete player.inventory.items[ingredientKey];
+            }
+        } else if (ARMOR[ingredientKey]) {
+            for(let i = 0; i < requiredAmount; i++) {
+                const index = player.inventory.armor.indexOf(ingredientKey);
+                if (index > -1) {
+                    player.inventory.armor.splice(index, 1);
+                }
+            }
         }
     }
     player.gold -= recipe.cost;
@@ -843,18 +1026,28 @@ function brewPotion(recipeKey) {
     // Add product to inventory
     player.addToInventory(recipe.output);
     const productDetails = getItemDetails(recipe.output);
-    addToLog(`You successfully brewed a <span class="font-bold text-green-300">${productDetails.name}</span>!`);
+    addToLog(`You successfully crafted a <span class="font-bold text-green-300">${productDetails.name}</span>!`);
+
+    // Update quest progress if applicable
+    if (player.activeQuest && player.activeQuest.category === 'creation') {
+        const quest = getQuestDetails(player.activeQuest);
+        if (quest && quest.target === recipe.output) {
+            player.questProgress++;
+            addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300');
+        }
+    }
 
     updateStatsView();
     renderAlchemist();
 }
 
 // --- QUESTS ---
-function acceptQuest(questKey) { 
+function acceptQuest(category, questKey) { 
     if (!player.activeQuest) { 
-        player.activeQuest = questKey; 
+        player.activeQuest = { category, key: questKey }; 
         player.questProgress = 0; 
-        addToLog(`New quest accepted: <span class="font-bold" style="color: var(--text-accent);">${QUESTS[questKey].title}</span>!`); 
+        const quest = getQuestDetails(player.activeQuest);
+        addToLog(`New quest accepted: <span class="font-bold" style="color: var(--text-accent);">${quest.title}</span>!`); 
         updateStatsView(); 
         renderQuestBoard(); 
     } else { 
@@ -862,11 +1055,43 @@ function acceptQuest(questKey) {
     } 
 }
 function completeQuest() {
-    if (!player.activeQuest) return; const quest = QUESTS[player.activeQuest];
-    if (quest.type === 'fetch') { player.inventory.items[quest.target] -= quest.required; if (player.inventory.items[quest.target] <= 0) { delete player.inventory.items[quest.target]; } }
+    if (!player.activeQuest) return;
+    const quest = getQuestDetails(player.activeQuest);
+    if (!quest) return;
+
+    if (player.activeQuest.category === 'collection') {
+        const itemDetails = getItemDetails(quest.target);
+        if (itemDetails) {
+            if (quest.target in ITEMS) {
+                player.inventory.items[quest.target] -= quest.required;
+                if (player.inventory.items[quest.target] <= 0) {
+                    delete player.inventory.items[quest.target];
+                }
+            } else { // It's equipment
+                for (let i = 0; i < quest.required; i++) {
+                    let category;
+                    if (quest.target in WEAPONS) category = 'weapons';
+                    else if (quest.target in ARMOR) category = 'armor';
+                    else if (quest.target in SHIELDS) category = 'shields';
+
+                    if (category) {
+                        const index = player.inventory[category].indexOf(quest.target);
+                        if (index > -1) {
+                            player.inventory[category].splice(index, 1);
+                        }
+                    }
+                }
+            }
+        }
+    }
     addToLog(`Quest Complete: <span class="font-bold text-green-400">${quest.title}</span>!`);
-    player.gainXp(quest.reward.xp); player.gold += quest.reward.gold; addToLog(`You received ${quest.reward.gold} G.`, 'text-yellow-400');
-    player.activeQuest = null; player.questProgress = 0; updateStatsView(); renderQuestBoard();
+    player.gainXp(quest.reward.xp); 
+    player.gold += quest.reward.gold; 
+    addToLog(`You received ${quest.reward.gold} G.`, 'text-yellow-400');
+    player.activeQuest = null; 
+    player.questProgress = 0; 
+    updateStatsView(); 
+    renderQuestBoard();
 }
 
 function cancelQuest() {
@@ -878,7 +1103,7 @@ function cancelQuest() {
         return;
     }
 
-    const quest = QUESTS[player.activeQuest];
+    const quest = getQuestDetails(player.activeQuest);
     player.gold -= penalty;
     addToLog(`You paid a ${penalty} G fee and abandoned the quest: <span class="font-bold text-yellow-300">${quest.title}</span>.`, 'text-red-400');
     
