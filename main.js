@@ -8,8 +8,8 @@ let isDebugVisible = false;
 
 // --- INITIALIZATION ---
 function initGame(playerName) { 
-    $('#start-screen').classList.add('hidden'); 
-    $('#game-container').classList.remove('hidden'); 
+    $('#start-screen-wrapper').classList.add('hidden'); 
+    $('#game-wrapper').classList.remove('hidden'); 
     player = new Player(playerName); 
     player.seed = Math.floor(Math.random() * 1000000); // Assign a random seed
     gameState.playerIsDying = false; 
@@ -102,6 +102,11 @@ function saveGame(manual = false) {
 }
 
 function renderLoadMenu() {
+    $('#start-screen-wrapper').classList.add('hidden');
+    $('#game-wrapper').classList.remove('hidden');
+    $('#stats-container').classList.add('hidden');
+    $('#log-container').classList.add('hidden');
+
     const saveKeys = JSON.parse(localStorage.getItem('rpgSaveKeys') || '[]');
     let html = `<div class="w-full text-center">
         <h2 class="font-medieval text-3xl mb-4 text-center">Load Character</h2>
@@ -135,8 +140,6 @@ function renderLoadMenu() {
         </div>
     </div>`;
 
-    $('#start-screen').classList.add('hidden');
-    $('#game-container').classList.remove('hidden');
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -187,14 +190,18 @@ function loadGameFromKey(saveKey) {
             
             updatePlayerTier(); // Calculate tier on load
 
-            $('#start-screen').classList.add('hidden'); 
-            $('#game-container').classList.remove('hidden'); 
+            $('#start-screen-wrapper').classList.add('hidden'); 
+            $('#game-wrapper').classList.remove('hidden');
+            $('#stats-container').classList.remove('hidden');
+            $('#log-container').classList.remove('hidden');
             addToLog(`Welcome back, ${player.name}!`); 
             applyTheme('default'); 
             updateStatsView(); 
             renderMainMenu(); 
         } catch (error) { 
             console.error("Could not load game:", error); 
+            alert("Could not load game. Save data may be corrupted.");
+            showStartScreen();
         } 
     } else {
         alert("Save file not found!");
@@ -256,8 +263,10 @@ function importSave(saveString) {
 
         updatePlayerTier(); // Calculate tier on import
 
-        $('#start-screen').classList.add('hidden');
-        $('#game-container').classList.remove('hidden');
+        $('#start-screen-wrapper').classList.add('hidden');
+        $('#game-wrapper').classList.remove('hidden');
+        $('#stats-container').classList.remove('hidden');
+        $('#log-container').classList.remove('hidden');
         logElement.innerHTML = '';
         addToLog(`Successfully imported character: ${player.name}!`);
         applyTheme('default');
@@ -274,11 +283,17 @@ function importSave(saveString) {
 
 // --- START SCREEN & UI HELPERS ---
 function showStartScreen() {
-    $('#game-container').classList.add('hidden');
-    $('#start-screen').classList.remove('hidden');
+    $('#game-wrapper').classList.add('hidden');
+    $('#start-screen-wrapper').classList.remove('hidden');
+    
+    // Make sure stats/log are visible for the next game session
+    $('#stats-container').classList.remove('hidden');
+    $('#log-container').classList.remove('hidden');
+
     logElement.innerHTML = '';
     player = null;
     updateLoadGameButtonVisibility();
+    applyTheme('default');
 }
 
 function updateLoadGameButtonVisibility() {
@@ -328,3 +343,4 @@ window.addEventListener('load', () => {
     $('#graveyard-btn').addEventListener('click', renderGraveyard); 
     updateLoadGameButtonVisibility();
 });
+
