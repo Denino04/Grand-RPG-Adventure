@@ -107,7 +107,7 @@ const LEGACY_QUESTS = {
 const SHOP_INVENTORY = {
     'Potions & Items': ['health_potion', 'mana_potion', 'superior_health_potion'],
     'Gear': ['dagger', 'leather_armor', 'wooden_shield'],
-    'Lures': ['goblin_scent_gland', 'bandit_coin', 'wolf_musk']
+    'Lures': ['goblin_scent_gland', 'bandit_coin', 'wolf_musk', 'rotten_cheese', 'warcaller_spore', 'silken_egg_sack']
 };
 const BLACKSMITH_INVENTORY = {
     'Weapons': ['rapier', 'steel_longsword', 'masterwork_spear', 'flaming_sword', 'vampiric_dagger'],
