@@ -298,11 +298,6 @@ function renderWildernessMenu() {
     render(container);
 }
 
-function toggleMobileMenu() {
-    const menu = document.getElementById('mobile-menu');
-    menu.classList.toggle('open');
-}
-
 function renderTown() {
     applyTheme('town');
     lastViewBeforeInventory = 'town';
@@ -320,9 +315,10 @@ function renderTown() {
         { name: 'Quest Board', action: "renderQuestBoard()" },
         { name: 'The Inn', action: "renderInn()" }, 
         { name: 'Enchanter', action: "addToLog('The Enchanter is under renovation. Please check back later.', 'text-gray-400')" }, 
-        { name: "Witch's Coven", action: "addToLog('The Witch\\'s Coven is currently brewing potions. Please check back later.', 'text-gray-400')" },
-        { name: 'Leave Town', action: "renderMainMenu()", isAction: true }
+        { name: "Witch's Coven", action: "addToLog('The Witch\\'s Coven is currently brewing potions. Please check back later.', 'text-gray-400')" }
     ];
+
+    const leaveTownAction = { name: 'Leave Town', action: "renderMainMenu()", isAction: true };
 
     // --- Title ---
     const title = document.createElement('h2');
@@ -337,53 +333,59 @@ function renderTown() {
     const locationRows = [
         locations.slice(0, 3),
         locations.slice(3, 6),
-        locations.slice(6, 9),
-        [locations[9]]
+        locations.slice(6, 9)
     ];
     locationRows.forEach(row => {
         const rowDiv = document.createElement('div');
         rowDiv.className = 'flex justify-center flex-wrap gap-4';
-        if (row[0].isAction) rowDiv.classList.add('mt-4');
         row.forEach(loc => {
             const button = document.createElement('button');
-            button.className = loc.isAction ? 'btn btn-action w-40' : 'btn btn-primary w-40';
+            button.className = 'btn btn-primary w-40';
             button.textContent = loc.name;
             button.setAttribute('onclick', loc.action);
             rowDiv.appendChild(button);
         });
         desktopButtonContainer.appendChild(rowDiv);
     });
+    const leaveTownRow = document.createElement('div');
+    leaveTownRow.className = 'flex justify-center flex-wrap gap-4 mt-4';
+    const leaveTownBtnDesktop = document.createElement('button');
+    leaveTownBtnDesktop.className = 'btn btn-action w-40';
+    leaveTownBtnDesktop.textContent = leaveTownAction.name;
+    leaveTownBtnDesktop.setAttribute('onclick', leaveTownAction.action);
+    leaveTownRow.appendChild(leaveTownBtnDesktop);
+    desktopButtonContainer.appendChild(leaveTownRow);
+    
     desktopContainer.appendChild(title.cloneNode(true));
     desktopContainer.appendChild(desktopButtonContainer);
     
-    // --- Mobile Menu (Hamburger) ---
+    // --- Mobile Menu (Scrollable) ---
     const mobileContainer = document.createElement('div');
     mobileContainer.className = 'md:hidden w-full h-full flex flex-col items-center';
+
+    const mobileTitle = title.cloneNode(true);
+    mobileTitle.classList.remove('mb-8');
+    mobileTitle.classList.add('mb-4');
     
-    // Hamburger Button
-    const hamburgerBtn = document.createElement('button');
-    hamburgerBtn.id = 'hamburger-btn';
-    hamburgerBtn.className = 'absolute top-6 right-6 z-30';
-    hamburgerBtn.setAttribute('onclick', 'toggleMobileMenu()');
-    hamburgerBtn.innerHTML = `<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>`;
-    
-    // Mobile Nav Panel
-    const mobileNav = document.createElement('div');
-    mobileNav.id = 'mobile-menu';
-    mobileNav.className = 'fixed top-0 right-0 h-full w-64 p-6 z-20 flex flex-col items-center gap-4';
+    const scrollableDiv = document.createElement('div');
+    scrollableDiv.className = 'w-full flex-grow overflow-y-auto inventory-scrollbar pr-2 space-y-3';
     
     locations.forEach(loc => {
         const button = document.createElement('button');
-        button.className = `${loc.isAction ? 'btn btn-action' : 'btn btn-primary'} w-full`;
+        button.className = 'btn btn-primary w-full';
         button.textContent = loc.name;
-        // Close menu on click
-        button.setAttribute('onclick', `${loc.action}; toggleMobileMenu();`);
-        mobileNav.appendChild(button);
+        button.setAttribute('onclick', loc.action);
+        scrollableDiv.appendChild(button);
     });
 
-    mobileContainer.appendChild(title);
-    mobileContainer.appendChild(hamburgerBtn);
-    mobileContainer.appendChild(mobileNav);
+    const leaveTownBtnMobile = document.createElement('button');
+    leaveTownBtnMobile.className = 'btn btn-action w-full mt-4';
+    leaveTownBtnMobile.textContent = leaveTownAction.name;
+    leaveTownBtnMobile.setAttribute('onclick', leaveTownAction.action);
+
+    mobileContainer.appendChild(mobileTitle);
+    mobileContainer.appendChild(scrollableDiv);
+    mobileContainer.appendChild(leaveTownBtnMobile);
 
     // --- Assemble final view ---
     container.appendChild(desktopContainer);
