@@ -58,7 +58,11 @@ const LURES = {
     'no_lure': { name: 'None', price: 0, description: 'No lure equipped.' },
     'goblin_scent_gland': { name: 'Goblin Scent Gland', price: 50, description: 'The potent smell seems to attract goblins.', lureTarget: 'goblin', uses: 5 },
     'bandit_coin': { name: 'Gilded Coin', price: 100, description: 'A shiny coin that seems to attract the greedy eyes of bandits.', lureTarget: 'bandit', uses: 3 },
-    'wolf_musk': { name: 'Wolf Musk', price: 75, description: 'A strong musk that draws in nearby wolves.', lureTarget: 'dire_wolf', uses: 5 }
+    'wolf_musk': { name: 'Wolf Musk', price: 75, description: 'A strong musk that draws in nearby wolves.', lureTarget: 'dire_wolf', uses: 5 },
+    'rotten_cheese': { name: 'Rotten Cheese', price: 50, description: 'The pungent smell of rotten cheese that attracts the hunger of rats.', lureTarget: 'giant_rat', uses: 5 },
+    'warcaller_spore': { name: 'Warcaller\'s Spore', price: 150, description: 'The spore of a barbaric race whose purpose to wage war.', lureTarget: 'orc_berserker', uses: 3 },
+    'silken_egg_sack': { name: 'Silken Egg Sack', price: 100, description: 'The egg sack of a hatched spider that releases a pheromone to pull them back home.', lureTarget: 'cave_spider', uses: 5 }
+
 };
 const MAGIC = {
     'fireball': {name: 'Fireball', type:'damage', damage: [2, 6], cost: 10, price: 100, description: 'Hurls a ball of fire at an enemy.'},
