@@ -66,7 +66,7 @@ class Player extends Entity {
         this.equippedShield = SHIELDS['no_shield'];
         this.equippedLure = 'no_lure';
         this.inventory = { 
-            items: { 'health_potion': 2 }, 
+            items: { 'health_potion': 3 }, 
             weapons: ['rusty_sword'], 
             armor: ['travelers_garb'], 
             shields: ['no_shield'], 
