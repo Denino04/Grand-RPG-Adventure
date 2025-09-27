@@ -871,7 +871,13 @@ function renderInventory() {
         
         let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${title}</h3><div class="space-y-2">`; 
         html += list.map(key => { 
-            const details = getItemDetails(key); 
+            const details = getItemDetails(key);
+            // --- FIX: Check if details exist before trying to render ---
+            if (!details) {
+                console.warn(`Could not find details for item key: ${key}. Skipping render.`);
+                return ''; // Return an empty string for invalid items
+            }
+            
             let countStr = '';
 
             if (category === 'items') {
