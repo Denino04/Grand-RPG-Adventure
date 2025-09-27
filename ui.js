@@ -850,6 +850,7 @@ function renderInventory() {
     }
     const scrollables = mainView.querySelectorAll('.inventory-scrollbar');
     const scrollPositions = Array.from(scrollables).map(el => el.scrollTop);
+    let itemsWereCleaned = false;
 
     gameState.currentView = 'inventory'; 
     const renderList = (category, title) => { 
@@ -869,23 +870,24 @@ function renderInventory() {
         
         if (!list || list.length === 0) return ''; 
         
+        const itemsToClean = [];
         let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${title}</h3><div class="space-y-2">`; 
+        
         html += list.map(key => { 
             const details = getItemDetails(key);
-            // --- FIX: Check if details exist before trying to render ---
             if (!details) {
-                console.warn(`Could not find details for item key: ${key}. Skipping render.`);
-                return ''; // Return an empty string for invalid items
+                console.warn(`Invalid item key found in save data: '${key}' in category '${category}'. It will be removed.`);
+                itemsToClean.push(key);
+                itemsWereCleaned = true;
+                return ''; // Skip rendering this invalid item
             }
             
             let countStr = '';
-
             if (category === 'items') {
                 countStr = `(x${player.inventory.items[key]})`;
             } else if (category === 'lures') {
                 countStr = `(x${player.inventory.lures[key]} uses)`;
-            }
-            else {
+            } else {
                  if (itemCounts[key] > 1) {
                     countStr = `(x${itemCounts[key]})`;
                 }
@@ -901,11 +903,26 @@ function renderInventory() {
             else if ((category === 'weapons' || category === 'armor' || category === 'shields' || category === 'lures') && !isEquipped) { 
                 buttonHtml = `<button onclick="equipItem('${key}')" class="btn btn-primary text-sm py-1 px-3">Equip</button>`; 
             }
-            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr} ${equippedText}</span>${buttonHtml}</div>`; }).join(''); 
-            html += `</div>`; 
-            return html; 
+            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr} ${equippedText}</span>${buttonHtml}</div>`; 
+        }).join(''); 
+
+        // After mapping, perform the cleanup
+        if (itemsToClean.length > 0) {
+            if (category === 'items' || category === 'lures') {
+                itemsToClean.forEach(itemKey => {
+                    delete player.inventory[category][itemKey];
+                });
+            } else { // weapons, armor, shields are arrays
+                player.inventory[category] = player.inventory[category].filter(itemKey => !itemsToClean.includes(itemKey));
+            }
+        }
+            
+        html += `</div>`; 
+        return html; 
     }; 
+
     const renderSpellbook = () => { let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-purple-300">Spellbook</h3><div class="space-y-2">`; if (player.spells.length === 0) { html += `<p class="text-gray-400">You have not learned any spells.</p>`; } else { html += player.spells.map(key => { const details = MAGIC[key]; return `<div class="p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><div class="flex justify-between items-center"><span class="font-bold text-purple-200">${details.name}</span><span class="text-blue-400">${details.cost} MP</span></div><p class="text-sm text-gray-400 mt-1">${details.description}</p></div>`; }).join(''); } html += `</div>`; return html; }; 
+    
     let html = `
         <div class="w-full text-left">
             <h2 class="font-medieval text-3xl mb-4 text-center">Inventory & Spells</h2>
@@ -925,6 +942,12 @@ function renderInventory() {
                 <button onclick="returnFromInventory()" class="btn btn-primary">Back</button>
             </div>
         </div>`;
+    
+    if (itemsWereCleaned) {
+        addToLog('Cleaned up obsolete items from your save file.', 'text-gray-500');
+        saveGame();
+    }
+    
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
