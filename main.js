@@ -332,5 +332,7 @@ $('#import-save-btn').addEventListener('click', () => {
 window.addEventListener('load', () => { 
     $('#load-game-btn').addEventListener('click', renderLoadMenu); 
     $('#graveyard-btn').addEventListener('click', renderGraveyard); 
+    $('#changelog-btn').addEventListener('click', renderChangeLog);
     updateLoadGameButtonVisibility();
 });
+

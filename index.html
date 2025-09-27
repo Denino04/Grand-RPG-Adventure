@@ -21,6 +21,7 @@
             <button id="start-game-btn" class="btn btn-primary text-xl px-8 py-3">Begin Adventure</button>
             <button id="load-game-btn" class="btn btn-primary text-xl px-8 py-3 hidden">Load Saved Game</button>
             <button id="graveyard-btn" class="btn btn-primary text-xl px-8 py-3 hidden">View Graveyard</button>
+            <button id="changelog-btn" class="btn btn-primary text-xl px-8 py-3">ChangeLog</button>
         </div>
         <div class="mt-4">
              <input type="text" id="import-save-input" class="bg-gray-800 border border-gray-600 text-white text-center text-sm rounded-lg px-3 py-1 w-64 focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="Paste Save Data...">
@@ -29,7 +30,7 @@
     </div>
 
     <!-- Main Game Container -->
-    <div id="game-container" class="relative w-full max-w-4xl mx-auto rounded-2xl shadow-2xl border p-6 hidden">
+    <div id="game-container" class="relative w-full max-w-6xl mx-auto rounded-2xl shadow-2xl border p-6 hidden">
         
         <button onclick="exitGame()" title="Save and Exit" class="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-red-600 rounded-full transition-colors duration-200 z-50">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -73,13 +74,16 @@
             </div>
         </div>
 
-        <div id="main-view" class="min-h-[450px] p-6 rounded-lg mb-4 flex flex-col justify-center items-center">
-            <!-- Game content is dynamically inserted here -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div id="main-view" class="min-h-[450px] p-6 rounded-lg flex flex-col justify-center items-center md:col-span-2">
+                <!-- Game content is dynamically inserted here -->
+            </div>
+
+            <div id="game-log" class="bg-black/30 rounded-lg p-4 md:col-span-1 min-h-[200px] md:min-h-[450px] h-full overflow-y-auto">
+                <!-- Log messages are added here -->
+            </div>
         </div>
 
-        <div class="bg-black/30 rounded-lg p-4 h-48 overflow-y-auto" id="game-log">
-            <!-- Log messages are added here -->
-        </div>
     </div>
 
     <!-- Tooltip Element -->

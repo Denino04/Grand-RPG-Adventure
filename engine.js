@@ -338,13 +338,23 @@ function startBattle(biomeKey) {
     currentEnemies = [];
 
     let numEnemies = 1;
-    if (player.level >= 5) {
+    const playerLevel = player.level;
+
+    if (playerLevel >= 6) { // Level 6 and above can face up to 3 enemies
         const rand = Math.random();
-        if (rand > 0.9) numEnemies = 3;
-        else if (rand > 0.6) numEnemies = 2;
-    } else {
-         if (Math.random() > 0.8) numEnemies = 2;
+        if (rand > 0.9) { // 10% chance for 3 enemies
+            numEnemies = 3;
+        } else if (rand > 0.6) { // 30% chance for 2 enemies
+            numEnemies = 2;
+        }
+        // 60% chance for 1 enemy
+    } else if (playerLevel >= 4) { // Level 4 and 5 can face up to 2 enemies
+        if (Math.random() > 0.5) { // 50% chance for 2 enemies
+            numEnemies = 2;
+        }
+        // 50% chance for 1 enemy
     }
+    // For levels 1, 2, and 3, numEnemies remains 1.
 
 
     for (let i = 0; i < numEnemies; i++) {
@@ -1192,4 +1202,3 @@ function cancelQuest() {
     updateStatsView();
     renderQuestBoard();
 }
-

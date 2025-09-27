@@ -1045,3 +1045,38 @@ function renderGraveyard() {
     render(container);
 }
 
+function renderChangeLog() {
+    let html = `<div class="w-full text-center">
+        <h2 class="font-medieval text-3xl mb-4 text-center">ChangeLog</h2>
+        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-4 text-left">`;
+
+    if (typeof CHANGELOG_DATA === 'undefined' || CHANGELOG_DATA.length === 0) {
+        html += `<p class="text-gray-400 text-center">No changelog entries found.</p>`;
+    } else {
+        CHANGELOG_DATA.forEach(entry => {
+            html += `
+                <div class="p-3 bg-slate-800 rounded-lg">
+                    <div class="flex justify-between items-baseline">
+                        <p class="font-bold text-yellow-300">${entry.version}</p>
+                        <p class="text-xs text-gray-500">${entry.date}</p>
+                    </div>
+                    <ul class="list-disc list-inside text-sm text-gray-300 mt-2 space-y-1">
+                        ${entry.changes.map(change => `<li>${change}</li>`).join('')}
+                    </ul>
+                </div>`;
+        });
+    }
+
+    html += `</div>
+        <div class="text-center mt-4">
+            <button onclick="showStartScreen()" class="btn btn-primary">Back</button>
+        </div>
+    </div>`;
+
+    $('#start-screen').classList.add('hidden');
+    $('#game-container').classList.remove('hidden');
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+

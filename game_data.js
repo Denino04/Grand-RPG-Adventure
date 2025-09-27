@@ -332,3 +332,108 @@ const BLACKSMITH_RECIPES = {
     'craft_soul_steel': { output: 'soul_steel_armor', ingredients: { 'soul_armor_shard': 5, 'adamantine_armor': 1 }, cost: 5000},
     'craft_vacuum_encaser': { output: 'vacuum_encaser', ingredients: { 'livyatan_vacuum_lining': 3 }, cost: 3000}
 };
+
+
+const CHANGELOG_DATA = [
+    {
+        version: "v0.2.5",
+        date: "2025-09-27",
+        changes: [
+            "Adjusted enemy encounter rates for early levels.",
+            "Players at levels 1-3 will now only encounter 1 enemy.",
+            "Players at levels 4-5 will encounter a maximum of 2 enemies.",
+            "Increased late-game difficulty: players can now encounter up to 4 enemies at level 40+ and up to 5 enemies at level 50+.",
+            "Added Changelog to see hanges between versions"
+        ]
+    },
+    {
+        version: "v0.2.4",
+        date: "2025-09-26",
+        changes: [
+            "UI update with optimizations for PC and Mobile."
+        ]
+    },
+    {
+        version: "v0.2.3",
+        date: "2025-09-26",
+        changes: [
+            "Additional bug fixes and quality-of-life improvements."
+        ]
+    },
+    {
+        version: "v0.2.2",
+        date: "2025-09-26",
+        changes: [
+            "Bug fixes.",
+            "Added Alchemist and Black Market."
+        ]
+    },
+    {
+        version: "v0.2.1",
+        date: "2025-09-26",
+        changes: [
+            "Major battle system overhaul:",
+            "- Biome mechanics reworked.",
+            "- Monster system redesigned.",
+            "- Equipment progression updated.",
+            "- RNG system overhauled."
+        ]
+    },
+    {
+        version: "v0.1.8",
+        date: "2025-09-25",
+        changes: [
+            "Endgame content added: Legacy Quest."
+        ]
+    },
+    {
+        version: "v0.1.7",
+        date: "2025-09-25",
+        changes: [
+            "Save/Load System overhauled with Save Key integration."
+        ]
+    },
+    {
+        version: "v0.1.6",
+        date: "2025-09-25",
+        changes: [
+            "New items introduced: Shield and Lure."
+        ]
+    },
+    {
+        version: "v0.1.5",
+        date: "2025-09-25",
+        changes: [
+            "Save/Load System implemented using LocalStorage."
+        ]
+    },
+    {
+        version: "v0.1.4",
+        date: "2025-09-25",
+        changes: [
+            "Biome System added."
+        ]
+    },
+    {
+        version: "v0.1.3",
+        date: "2025-09-24",
+        changes: [
+            "Town System expanded with Quest System and Magic Shop."
+        ]
+    },
+    {
+        version: "v0.1.2",
+        date: "2025-09-24",
+        changes: [
+            "Town System: implemented General Shop, Blacksmith, and Inn."
+        ]
+    },
+    {
+        version: "v0.1.1",
+        date: "2025-09-24",
+        changes: [
+            "Project initialized (base game loop created)."
+        ]
+    }
+];
+
