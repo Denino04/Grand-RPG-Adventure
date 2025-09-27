@@ -161,33 +161,23 @@ function loadGameFromKey(saveKey) {
             const parsedData = JSON.parse(savedData); 
             player = new Player(parsedData.name); 
             Object.assign(player, parsedData); 
-            if (!player.legacyQuestProgress) {
-                player.legacyQuestProgress = {};
-            }
-            if (!player.questsTakenToday) {
-                player.questsTakenToday = [];
-            }
+            
+            // --- Compatibility fixes for old save files ---
+            if (!player.legacyQuestProgress) { player.legacyQuestProgress = {}; }
+            if (!player.questsTakenToday) { player.questsTakenToday = []; }
             if (!player.blackMarketStock) {
                 player.blackMarketStock = { seasonal: [] };
                 generateBlackMarketStock();
             }
+            if (!player.equippedLure) { player.equippedLure = 'no_lure'; }
+            if (!player.inventory.lures) { player.inventory.lures = {}; }
+            if (typeof player.activeQuest === 'string') { player.activeQuest = null; player.questProgress = 0; }
+            if (!player.seed) { player.seed = Math.floor(Math.random() * 1000000); }
+            if (!player.biomeOrder || player.biomeOrder.length === 0) { generateRandomizedBiomeOrder(); }
+            if (!player.specialWeaponStates) { player.specialWeaponStates = {}; }
+            // --- End compatibility fixes ---
+
             gameState.playerIsDying = false; 
-
-            // Compatibility fix for old save files with the old quest system
-            if (typeof player.activeQuest === 'string') {
-                player.activeQuest = null;
-                player.questProgress = 0;
-            }
-
-            // Compatibility for saves without a seed
-            if (!player.seed) {
-                player.seed = Math.floor(Math.random() * 1000000);
-            }
-
-            if (!player.biomeOrder || player.biomeOrder.length === 0) {
-                generateRandomizedBiomeOrder();
-            }
-            
             updatePlayerTier(); // Calculate tier on load
 
             $('#start-screen').classList.add('hidden'); 
@@ -235,30 +225,21 @@ function importSave(saveString) {
         Object.assign(player, parsedData);
         player.saveKey = generateSaveKey(); 
         gameState.playerIsDying = false; 
-        if (!player.legacyQuestProgress) {
-            player.legacyQuestProgress = {};
-        }
-        if (!player.questsTakenToday) {
-            player.questsTakenToday = [];
-        }
 
-        // Compatibility fix for old save files with the old quest system
-        if (typeof player.activeQuest === 'string') {
-            player.activeQuest = null;
-            player.questProgress = 0;
+        // --- Compatibility fixes for old save files ---
+        if (!player.legacyQuestProgress) { player.legacyQuestProgress = {}; }
+        if (!player.questsTakenToday) { player.questsTakenToday = []; }
+        if (!player.blackMarketStock) {
+            player.blackMarketStock = { seasonal: [] };
+            generateBlackMarketStock();
         }
-
-        // Compatibility for saves without a seed
-        if (!player.seed) {
-            player.seed = Math.floor(Math.random() * 1000000);
-        }
-
-        if (!player.biomeOrder || player.biomeOrder.length === 0) {
-            generateRandomizedBiomeOrder();
-        }
-        if (!player.specialWeaponStates) {
-            player.specialWeaponStates = {};
-        }
+        if (!player.equippedLure) { player.equippedLure = 'no_lure'; }
+        if (!player.inventory.lures) { player.inventory.lures = {}; }
+        if (typeof player.activeQuest === 'string') { player.activeQuest = null; player.questProgress = 0; }
+        if (!player.seed) { player.seed = Math.floor(Math.random() * 1000000); }
+        if (!player.biomeOrder || player.biomeOrder.length === 0) { generateRandomizedBiomeOrder(); }
+        if (!player.specialWeaponStates) { player.specialWeaponStates = {}; }
+        // --- End compatibility fixes ---
 
         updatePlayerTier(); // Calculate tier on import
 

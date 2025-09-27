@@ -157,13 +157,18 @@ function updateStatsView() {
     $('#player-mp-text').textContent = `${player.mp} / ${player.maxMp}`; 
     $('#player-xp-text').textContent = `${player.xp} / ${player.xpToNextLevel}`;
     
-    const weapon = player.equippedWeapon; 
-    const armor = player.equippedArmor;
-    const shield = player.equippedShield;
-    const lure = LURES[player.equippedLure];
+    // --- Equipment Display (with fallbacks for robustness) ---
+    const weapon = player.equippedWeapon || WEAPONS['fists'];
+    const armor = player.equippedArmor || ARMOR['travelers_garb'];
+    const shield = player.equippedShield || SHIELDS['no_shield'];
+    const lure = LURES[player.equippedLure] || LURES['no_lure'];
     
-    $('#equipped-weapon').textContent = `${weapon.name} (${weapon.damage[0]}d${weapon.damage[1]})`; 
+    // Weapon
+    const weaponName = weapon.name;
+    const weaponDamage = weapon.damage ? `(${weapon.damage[0]}d${weapon.damage[1]})` : '';
+    $('#equipped-weapon').textContent = `${weaponName} ${weaponDamage}`; 
     
+    // Armor
     let armorStats = [`Def: ${armor.defense}`];
     if (armor.blockChance > 0) {
         armorStats.push(`Block: ${Math.round(armor.blockChance * 100)}%`);
@@ -173,6 +178,7 @@ function updateStatsView() {
     }
     $('#equipped-armor').textContent = `${armor.name} (${armorStats.join(', ')})`;
 
+    // Shield
     let shieldStats = [`Def: ${shield.defense}`];
     if (shield.blockChance > 0) {
         shieldStats.push(`Block: ${Math.round(shield.blockChance * 100)}%`);
@@ -180,8 +186,9 @@ function updateStatsView() {
     if (shield.effect?.type === 'parry') {
         shieldStats.push(`Parry: ${Math.round(shield.effect.chance * 100)}%`);
     }
-     $('#equipped-shield').textContent = `${shield.name} (${shieldStats.join(', ')})`;
+    $('#equipped-shield').textContent = `${shield.name} (${shieldStats.join(', ')})`;
 
+    // Lure
     $('#equipped-lure').textContent = lure.name;
     
     const questTrackerEl = $('#quest-tracker');

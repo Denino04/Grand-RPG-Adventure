@@ -335,6 +335,13 @@ const BLACKSMITH_RECIPES = {
 
 
 const CHANGELOG_DATA = [
+        {
+        version: "v0.2.6",
+        date: "2025-09-27",
+        changes: [
+            "Fix Safe file incompatibility between Version 0.1 and Version 0.2.",
+        ]
+    },
     {
         version: "v0.2.5",
         date: "2025-09-27",
