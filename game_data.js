@@ -159,6 +159,7 @@ const SHIELDS = {
 };
 
 const ARMOR = {
+    'tattered_rags': {name: 'Tattered Rags', defense: 0, price: 0, description: "Tattered rags unfit for usage."},
     'travelers_garb': {name: 'Traveler\'s Garb', defense: 1, price: 0, description: "Simple clothes for a long journey. Offers minimal protection."},
     'leather_armor': {name: 'Leather Armor', defense: 3, price: 50, description: "Hardened leather plates, a solid choice for any adventurer."},
     'padded_leather': {name: 'Padded Leather', defense: 5, price: 150, description: "Reinforced leather with thick padding underneath."},
