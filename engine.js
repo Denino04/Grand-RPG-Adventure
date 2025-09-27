@@ -338,24 +338,34 @@ function startBattle(biomeKey) {
     currentEnemies = [];
 
     let numEnemies = 1;
-    const playerLevel = player.level;
-
-    if (playerLevel >= 6) { // Level 6 and above can face up to 3 enemies
+    if (player.level >= 50) {
         const rand = Math.random();
-        if (rand > 0.9) { // 10% chance for 3 enemies
+        if (rand > 0.9) numEnemies = 5;       // 10% for 5
+        else if (rand > 0.7) numEnemies = 4;  // 20% for 4
+        else if (rand > 0.4) numEnemies = 3;  // 30% for 3
+        else if (rand > 0.1) numEnemies = 2;  // 30% for 2
+        // 10% for 1
+    } else if (player.level >= 40) {
+        const rand = Math.random();
+        if (rand > 0.8) numEnemies = 4;      // 20% for 4
+        else if (rand > 0.5) numEnemies = 3; // 30% for 3
+        else if (rand > 0.2) numEnemies = 2; // 30% for 2
+        // 20% for 1
+    } else if (player.level >= 6) {
+        const rand = Math.random();
+        if (rand > 0.8) { // 20% chance for 3 enemies
             numEnemies = 3;
-        } else if (rand > 0.6) { // 30% chance for 2 enemies
-            numEnemies = 2;
-        }
-        // 60% chance for 1 enemy
-    } else if (playerLevel >= 4) { // Level 4 and 5 can face up to 2 enemies
-        if (Math.random() > 0.5) { // 50% chance for 2 enemies
+        } else if (rand > 0.5) { // 30% chance for 2 enemies
             numEnemies = 2;
         }
         // 50% chance for 1 enemy
+    } else if (player.level >= 4) { // Levels 4 and 5
+        if (Math.random() < 0.3) { // 30% chance for 2 enemies
+            numEnemies = 2;
+        }
+        // 70% chance for 1 enemy
     }
-    // For levels 1, 2, and 3, numEnemies remains 1.
-
+    // For levels 1, 2, and 3, numEnemies will remain 1.
 
     for (let i = 0; i < numEnemies; i++) {
         currentEnemies.push(generateEnemy(biomeKey));
