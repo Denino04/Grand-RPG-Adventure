@@ -22,17 +22,17 @@ function startBattle(biomeKey) {
         // 20% for 1
     } else if (player.level >= 6) {
         const rand = Math.random();
-        if (rand > 0.7) { // 30% chance for 3 enemies
+        if (rand > 0.8) { // 20% chance for 3 enemies
             numEnemies = 3;
-        } else if (rand > 0.4) { // 30% chance for 2 enemies
+        } else if (rand > 0.5) { // 30% chance for 2 enemies
             numEnemies = 2;
         }
-        // 40% chance for 1 enemy
+        // 50% chance for 1 enemy
     } else if (player.level >= 4) { // Levels 4 and 5
-        if (Math.random() > 0.5) { // 50% chance for 2 enemies
+        if (Math.random() < 0.3) { // 30% chance for 2 enemies
             numEnemies = 2;
         }
-        // 50% for 1 enemy
+        // 70% chance for 1 enemy
     }
     // For levels 1, 2, and 3, numEnemies will remain 1.
 
@@ -52,13 +52,49 @@ function startBattle(biomeKey) {
     renderBattle(); 
 }
 
+function performSpellFollowUpAttack(target) {
+    if (!target || !target.isAlive()) {
+        // If the original target is dead, find a new living target
+        const livingEnemies = currentEnemies.filter(e => e.isAlive());
+        if (livingEnemies.length > 0) {
+            target = livingEnemies[0];
+        } else {
+            return; // No one left to attack
+        }
+    }
+    
+    const weapon = player.equippedWeapon;
+    addToLog(`Your ${weapon.name} resonates with the spell, lashing out with a follow-up strike!`, 'text-yellow-300');
+    
+    // Use a simplified attack logic for the follow-up
+    let damage = rollDice(...weapon.damage, 'Spell Follow-up Attack') + Math.floor(player.intelligence / 2); // Scales with INT
+    const finalDamage = target.takeDamage(damage, { element: player.weaponElement });
+    addToLog(`The follow-up attack hits ${target.name} for <span class="font-bold text-yellow-300">${finalDamage}</span> damage.`);
+    
+    // Check battle status again after the follow-up
+    setTimeout(() => checkBattleStatus(true), 200);
+}
+
+function performShieldFollowUpAttack(target) {
+     if (!target || !target.isAlive()) return;
+     const shield = player.equippedShield;
+     if (!shield.effect?.attack_follow_up) return;
+
+     addToLog(`Your ${shield.name} retaliates!`, 'text-orange-400');
+     const effect = shield.effect.attack_follow_up;
+     const damage = rollDice(...effect.damage, 'Shield Follow-up');
+     const finalDamage = target.takeDamage(damage, { element: player.shieldElement });
+     addToLog(`It strikes ${target.name} for <span class="font-bold text-orange-400">${finalDamage}</span> damage.`);
+
+     if (effect.paralyze_chance && Math.random() < effect.paralyze_chance) {
+         target.statusEffects.paralyzed = { duration: effect.duration + 1 };
+         addToLog(`${target.name} is paralyzed by the blow!`, 'text-yellow-500');
+     }
+}
+
+
 function performAttack(targetIndex) {
     const weapon = player.equippedWeapon; 
-    if (weapon.name === 'Fists' && player.equippedCatalyst.name !== 'None') {
-        addToLog('You cannot attack with your fists while holding a catalyst. Use it to cast spells.', 'text-blue-400');
-        renderBattle('main'); // Re-render the battle UI to show action buttons again
-        return;
-    }
 
     const target = currentEnemies[targetIndex];
     if (!target || !target.isAlive()) {
@@ -66,77 +102,167 @@ function performAttack(targetIndex) {
         return;
     };
     gameState.isPlayerTurn = false; 
-    let damage = rollDice(...weapon.damage, 'Player Weapon Attack') + player.strength; 
-    let attackEffects = {};
-    let messageLog = [];
 
-    // --- DAMAGE MODIFICATION ---
-    if(player.statusEffects.strength) {
-        damage = Math.floor(damage * player.statusEffects.strength.multiplier);
-        messageLog.push(`Your strength is augmented!`);
-    }
-    if (weapon.effect?.type === 'crit' && Math.random() < weapon.effect.chance) {
-        damage = Math.floor(damage * weapon.effect.multiplier);
-        messageLog.push(`CRITICAL HIT!`);
-    }
-    if (weapon.effect?.bonus_vs_dragon && target.speciesData.name === 'Dragon') {
-        damage = Math.floor(damage * weapon.effect.bonus_vs_dragon);
-        messageLog.push(`Your weapon glows with power against the dragon!`);
-    }
+    const performSingleAttack = (attackTarget, isSecondStrike = false) => {
+        let damage = rollDice(...weapon.damage, `Player Weapon Attack ${isSecondStrike ? '2' : '1'}`) + player.strength; 
+        let attackEffects = { element: player.weaponElement };
+        let messageLog = [];
 
-    // --- APPLY ATTACK EFFECTS ---
-    if (weapon.effect?.ignore_defense) {
-        attackEffects.ignore_defense = weapon.effect.ignore_defense;
-    }
-    
-    // --- DEAL DAMAGE ---
-    const finalDamage = target.takeDamage(damage, attackEffects);
-    addToLog(`You attack ${target.name} with ${weapon.name}, dealing <span class="font-bold text-yellow-300">${finalDamage}</span> damage. ${messageLog.join(' ')}`);
-    
-    // --- POST-DAMAGE EFFECTS ---
+        if (player.statusEffects.drenched) {
+            damage = Math.floor(damage * player.statusEffects.drenched.multiplier);
+            messageLog.push(`Your attack is weakened!`);
+        }
+
+        // --- DAMAGE MODIFICATION ---
+        if(player.statusEffects.strength) {
+            damage = Math.floor(damage * player.statusEffects.strength.multiplier);
+            if (!isSecondStrike) messageLog.push(`Your strength is augmented!`);
+        }
+        if (player.weaponElement === 'fire') {
+            const fireMultiplier = 1 + Math.random() * 0.2;
+            damage = Math.floor(damage * fireMultiplier);
+        }
+        if (weapon.effect?.type === 'crit' && Math.random() < weapon.effect.chance) {
+            damage = Math.floor(damage * weapon.effect.multiplier);
+            messageLog.push(`CRITICAL HIT!`);
+        }
+        if (weapon.effect?.bonus_vs_dragon && attackTarget.speciesData.name === 'Dragon') {
+            damage = Math.floor(damage * weapon.effect.bonus_vs_dragon);
+            if (!isSecondStrike) messageLog.push(`Your weapon glows with power against the dragon!`);
+        }
+
+        // --- APPLY ATTACK EFFECTS ---
+        if (weapon.effect?.ignore_defense) {
+            attackEffects.ignore_defense = weapon.effect.ignore_defense;
+        }
+        
+        // --- DEAL DAMAGE ---
+        const finalDamage = attackTarget.takeDamage(damage, attackEffects);
+        let damageType = '';
+        if (player.weaponElement && player.weaponElement !== 'none') {
+            damageType = ` ${ELEMENTS[player.weaponElement].name}`;
+        }
+        addToLog(`You attack ${attackTarget.name} with ${weapon.name}, dealing <span class="font-bold text-yellow-300">${finalDamage}</span>${damageType} damage. ${messageLog.join(' ')}`);
+        
+        const weaponRarityName = weapon.rarity || 'Common';
+        const rarityIndex = (Object.values(MONSTER_RARITY).findIndex(r => r.name === weaponRarityName) + 1) || 1;
+
+        if (finalDamage > 0 && !isSecondStrike) {
+             if (player.weaponElement === 'water') {
+                addToLog(`The water from your attack drenches ${attackTarget.name}!`, 'text-blue-400');
+                attackTarget.statusEffects.drenched = { duration: 2, multiplier: 0.9 };
+            }
+            if (player.weaponElement === 'earth' && Math.random() < (rarityIndex * 0.05)) {
+                if (!attackTarget.statusEffects.paralyzed) {
+                    attackTarget.statusEffects.paralyzed = { duration: 2 }; // Duration is 2 so it lasts for their next turn
+                    addToLog(`${attackTarget.name} is paralyzed by the force of the earth!`, 'text-yellow-500');
+                }
+            }
+            if (player.weaponElement === 'nature') {
+                const lifestealAmount = Math.floor(finalDamage * (rarityIndex * 0.05));
+                if (lifestealAmount > 0) {
+                    player.hp = Math.min(player.maxHp, player.hp + lifestealAmount);
+                    addToLog(`You drain <span class="font-bold text-green-400">${lifestealAmount}</span> HP.`, 'text-green-300');
+                    updateStatsView();
+                }
+            }
+            if (player.weaponElement === 'light' && Math.random() < (rarityIndex * 0.05)) {
+                const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched'].includes(key));
+                if (debuffs.length > 0) {
+                    const effectToCleanse = debuffs[0];
+                    delete player.statusEffects[effectToCleanse];
+                    addToLog(`Your weapon's light energy cleanses you of ${effectToCleanse}!`, 'text-yellow-200');
+                }
+            }
+            if (player.weaponElement === 'lightning' && Math.random() < (rarityIndex * 0.05)) {
+                const otherTargets = currentEnemies.filter(e => e.isAlive() && e !== attackTarget);
+                if (otherTargets.length > 0) {
+                    const chainTarget = otherTargets[Math.floor(Math.random() * otherTargets.length)];
+                    const chainDamage = Math.floor(finalDamage / 2);
+                    const finalChainDamage = chainTarget.takeDamage(chainDamage, attackEffects);
+                    addToLog(`Lightning chains from your attack, hitting ${chainTarget.name} for <span class="font-bold text-blue-300">${finalChainDamage}</span> damage!`, 'text-blue-400');
+                }
+            }
+        }
+
+        // --- POST-DAMAGE EFFECTS ---
     if (weapon.effect) {
         if (weapon.effect.type === 'fire_damage') { 
             const fireDamage = rollDice(...weapon.effect.damage, 'Fire Damage'); 
-            const finalFireDamage = target.takeDamage(fireDamage, {ignore_defense: 1.0});
+            const finalFireDamage = target.takeDamage(fireDamage, {ignore_defense: 1.0, isMagic: true, element: 'fire'});
             addToLog(`The blade burns for an extra <span class="font-bold text-orange-400">${finalFireDamage}</span> fire damage.`); 
         }
         if (weapon.effect.type === 'lightning_damage') { 
             const lightningDamage = rollDice(...weapon.effect.damage, 'Lightning Damage'); 
-            const finalLightningDamage = target.takeDamage(lightningDamage, {ignore_defense: 1.0});
+            const finalLightningDamage = target.takeDamage(lightningDamage, {ignore_defense: 1.0, isMagic: true, element: 'lightning'});
             addToLog(`Lightning arcs from your weapon for an extra <span class="font-bold text-blue-400">${finalLightningDamage}</span> damage.`); 
         }
         if (weapon.effect.type === 'lifesteal') { 
             const healedAmount = Math.floor(finalDamage * weapon.effect.amount); 
-            if (healedAmount > 0) { 
-                player.hp = Math.min(player.maxHp, player.hp + healedAmount); 
-                addToLog(`You drain <span class="font-bold text-green-400">${healedAmount}</span> HP.`); 
-                updateStatsView(); 
-            } 
+                if (healedAmount > 0) { 
+                    player.hp = Math.min(player.maxHp, player.hp + healedAmount); 
+                    addToLog(`You drain <span class="font-bold text-green-400">${healedAmount}</span> HP.`); 
+                    updateStatsView(); 
+                } 
+            }
+            if (weapon.effect.type === 'paralyze' && Math.random() < weapon.effect.chance) {
+                attackTarget.statusEffects.paralyzed = { duration: weapon.effect.duration + 1 };
+                addToLog(`${attackTarget.name} is paralyzed by the blow!`, 'text-yellow-500');
+            }
+            if (weapon.effect.petrify_chance && Math.random() < weapon.effect.petrify_chance) {
+                attackTarget.statusEffects.petrified = { duration: weapon.effect.duration + 1 };
+                addToLog(`${attackTarget.name} is petrified by the attack!`, 'text-gray-400');
+            }
         }
-        if (weapon.effect.type === 'paralyze' && Math.random() < weapon.effect.chance) {
-            target.statusEffects.paralyzed = { duration: weapon.effect.duration + 1 };
-            addToLog(`${target.name} is paralyzed by the blow!`, 'text-yellow-500');
+    };
+    
+    performSingleAttack(target);
+    
+    // Chain the next actions
+    setTimeout(() => {
+        if (player.equippedShield.effect?.attack_follow_up) {
+            performShieldFollowUpAttack(target);
         }
-        if (weapon.effect.petrify_chance && Math.random() < weapon.effect.petrify_chance) {
-            target.statusEffects.petrified = { duration: weapon.effect.duration + 1 };
-            addToLog(`${target.name} is petrified by the attack!`, 'text-gray-400');
+
+        const weaponRarityName = weapon.rarity || 'Common';
+        const rarityIndex = (Object.values(MONSTER_RARITY).findIndex(r => r.name === weaponRarityName) + 1) || 1;
+
+        if (player.weaponElement === 'wind' && target.isAlive() && Math.random() < (rarityIndex * 0.05)) {
+            setTimeout(() => {
+                addToLog(`The swirling winds grant you another strike!`, 'text-gray-300');
+                performSingleAttack(target, true); // Call again, but mark as second strike
+                 setTimeout(checkBattleStatus, 200);
+            }, 300);
+        } else if (weapon.effect?.double_strike && target.isAlive()) {
+             setTimeout(() => {
+                addToLog("You strike again!", "text-yellow-300");
+                performSingleAttack(target, true);
+                setTimeout(checkBattleStatus, 200);
+            }, 300);
+        } else {
+            setTimeout(checkBattleStatus, 200);
         }
-    }
-    setTimeout(checkBattleStatus, 200);
+    }, 300);
 }
+
 
 function castSpell(spellKey, targetIndex) {
     const spell = MAGIC[spellKey];
     const catalyst = player.equippedCatalyst;
+    const armor = player.equippedArmor;
     let spellCost = spell.cost;
 
     if (catalyst.name === 'None') {
         addToLog(`You need to equip a catalyst to cast spells!`, 'text-blue-400');
+        renderBattle();
         return;
     }
 
     if (catalyst.effect?.mana_discount) {
         spellCost = Math.max(1, spellCost - catalyst.effect.mana_discount);
+    }
+    if (armor.effect?.mana_discount) {
+        spellCost = Math.max(1, spellCost - armor.effect.mana_discount);
     }
     
     if (player.mp < spellCost) {
@@ -179,12 +305,21 @@ function castSpell(spellKey, targetIndex) {
                 magicDamage = Math.floor(magicDamage / 2);
                 messageLog.push(`Your spell fizzles inside the beast!`);
             }
-            const finalDamage = target.takeDamage(magicDamage); 
+            const finalDamage = target.takeDamage(magicDamage, { isMagic: true, element: spell.element || 'none' }); 
             addToLog(`It deals <span class="font-bold text-purple-400">${finalDamage}</span> damage. ${messageLog.join(' ')}`);
+
+             if (catalyst.effect?.spell_lifesteal) {
+                const healedAmount = Math.floor(finalDamage * catalyst.effect.spell_lifesteal);
+                if (healedAmount > 0) {
+                    player.hp = Math.min(player.maxHp, player.hp + healedAmount);
+                    addToLog(`You drain <span class="font-bold text-green-400">${healedAmount}</span> HP from the spell.`, 'text-green-300');
+                    updateStatsView();
+                }
+            }
 
             if (catalyst.effect?.bonus_fire_damage) {
                 const fireDamage = rollDice(...catalyst.effect.bonus_fire_damage, 'Bonus Fire Damage');
-                const finalFireDamage = target.takeDamage(fireDamage, { ignore_defense: 1.0 });
+                const finalFireDamage = target.takeDamage(fireDamage, { ignore_defense: 1.0, isMagic: true, element: 'fire' });
                 addToLog(`The spell burns for an extra <span class="font-bold text-orange-400">${finalFireDamage}</span> fire damage.`);
             }
             break;
@@ -198,7 +333,14 @@ function castSpell(spellKey, targetIndex) {
             updateStatsView(); 
             break;
     }
-    setTimeout(checkBattleStatus, 200);
+
+    // Check for spell follow-up attack
+    if (player.equippedWeapon.effect?.spell_follow_up) {
+        // We use a timeout to let the spell damage log appear first
+        setTimeout(() => performSpellFollowUpAttack(target), 200);
+    } else {
+        setTimeout(checkBattleStatus, 200);
+    }
 }
 
 function battleAction(type, actionData = null) {
@@ -336,15 +478,28 @@ function checkBattleStatus(isReaction = false) {
 }
 function handlePlayerEndOfTurn() {
     const catalyst = player.equippedCatalyst;
+    const armor = player.equippedArmor;
+    const shield = player.equippedShield;
+
     if (catalyst.effect?.hp_regen) {
         const regen = catalyst.effect.hp_regen;
         player.hp = Math.min(player.maxHp, player.hp + regen);
         addToLog(`Your ${catalyst.name} regenerates <span class="font-bold text-green-400">${regen}</span> HP.`, 'text-green-300');
     }
+    if (shield.effect?.hp_regen) {
+        const regen = shield.effect.hp_regen;
+        player.hp = Math.min(player.maxHp, player.hp + regen);
+        addToLog(`Your ${shield.name} regenerates <span class="font-bold text-green-400">${regen}</span> HP.`, 'text-green-300');
+    }
     if (catalyst.effect?.mana_regen) {
         const regen = catalyst.effect.mana_regen;
         player.mp = Math.min(player.maxMp, player.mp + regen);
         addToLog(`Your ${catalyst.name} restores <span class="font-bold text-blue-400">${regen}</span> MP.`, 'text-blue-300');
+    }
+     if (armor.effect?.mana_regen) {
+        const regen = armor.effect.mana_regen;
+        player.mp = Math.min(player.maxMp, player.mp + regen);
+        addToLog(`Your ${armor.name} restores <span class="font-bold text-blue-400">${regen}</span> MP.`, 'text-blue-300');
     }
 
     const effects = player.statusEffects;
@@ -582,3 +737,6 @@ function addToGraveyard(deadPlayer, killer) {
     }
     localStorage.setItem('rpgGraveyard', JSON.stringify(graveyard));
 }
+
+
+

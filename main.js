@@ -134,12 +134,11 @@ function renderLoadMenu() {
             <button onclick="showStartScreen()" class="btn btn-primary">Back</button>
         </div>
     </div>`;
-
+    
     $('#start-screen').classList.add('hidden');
-    $('#game-container').classList.remove('hidden');
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    render(container);
+    const screenContainer = $('#changelog-screen'); // Re-use this container for load menu as well
+    screenContainer.innerHTML = html;
+    screenContainer.classList.remove('hidden');
 }
 
 function deleteSave(saveKey) {
@@ -161,26 +160,70 @@ function loadGameFromKey(saveKey) {
             const parsedData = JSON.parse(savedData); 
             player = new Player(parsedData.name); 
             Object.assign(player, parsedData); 
+
+            // --- Re-link equipped items to the master objects to fix reference issues ---
+            const weaponKey = findKeyByName(parsedData.equippedWeapon?.name, WEAPONS) || 'fists';
+            player.equippedWeapon = WEAPONS[weaponKey];
+
+            const catalystKey = findKeyByName(parsedData.equippedCatalyst?.name, CATALYSTS) || 'no_catalyst';
+            player.equippedCatalyst = CATALYSTS[catalystKey];
+
+            const armorKey = findKeyByName(parsedData.equippedArmor?.name, ARMOR) || 'travelers_garb';
+            player.equippedArmor = ARMOR[armorKey];
+
+            const shieldKey = findKeyByName(parsedData.equippedShield?.name, SHIELDS) || 'no_shield';
+            player.equippedShield = SHIELDS[shieldKey];
             
-            // --- Compatibility fixes for old save files ---
-            if (!player.legacyQuestProgress) { player.legacyQuestProgress = {}; }
-            if (!player.questsTakenToday) { player.questsTakenToday = []; }
+            // --- Compatibility Checks for old saves ---
+            if (!LURES[player.equippedLure]) {
+                player.equippedLure = 'no_lure';
+            }
+            if (!player.inventory.catalysts) {
+                player.inventory.catalysts = [];
+            }
+            if (!player.equipmentOrder) {
+                player.equipmentOrder = [];
+                if (player.equippedWeapon && player.equippedWeapon.name !== 'Fists') {
+                    player.equipmentOrder.push('weapon');
+                }
+                if (player.equippedShield && player.equippedShield.name !== 'None') {
+                    player.equipmentOrder.push('shield');
+                }
+                if (player.equippedCatalyst && player.equippedCatalyst.name !== 'None') {
+                    player.equipmentOrder.push('catalyst');
+                }
+            }
+            if (!player.legacyQuestProgress) {
+                player.legacyQuestProgress = {};
+            }
+            if (!player.questsTakenToday) {
+                player.questsTakenToday = [];
+            }
             if (!player.blackMarketStock) {
                 player.blackMarketStock = { seasonal: [] };
                 generateBlackMarketStock();
             }
-            if (!player.equippedLure) { player.equippedLure = 'no_lure'; }
-            if (!player.inventory.lures) { player.inventory.lures = {}; }
-            if (typeof player.activeQuest === 'string') { player.activeQuest = null; player.questProgress = 0; }
-            if (!player.seed) { player.seed = Math.floor(Math.random() * 1000000); }
-            if (!player.biomeOrder || player.biomeOrder.length === 0) { generateRandomizedBiomeOrder(); }
-            if (!player.specialWeaponStates) { player.specialWeaponStates = {}; }
-            // --- End compatibility fixes ---
-
             gameState.playerIsDying = false; 
+
+            // Compatibility fix for old save files with the old quest system
+            if (typeof player.activeQuest === 'string') {
+                player.activeQuest = null;
+                player.questProgress = 0;
+            }
+
+            // Compatibility for saves without a seed
+            if (!player.seed) {
+                player.seed = Math.floor(Math.random() * 1000000);
+            }
+
+            if (!player.biomeOrder || player.biomeOrder.length === 0) {
+                generateRandomizedBiomeOrder();
+            }
+            
             updatePlayerTier(); // Calculate tier on load
 
             $('#start-screen').classList.add('hidden'); 
+            $('#changelog-screen').classList.add('hidden');
             $('#game-container').classList.remove('hidden'); 
             addToLog(`Welcome back, ${player.name}!`); 
             applyTheme('default'); 
@@ -226,24 +269,67 @@ function importSave(saveString) {
         player.saveKey = generateSaveKey(); 
         gameState.playerIsDying = false; 
 
-        // --- Compatibility fixes for old save files ---
-        if (!player.legacyQuestProgress) { player.legacyQuestProgress = {}; }
-        if (!player.questsTakenToday) { player.questsTakenToday = []; }
-        if (!player.blackMarketStock) {
-            player.blackMarketStock = { seasonal: [] };
-            generateBlackMarketStock();
+        // --- Re-link equipped items to the master objects to fix reference issues ---
+        const weaponKey = findKeyByName(parsedData.equippedWeapon?.name, WEAPONS) || 'fists';
+        player.equippedWeapon = WEAPONS[weaponKey];
+
+        const catalystKey = findKeyByName(parsedData.equippedCatalyst?.name, CATALYSTS) || 'no_catalyst';
+        player.equippedCatalyst = CATALYSTS[catalystKey];
+
+        const armorKey = findKeyByName(parsedData.equippedArmor?.name, ARMOR) || 'travelers_garb';
+        player.equippedArmor = ARMOR[armorKey];
+
+        const shieldKey = findKeyByName(parsedData.equippedShield?.name, SHIELDS) || 'no_shield';
+        player.equippedShield = SHIELDS[shieldKey];
+
+        // --- Compatibility Checks for old saves ---
+        if (!LURES[player.equippedLure]) {
+            player.equippedLure = 'no_lure';
         }
-        if (!player.equippedLure) { player.equippedLure = 'no_lure'; }
-        if (!player.inventory.lures) { player.inventory.lures = {}; }
-        if (typeof player.activeQuest === 'string') { player.activeQuest = null; player.questProgress = 0; }
-        if (!player.seed) { player.seed = Math.floor(Math.random() * 1000000); }
-        if (!player.biomeOrder || player.biomeOrder.length === 0) { generateRandomizedBiomeOrder(); }
-        if (!player.specialWeaponStates) { player.specialWeaponStates = {}; }
-        // --- End compatibility fixes ---
+        if (!player.inventory.catalysts) {
+            player.inventory.catalysts = [];
+        }
+         if (!player.equipmentOrder) {
+            player.equipmentOrder = [];
+            if (player.equippedWeapon && player.equippedWeapon.name !== 'Fists') {
+                player.equipmentOrder.push('weapon');
+            }
+            if (player.equippedShield && player.equippedShield.name !== 'None') {
+                player.equipmentOrder.push('shield');
+            }
+            if (player.equippedCatalyst && player.equippedCatalyst.name !== 'None') {
+                player.equipmentOrder.push('catalyst');
+            }
+        }
+        if (!player.legacyQuestProgress) {
+            player.legacyQuestProgress = {};
+        }
+        if (!player.questsTakenToday) {
+            player.questsTakenToday = [];
+        }
+
+        // Compatibility fix for old save files with the old quest system
+        if (typeof player.activeQuest === 'string') {
+            player.activeQuest = null;
+            player.questProgress = 0;
+        }
+
+        // Compatibility for saves without a seed
+        if (!player.seed) {
+            player.seed = Math.floor(Math.random() * 1000000);
+        }
+
+        if (!player.biomeOrder || player.biomeOrder.length === 0) {
+            generateRandomizedBiomeOrder();
+        }
+        if (!player.specialWeaponStates) {
+            player.specialWeaponStates = {};
+        }
 
         updatePlayerTier(); // Calculate tier on import
 
         $('#start-screen').classList.add('hidden');
+        $('#changelog-screen').classList.add('hidden');
         $('#game-container').classList.remove('hidden');
         logElement.innerHTML = '';
         addToLog(`Successfully imported character: ${player.name}!`);
@@ -262,6 +348,7 @@ function importSave(saveString) {
 // --- START SCREEN & UI HELPERS ---
 function showStartScreen() {
     $('#game-container').classList.add('hidden');
+    $('#changelog-screen').classList.add('hidden');
     $('#start-screen').classList.remove('hidden');
     logElement.innerHTML = '';
     player = null;
@@ -290,30 +377,37 @@ function generateSaveKey() {
 
 
 // --- EVENT LISTENERS ---
-$('#start-game-btn').addEventListener('click', () => { 
-    const name = $('#player-name-input').value.trim(); 
-    if (name) { 
-        initGame(name); 
-    } else { 
-        $('#player-name-input').classList.add('border-red-500'); 
-    } 
-});
-
-$('#player-name-input').addEventListener('keypress', (e) => { 
-    if (e.key === 'Enter') $('#start-game-btn').click(); 
-});
-
-$('#import-save-btn').addEventListener('click', () => {
-    const saveString = $('#import-save-input').value.trim();
-    if (saveString) {
-        importSave(saveString);
-    }
-});
-
 window.addEventListener('load', () => { 
+    $('#start-game-btn').addEventListener('click', () => { 
+        const name = $('#player-name-input').value.trim(); 
+        if (name) { 
+            initGame(name); 
+        } else { 
+            $('#player-name-input').classList.add('border-red-500'); 
+        } 
+    });
+
+    $('#player-name-input').addEventListener('keypress', (e) => { 
+        if (e.key === 'Enter') $('#start-game-btn').click(); 
+    });
+
+    $('#import-save-btn').addEventListener('click', () => {
+        const saveString = $('#import-save-input').value.trim();
+        if (saveString) {
+            importSave(saveString);
+        }
+    });
+
     $('#load-game-btn').addEventListener('click', renderLoadMenu); 
     $('#graveyard-btn').addEventListener('click', renderGraveyard); 
-    $('#changelog-btn').addEventListener('click', renderChangeLog);
+    $('#changelog-btn').addEventListener('click', renderChangelog);
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === '`') {
+            toggleDebug();
+        }
+    });
+
     updateLoadGameButtonVisibility();
 });
 

@@ -21,22 +21,62 @@
             <button id="start-game-btn" class="btn btn-primary text-xl px-8 py-3">Begin Adventure</button>
             <button id="load-game-btn" class="btn btn-primary text-xl px-8 py-3 hidden">Load Saved Game</button>
             <button id="graveyard-btn" class="btn btn-primary text-xl px-8 py-3 hidden">View Graveyard</button>
-            <button id="changelog-btn" class="btn btn-primary text-xl px-8 py-3">ChangeLog</button>
+            <button id="changelog-btn" class="btn btn-primary text-xl px-8 py-3">View Changelog</button>
         </div>
         <div class="mt-4">
              <input type="text" id="import-save-input" class="bg-gray-800 border border-gray-600 text-white text-center text-sm rounded-lg px-3 py-1 w-64 focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="Paste Save Data...">
              <button id="import-save-btn" class="btn btn-primary text-sm px-4 py-1">Import Save</button>
         </div>
     </div>
+    
+    <!-- Changelog Screen -->
+    <div id="changelog-screen" class="w-full max-w-2xl mx-auto text-left hidden">
+        <!-- Content will be injected by ui.js -->
+    </div>
 
     <!-- Main Game Container -->
-    <div id="game-container" class="relative w-full max-w-6xl mx-auto rounded-2xl shadow-2xl border p-6 hidden">
+    <div id="game-container" class="relative w-full max-w-4xl mx-auto rounded-2xl shadow-2xl border p-6 hidden">
         
         <button onclick="exitGame()" title="Save and Exit" class="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-red-600 rounded-full transition-colors duration-200 z-50">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
         </button>
+
+        <div id="debug-panel" class="hidden absolute top-0 right-0 bg-black/80 text-white p-4 rounded-bl-lg max-w-sm max-h-[90vh] overflow-auto text-xs z-50">
+            <h3 class="font-bold mb-2">Debug Info</h3>
+            <pre id="debug-content" class="max-h-48 overflow-y-auto"></pre>
+            <hr class="my-2 border-gray-600">
+            <h4 class="font-bold mb-2">Modify Stats</h4>
+             <div class="grid grid-cols-2 gap-2 text-xs">
+                <div><label for="debug-level">Level:</label><input type="number" id="debug-level" class="w-full bg-gray-700 p-1 rounded"></div>
+                <div><label for="debug-gold">Gold:</label><input type="number" id="debug-gold" class="w-full bg-gray-700 p-1 rounded"></div>
+                <div><label for="debug-xp">XP:</label><input type="number" id="debug-xp" class="w-full bg-gray-700 p-1 rounded"></div>
+                <div><label for="debug-hp">HP:</label><input type="number" id="debug-hp" class="w-full bg-gray-700 p-1 rounded"></div>
+                <div><label for="debug-mp">MP:</label><input type="number" id="debug-mp" class="w-full bg-gray-700 p-1 rounded"></div>
+             </div>
+             <button onclick="debugUpdateVariables()" class="btn btn-primary w-full text-xs py-1 mt-2">Update Stats</button>
+            <hr class="my-2 border-gray-600">
+            <h4 class="font-bold mb-2">Add Equipment</h4>
+            <div class="space-y-2">
+                <div>
+                    <label for="debug-item-type" class="text-xs">Type:</label>
+                    <select id="debug-item-type" class="bg-gray-700 text-xs rounded p-1 w-full">
+                        <option value="weapons">Weapons</option>
+                        <option value="catalysts">Catalysts</option>
+                        <option value="armor">Armor</option>
+                        <option value="shields">Shields</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="debug-item-select" class="text-xs">Item:</label>
+                    <select id="debug-item-select" class="bg-gray-700 text-xs rounded p-1 w-full">
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
+                <button onclick="debugAddItem()" class="btn btn-primary w-full text-xs py-1">Add to Inventory</button>
+            </div>
+        </div>
         
         <div id="stats-view" class="mb-4 p-4 rounded-lg grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-4 text-sm">
             <div class="lg:col-span-2 space-y-2">
@@ -67,6 +107,7 @@
                  </div>
                  <div id="equipment-display" class="text-xs space-y-1">
                     <p>Weapon: <span id="equipped-weapon"></span></p>
+                    <p>Catalyst: <span id="equipped-catalyst"></span></p>
                     <p>Armor: <span id="equipped-armor"></span></p>
                     <p>Shield: <span id="equipped-shield"></span></p>
                     <p>Lure: <span id="equipped-lure"></span></p>
@@ -74,16 +115,13 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div id="main-view" class="min-h-[450px] p-6 rounded-lg flex flex-col justify-center items-center md:col-span-2">
-                <!-- Game content is dynamically inserted here -->
-            </div>
-
-            <div id="game-log" class="bg-black/30 rounded-lg p-4 md:col-span-1 min-h-[200px] md:min-h-[450px] h-full overflow-y-auto">
-                <!-- Log messages are added here -->
-            </div>
+        <div id="main-view" class="min-h-[450px] p-6 rounded-lg mb-4 flex flex-col justify-center items-center">
+            <!-- Game content is dynamically inserted here -->
         </div>
 
+        <div class="bg-black/30 rounded-lg p-4 h-48 overflow-y-auto" id="game-log">
+            <!-- Log messages are added here -->
+        </div>
     </div>
 
     <!-- Tooltip Element -->
@@ -148,6 +186,7 @@
 
 <script src="game_data.js"></script>
 <script src="engine.js"></script>
+<script src="battle.js"></script>
 <script src="ui.js"></script>
 <script src="main.js"></script>
 <script>

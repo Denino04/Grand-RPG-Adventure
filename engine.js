@@ -44,6 +44,17 @@ function choices(population, weights, rng) {
     } 
 }
 
+/**
+ * Finds the key of an item in a given object based on its name.
+ * @param {string} name The name of the item to find.
+ * @param {object} object The object to search in (e.g., WEAPONS, ARMOR).
+ * @returns {string|null} The key of the item, or null if not found.
+ */
+function findKeyByName(name, object) {
+    if (!name || !object) return null;
+    return Object.keys(object).find(key => object[key].name === name);
+}
+
 
 // --- CLASSES ---
 class Entity {
@@ -61,13 +72,25 @@ class Player extends Entity {
         this.playerTier = 1; // Highest unlocked biome tier
         this.specialWeaponStates = {};
         this.blackMarketStock = { seasonal: [] };
-        this.equippedWeapon = WEAPONS['rusty_sword'];
+        
+        this.equippedWeapon = WEAPONS['fists'];
+        this.equippedCatalyst = CATALYSTS['no_catalyst'];
         this.equippedArmor = ARMOR['travelers_garb'];
         this.equippedShield = SHIELDS['no_shield'];
         this.equippedLure = 'no_lure';
+
+        this.weaponElement = 'none';
+        this.armorElement = 'none';
+        this.shieldElement = 'none';
+
+        this.equipmentOrder = []; // Tracks the order of 'weapon', 'catalyst', 'shield'
         this.inventory = { 
-            items: { 'health_potion': 3 }, 
-            weapons: ['rusty_sword'], 
+            items: { 
+                'health_potion': 3,
+                'mana_potion': 1
+            }, 
+            weapons: ['fists', 'rusty_sword'],
+            catalysts: ['no_catalyst', 'wooden_stick'],
             armor: ['travelers_garb'], 
             shields: ['no_shield'], 
             lures: { } 
@@ -83,16 +106,20 @@ class Player extends Entity {
         const details = getItemDetails(itemKey); if (!details) return;
         if (verbose) addToLog(`You received: <span class="font-bold" style="color: var(--text-accent);">${details.name}</span>!`, 'text-green-400');
         
-        const category = itemKey in WEAPONS ? 'weapons' : 
+        const category = itemKey in WEAPONS ? 'weapons' :
+                         (itemKey in CATALYSTS ? 'catalysts' :
                          (itemKey in ARMOR ? 'armor' : 
                          (itemKey in SHIELDS ? 'shields' : 
-                         (itemKey in LURES ? 'lures' : 'items')));
+                         (itemKey in LURES ? 'lures' : 'items'))));
 
         if (category === 'lures') {
              this.inventory.lures[itemKey] = (this.inventory.lures[itemKey] || 0) + details.uses;
         } else if (category === 'items') { 
             this.inventory.items[itemKey] = (this.inventory.items[itemKey] || 0) + quantity; 
-        } else { 
+        } else {
+            if (!this.inventory[category]) {
+                this.inventory[category] = [];
+            }
             this.inventory[category].push(itemKey);
         }
     }
@@ -111,15 +138,15 @@ class Player extends Entity {
         const shield = this.equippedShield;
         const armor = this.equippedArmor;
 
-        // Parry logic (Shield)
+        // Parry logic (Stops attack entirely)
         if (shield && shield.effect?.type === 'parry' && Math.random() < shield.effect.chance && attacker && attacker.isAlive()) {
             attacker.attackParried = true; // Flag that the attack was stopped
             addToLog(`You parried ${attacker.name}'s attack with your ${shield.name}!`, 'text-yellow-300 font-bold');
             setTimeout(() => {
                 addToLog(`You launch a swift counter-attack!`, 'text-yellow-300');
-                const weapon = this.equippedWeapon; 
-                let counterDamage = rollDice(...weapon.damage) + this.strength; 
-                const finalDamage = attacker.takeDamage(counterDamage);
+                const weapon = this.equippedWeapon;
+                let counterDamage = rollDice(...weapon.damage, 'Player Parry') + this.strength;
+                const finalDamage = attacker.takeDamage(counterDamage, { element: this.weaponElement });
                 addToLog(`Your riposte hits ${attacker.name} for <span class="font-bold text-yellow-300">${finalDamage}</span> damage.`);
                 if (!gameState.battleEnded) {
                      checkBattleStatus(true); // Pass true to indicate this is a reaction
@@ -129,7 +156,7 @@ class Player extends Entity {
             return 0; // No damage taken
         }
         
-        // Dodge logic (Armor)
+        // Dodge logic (Stops attack entirely)
         if (armor && armor.effect?.type === 'dodge' && Math.random() < armor.effect.chance) {
             attacker.attackParried = true; // Flag that the attack was stopped
             addToLog(`You dodged ${attacker.name}'s attack!`, 'text-teal-300 font-bold');
@@ -137,7 +164,7 @@ class Player extends Entity {
             return 0;
         }
 
-        // Block logic (Shield + Armor)
+        // Block logic (Stops attack entirely)
         const totalBlockChance = (shield?.blockChance || 0) + (armor?.blockChance || 0);
         if (!ignoresDefense && totalBlockChance > 0 && Math.random() < totalBlockChance) {
             addToLog(`You blocked the attack!`, 'text-cyan-400 font-bold');
@@ -145,7 +172,38 @@ class Player extends Entity {
             return 0;
         }
 
-        let totalDefense = ignoresDefense ? 0 : this.equippedArmor.defense + (shield ? shield.defense : 0);
+        // --- Defense Calculation with Elemental Modifiers ---
+        let armorDefense = ignoresDefense ? 0 : (armor?.defense || 0);
+        let shieldDefense = ignoresDefense ? 0 : (shield?.defense || 0);
+
+        if (attacker?.element && attacker.element !== 'none' && !ignoresDefense) {
+            const attackerElement = ELEMENTS[attacker.element];
+
+            // Armor elemental check
+            if (this.armorElement !== 'none') {
+                if (attackerElement.weakness.includes(this.armorElement)) { // Armor is strong vs attack
+                    armorDefense *= 2;
+                    addToLog(`Your armor's enchantment resists the attack, doubling its effectiveness!`, 'text-green-400');
+                } else if (attackerElement.strength.includes(this.armorElement)) { // Armor is weak vs attack
+                    armorDefense = 0;
+                    addToLog(`Your armor's enchantment is weak to the attack, offering no protection!`, 'text-red-500');
+                }
+            }
+            
+            // Shield elemental check
+            if (this.shieldElement !== 'none') {
+                if (attackerElement.weakness.includes(this.shieldElement)) { // Shield is strong vs attack
+                    shieldDefense *= 2;
+                    addToLog(`Your shield's enchantment resists the attack, doubling its effectiveness!`, 'text-green-400');
+                } else if (attackerElement.strength.includes(this.shieldElement)) { // Shield is weak vs attack
+                    shieldDefense = 0;
+                    addToLog(`Your shield's enchantment is weak to the attack, offering no protection!`, 'text-red-500');
+                }
+            }
+        }
+
+        let totalDefense = armorDefense + shieldDefense;
+        
         if(this.statusEffects.stonehide) {
             totalDefense = Math.floor(totalDefense * this.statusEffects.stonehide.multiplier);
             addToLog(`Your stone-like skin absorbs the blow!`, `text-gray-400`);
@@ -154,15 +212,34 @@ class Player extends Entity {
         if (ignoresDefense) {
              addToLog(`The attack ignores your defense!`, 'text-yellow-500 font-bold');
         }
-        const finalDamage = Math.max(0, damage - totalDefense); 
-        this.hp -= finalDamage; 
-        addToLog(`You take <span class="font-bold text-red-400">${finalDamage}</span> damage.`); 
 
-        // Reflect logic
+        // --- Final Damage Calculation ---
+        let effectiveDefense = totalDefense;
+        if (attacker?.element === 'void') {
+            effectiveDefense *= 0.5;
+            addToLog(`The void attack partially bypasses your defense!`, 'text-purple-400');
+        }
+        const finalDamage = Math.max(0, damage - effectiveDefense);
+        this.hp -= finalDamage;
+        
+        let damageType = '';
+        if (attacker && attacker.element && attacker.element !== 'none') {
+            damageType = ` ${ELEMENTS[attacker.element].name}`;
+        }
+        addToLog(`You take <span class="font-bold text-red-400">${finalDamage}</span>${damageType} damage.`);
+
+        // --- Post-Damage Effects (Reflect) ---
+        if (armor?.effect?.reflect_damage && attacker && attacker.isAlive()) {
+             const reflectedDamage = Math.floor(damage * armor.effect.reflect_damage);
+             if (reflectedDamage > 0) {
+                 attacker.takeDamage(reflectedDamage, { element: this.armorElement });
+                 addToLog(`Your ${armor.name} reflects <span class="font-bold text-orange-400">${reflectedDamage}</span> damage back at ${attacker.name}!`, 'text-orange-300');
+             }
+        }
         if (shield && shield.effect?.type === 'reflect' && attacker && attacker.isAlive()) {
             const reflectedDamage = Math.floor(damage * shield.effect.amount);
             if (reflectedDamage > 0) {
-                attacker.takeDamage(reflectedDamage);
+                attacker.takeDamage(reflectedDamage, { element: this.shieldElement });
                 addToLog(`Your ${shield.name} reflects <span class="font-bold text-orange-400">${reflectedDamage}</span> damage back at ${attacker.name}!`, 'text-orange-300');
             }
         }
@@ -173,13 +250,17 @@ class Player extends Entity {
 }
 
 class Enemy extends Entity {
-     constructor(speciesData, rarityData, playerLevel) {
+     constructor(speciesData, rarityData, playerLevel, elementData = { key: 'none', adjective: '' }) {
         const finalMultiplier = rarityData.multiplier;
         const finalHp = Math.floor((speciesData.base_hp + (playerLevel * 1.5)) * finalMultiplier);
         const finalStrength = Math.floor((speciesData.base_strength + Math.floor(playerLevel / 2)) * finalMultiplier);
         const finalDefense = Math.floor(((speciesData.base_defense || 0) + Math.floor(playerLevel / 3)) * finalMultiplier);
+        
+        const name = elementData.key !== 'none' 
+            ? `${rarityData.name} ${elementData.adjective} ${speciesData.name}`
+            : `${rarityData.name} ${speciesData.name}`;
 
-        super(`${rarityData.name} ${speciesData.name}`, finalHp, finalStrength);
+        super(name, finalHp, finalStrength);
         
         const classDamage = MONSTER_CLASS_DAMAGE[speciesData.class];
         const tier = speciesData.tier;
@@ -190,14 +271,22 @@ class Enemy extends Entity {
         
         this.defense = finalDefense;
         this.ability = speciesData.ability;
+        this.element = elementData.key;
         this.xpReward = Math.floor(speciesData.base_xp * finalMultiplier * (speciesData.class === 'Monstrosity' ? 1.2 : 1)); 
         this.goldReward = Math.floor(speciesData.base_gold * finalMultiplier * (speciesData.class === 'Monstrosity' ? 1.2 : 1));
-        this.lootTable = speciesData.loot_table; 
+        this.lootTable = {...speciesData.loot_table}; // Create a copy to modify
         this.lootChanceMod = (speciesData.class === 'Beast' ? 1.5 : 1);
         this.potionDropChanceMod = (speciesData.class === 'Humanoid' ? 1.5 : 1);
         this.speciesData = speciesData;
         this.rarityData = rarityData;
         
+        if (this.element !== 'none') {
+            const essenceKey = `${this.element}_essence`;
+            if (ITEMS[essenceKey]) {
+                this.lootTable[essenceKey] = (this.lootTable[essenceKey] || 0) + 0.3 + (rarityIndex * 0.05); // Base 30% + 5% per rarity
+            }
+        }
+
         if (this.speciesData.class === 'Undead') {
             this.revived = false;
         }
@@ -214,11 +303,25 @@ class Enemy extends Entity {
         addToLog(`${this.name} attacks ${target.name}!`); 
         this._performAttack(target);
         if (this.attackParried) return; // If the attack was parried or dodged, stop here.
-        if (this.ability === 'double_strike' && Math.random() < 0.33) { addToLog(`${this.name}'s fury lets it attack again!`, 'text-red-500 font-bold'); setTimeout(() => this._performAttack(target), 500); }
+
+        const rarityIndex = this.rarityData.rarityIndex;
+        if (this.element === 'wind' && !this.attackParried && Math.random() < (rarityIndex * 0.05)) {
+            addToLog(`The swirling winds grant ${this.name} another strike!`, 'text-gray-300');
+            setTimeout(() => {
+                let followUpDamage = Math.floor((rollDice(this.damage[0], this.damage[1], `${this.name} Wind Follow-up`) + this.strength) / 2);
+                if (this.element === 'fire') { // Apply fire bonus to follow-up as well
+                    followUpDamage = Math.floor(followUpDamage * (1 + Math.random() * 0.2));
+                }
+                target.takeDamage(followUpDamage, !!this.statusEffects.ultra_focus, this);
+            }, 500);
+        } else if (this.ability === 'double_strike' && Math.random() < 0.33) { 
+            addToLog(`${this.name}'s fury lets it attack again!`, 'text-red-500 font-bold'); 
+            setTimeout(() => this._performAttack(target), 500); 
+        }
     }
     _performAttack(target) {
-        const weapon = player.equippedWeapon;
-        if (weapon.effect && weapon.effect.type === 'ranged' && Math.random() < weapon.effect.chance) {
+        const catalyst = player.equippedCatalyst;
+        if (catalyst && catalyst.effect?.ranged_chance && Math.random() < catalyst.effect.ranged_chance) {
             addToLog(`The ${this.name} misses its attack due to your ranged advantage!`, 'text-blue-300');
             return;
         }
@@ -227,14 +330,52 @@ class Enemy extends Entity {
         if (this.statusEffects.enrage) {
             diceCount++;
         }
-        let totalDamage = rollDice(diceCount, this.damage[1]) + this.strength; 
+        let totalDamage = rollDice(diceCount, this.damage[1], `${this.name} Attack`) + this.strength; 
         
-        if (target.statusEffects.swallowed && target.statusEffects.swallowed.swallower === this) {
+        if (this.statusEffects.drenched) {
+            totalDamage = Math.floor(totalDamage * this.statusEffects.drenched.multiplier);
+            addToLog(`${this.name}'s attack is weakened by the water!`, 'text-blue-300');
+        }
+
+        if (this.element === 'fire') {
+            const fireMultiplier = 1 + Math.random() * 0.2;
+            totalDamage = Math.floor(totalDamage * fireMultiplier);
+        }
+        
+        if (target.statusEffects.swallowed && target.statusEffects.swallower === this) {
             totalDamage *= 2;
             addToLog(`${this.name}'s attack is amplified from within!`, 'text-red-600');
         }
         
         let damageDealt = target.takeDamage(totalDamage, !!this.statusEffects.ultra_focus, this);
+
+        const rarityIndex = this.rarityData.rarityIndex;
+        if (damageDealt > 0) {
+            if (this.element === 'water') {
+                addToLog(`The water attack leaves you drenched, weakening your next attack!`, 'text-blue-400');
+                target.statusEffects.drenched = { duration: 2, multiplier: 0.9 };
+            }
+            if (this.element === 'earth' && Math.random() < (rarityIndex * 0.05)) {
+                if (!target.statusEffects.paralyzed) {
+                    applyStatusEffect(target, 'paralyzed', { duration: 2 }, this.name);
+                }
+            }
+            if (this.element === 'nature') {
+                const lifestealAmount = Math.floor(damageDealt * (rarityIndex * 0.05));
+                if (lifestealAmount > 0) {
+                    this.hp = Math.min(this.maxHp, this.hp + lifestealAmount);
+                    addToLog(`${this.name} drains <span class="font-bold text-green-400">${lifestealAmount}</span> HP from the natural energy.`, 'text-green-300');
+                }
+            }
+            if (this.element === 'light' && Math.random() < (rarityIndex * 0.05)) {
+                const debuffs = Object.keys(this.statusEffects).filter(key => ['paralyzed', 'petrified', 'drenched'].includes(key));
+                if (debuffs.length > 0) {
+                    const effectToCleanse = debuffs[0];
+                    delete this.statusEffects[effectToCleanse];
+                    addToLog(`The light energy cleanses ${this.name} of ${effectToCleanse}!`, 'text-yellow-200');
+                }
+            }
+        }
 
         if (this.ability === 'life_drain') { const drainAmount = Math.floor(damageDealt / 2); this.hp = Math.min(this.maxHp, this.hp + drainAmount); addToLog(`${this.name} drains <span class="font-bold text-green-400">${drainAmount}</span> HP!`); }
         if (this.ability === 'earthshaker' && Math.random() < 0.3) {
@@ -253,7 +394,32 @@ class Enemy extends Entity {
         }
 
         let damageTaken = this.statusEffects.enrage ? damage * 2 : damage;
-        const finalDamage = Math.max(0, Math.floor(damageTaken - currentDefense));
+
+        // --- Elemental Calculation ---
+        if (effects.element && effects.element !== 'none' && this.element !== 'none') {
+            const monsterElement = ELEMENTS[this.element];
+            if (monsterElement.weakness.includes(effects.element)) {
+                damageTaken *= 2;
+                addToLog("It's super effective!", 'text-green-400');
+            }
+            if (monsterElement.strength.includes(effects.element)) {
+                damageTaken = Math.floor(damageTaken / 2);
+                addToLog("It's not very effective...", 'text-red-500');
+            }
+        }
+
+        if (effects.isMagic && this.speciesData.spell_resistance) {
+            damageTaken *= (1 - this.speciesData.spell_resistance);
+            addToLog(`${this.name} resists some of the magical damage!`, 'text-purple-200');
+        }
+
+        let effectiveDefense = currentDefense;
+        if (effects.element === 'void') {
+            effectiveDefense *= 0.5;
+            addToLog(`Your void attack partially bypasses the enemy's defense!`, 'text-purple-400');
+        }
+
+        const finalDamage = Math.max(0, Math.floor(damageTaken - effectiveDefense));
         this.hp -= finalDamage;
 
         if (gameState.currentView === 'battle') {
@@ -318,548 +484,28 @@ function generateEnemy(biomeKey) {
     const speciesKey = choices(Object.keys(monsterPool), Object.values(monsterPool));
     const speciesData = MONSTER_SPECIES[speciesKey];
 
+    // Determine Rarity
     const rarityKeys = Object.keys(MONSTER_RARITY);
-    let weights = [60, 25, 10, 4, 1]; // Common, Uncommon, Rare, Epic, Legendary
+    let rarityWeights = [60, 25, 10, 4, 1]; // Common, Uncommon, Rare, Epic, Legendary
     if (speciesData.class === 'Monstrosity') {
-        weights = [40, 30, 15, 10, 5]; // Higher chance for higher rarity
+        rarityWeights = [40, 30, 15, 10, 5]; // Higher chance for higher rarity
     }
-    const chosenRarityKey = choices(rarityKeys, weights);
+    const chosenRarityKey = choices(rarityKeys, rarityWeights);
     const rarityData = MONSTER_RARITY[chosenRarityKey];
 
-    return new Enemy(speciesData, rarityData, player.level);
-}
+    // Determine Element based on specified probabilities
+    const elementPopulation = ['none', 'fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'void'];
+    const elementWeights = [40, 9, 9, 9, 9, 9, 9, 3, 3]; // 40% none, 9% standard, 3% rare
+    const chosenElementKey = choices(elementPopulation, elementWeights);
 
-// --- BATTLE FUNCTIONS ---
-function startBattle(biomeKey) { 
-    gameState.isPlayerTurn = true; 
-    gameState.battleEnded = false;
-    gameState.currentBiome = biomeKey;
-    $('#inventory-btn').disabled = true;
-    currentEnemies = [];
-
-    let numEnemies = 1;
-    if (player.level >= 50) {
-        const rand = Math.random();
-        if (rand > 0.9) numEnemies = 5;       // 10% for 5
-        else if (rand > 0.7) numEnemies = 4;  // 20% for 4
-        else if (rand > 0.4) numEnemies = 3;  // 30% for 3
-        else if (rand > 0.1) numEnemies = 2;  // 30% for 2
-        // 10% for 1
-    } else if (player.level >= 40) {
-        const rand = Math.random();
-        if (rand > 0.8) numEnemies = 4;      // 20% for 4
-        else if (rand > 0.5) numEnemies = 3; // 30% for 3
-        else if (rand > 0.2) numEnemies = 2; // 30% for 2
-        // 20% for 1
-    } else if (player.level >= 6) {
-        const rand = Math.random();
-        if (rand > 0.8) { // 20% chance for 3 enemies
-            numEnemies = 3;
-        } else if (rand > 0.5) { // 30% chance for 2 enemies
-            numEnemies = 2;
-        }
-        // 50% chance for 1 enemy
-    } else if (player.level >= 4) { // Levels 4 and 5
-        if (Math.random() < 0.3) { // 30% chance for 2 enemies
-            numEnemies = 2;
-        }
-        // 70% chance for 1 enemy
-    }
-    // For levels 1, 2, and 3, numEnemies will remain 1.
-
-    for (let i = 0; i < numEnemies; i++) {
-        currentEnemies.push(generateEnemy(biomeKey));
+    let elementData = { key: 'none', adjective: '' };
+    if (chosenElementKey !== 'none') {
+        const chosenElement = ELEMENTS[chosenElementKey];
+        elementData = { key: chosenElementKey, adjective: chosenElement.adjective };
     }
 
-    const biome = BIOMES[biomeKey];
-    if (biome && biome.theme) {
-        applyTheme(biome.theme);
-    }
-    
-    lastViewBeforeInventory = 'battle';
-    gameState.currentView = 'battle'; 
-    const enemyNames = currentEnemies.map(e => `<span class="font-bold text-red-400">${e.name}</span>`).join(', ');
-    addToLog(`You encounter: ${enemyNames} in the ${BIOMES[biomeKey].name}!`); 
-    renderBattle(); 
-}
 
-function performAttack(targetIndex) {
-    const target = currentEnemies[targetIndex];
-    if (!target || !target.isAlive()) {
-        renderBattle('main'); // Target is dead, go back to main battle screen
-        return;
-    };
-    gameState.isPlayerTurn = false; 
-    const weapon = player.equippedWeapon; 
-    let damage = rollDice(...weapon.damage) + player.strength; 
-    let attackEffects = {};
-    let messageLog = [];
-
-    // --- DAMAGE MODIFICATION ---
-    if(player.statusEffects.strength) {
-        damage = Math.floor(damage * player.statusEffects.strength.multiplier);
-        messageLog.push(`Your strength is augmented!`);
-    }
-    if (weapon.effect?.type === 'crit' && Math.random() < weapon.effect.chance) {
-        damage = Math.floor(damage * weapon.effect.multiplier);
-        messageLog.push(`CRITICAL HIT!`);
-    }
-    if (weapon.effect?.bonus_vs_dragon && target.speciesData.name === 'Dragon') {
-        damage = Math.floor(damage * weapon.effect.bonus_vs_dragon);
-        messageLog.push(`Your weapon glows with power against the dragon!`);
-    }
-
-    // --- APPLY ATTACK EFFECTS ---
-    if (weapon.effect?.ignore_defense) {
-        attackEffects.ignore_defense = weapon.effect.ignore_defense;
-    }
-    
-    // --- DEAL DAMAGE ---
-    const finalDamage = target.takeDamage(damage, attackEffects);
-    addToLog(`You attack ${target.name} with ${weapon.name}, dealing <span class="font-bold text-yellow-300">${finalDamage}</span> damage. ${messageLog.join(' ')}`);
-    
-    // --- POST-DAMAGE EFFECTS ---
-    if (weapon.effect) {
-        if (weapon.effect.type === 'fire_damage') { 
-            const fireDamage = rollDice(...weapon.effect.damage); 
-            const finalFireDamage = target.takeDamage(fireDamage, {ignore_defense: 1.0});
-            addToLog(`The blade burns for an extra <span class="font-bold text-orange-400">${finalFireDamage}</span> fire damage.`); 
-        }
-        if (weapon.effect.type === 'lightning_damage') { 
-            const lightningDamage = rollDice(...weapon.effect.damage); 
-            const finalLightningDamage = target.takeDamage(lightningDamage, {ignore_defense: 1.0});
-            addToLog(`Lightning arcs from your weapon for an extra <span class="font-bold text-blue-400">${finalLightningDamage}</span> damage.`); 
-        }
-        if (weapon.effect.type === 'lifesteal') { 
-            const healedAmount = Math.floor(finalDamage * weapon.effect.amount); 
-            if (healedAmount > 0) { 
-                player.hp = Math.min(player.maxHp, player.hp + healedAmount); 
-                addToLog(`You drain <span class="font-bold text-green-400">${healedAmount}</span> HP.`); 
-                updateStatsView(); 
-            } 
-        }
-        if (weapon.effect.type === 'paralyze' && Math.random() < weapon.effect.chance) {
-            target.statusEffects.paralyzed = { duration: weapon.effect.duration + 1 };
-            addToLog(`${target.name} is paralyzed by the blow!`, 'text-yellow-500');
-        }
-        if (weapon.effect.petrify_chance && Math.random() < weapon.effect.petrify_chance) {
-            target.statusEffects.petrified = { duration: weapon.effect.duration + 1 };
-            addToLog(`${target.name} is petrified by the attack!`, 'text-gray-400');
-        }
-    }
-    setTimeout(checkBattleStatus, 200);
-}
-
-function castSpell(spellKey, targetIndex) {
-    const spell = MAGIC[spellKey];
-    if (player.mp < spell.cost) {
-        addToLog(`Not enough MP to cast ${spell.name}!`, 'text-blue-400');
-        return;
-    }
-    const target = currentEnemies[targetIndex];
-    if ((spell.type === 'damage') && (!target || !target.isAlive())) {
-        renderBattle('main');
-        return;
-    }
-
-    gameState.isPlayerTurn = false; 
-    player.mp -= spell.cost; 
-    updateStatsView();
-    
-    if (spell.type === 'damage') {
-        addToLog(`You cast ${spell.name} on ${target.name}!`, 'text-purple-300');
-    } else {
-        addToLog(`You cast ${spell.name}!`, 'text-purple-300');
-    }
-
-    switch(spell.type) {
-        case 'damage': 
-            let magicDamage = rollDice(...spell.damage) + player.intelligence; 
-            if (player.statusEffects.swallowed) {
-                magicDamage = Math.floor(magicDamage / 2);
-                addToLog(`Your spell fizzles inside the beast!`, 'text-gray-400');
-            }
-            const finalDamage = target.takeDamage(magicDamage); 
-            addToLog(`It deals <span class="font-bold text-purple-400">${finalDamage}</span> damage.`); 
-            break;
-        case 'healing': 
-            const healAmount = rollDice(...spell.healing) + player.intelligence; 
-            player.hp = Math.min(player.maxHp, player.hp + healAmount); 
-            addToLog(`You recover <span class="font-bold text-green-400">${healAmount}</span> HP.`); 
-            updateStatsView(); 
-            break;
-    }
-    setTimeout(checkBattleStatus, 200);
-}
-
-function battleAction(type, actionData = null) {
-    if (!player.isAlive()) {
-        checkPlayerDeath();
-        return;
-    }
-    if (!gameState.isPlayerTurn) return;
-
-    const aliveEnemies = currentEnemies.filter(e => e.isAlive());
-
-    if ((type === 'attack' || type === 'magic_select') && aliveEnemies.length > 1) {
-        if (type === 'attack') {
-            renderBattle('attack');
-        } else { // magic_select
-            const spell = MAGIC[actionData.spellKey];
-            if (spell.type === 'damage') {
-                renderBattle('magic_target', actionData);
-            } else {
-                castSpell(actionData.spellKey, 0); // Self-cast or non-targeted
-            }
-        }
-        return;
-    }
-
-    $('#battle-actions')?.classList.add('hidden');
-    switch (type) {
-        case 'attack':
-            const targetIndex = currentEnemies.findIndex(e => e.isAlive());
-            if (targetIndex !== -1) {
-                 performAttack(targetIndex);
-            }
-            break;
-        case 'magic_select': // From single enemy or non-damage spell
-             const spell = MAGIC[actionData.spellKey];
-             const magicTargetIndex = currentEnemies.findIndex(e => e.isAlive());
-             if (spell.type === 'damage' && magicTargetIndex !== -1) {
-                castSpell(actionData.spellKey, magicTargetIndex);
-             } else {
-                castSpell(actionData.spellKey, 0); // Self-cast
-             }
-             break;
-        case 'magic': renderBattle('magic'); break;
-        case 'item': renderBattle('item'); break;
-        case 'flee':
-            gameState.isPlayerTurn = false;
-            if (Math.random() > 0.2) { addToLog(`You successfully escaped!`, 'text-green-400'); setTimeout(renderMainMenu, 1500); }
-            else { addToLog(`You failed to escape!`, 'text-red-400'); setTimeout(enemyTurn, 400); }
-            break;
-    }
-}
-
-function struggleSwallow() {
-    const swallower = player.statusEffects.swallowed.swallower;
-    const rarityIndex = Object.keys(MONSTER_RARITY).indexOf(swallower.rarityData.name.toLowerCase());
-    const struggleDifficulty = 10 + (rarityIndex * 5); // Base difficulty 10, +5 for each rarity tier
-    
-    const successChance = player.intelligence / struggleDifficulty;
-
-    if (Math.random() < successChance) {
-        addToLog(`You fight your way out of the beast's gullet!`, 'text-green-500 font-bold');
-        delete player.statusEffects.swallowed;
-    } else {
-        addToLog(`You struggle but cannot break free! The powerful beast is difficult to escape.`, 'text-red-500');
-    }
-    gameState.isPlayerTurn = false;
-    setTimeout(enemyTurn, 400);
-}
-
-function checkBattleStatus(isReaction = false) {
-    if (gameState.battleEnded) return;
-    let allDefeated = true;
-    for (let i = currentEnemies.length - 1; i >= 0; i--) {
-        const enemy = currentEnemies[i];
-        if (!enemy.isAlive()) {
-            if (enemy.speciesData.class === 'Undead' && !enemy.revived && enemy.ability !== 'alive_again') {
-                addToLog(`${enemy.name} reforms from shattered bones!`, 'text-gray-400 font-bold');
-                enemy.hp = Math.floor(enemy.maxHp * 0.5);
-                enemy.revived = true;
-                allDefeated = false;
-            } else if (enemy.ability === 'alive_again' && Math.random() < enemy.reviveChance) {
-                addToLog(`${enemy.name} rises again!`, 'text-purple-600 font-bold');
-                enemy.hp = Math.floor(enemy.maxHp * 0.5); // Revive with half HP
-                enemy.reviveChance /= 2;
-                allDefeated = false; // The fight is not over
-            } else {
-                if (player.statusEffects.swallowed && player.statusEffects.swallowed.swallower === enemy) {
-                    delete player.statusEffects.swallowed;
-                    addToLog(`You are freed as the ${enemy.name} collapses!`, 'text-green-500');
-                }
-
-                addToLog(`You have defeated ${enemy.name}!`, 'text-green-400 font-bold');
-                
-                if (enemy.rarityData.name === 'Legendary') {
-                    const speciesKey = enemy.speciesData.key;
-                    if (!player.legacyQuestProgress[speciesKey]) {
-                        player.legacyQuestProgress[speciesKey] = true;
-                        addToLog(`Legacy Quest Progress: You have slain a legendary ${enemy.speciesData.name}!`, 'text-purple-300 font-bold');
-                    }
-                }
-
-                player.gainXp(enemy.xpReward); 
-                player.gold += enemy.goldReward;
-                addToLog(`You found <span class="font-bold">${enemy.goldReward}</span> G.`, 'text-yellow-400');
-                for (const item in enemy.lootTable) { 
-                    let dropChance = enemy.lootTable[item];
-                    if (enemy.rarityData.name === "Legendary") dropChance *= 2; // Double loot chance for legendary
-                    if (Math.random() < dropChance) { 
-                        player.addToInventory(item); 
-                    } 
-                }
-                
-                if (player.activeQuest && player.activeQuest.category === 'extermination') { 
-                    const quest = getQuestDetails(player.activeQuest); 
-                    if (quest && quest.target === enemy.speciesData.key) { 
-                        player.questProgress++; 
-                        addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300'); 
-                    } 
-                }
-                currentEnemies.splice(i, 1);
-            }
-        } else {
-            allDefeated = false;
-        }
-    }
-
-    if (allDefeated) {
-        gameState.battleEnded = true;
-        addToLog(`VICTORY! All enemies have been defeated.`, 'text-yellow-200 font-bold text-lg');
-        setTimeout(renderPostBattleMenu, 1500);
-    } else if (!gameState.isPlayerTurn && !isReaction) {
-        setTimeout(enemyTurn, 400);
-    }
-    updateStatsView();
-}
-function handlePlayerEndOfTurn() {
-    const effects = player.statusEffects;
-    for (const effectKey in effects) {
-        if (effects[effectKey].duration) {
-            effects[effectKey].duration--;
-            if (effects[effectKey].duration <= 0) {
-                delete effects[effectKey];
-                addToLog(`Your ${effectKey} has worn off.`);
-            }
-        }
-    }
-    if (effects.poison) {
-        const poisonDamage = rollDice(...effects.poison.damage);
-        player.takeDamage(poisonDamage, true);
-        addToLog(`You take <span class="font-bold text-green-600">${poisonDamage}</span> poison damage.`);
-    }
-    if (effects.swallowed) {
-        addToLog(`You are being digested inside the ${effects.swallowed.by}!`, 'text-red-500');
-        const digestDamage = rollDice(2, 6);
-        player.takeDamage(digestDamage, true, effects.swallowed.swallower);
-    }
-    updateStatsView();
-}
-function handleEnemyEndOfTurn(enemy) {
-    const effects = enemy.statusEffects;
-    for(const effectKey in effects) {
-        if(effects[effectKey].duration) {
-            effects[effectKey].duration--;
-            if(effects[effectKey].duration <= 0) {
-                delete effects[effectKey];
-                addToLog(`${enemy.name} is no longer ${effectKey}.`);
-            }
-        }
-    }
-    updateStatsView();
-}
-function enemyTurn() {
-    handlePlayerEndOfTurn();
-    if (!player.isAlive()) {
-        checkPlayerDeath();
-        return;
-    }
-
-    let turnDelay = 500;
-    const enemiesActingThisTurn = [...currentEnemies];
-
-    enemiesActingThisTurn.forEach((enemy, i) => {
-        setTimeout(() => {
-            if (!enemy.isAlive() || !player.isAlive()) return;
-            
-            let tookTurn = false;
-            if (enemy.statusEffects.petrified || enemy.statusEffects.paralyzed) {
-                const status = enemy.statusEffects.petrified ? 'petrified' : 'paralyzed';
-                addToLog(`${enemy.name} is ${status} and cannot move!`);
-                tookTurn = true; 
-            } else {
-                let usedAbility = false;
-                if (enemy.ability) {
-                    switch(enemy.ability) {
-                        case 'enrage':
-                            if (!enemy.statusEffects.enrage && Math.random() < 0.5) {
-                                enemy.statusEffects.enrage = { duration: 3 };
-                                addToLog(`${enemy.name} flies into a rage!`, 'text-red-500 font-bold');
-                                usedAbility = true;
-                            }
-                            break;
-                        case 'poison_web':
-                            if (!player.statusEffects.poison && Math.random() < 0.4) {
-                                const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
-                                applyStatusEffect(player, 'poison', { duration: 3, damage: [rarityDice * 2, 4] }, enemy.name);
-                                usedAbility = true;
-                            }
-                            break;
-                        case 'petrification':
-                            if (!player.statusEffects.petrified && Math.random() < 0.25) {
-                                applyStatusEffect(player, 'petrified', { duration: 2 }, enemy.name);
-                                 usedAbility = true;
-                            }
-                            break;
-                         case 'necromancy':
-                            const hpPercent = enemy.hp / enemy.maxHp;
-                            if ((hpPercent <= 0.5 && !enemy.summonedAt50) || (hpPercent <= 0.1 && !enemy.summonedAt10)) {
-                                 if(hpPercent <= 0.5) enemy.summonedAt50 = true;
-                                 if(hpPercent <= 0.1) enemy.summonedAt10 = true;
-                                 addToLog(`${enemy.name} chants an ancient rite, and skeletons burst from the ground!`, 'text-purple-500');
-                                 for (let j = 0; j < 2; j++) {
-                                     const skeleton = new Enemy(MONSTER_SPECIES['skeleton'], enemy.rarityData, player.level);
-                                     currentEnemies.push(skeleton);
-                                 }
-                                 renderBattle(); 
-                                 usedAbility = true;
-                            }
-                            break;
-                        case 'ultra_focus':
-                            if (!enemy.statusEffects.ultra_focus && Math.random() < 0.4) {
-                                enemy.statusEffects.ultra_focus = { duration: 3 };
-                                addToLog(`${enemy.name}'s eye glows with intense focus! Its attacks will ignore defense.`, 'text-yellow-500 font-bold');
-                                usedAbility = true;
-                            }
-                            break;
-                        case 'healing':
-                            if (enemy.hp < enemy.maxHp && Math.random() < 0.5) {
-                                const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
-                                const healAmount = rollDice(rarityDice * 3, 8);
-                                addToLog(`${enemy.name} radiates a soothing light!`, 'text-green-400');
-                                currentEnemies.forEach(ally => {
-                                    if (ally.isAlive()) {
-                                        ally.hp = Math.min(ally.maxHp, ally.hp + healAmount);
-                                        addToLog(`${ally.name} is healed for <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-green-300');
-                                    }
-                                });
-                                renderBattle();
-                                usedAbility = true;
-                            }
-                            break;
-                        case 'true_poison':
-                             if (!player.statusEffects.poison && Math.random() < 0.6) {
-                                const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
-                                applyStatusEffect(player, 'poison', { duration: 3, damage: [rarityDice * 3, 8] }, enemy.name);
-                                usedAbility = true;
-                            }
-                            break;
-                        case 'living_shield':
-                            if (!enemy.statusEffects.living_shield && Math.random() < 0.5) {
-                                enemy.statusEffects.living_shield = { duration: 3 };
-                                addToLog(`${enemy.name}'s armor plating grows thicker, doubling its defense!`, 'text-gray-400 font-bold');
-                                usedAbility = true;
-                            }
-                            break;
-                        case 'swallow':
-                            if (!player.statusEffects.swallowed && Math.random() < 0.25) {
-                                applyStatusEffect(player, 'swallowed', { by: enemy.name, swallower: enemy, duration: Infinity }, enemy.name);
-                                usedAbility = true;
-                                renderBattle();
-                            }
-                            break;
-                        case 'scorch_earth':
-                            if (Math.random() < 0.4) {
-                                addToLog(`${enemy.name} unleashes a torrent of flame!`, 'text-orange-600 font-bold');
-                                const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
-                                const fireDamage = rollDice(rarityDice * 4, 8) + enemy.strength;
-                                player.takeDamage(fireDamage, true, enemy);
-                                usedAbility = true;
-                            }
-                            break;
-                    }
-                }
-                if (!usedAbility) {
-                    enemy.attack(player);
-                }
-                tookTurn = true;
-            }
-            
-            if (tookTurn) {
-                handleEnemyEndOfTurn(enemy);
-                checkPlayerDeath();
-            }
-
-            if (i === enemiesActingThisTurn.length - 1) {
-                 setTimeout(() => endPlayerTurnPhase(), turnDelay);
-            }
-        }, i * turnDelay);
-    });
-}
-function endPlayerTurnPhase() {
-    if (gameState.battleEnded) return;
-    if (!player.isAlive()) {
-        checkPlayerDeath();
-        return;
-    }
-
-    if (player.statusEffects.petrified) {
-        addToLog("You are petrified and cannot move!", 'text-gray-400');
-        setTimeout(enemyTurn, 500);
-    } else if (player.statusEffects.paralyzed) {
-        addToLog("You are paralyzed and cannot move!", 'text-orange-400');
-        setTimeout(enemyTurn, 500);
-    } else {
-        renderBattle();
-        $('#battle-actions')?.classList.remove('hidden'); 
-        gameState.isPlayerTurn = true;
-    }
-}
-function checkPlayerDeath() {
-    if (!player.isAlive() && !gameState.playerIsDying) {
-        gameState.playerIsDying = true;
-
-        const weapon = player.equippedWeapon;
-        if(weapon.effect?.revive && !player.specialWeaponStates.void_greatsword_revive_used) {
-            player.hp = Math.floor(player.maxHp * 0.5);
-            player.specialWeaponStates.void_greatsword_revive_used = true;
-            addToLog('The Void Greatsword flashes with dark energy, pulling your soul back from the brink!', 'text-purple-400 font-bold');
-            updateStatsView();
-            gameState.playerIsDying = false; 
-            return;
-        }
-        
-        const template = document.getElementById('template-death');
-        render(template.content.cloneNode(true));
-        const killer = currentEnemies.length > 0 ? currentEnemies[0].name : 'the wilderness';
-        addToLog(`You were defeated by ${killer}...`, 'text-red-600 font-bold'); 
-        
-        addToGraveyard(player, killer);
-
-        addToLog('Your save file has been deleted.', 'text-gray-500');
-        const saveKeys = JSON.parse(localStorage.getItem('rpgSaveKeys') || '[]');
-        const keyIndex = saveKeys.indexOf(player.saveKey);
-        if (keyIndex > -1) {
-            saveKeys.splice(keyIndex, 1);
-        }
-        localStorage.setItem('rpgSaveKeys', JSON.stringify(saveKeys));
-        localStorage.removeItem(`rpgSaveData_${player.saveKey}`);
-
-        setTimeout(() => { 
-            $('#game-container').classList.add('hidden'); 
-            $('#start-screen').classList.remove('hidden'); 
-            $('#player-name-input').value = ''; 
-            logElement.innerHTML = ''; 
-            updateLoadGameButtonVisibility();
-        }, 3000);
-    }
-}
-
-function addToGraveyard(deadPlayer, killer) {
-    let graveyard = JSON.parse(localStorage.getItem('rpgGraveyard') || '[]');
-    graveyard.unshift({
-        name: deadPlayer.name,
-        level: deadPlayer.level,
-        cause: `Slain by ${killer}`,
-        date: new Date().toLocaleString()
-    });
-    if (graveyard.length > 10) {
-        graveyard = graveyard.slice(0, 10);
-    }
-    localStorage.setItem('rpgGraveyard', JSON.stringify(graveyard));
+    return new Enemy(speciesData, rarityData, player.level, elementData);
 }
 
 function generateBlackMarketStock() {
@@ -901,7 +547,71 @@ function generateBlackMarketStock() {
 }
 
 
-// --- PLAYER ACTIONS ---
+// --- PLAYER ACTIONS (OUT OF BATTLE) ---
+
+function enchantItem(gearType, elementKey) {
+    if (!player) return;
+
+    let gear, currentElementProp;
+    switch(gearType) {
+        case 'weapon':
+            gear = player.equippedWeapon;
+            currentElementProp = 'weaponElement';
+            break;
+        case 'armor':
+            gear = player.equippedArmor;
+            currentElementProp = 'armorElement';
+            break;
+        case 'shield':
+            gear = player.equippedShield;
+            currentElementProp = 'shieldElement';
+            break;
+        default:
+            return;
+    }
+    
+    if (!gear || gear.rarity === 'Broken' || !gear.rarity) {
+        addToLog(`You cannot enchant this item.`, 'text-red-400');
+        return;
+    }
+
+    if (player[currentElementProp] === elementKey) {
+        addToLog(`This item is already enchanted with ${elementKey}.`, 'text-yellow-400');
+        return;
+    }
+
+    const costs = ENCHANTING_COSTS[gear.rarity];
+    if (!costs) {
+         addToLog(`Cannot find enchanting costs for ${gear.rarity} rarity.`, 'text-red-400');
+        return;
+    }
+
+    const essenceKey = `${elementKey}_essence`;
+    const playerEssence = player.inventory.items[essenceKey] || 0;
+
+    if (playerEssence < costs.essence) {
+        addToLog(`You need ${costs.essence} ${getItemDetails(essenceKey).name} to enchant this.`, 'text-red-400');
+        return;
+    }
+    if (player.gold < costs.gold) {
+        addToLog(`You need ${costs.gold} G to enchant this.`, 'text-red-400');
+        return;
+    }
+
+    // Pay costs
+    player.inventory.items[essenceKey] -= costs.essence;
+    if (player.inventory.items[essenceKey] <= 0) {
+        delete player.inventory.items[essenceKey];
+    }
+    player.gold -= costs.gold;
+
+    // Apply enchant
+    player[currentElementProp] = elementKey;
+
+    addToLog(`You successfully enchanted your ${gear.name} with the power of ${elementKey}!`, 'text-green-400 font-bold');
+    updateStatsView();
+    renderEnchanter(elementKey); // Re-render to update UI
+}
 
 function restAtInn(cost) { 
     player.gold -= cost; 
@@ -928,7 +638,7 @@ function learnSpell(spellKey) {
         player.spells.push(spellKey); 
         addToLog(`You have learned the spell: <span class="font-bold text-purple-300">${details.name}</span>!`, 'text-green-400'); 
         updateStatsView(); 
-        renderMagicShop(); 
+        renderMagicShopBuy(); 
     } 
 }
 
@@ -942,6 +652,8 @@ function buyItem(itemKey, shopType, priceOverride = null) {
         updateStatsView(); 
         if (shopType === 'blacksmith') {
             renderBlacksmithBuy();
+        } else if (shopType === 'magic') {
+            renderMagicShopBuy();
         } else {
             renderShop(shopType);
         }
@@ -988,14 +700,95 @@ function useItem(itemKey, inBattle = false) {
     }
     return true;
 }
-function equipItem(itemKey) { 
-    if (itemKey in WEAPONS) player.equippedWeapon = WEAPONS[itemKey]; 
-    if (itemKey in ARMOR) player.equippedArmor = ARMOR[itemKey]; 
-    if (itemKey in SHIELDS) player.equippedShield = SHIELDS[itemKey]; 
-    if (itemKey in LURES) player.equippedLure = itemKey;
-    addToLog(`You equipped the <span class="font-bold text-cyan-300">${getItemDetails(itemKey).name}</span>.`); 
-    updateStatsView(); 
-    renderInventory(); 
+
+function equipItem(itemKey) {
+    const details = getItemDetails(itemKey);
+    if (!details) return;
+
+    let itemType = null;
+    if (WEAPONS[itemKey]) { itemType = 'weapon'; }
+    else if (CATALYSTS[itemKey]) { itemType = 'catalyst'; }
+    else if (SHIELDS[itemKey]) { itemType = 'shield'; }
+    else if (ARMOR[itemKey]) { itemType = 'armor'; }
+    else if (LURES[itemKey]) { itemType = 'lure'; }
+
+    // --- Simple Equips (Armor & Lure) ---
+    if (itemType === 'armor') {
+        if (player.equippedArmor === details) return;
+        player.equippedArmor = details;
+    } else if (itemType === 'lure') {
+        if (player.equippedLure === itemKey) return;
+        player.equippedLure = itemKey;
+    } 
+    // --- Complex 2-of-3 Logic ---
+    else if (itemType) {
+        const isCurrentlyEquipped = 
+            (itemType === 'weapon' && player.equippedWeapon === details) ||
+            (itemType === 'catalyst' && player.equippedCatalyst === details) ||
+            (itemType === 'shield' && player.equippedShield === details);
+
+        if (isCurrentlyEquipped) return;
+
+        // --- Handle Dual Wield Restriction ---
+        if (details.effect?.dual_wield) {
+            if (player.equippedShield.name !== 'None') {
+                addToLog(`You unequip your ${player.equippedShield.name} to wield two swords.`, 'text-yellow-500');
+                player.equippedShield = SHIELDS['no_shield'];
+                const shieldIndex = player.equipmentOrder.indexOf('shield');
+                if (shieldIndex > -1) player.equipmentOrder.splice(shieldIndex, 1);
+            }
+            if (player.equippedCatalyst.name !== 'None') {
+                addToLog(`You unequip your ${player.equippedCatalyst.name} to wield two swords.`, 'text-yellow-500');
+                player.equippedCatalyst = CATALYSTS['no_catalyst'];
+                 const catalystIndex = player.equipmentOrder.indexOf('catalyst');
+                if (catalystIndex > -1) player.equipmentOrder.splice(catalystIndex, 1);
+            }
+        }
+        
+        // Prevent equipping a shield/catalyst if dual wielding
+        if ((itemType === 'shield' || itemType === 'catalyst') && player.equippedWeapon.effect?.dual_wield) {
+            addToLog(`You cannot use a ${itemType} while dual wielding.`, 'text-red-400');
+            return;
+        }
+
+
+        // Remove from queue if it's already there (for re-equipping)
+        const typeIndex = player.equipmentOrder.indexOf(itemType);
+        if (typeIndex > -1) {
+            player.equipmentOrder.splice(typeIndex, 1);
+        }
+
+        // If queue is full, unequip the oldest item
+        if (player.equipmentOrder.length >= 2) {
+            const typeToUnequip = player.equipmentOrder.shift(); // remove the oldest
+            let unequippedItemName = '';
+            if (typeToUnequip === 'weapon') {
+                unequippedItemName = player.equippedWeapon.name;
+                player.equippedWeapon = WEAPONS['fists'];
+            } else if (typeToUnequip === 'catalyst') {
+                unequippedItemName = player.equippedCatalyst.name;
+                player.equippedCatalyst = CATALYSTS['no_catalyst'];
+            } else if (typeToUnequip === 'shield') {
+                unequippedItemName = player.equippedShield.name;
+                player.equippedShield = SHIELDS['no_shield'];
+            }
+            addToLog(`You unequipped ${unequippedItemName} to make room for the ${details.name}.`, 'text-yellow-500');
+        }
+
+        // Add new item's type to the queue
+        player.equipmentOrder.push(itemType);
+        
+        // Equip the new item
+        if (itemType === 'weapon') player.equippedWeapon = details;
+        else if (itemType === 'catalyst') player.equippedCatalyst = details;
+        else if (itemType === 'shield') player.equippedShield = details;
+    }
+
+    addToLog(`You equipped the <span class="font-bold text-cyan-300">${details.name}</span>.`);
+    updateStatsView();
+    if (gameState.currentView === 'inventory') {
+        renderInventory();
+    }
 }
 
 function brewPotion(recipeKey) {
@@ -1065,8 +858,8 @@ function brewPotion(recipeKey) {
     renderAlchemist();
 }
 
-function craftGear(recipeKey) {
-    const recipe = BLACKSMITH_RECIPES[recipeKey];
+function craftGear(recipeKey, sourceShop) {
+    const recipe = (sourceShop === 'magic' ? MAGIC_SHOP_RECIPES[recipeKey] : BLACKSMITH_RECIPES[recipeKey]);
     if (!recipe) return;
 
     let hasIngredients = true;
@@ -1091,7 +884,7 @@ function craftGear(recipeKey) {
         return;
     }
     if (player.gold < recipe.cost) {
-        addToLog("You can't afford the forging fee.", 'text-red-400');
+        addToLog("You can't afford the fee.", 'text-red-400');
         return;
     }
 
@@ -1117,7 +910,7 @@ function craftGear(recipeKey) {
     // Add product to inventory
     player.addToInventory(recipe.output);
     const productDetails = getItemDetails(recipe.output);
-    addToLog(`You successfully forged a <span class="font-bold text-green-300">${productDetails.name}</span>!`);
+    addToLog(`You successfully created a <span class="font-bold text-green-300">${productDetails.name}</span>!`);
 
     // Update quest progress if applicable
     if (player.activeQuest && player.activeQuest.category === 'creation') {
@@ -1129,7 +922,11 @@ function craftGear(recipeKey) {
     }
 
     updateStatsView();
-    renderBlacksmithCraft();
+    if (sourceShop === 'magic') {
+        renderMagicShopCraft();
+    } else {
+        renderBlacksmithCraft();
+    }
 }
 
 
@@ -1212,3 +1009,7 @@ function cancelQuest() {
     updateStatsView();
     renderQuestBoard();
 }
+
+
+
+
