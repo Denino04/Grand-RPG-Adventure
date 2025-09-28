@@ -404,7 +404,9 @@ window.addEventListener('load', () => {
 
     const keysPressed = new Set();
     document.addEventListener('keydown', (e) => {
-        keysPressed.add(e.key.toLowerCase());
+        if (e.key) {
+            keysPressed.add(e.key.toLowerCase());
+        }
         if (keysPressed.has('d') && keysPressed.has('`')) {
             e.preventDefault(); // Prevents any default browser action
             toggleDebug();
@@ -412,7 +414,9 @@ window.addEventListener('load', () => {
     });
 
     document.addEventListener('keyup', (e) => {
-        keysPressed.delete(e.key.toLowerCase());
+        if (e.key) {
+            keysPressed.delete(e.key.toLowerCase());
+        }
     });
 
     updateLoadGameButtonVisibility();

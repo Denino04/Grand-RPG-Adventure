@@ -385,6 +385,15 @@ function battleAction(type, actionData = null) {
              break;
         case 'magic': renderBattle('magic'); break;
         case 'item': renderBattle('item'); break;
+        case 'item_select': // New case for selecting a target for an item
+            const item = ITEMS[actionData.itemKey];
+            const itemTargetIndex = currentEnemies.findIndex(e => e.isAlive());
+            if (aliveEnemies.length > 1) {
+                 renderBattle('item_target', actionData);
+            } else if (itemTargetIndex !== -1) {
+                useItem(actionData.itemKey, true, itemTargetIndex);
+            }
+            break;
         case 'flee':
             gameState.isPlayerTurn = false;
             if (Math.random() > 0.2) { addToLog(`You successfully escaped!`, 'text-green-400'); setTimeout(renderMainMenu, 1500); }
@@ -737,6 +746,7 @@ function addToGraveyard(deadPlayer, killer) {
     }
     localStorage.setItem('rpgGraveyard', JSON.stringify(graveyard));
 }
+
 
 
 

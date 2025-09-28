@@ -87,10 +87,17 @@ class Player extends Entity {
         this.inventory = { 
             items: { 
                 'health_potion': 3,
-                'mana_potion': 1
+                'fire_essence': 10,
+                'water_essence': 10,
+                'earth_essence': 10,
+                'wind_essence': 10,
+                'lightning_essence': 10,
+                'nature_essence': 10,
+                'light_essence': 10,
+                'void_essence': 10
             }, 
             weapons: ['fists', 'rusty_sword'],
-            catalysts: ['no_catalyst'],
+            catalysts: ['no_catalyst', 'wooden_stick'],
             armor: ['travelers_garb'], 
             shields: ['no_shield'], 
             lures: { } 
@@ -226,7 +233,7 @@ class Player extends Entity {
         if (attacker && attacker.element && attacker.element !== 'none') {
             damageType = ` ${ELEMENTS[attacker.element].name}`;
         }
-        addToLog(`You take <span class="font-bold text-red-400">${finalDamage}</span>${damageType} damage.`);
+        addToLog(`You take <span class="font-bold text-red-400">${finalDamage}</span>${damageType} damage.`); 
 
         // --- Post-Damage Effects (Reflect) ---
         if (armor?.effect?.reflect_damage && attacker && attacker.isAlive()) {
@@ -659,7 +666,7 @@ function buyItem(itemKey, shopType, priceOverride = null) {
         }
     } 
 }
-function useItem(itemKey, inBattle = false) {
+function useItem(itemKey, inBattle = false, targetIndex = null) {
     if (!player.inventory.items[itemKey] || player.inventory.items[itemKey] < 1) {
         addToLog("You don't have that item!", 'text-red-400');
         if (inBattle) renderBattle('item');
@@ -668,31 +675,51 @@ function useItem(itemKey, inBattle = false) {
     }
     const details = ITEMS[itemKey];
     
-    if (inBattle) gameState.isPlayerTurn = false;
-
-    if (details.type === 'healing') {
-        player.hp = Math.min(player.maxHp, player.hp + details.amount);
-    } else if (details.type === 'mana_restore') {
-        player.mp = Math.min(player.maxMp, player.mp + details.amount);
-    } else if (details.type === 'buff') {
-        player.statusEffects[details.effect.type] = { ...details.effect };
-        addToLog(`You drink the ${details.name} and feel a surge of power!`, 'text-yellow-300');
-    } else if (details.type === 'cleanse') {
-        const badEffects = ['poison', 'petrified', 'paralyzed', 'swallowed'];
-        for (const effect of badEffects) {
-            if (player.statusEffects[effect]) {
-                delete player.statusEffects[effect];
-            }
+    // Handle targeted combat items (Essences)
+    if (inBattle && details.type === 'enchant') {
+        const target = currentEnemies[targetIndex];
+        if (targetIndex === null || !target || !target.isAlive()) {
+            addToLog("You must select a valid target.", 'text-red-400');
+            renderBattle('item'); // Go back to item menu if target is invalid
+            return false;
         }
-        addToLog(`You drink the ${details.name} and feel purified.`, 'text-cyan-300');
+        
+        gameState.isPlayerTurn = false;
+        const element = itemKey.replace('_essence', '');
+        const damage = rollDice(1, 8, 'Essence Attack') + player.intelligence;
+
+        addToLog(`You channel the ${details.name}, unleashing a blast of ${element} energy!`, 'text-yellow-300');
+        const finalDamage = target.takeDamage(damage, { isMagic: true, element: element });
+        addToLog(`It hits ${target.name} for <span class="font-bold text-purple-400">${finalDamage}</span> ${element} damage.`);
+
+    } else { // Handle self-use items (Potions, Buffs)
+        if (inBattle) gameState.isPlayerTurn = false;
+
+        if (details.type === 'healing') {
+            player.hp = Math.min(player.maxHp, player.hp + details.amount);
+        } else if (details.type === 'mana_restore') {
+            player.mp = Math.min(player.maxMp, player.mp + details.amount);
+        } else if (details.type === 'buff') {
+            player.statusEffects[details.effect.type] = { ...details.effect };
+            addToLog(`You drink the ${details.name} and feel a surge of power!`, 'text-yellow-300');
+        } else if (details.type === 'cleanse') {
+            const badEffects = ['poison', 'petrified', 'paralyzed', 'swallowed'];
+            for (const effect of badEffects) {
+                if (player.statusEffects[effect]) {
+                    delete player.statusEffects[effect];
+                }
+            }
+            addToLog(`You drink the ${details.name} and feel purified.`, 'text-cyan-300');
+        }
+        addToLog(`You used a <span class="font-bold text-green-300">${details.name}</span>.`);
     }
 
     player.inventory.items[itemKey]--;
-    addToLog(`You used a <span class="font-bold text-green-300">${details.name}</span>.`);
     if (player.inventory.items[itemKey] <= 0) {
         delete player.inventory.items[itemKey];
     }
     updateStatsView();
+
     if (!inBattle) {
         renderInventory();
     } else {
@@ -1009,7 +1036,4 @@ function cancelQuest() {
     updateStatsView();
     renderQuestBoard();
 }
-
-
-
 
