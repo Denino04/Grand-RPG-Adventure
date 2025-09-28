@@ -87,17 +87,10 @@ class Player extends Entity {
         this.inventory = { 
             items: { 
                 'health_potion': 3,
-                'fire_essence': 10,
-                'water_essence': 10,
-                'earth_essence': 10,
-                'wind_essence': 10,
-                'lightning_essence': 10,
-                'nature_essence': 10,
-                'light_essence': 10,
-                'void_essence': 10
+                'mana_potion': 1
             }, 
             weapons: ['fists', 'rusty_sword'],
-            catalysts: ['no_catalyst', 'wooden_stick'],
+            catalysts: ['no_catalyst'],
             armor: ['travelers_garb'], 
             shields: ['no_shield'], 
             lures: { } 
