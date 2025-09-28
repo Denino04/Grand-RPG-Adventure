@@ -402,12 +402,12 @@ const MAGIC_SHOP_RECIPES = {
 };
 
 const ENCHANTING_COSTS = {
-    'Broken': { essence: 5, gold: 50 },
-    'Common': { essence: 10, gold: 100 },
-    'Uncommon': { essence: 15, gold: 250 },
-    'Rare': { essence: 20, gold: 500 },
-    'Epic': { essence: 25, gold: 1000 },
-    'Legendary': { essence: 30, gold: 2500 }
+    'Broken': { essence: 1, gold: 50 },
+    'Common': { essence: 5, gold: 250 },
+    'Uncommon': { essence: 10, gold: 500 },
+    'Rare': { essence: 15, gold: 1500 },
+    'Epic': { essence: 20, gold: 5000 },
+    'Legendary': { essence: 30, gold: 10000 }
 };
 
 const CHANGELOG_DATA = [
