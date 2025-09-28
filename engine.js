@@ -90,7 +90,7 @@ class Player extends Entity {
                 'mana_potion': 1
             }, 
             weapons: ['fists', 'rusty_sword'],
-            catalysts: ['no_catalyst', 'wooden_stick'],
+            catalysts: ['no_catalyst'],
             armor: ['travelers_garb'], 
             shields: ['no_shield'], 
             lures: { } 

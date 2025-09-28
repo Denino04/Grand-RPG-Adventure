@@ -402,10 +402,17 @@ window.addEventListener('load', () => {
     $('#graveyard-btn').addEventListener('click', renderGraveyard); 
     $('#changelog-btn').addEventListener('click', renderChangelog);
 
+    const keysPressed = new Set();
     document.addEventListener('keydown', (e) => {
-        if (e.key === '`') {
+        keysPressed.add(e.key.toLowerCase());
+        if (keysPressed.has('d') && keysPressed.has('`')) {
+            e.preventDefault(); // Prevents any default browser action
             toggleDebug();
         }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        keysPressed.delete(e.key.toLowerCase());
     });
 
     updateLoadGameButtonVisibility();
