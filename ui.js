@@ -57,28 +57,34 @@ function updateDebugView() {
 function updateDebugAddItemOptions() {
     if (!isDebugVisible) return;
     
-    const typeSelect = $('#debug-item-type');
     const itemSelect = $('#debug-item-select');
-    if (!typeSelect || !itemSelect) return;
-
-    const selectedCategory = typeSelect.value;
-    
-    let sourceObject;
-    switch (selectedCategory) {
-        case 'weapons': sourceObject = WEAPONS; break;
-        case 'catalysts': sourceObject = CATALYSTS; break;
-        case 'armor': sourceObject = ARMOR; break;
-        case 'shields': sourceObject = SHIELDS; break;
-        default: sourceObject = {};
-    }
+    if (!itemSelect) return;
 
     itemSelect.innerHTML = ''; // Clear existing options
-    for (const key in sourceObject) {
-        const item = sourceObject[key];
-        const option = document.createElement('option');
-        option.value = key;
-        option.textContent = item.name;
-        itemSelect.appendChild(option);
+
+    const itemCategories = {
+        'Weapons': WEAPONS,
+        'Catalysts': CATALYSTS,
+        'Armor': ARMOR,
+        'Shields': SHIELDS,
+        'Items': ITEMS,
+        'Lures': LURES
+    };
+
+    for (const categoryName in itemCategories) {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = categoryName;
+
+        const sourceObject = itemCategories[categoryName];
+        for (const key in sourceObject) {
+            const item = sourceObject[key];
+            if (!item.name) continue; // Skip items without a name
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = item.name;
+            optgroup.appendChild(option);
+        }
+        itemSelect.appendChild(optgroup);
     }
 }
 
@@ -102,6 +108,8 @@ function populateDebugStatInputs() {
     $('#debug-xp').value = player.xp;
     $('#debug-hp').value = player.hp;
     $('#debug-mp').value = player.mp;
+    $('#debug-str').value = player.strength;
+    $('#debug-int').value = player.intelligence;
 }
 
 function debugUpdateVariables() {
@@ -111,6 +119,8 @@ function debugUpdateVariables() {
     player.xp = parseInt($('#debug-xp').value) || player.xp;
     player.hp = parseInt($('#debug-hp').value) || player.hp;
     player.mp = parseInt($('#debug-mp').value) || player.mp;
+    player.strength = parseInt($('#debug-str').value) || player.strength;
+    player.intelligence = parseInt($('#debug-int').value) || player.intelligence;
     
     addToLog('DEBUG: Player stats updated.', 'text-gray-500');
     updateStatsView();
