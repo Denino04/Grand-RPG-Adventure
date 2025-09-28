@@ -202,7 +202,7 @@ function showTooltip(itemKey, event) {
     if (details.blockChance > 0) content += `<p>Block Chance: ${Math.round(details.blockChance * 100)}%</p>`;
     if (details.effect?.type === 'dodge') content += `<p>Dodge Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
     if (details.effect?.type === 'parry') content += `<p>Parry Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
-    if (details.amount) content += `<p class="text-green-400">Heals: ${details.amount} HP</p>`;
+    if (details.amount && details.type !== 'mana_restore') content += `<p class="text-green-400">Heals: ${details.amount} HP</p>`; 
     if (details.type === 'mana_restore') content += `<p class="text-blue-400">Restores: ${details.amount} MP</p>`;
     if (details.cost) content += `<p class="text-blue-400">MP Cost: ${details.cost}</p>`;
     if (details.healing) content += `<p class="text-green-400">Healing: ${details.healing[0]}d${details.healing[1]}</p>`;
