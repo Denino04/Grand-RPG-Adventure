@@ -218,8 +218,12 @@ const ARMOR = {
 
 const ITEMS = {
     'health_potion': {name: 'Health Potion', type: 'healing', amount: 20, price: 30, description: "A simple vial that restores a small amount of health."},
-    'superior_health_potion': {name: 'Superior Health Potion', type: 'healing', amount: 50, price: 75, description: "A potent draught that restores a moderate amount of health."},
+    'condensed_health_potion': {name: 'Condesed Health Potion', type: 'healing', amount: 50, price: 75, description: "A heavy, concentrated mixture of refined herbs and purified mountain water. This potion is thicker and more potent than its normal counterpart, designed to provide substantial, immediate relief."},
+    'superior_health_potion': {name: 'Superior Health Potion', type: 'healing', amount: 100, price: 200, description: "A potent draught that restores a moderate amount of health."},
     'mana_potion': {name: 'Mana Potion', type: 'mana_restore', amount: 20, price: 40, description: "A swirling blue liquid that restores magical energy."},
+    'condensed_mana_potion': {name: 'Condensed Mana Potion', type: 'mana_restore', amount: 50, price: 100, description: "An oxidized flask containing a potent brew of crushed celestial beetles and distilled shadow essence. It provides a sharp, invigorating shock to the mind, clearing the fog of battle-weariness."},
+    'superior_mana_potion': {name: 'Superion Mana Potion', type: 'mana_restore', amount: 100, price: 250, description: "A masterwork of alchemy. The shimmering liquid is pure, crystallized Arcane Energy, providing not just mana, but a momentary conduit to the raw source of magic itself."},
+
     'goblin_ear': {name: 'Goblin Ear', type: 'junk', price: 5, description: "A grotesque trophy."},
     'wolf_pelt': {name: 'Wolf Pelt', type: 'junk', price: 12, description: "A thick and coarse pelt."},
     'rat_tail': {name: 'Rat Tail', type: 'junk', price: 2, description: "It's... a rat tail."},
@@ -358,7 +362,7 @@ const LEGACY_QUESTS = {
 };
 
 const SHOP_INVENTORY = {
-    'Potions & Items': ['health_potion', 'mana_potion', 'superior_health_potion'],
+    'Potions & Items': ['health_potion', 'mana_potion', 'condensed_health_potion', 'condensed_mana_potion'],
     'Weapons': ['rusty_sword', 'wooden_stick'],
     'Gear': ['travelers_garb', 'leather_armor', 'padded_leather', 'wooden_shield']
 };
