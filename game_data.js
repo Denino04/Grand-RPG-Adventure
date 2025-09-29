@@ -580,7 +580,7 @@ const LEGACY_QUESTS = {
 };
 
 const SHOP_INVENTORY = {
-    'Potions & Items': ['health_potion', 'mana_potion', 'superior_health_potion'],
+    'Potions & Items': ['health_potion', 'mana_potion', 'condensed_health_potion', 'condensed_mana_potion'],
     'Weapons': ['rusty_sword', 'wooden_stick'],
     'Gear': ['travelers_garb', 'leather_armor', 'padded_leather', 'wooden_shield']
 };
@@ -636,7 +636,8 @@ const CHANGELOG_DATA = [
         version: "v0.3 - Magic and Elements",
         date: "2025-09-28",
         changes: [
-            "<strong>0.3.1</strong> - Implemented the foundational Elemental System, preparing the game for deeper magical combat."
+            "<strong>0.3.1</strong> - Implemented the foundational Elemental System, preparing the game for deeper magical combat.",
+            "<strong>0.3.2</strong> - Implemented the Magical System Overhaul, changing how Spells and Catalysts works."
         ]
     },
     {
