@@ -292,14 +292,51 @@ function showTooltip(itemKey, event) {
         if (!details) return;
 
         content = `<h4 class="font-bold mb-1" style="color: var(--text-accent);">${details.name}</h4>`;
-        if (details.damage) content += `<p>Damage: ${details.damage[0]}d${details.damage[1]}</p>`;
-        if (details.defense) content += `<p>Defense: ${details.defense}</p>`;
-        if (details.blockChance > 0) content += `<p>Block Chance: ${Math.round(details.blockChance * 100)}%</p>`;
-        if (details.effect?.type === 'dodge') content += `<p>Dodge Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
-        if (details.effect?.type === 'parry') content += `<p>Parry Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
-        if (details.amount && details.type === 'healing') content += `<p class="text-green-400">Heals: ${details.amount} HP</p>`;
-        if (details.type === 'mana_restore') content += `<p class="text-blue-400">Restores: ${details.amount} MP</p>`;
-        if (details.uses) content += `<p class="text-purple-300">Uses: ${details.uses}</p>`;
+
+        // --- Basic Stats ---
+        let stats = [];
+        if (details.damage) stats.push(`Damage: ${details.damage[0]}d${details.damage[1]}`);
+        if (details.defense) stats.push(`Defense: ${details.defense}`);
+        if (details.blockChance > 0) stats.push(`Block: ${Math.round(details.blockChance * 100)}%`);
+        if (details.amount && details.type === 'healing') stats.push(`<span class="text-green-400">Heals: ${details.amount} HP</span>`);
+        if (details.type === 'mana_restore') stats.push(`<span class="text-blue-400">Restores: ${details.amount} MP</span>`);
+        if (details.uses) stats.push(`<span class="text-purple-300">Uses: ${details.uses}</span>`);
+        if (stats.length > 0) content += `<p>${stats.join(' | ')}</p>`;
+
+        // --- Special Properties ---
+        let specialProps = [];
+        if (details.effect) {
+            const effect = details.effect;
+            if (effect.type === 'crit') specialProps.push(`Crit: ${effect.chance * 100}% for ${effect.multiplier}x`);
+            if (effect.type === 'fire_damage' || effect.type === 'lightning_damage') specialProps.push(`+${effect.damage[0]}d${effect.damage[1]} ${capitalize(effect.type.split('_')[0])} Dmg`);
+            if (effect.type === 'lifesteal') specialProps.push(`Lifesteal: ${effect.amount * 100}%`);
+            if (effect.type === 'paralyze') specialProps.push(`Paralyze: ${effect.chance * 100}% for ${effect.duration}t`);
+            if (effect.type === 'dodge') specialProps.push(`Dodge: ${effect.chance * 100}%`);
+            if (effect.type === 'parry') specialProps.push(`Parry: ${effect.chance * 100}%`);
+            if (effect.type === 'ranged' && effect.petrify_chance) specialProps.push(`Petrify: ${effect.petrify_chance * 100}% for ${effect.duration}t`);
+            if (effect.type === 'debuff_resist') specialProps.push(`Resist Debuffs: ${effect.chance * 100}%`);
+            if (effect.type === 'reflect') specialProps.push(`Reflect: ${effect.amount * 100}% Dmg`);
+            if (effect.ignore_defense) specialProps.push(`Ignore Defense: ${effect.ignore_defense * 100}%`);
+            if (effect.spell_follow_up) specialProps.push(`Spell Follow-up`);
+            if (effect.attack_follow_up) specialProps.push(`Retaliates on attack`);
+            if (effect.double_strike) specialProps.push(`Double Strike`);
+            if (effect.dual_wield) specialProps.push(`Dual Wield`);
+            if (effect.revive) specialProps.push(`Revives on death`);
+            if (effect.hp_regen) specialProps.push(`+${effect.hp_regen} HP/turn`);
+            if (effect.mana_regen) specialProps.push(`+${effect.mana_regen} MP/turn`);
+            if (effect.mana_discount) specialProps.push(`-${effect.mana_discount} MP Cost`);
+            if (effect.spell_amp) specialProps.push(`+${effect.spell_amp} Spell Dice`);
+            if (effect.spell_crit_chance) specialProps.push(`Spell Crit: ${effect.spell_crit_chance * 100}% for ${effect.spell_crit_multiplier}x`);
+            if (effect.spell_lifesteal) specialProps.push(`Spell Lifesteal: ${effect.spell_lifesteal * 100}%`);
+            if (details.rarity === 'Common' && effect.type === 'dodge' && effect.chance < 0) specialProps.push(`Dodge: ${effect.chance * 100}%`);
+        }
+
+        if (specialProps.length > 0) {
+            content += `<div class="mt-2 pt-2 border-t border-gray-600">
+                            <p class="text-sm text-cyan-300">${specialProps.join(', ')}</p>
+                        </div>`;
+        }
+
         content += `<p class="text-gray-400 mt-2 text-sm"><em>${details.description}</em></p>`;
     }
 
@@ -522,7 +559,7 @@ function renderTown() {
 
     const locations = [
         { name: 'General Store', action: "renderShop('store')" }, 
-        { name: 'Blacksmith', action: "renderShop('blacksmith')" }, 
+        { name: 'Blacksmith', action: "renderBlacksmithMenu()" }, 
         { name: 'Black Market', action: "renderShop('black_market')" },
         { name: "Sage's Tower", action: "renderSageTowerMenu()" }, 
         { name: 'Alchemist', action: "renderAlchemist()" }, 
@@ -1668,8 +1705,4 @@ function renderChangelog() {
     
     changelogScreen.innerHTML = html;
 }
-
-
-
-
 
