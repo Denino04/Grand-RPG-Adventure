@@ -5,6 +5,7 @@ function startBattle(biomeKey) {
     gameState.currentBiome = biomeKey;
     $('#inventory-btn').disabled = true;
     currentEnemies = [];
+    player.clearBattleBuffs(); // Clear buffs from previous battle
 
     let numEnemies = 1;
     if (player.level >= 50) {
@@ -113,17 +114,41 @@ function performAttack(targetIndex) {
             messageLog.push(`Your attack is weakened!`);
         }
 
-        // --- DAMAGE MODIFICATION ---
-        if(player.statusEffects.strength) {
-            damage = Math.floor(damage * player.statusEffects.strength.multiplier);
+        // --- STRENGTH MODIFICATION FROM BUFFS ---
+        if(player.statusEffects.buff_strength) {
+            damage = Math.floor(damage * player.statusEffects.buff_strength.multiplier);
             if (!isSecondStrike) messageLog.push(`Your strength is augmented!`);
         }
+        if (player.statusEffects.buff_chaos_strength) {
+             damage = Math.floor(damage * player.statusEffects.buff_chaos_strength.strMultiplier);
+             if (!isSecondStrike) messageLog.push(`Your chaotic power surges!`);
+        }
+        if (player.statusEffects.buff_titan) {
+            damage = Math.floor(damage * player.statusEffects.buff_titan.strMultiplier);
+            if (!isSecondStrike) messageLog.push(`You strike with titanic force!`);
+        }
+
+        // --- CRIT CHANCE ---
+        let critChance = 0;
+        if (weapon.effect?.type === 'crit') {
+            critChance += weapon.effect.chance;
+        }
+        if (player.statusEffects.buff_shroud || player.statusEffects.buff_voidwalker) {
+            critChance += 0.5; // 50% bonus crit chance
+        }
+
+
+        // --- DAMAGE MODIFICATION ---
         if (player.weaponElement === 'fire') {
             const fireMultiplier = 1 + Math.random() * 0.2;
             damage = Math.floor(damage * fireMultiplier);
         }
-        if (weapon.effect?.type === 'crit' && Math.random() < weapon.effect.chance) {
-            damage = Math.floor(damage * weapon.effect.multiplier);
+        if (Math.random() < critChance) {
+            let critMultiplier = weapon.effect?.multiplier || 1.5; // Default crit multi
+            if (player.statusEffects.buff_voidwalker) {
+                critMultiplier += 0.5; // Bonus crit damage
+            }
+            damage = Math.floor(damage * critMultiplier);
             messageLog.push(`CRITICAL HIT!`);
         }
         if (weapon.effect?.bonus_vs_dragon && attackTarget.speciesData.name === 'Dragon') {
@@ -186,32 +211,55 @@ function performAttack(targetIndex) {
         }
 
         // --- POST-DAMAGE EFFECTS ---
-    if (weapon.effect) {
-        if (weapon.effect.type === 'fire_damage') { 
-            const fireDamage = rollDice(...weapon.effect.damage, 'Fire Damage'); 
-            const finalFireDamage = target.takeDamage(fireDamage, {ignore_defense: 1.0, isMagic: true, element: 'fire'});
-            addToLog(`The blade burns for an extra <span class="font-bold text-orange-400">${finalFireDamage}</span> fire damage.`); 
-        }
-        if (weapon.effect.type === 'lightning_damage') { 
-            const lightningDamage = rollDice(...weapon.effect.damage, 'Lightning Damage'); 
-            const finalLightningDamage = target.takeDamage(lightningDamage, {ignore_defense: 1.0, isMagic: true, element: 'lightning'});
-            addToLog(`Lightning arcs from your weapon for an extra <span class="font-bold text-blue-400">${finalLightningDamage}</span> damage.`); 
-        }
-        if (weapon.effect.type === 'lifesteal') { 
-            const healedAmount = Math.floor(finalDamage * weapon.effect.amount); 
-                if (healedAmount > 0) { 
-                    player.hp = Math.min(player.maxHp, player.hp + healedAmount); 
-                    addToLog(`You drain <span class="font-bold text-green-400">${healedAmount}</span> HP.`); 
-                    updateStatsView(); 
-                } 
+        if (weapon.effect) {
+            if (weapon.effect.type === 'fire_damage') { 
+                const fireDamage = rollDice(...weapon.effect.damage, 'Fire Damage'); 
+                const finalFireDamage = target.takeDamage(fireDamage, {ignore_defense: 1.0, isMagic: true, element: 'fire'});
+                addToLog(`The blade burns for an extra <span class="font-bold text-orange-400">${finalFireDamage}</span> fire damage.`); 
             }
-            if (weapon.effect.type === 'paralyze' && Math.random() < weapon.effect.chance) {
-                attackTarget.statusEffects.paralyzed = { duration: weapon.effect.duration + 1 };
-                addToLog(`${attackTarget.name} is paralyzed by the blow!`, 'text-yellow-500');
+            if (weapon.effect.type === 'lightning_damage') { 
+                const lightningDamage = rollDice(...weapon.effect.damage, 'Lightning Damage'); 
+                const finalLightningDamage = target.takeDamage(lightningDamage, {ignore_defense: 1.0, isMagic: true, element: 'lightning'});
+                addToLog(`Lightning arcs from your weapon for an extra <span class="font-bold text-blue-400">${finalLightningDamage}</span> damage.`); 
             }
-            if (weapon.effect.petrify_chance && Math.random() < weapon.effect.petrify_chance) {
-                attackTarget.statusEffects.petrified = { duration: weapon.effect.duration + 1 };
-                addToLog(`${attackTarget.name} is petrified by the attack!`, 'text-gray-400');
+            if (weapon.effect.type === 'lifesteal') { 
+                const healedAmount = Math.floor(finalDamage * weapon.effect.amount); 
+                    if (healedAmount > 0) { 
+                        player.hp = Math.min(player.maxHp, player.hp + healedAmount); 
+                        addToLog(`You drain <span class="font-bold text-green-400">${healedAmount}</span> HP.`); 
+                        updateStatsView(); 
+                    } 
+                }
+                if (weapon.effect.type === 'paralyze' && Math.random() < weapon.effect.chance) {
+                    attackTarget.statusEffects.paralyzed = { duration: weapon.effect.duration + 1 };
+                    addToLog(`${attackTarget.name} is paralyzed by the blow!`, 'text-yellow-500');
+                }
+                if (weapon.effect.petrify_chance && Math.random() < weapon.effect.petrify_chance) {
+                    attackTarget.statusEffects.petrified = { duration: weapon.effect.duration + 1 };
+                    addToLog(`${attackTarget.name} is petrified by the attack!`, 'text-gray-400');
+                }
+            }
+
+        // --- CHAIN LIGHTNING LOGIC from Buffs ---
+        if (player.statusEffects.buff_ion_self || player.statusEffects.buff_ion_other) {
+            const isSelfDamage = !!player.statusEffects.buff_ion_self;
+            let potentialTargets = currentEnemies.filter(e => e.isAlive() && e !== attackTarget);
+            if (isSelfDamage) {
+                potentialTargets.push(player); // Add player to potential targets
+            }
+            
+            if (potentialTargets.length > 0) {
+                addToLog("Unstable ions arc from your attack!", "text-blue-300");
+                const chainTarget = potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
+                const chainDamage = Math.floor(finalDamage / 2);
+
+                if (chainTarget instanceof Player) {
+                    player.takeDamage(chainDamage, true); // True damage to player
+                    addToLog(`The lightning chains back, shocking you for <span class="font-bold text-red-400">${chainDamage}</span> damage!`);
+                } else {
+                    const finalChainDamage = chainTarget.takeDamage(chainDamage, attackEffects);
+                    addToLog(`It chains to ${chainTarget.name} for <span class="font-bold text-blue-400">${finalChainDamage}</span> damage!`);
+                }
             }
         }
     };
@@ -247,7 +295,18 @@ function performAttack(targetIndex) {
 
 
 function castSpell(spellKey, targetIndex) {
-    const spell = MAGIC[spellKey];
+    const spellData = SPELLS[spellKey];
+    if (!spellData) return;
+
+    const playerSpell = player.spells[spellKey];
+    if (!playerSpell) {
+        addToLog(`You do not know this spell.`, 'text-red-400');
+        return;
+    }
+
+    const tierIndex = playerSpell.tier - 1;
+    const spell = spellData.tiers[tierIndex];
+
     const catalyst = player.equippedCatalyst;
     const armor = player.equippedArmor;
     let spellCost = spell.cost;
@@ -271,7 +330,7 @@ function castSpell(spellKey, targetIndex) {
     }
     
     const target = currentEnemies[targetIndex];
-    if ((spell.type === 'damage') && (!target || !target.isAlive())) {
+    if ((spellData.type === 'st' || spellData.type === 'aoe') && (!target || !target.isAlive())) {
         renderBattle('main');
         return;
     }
@@ -280,7 +339,7 @@ function castSpell(spellKey, targetIndex) {
     player.mp -= spellCost; 
     updateStatsView();
     
-    if (spell.type === 'damage') {
+    if (spellData.type !== 'support' && spellData.element !== 'healing') {
         addToLog(`You cast ${spell.name} on ${target.name}!`, 'text-purple-300');
     } else {
         addToLog(`You cast ${spell.name}!`, 'text-purple-300');
@@ -288,60 +347,126 @@ function castSpell(spellKey, targetIndex) {
 
     let messageLog = [];
 
-    switch(spell.type) {
-        case 'damage': 
-            let diceCount = spell.damage[0];
-            if (catalyst.effect?.spell_amp) {
-                diceCount += catalyst.effect.spell_amp;
-            }
-            let magicDamage = rollDice(diceCount, spell.damage[1], `Player Spell: ${spell.name}`) + player.intelligence;
+    // --- SPELL LOGIC ---
+    if (spellData.type === 'st' || spellData.type === 'aoe' || spellData.element === 'healing') {
+        let diceCount = spell.damage[0];
+        const spellAmp = catalyst.effect?.spell_amp || 0;
+        diceCount = Math.min(spell.cap, diceCount + spellAmp);
 
-            if (catalyst.effect?.spell_crit_chance && Math.random() < catalyst.effect.spell_crit_chance) {
-                magicDamage = Math.floor(magicDamage * catalyst.effect.spell_crit_multiplier);
-                messageLog.push('SPELL CRITICAL!');
+        let magicDamage = rollDice(diceCount, spell.damage[1], `Player Spell: ${spell.name}`) + player.intelligence;
+
+        if (catalyst.effect?.spell_crit_chance && Math.random() < catalyst.effect.spell_crit_chance) {
+            magicDamage = Math.floor(magicDamage * (catalyst.effect.spell_crit_multiplier || 1.5));
+            messageLog.push('SPELL CRITICAL!');
+        }
+        
+        if (spellData.element === 'healing') {
+            player.hp = Math.min(player.maxHp, player.hp + magicDamage);
+            addToLog(`You recover <span class="font-bold text-green-400">${magicDamage}</span> HP.`, 'text-green-300');
+        } else {
+            // Apply elemental damage fluctuation for Fire spells
+            if (spellData.element === 'fire') {
+                const fireMultiplier = 1 + Math.random() * 0.2;
+                magicDamage = Math.floor(magicDamage * fireMultiplier);
             }
 
-            if (player.statusEffects.swallowed) {
-                magicDamage = Math.floor(magicDamage / 2);
-                messageLog.push(`Your spell fizzles inside the beast!`);
-            }
-            const finalDamage = target.takeDamage(magicDamage, { isMagic: true, element: spell.element || 'none' }); 
+            // Main target damage
+            const finalDamage = target.takeDamage(magicDamage, { isMagic: true, element: spellData.element });
             addToLog(`It deals <span class="font-bold text-purple-400">${finalDamage}</span> damage. ${messageLog.join(' ')}`);
 
-             if (catalyst.effect?.spell_lifesteal) {
-                const healedAmount = Math.floor(finalDamage * catalyst.effect.spell_lifesteal);
-                if (healedAmount > 0) {
-                    player.hp = Math.min(player.maxHp, player.hp + healedAmount);
-                    addToLog(`You drain <span class="font-bold text-green-400">${healedAmount}</span> HP from the spell.`, 'text-green-300');
-                    updateStatsView();
+            // Apply secondary elemental effects after main damage
+            if (finalDamage > 0) {
+                 if (spellData.element === 'water') {
+                    addToLog(`The water from your spell drenches ${target.name}!`, 'text-blue-400');
+                    target.statusEffects.drenched = { duration: 2, multiplier: 0.9 };
+                }
+                if (spellData.element === 'earth' && Math.random() < 0.2) { // 20% chance for paralysis
+                    if (!target.statusEffects.paralyzed) {
+                        target.statusEffects.paralyzed = { duration: 2 };
+                        addToLog(`${target.name} is paralyzed by the force of the earth!`, 'text-yellow-500');
+                    }
+                }
+                 if (spellData.element === 'nature') {
+                    const lifestealAmount = Math.floor(finalDamage * 0.1); // 10% lifesteal
+                    if (lifestealAmount > 0) {
+                        player.hp = Math.min(player.maxHp, player.hp + lifestealAmount);
+                        addToLog(`You drain <span class="font-bold text-green-400">${lifestealAmount}</span> HP.`, 'text-green-300');
+                        updateStatsView();
+                    }
+                }
+                 if (spellData.element === 'light' && Math.random() < 0.2) { // 20% chance to cleanse
+                    const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched'].includes(key));
+                    if (debuffs.length > 0) {
+                        const effectToCleanse = debuffs[0];
+                        delete player.statusEffects[effectToCleanse];
+                        addToLog(`Your spell's light energy cleanses you of ${effectToCleanse}!`, 'text-yellow-200');
+                    }
                 }
             }
 
-            if (catalyst.effect?.bonus_fire_damage) {
-                const fireDamage = rollDice(...catalyst.effect.bonus_fire_damage, 'Bonus Fire Damage');
-                const finalFireDamage = target.takeDamage(fireDamage, { ignore_defense: 1.0, isMagic: true, element: 'fire' });
-                addToLog(`The spell burns for an extra <span class="font-bold text-orange-400">${finalFireDamage}</span> fire damage.`);
+            // AoE splash damage
+            if (spellData.type === 'aoe') {
+                const splashDamage = Math.floor(magicDamage * spell.splash);
+                currentEnemies.forEach(enemy => {
+                    if (enemy !== target && enemy.isAlive()) {
+                        const finalSplashDamage = enemy.takeDamage(splashDamage, { isMagic: true, element: spellData.element });
+                        addToLog(`${enemy.name} is hit by the splash for <span class="font-bold text-purple-300">${finalSplashDamage}</span> damage!`);
+                    }
+                });
             }
-            break;
-        case 'healing': 
-            let healAmount = rollDice(...spell.healing, `Player Healing: ${spell.name}`) + player.intelligence; 
-            if (catalyst.effect?.heal_amp) {
-                healAmount = Math.floor(healAmount * catalyst.effect.heal_amp);
+             // Chain Lightning for lightning spells
+            if (spellData.element === 'lightning' && finalDamage > 0) {
+                const otherTargets = currentEnemies.filter(e => e.isAlive() && e !== target);
+                if (otherTargets.length > 0) {
+                    const chainTarget = otherTargets[Math.floor(Math.random() * otherTargets.length)];
+                    const chainDamage = Math.floor(finalDamage / 2);
+                    const finalChainDamage = chainTarget.takeDamage(chainDamage, { isMagic: true, element: 'lightning' });
+                    addToLog(`Lightning chains from your spell, hitting ${chainTarget.name} for <span class="font-bold text-blue-300">${finalChainDamage}</span> damage!`, 'text-blue-400');
+                }
             }
-            player.hp = Math.min(player.maxHp, player.hp + healAmount); 
-            addToLog(`You recover <span class="font-bold text-green-400">${healAmount}</span> HP.`); 
-            updateStatsView(); 
-            break;
+        }
+    } else if (spellData.type === 'support') {
+        const effect = spell.effect;
+        if (effect) {
+             // For effects that have an immediate, one-time action
+            if (effect.cleanse) {
+                const badEffects = ['poison', 'petrified', 'paralyzed', 'swallowed'];
+                let cleansed = false;
+                for (const effectKey of badEffects) {
+                    if (player.statusEffects[effectKey]) {
+                        delete player.statusEffects[effectKey];
+                        cleansed = true;
+                    }
+                }
+                if (cleansed) {
+                    addToLog('You are cleansed of negative effects!', 'text-cyan-300');
+                }
+            }
+
+            // For debuffs that target enemies
+            if (effect.type.startsWith('debuff_')) {
+                currentEnemies.forEach(enemy => {
+                    if (enemy.isAlive()) {
+                        enemy.statusEffects[effect.type] = { ...effect };
+                    }
+                });
+            } else {
+                // Apply the status effect object to the player
+                 player.statusEffects[effect.type] = { ...effect };
+            }
+           
+            addToLog(spell.description, 'text-yellow-300');
+        }
     }
 
     // Check for spell follow-up attack
     if (player.equippedWeapon.effect?.spell_follow_up) {
-        // We use a timeout to let the spell damage log appear first
         setTimeout(() => performSpellFollowUpAttack(target), 200);
     } else {
         setTimeout(checkBattleStatus, 200);
     }
 }
+
 
 function battleAction(type, actionData = null) {
     if (!player.isAlive()) {
@@ -356,10 +481,10 @@ function battleAction(type, actionData = null) {
         if (type === 'attack') {
             renderBattle('attack');
         } else { // magic_select
-            const spell = MAGIC[actionData.spellKey];
-            if (spell.type === 'damage') {
+            const spellData = SPELLS[actionData.spellKey];
+            if (spellData.type === 'st' || spellData.type === 'aoe') {
                 renderBattle('magic_target', actionData);
-            } else {
+            } else { // Support or Healing
                 castSpell(actionData.spellKey, 0); // Self-cast or non-targeted
             }
         }
@@ -375,9 +500,9 @@ function battleAction(type, actionData = null) {
             }
             break;
         case 'magic_select': // From single enemy or non-damage spell
-             const spell = MAGIC[actionData.spellKey];
+             const spellData = SPELLS[actionData.spellKey];
              const magicTargetIndex = currentEnemies.findIndex(e => e.isAlive());
-             if (spell.type === 'damage' && magicTargetIndex !== -1) {
+             if ((spellData.type === 'st' || spellData.type === 'aoe') && magicTargetIndex !== -1) {
                 castSpell(actionData.spellKey, magicTargetIndex);
              } else {
                 castSpell(actionData.spellKey, 0); // Self-cast
@@ -396,8 +521,16 @@ function battleAction(type, actionData = null) {
             break;
         case 'flee':
             gameState.isPlayerTurn = false;
-            if (Math.random() > 0.2) { addToLog(`You successfully escaped!`, 'text-green-400'); setTimeout(renderMainMenu, 1500); }
-            else { addToLog(`You failed to escape!`, 'text-red-400'); setTimeout(enemyTurn, 400); }
+            if (player.statusEffects.buff_voidwalker || Math.random() > 0.2) {
+                if (player.statusEffects.buff_voidwalker) {
+                    addToLog('You slip through the shadows, guaranteeing your escape!', 'text-purple-400');
+                }
+                addToLog(`You successfully escaped!`, 'text-green-400');
+                setTimeout(renderMainMenu, 1500);
+            } else {
+                addToLog(`You failed to escape!`, 'text-red-400');
+                setTimeout(enemyTurn, 400);
+            }
             break;
     }
 }
@@ -512,12 +645,30 @@ function handlePlayerEndOfTurn() {
     }
 
     const effects = player.statusEffects;
+
+    // Handle heal-over-time effects
+    if (effects.buff_ingrain) {
+        const healEffect = effects.buff_ingrain;
+        const healAmount = rollDice(healEffect.healing[0], healEffect.healing[1], 'Ingrain Heal');
+        player.hp = Math.min(player.maxHp, player.hp + healAmount);
+        addToLog(`Your roots draw <span class="font-bold text-green-400">${healAmount}</span> HP from the earth.`, 'text-green-300');
+    }
+    if (effects.buff_mother_nature) {
+        const healEffect = effects.buff_mother_nature;
+        const hpHeal = rollDice(healEffect.healing[0], healEffect.healing[1], 'Mother Nature HP Heal');
+        const mpHeal = rollDice(healEffect.healing[0], healEffect.healing[1], 'Mother Nature MP Heal');
+        player.hp = Math.min(player.maxHp, player.hp + hpHeal);
+        player.mp = Math.min(player.maxMp, player.mp + mpHeal);
+        addToLog(`Nature's blessing restores <span class="font-bold text-green-400">${hpHeal}</span> HP and <span class="font-bold text-blue-400">${mpHeal}</span> MP.`, 'text-teal-300');
+    }
+
+
     for (const effectKey in effects) {
         if (effects[effectKey].duration) {
             effects[effectKey].duration--;
             if (effects[effectKey].duration <= 0) {
                 delete effects[effectKey];
-                addToLog(`Your ${effectKey} has worn off.`);
+                addToLog(`Your ${effectKey.replace('buff_', '').replace('_', ' ')} has worn off.`);
             }
         }
     }
@@ -540,7 +691,7 @@ function handleEnemyEndOfTurn(enemy) {
             effects[effectKey].duration--;
             if(effects[effectKey].duration <= 0) {
                 delete effects[effectKey];
-                addToLog(`${enemy.name} is no longer ${effectKey}.`);
+                addToLog(`${enemy.name} is no longer ${effectKey.replace('debuff_', '').replace('_', ' ')}.`);
             }
         }
     }
@@ -551,6 +702,12 @@ function enemyTurn() {
     if (!player.isAlive()) {
         checkPlayerDeath();
         return;
+    }
+
+    if (player.statusEffects.buff_haste || player.statusEffects.buff_hermes) {
+        addToLog("Your haste allows you to act again immediately!", "text-cyan-300 font-bold");
+        setTimeout(() => endPlayerTurnPhase(), 500);
+        return; // Skip the rest of the enemy turn
     }
 
     let turnDelay = 500;
@@ -746,7 +903,4 @@ function addToGraveyard(deadPlayer, killer) {
     }
     localStorage.setItem('rpgGraveyard', JSON.stringify(graveyard));
 }
-
-
-
 

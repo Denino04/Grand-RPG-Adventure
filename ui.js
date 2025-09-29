@@ -3,6 +3,7 @@ const $ = (selector) => document.querySelector(selector);
 const logElement = $('#game-log');
 const mainView = $('#main-view');
 
+
 function capitalize(str) {
     if (!str) return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
@@ -20,7 +21,7 @@ function rollDice(numDice, sides, purpose = 'Generic Roll') {
     return total; 
 }
 function addToLog(message, colorClass = '') { const p = document.createElement('p'); p.innerHTML = message; p.className = `mb-1 ${colorClass}`; logElement.appendChild(p); logElement.scrollTop = logElement.scrollHeight; }
-function getItemDetails(itemKey) { if (itemKey in ITEMS) return ITEMS[itemKey]; if (itemKey in WEAPONS) return WEAPONS[itemKey]; if (itemKey in CATALYSTS) return CATALYSTS[itemKey]; if (itemKey in ARMOR) return ARMOR[itemKey]; if (itemKey in SHIELDS) return SHIELDS[itemKey]; if (itemKey in LURES) return LURES[itemKey]; if (itemKey in MAGIC) return MAGIC[itemKey]; return null; }
+function getItemDetails(itemKey) { if (itemKey in ITEMS) return ITEMS[itemKey]; if (itemKey in WEAPONS) return WEAPONS[itemKey]; if (itemKey in CATALYSTS) return CATALYSTS[itemKey]; if (itemKey in ARMOR) return ARMOR[itemKey]; if (itemKey in SHIELDS) return SHIELDS[itemKey]; if (itemKey in LURES) return LURES[itemKey]; return null; }
 function render(viewElement) { 
     hideTooltip();
     mainView.innerHTML = ''; 
@@ -34,6 +35,20 @@ function toggleDebug() {
     const panel = $('#debug-panel');
     panel.classList.toggle('hidden', !isDebugVisible);
     if (isDebugVisible) {
+        // --- Dynamically add the effective stats container if it doesn't exist ---
+        if (!$('#debug-effective-stats-container')) {
+            const modifyStatsTitle = Array.from(panel.querySelectorAll('h4')).find(h => h.textContent === 'Modify Stats');
+            if (modifyStatsTitle) {
+                const container = document.createElement('div');
+                container.id = 'debug-effective-stats-container';
+                container.innerHTML = `
+                    <hr class="my-2 border-gray-600">
+                    <h4 class="font-bold mb-2">Active Effects & Stat Changes</h4>
+                    <div id="debug-effective-stats" class="text-xs space-y-1"></div>
+                `;
+                modifyStatsTitle.before(container);
+            }
+        }
         updateDebugView();
         updateDebugAddItemOptions();
         populateDebugStatInputs();
@@ -42,16 +57,78 @@ function toggleDebug() {
 
 function updateDebugView() {
     if (!isDebugVisible || !player) return;
+    // Raw JSON data
     const content = {
         player: player,
         gameState: gameState,
         currentEnemies: currentEnemies
     };
     $('#debug-content').textContent = JSON.stringify(content, (key, value) => {
-        // A replacer function to handle circular structures if any arise
         if (key === 'swallower') return value ? `Enemy(${value.name})` : value;
         return value;
     }, 2);
+
+    // Display active effects and calculated stat changes
+    const statsDiv = $('#debug-effective-stats');
+    if (!statsDiv) return;
+
+    const effects = player.statusEffects;
+    
+    // --- Calculate Effective Stats ---
+    let effectiveStrength = player.strength;
+    let effectiveDefense = (player.equippedArmor?.defense || 0) + (player.equippedShield?.defense || 0);
+
+    for (const key in effects) {
+        const effect = effects[key];
+        
+        // Handle strength multipliers
+        if (effect.strMultiplier) {
+            effectiveStrength = Math.floor(effectiveStrength * effect.strMultiplier);
+        } else if (key === 'strength' && effect.multiplier) { // For older strength potion effect
+            effectiveStrength = Math.floor(effectiveStrength * effect.multiplier);
+        }
+        
+        // Handle defense multipliers
+        if (effect.defMultiplier) {
+            effectiveDefense = Math.floor(effectiveDefense * effect.defMultiplier);
+        } else if (key === 'stonehide' && effect.multiplier) {
+             effectiveDefense = Math.floor(effectiveDefense * effect.multiplier);
+        }
+    }
+
+    // --- Build HTML ---
+    let statsHtml = '<ul class="list-disc list-inside mb-2">';
+    
+    // Strength
+    statsHtml += `<li>Strength: ${player.strength}`;
+    if (effectiveStrength !== player.strength) {
+        statsHtml += ` -> <strong class="text-green-400">${effectiveStrength}</strong>`;
+    }
+    statsHtml += '</li>';
+
+    // Defense
+    let baseDefense = (player.equippedArmor?.defense || 0) + (player.equippedShield?.defense || 0);
+    statsHtml += `<li>Defense: ${baseDefense}`;
+    if (effectiveDefense !== baseDefense) {
+        statsHtml += ` -> <strong class="text-green-400">${effectiveDefense}</strong>`;
+    }
+    statsHtml += '</li>';
+    
+    statsHtml += '</ul>';
+
+    let effectsHtml = '<hr class="my-1 border-gray-600"><p class="font-semibold">Active Effects:</p><ul class="list-disc list-inside">';
+    let hasEffects = false;
+    for (const key in effects) {
+        hasEffects = true;
+        const effect = effects[key];
+        effectsHtml += `<li><span class="font-semibold text-yellow-300">${capitalize(key)}</span> (Duration: ${effect.duration || '∞'})</li>`;
+    }
+    if (!hasEffects) {
+        effectsHtml += '<li>None</li>';
+    }
+    effectsHtml += '</ul>';
+
+    statsDiv.innerHTML = statsHtml + effectsHtml;
 }
 
 function updateDebugAddItemOptions() {
@@ -185,66 +262,45 @@ function applyTheme(themeName = 'default') {
 
 
 // --- TOOLTIP FUNCTIONS ---
+let activeTooltipItem = null;
 function showTooltip(itemKey, event) {
     const tooltipElement = $('#tooltip');
     if (event.type === 'click' && tooltipElement.style.display === 'block' && activeTooltipItem === itemKey) {
         hideTooltip();
         return;
     }
-    
-    const details = getItemDetails(itemKey);
-    if (!details) return;
 
-    let content = `<h4 class="font-bold mb-1" style="color: var(--text-accent);">${details.name}</h4>`;
-    
-    if (details.damage) content += `<p>Damage: ${details.damage[0]}d${details.damage[1]}</p>`;
-    if (details.defense) content += `<p>Defense: ${details.defense}</p>`;
-    if (details.blockChance > 0) content += `<p>Block Chance: ${Math.round(details.blockChance * 100)}%</p>`;
-    if (details.effect?.type === 'dodge') content += `<p>Dodge Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
-    if (details.effect?.type === 'parry') content += `<p>Parry Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
-    if (details.amount && details.type !== 'mana_restore') content += `<p class="text-green-400">Heals: ${details.amount} HP</p>`; 
-    if (details.type === 'mana_restore') content += `<p class="text-blue-400">Restores: ${details.amount} MP</p>`;
-    if (details.cost) content += `<p class="text-blue-400">MP Cost: ${details.cost}</p>`;
-    if (details.healing) content += `<p class="text-green-400">Healing: ${details.healing[0]}d${details.healing[1]}</p>`;
-    if (details.uses) {
-       content += `<p class="text-purple-300">Uses: ${details.uses}</p>`;
-    }
-    content += `<p class="text-gray-400 mt-2 text-sm"><em>${details.description}</em></p>`;
-    
-    if (details.effect || details.type === 'buff' || details.type === 'cleanse') {
-        content += `<p class="mt-2 font-semibold text-cyan-300">Special Properties:</p><ul class="list-disc list-inside text-sm">`
-        if (details.effect?.type === 'fire_damage') content += `<li>Deals an extra ${details.effect.damage[0]}d${details.effect.damage[1]} Fire Damage.</li>`;
-        if (details.effect?.type === 'lightning_damage') content += `<li>Deals an extra ${details.effect.damage[0]}d${details.effect.damage[1]} Lightning Damage.</li>`;
-        if (details.effect?.type === 'lifesteal') content += `<li>Heals for ${details.effect.amount * 100}% of damage dealt.</li>`;
-        if (details.effect?.type === 'crit') content += `<li>${details.effect.chance * 100}% chance to deal ${details.effect.multiplier}x damage.</li>`;
-        if (details.effect?.type === 'ignore_defense') content += `<li>Ignores ${details.effect.amount * 100}% of enemy defense.</li>`;
-        if (details.effect?.type === 'ranged') content += `<li>Ranged: Causes enemies to have a ${details.effect.chance * 100}% chance to miss.</li>`;
-        if (details.effect?.petrify_chance) content += `<li>${details.effect.petrify_chance * 100}% chance to Petrify for ${details.effect.duration} turn.</li>`;
-        if (details.effect?.type === 'paralyze') content += `<li>${details.effect.chance * 100}% chance to Paralyze for ${details.effect.duration} turn.</li>`;
-        if (details.effect?.type === 'parry') content += `<li>Grants a chance to parry, negating damage and launching a counter-attack.</li>`;
-        if (details.effect?.type === 'dodge') content += `<li>${details.effect.chance * 100}% chance to completely evade an attack.</li>`;
-        if (details.effect?.type === 'debuff_resist') content += `<li>${details.effect.chance * 100}% chance to resist negative status effects.</li>`;
-        if (details.effect?.type === 'reflect') content += `<li>Reflects ${details.effect.amount * 100}% of pre-mitigation damage back at the attacker.</li>`;
-        if (details.effect?.bonus_vs_dragon) content += `<li>Deals ${details.effect.bonus_vs_dragon * 100}% damage to Dragons.</li>`;
-        if (details.effect?.revive) content += `<li>Revives the user to 50% HP upon death. (Once per lifetime)</li>`;
-        if (details.effect?.spell_follow_up) content += `<li>Follows up any spell cast with a physical attack.</li>`;
-        if (details.effect?.spell_amp) content += `<li>Increases spell damage dice by ${details.effect.spell_amp}.</li>`;
-        if (details.effect?.mana_discount) content += `<li>Reduces spell mana cost by ${details.effect.mana_discount}.</li>`;
-        if (details.effect?.hp_regen) content += `<li>Regenerates ${details.effect.hp_regen} HP per turn.</li>`;
-        if (details.effect?.mana_regen) content += `<li>Regenerates ${details.effect.mana_regen} MP per turn.</li>`;
-        if (details.effect?.spell_crit_chance) content += `<li>Grants a ${details.effect.spell_crit_chance * 100}% chance for spells to critically strike for ${details.effect.spell_crit_multiplier}x damage.</li>`;
-        if (details.effect?.heal_amp) content += `<li>Increases healing from spells by ${(details.effect.heal_amp - 1) * 100}%.</li>`;
-        if (details.type === 'buff') {
-            let effectText = `Increases ${details.effect.type} by ${ (details.effect.multiplier - 1) * 100}% for ${details.effect.duration} turns.`;
-            if (details.effect.type === 'stonehide') {
-                 effectText = `Increases defense by ${ (details.effect.multiplier - 1) * 100}% for ${details.effect.duration} turns.`;
-            }
-            content += `<li>${effectText}</li>`;
-        }
-        if (details.type === 'cleanse') {
-            content += `<li>Removes all negative status effects.</li>`;
-        }
-        content += `</ul>`
+    let details;
+    let content = '';
+
+    // Handle Spells separately
+    if (itemKey in SPELLS) {
+        const spellTree = SPELLS[itemKey];
+        const playerSpell = player.spells[itemKey];
+        const tier = playerSpell ? playerSpell.tier : 1;
+        details = spellTree.tiers[tier - 1];
+
+        content = `<h4 class="font-bold mb-1" style="color: var(--text-accent);">${details.name} (Tier ${tier})</h4>`;
+        content += `<p class="text-xs text-gray-400 mb-2">${capitalize(spellTree.element)} / ${spellTree.type.toUpperCase()}</p>`;
+        if (details.damage) content += `<p>Power: ${details.damage[0]}d${details.damage[1]} (Cap: ${details.cap} dice)</p>`;
+        if (details.cost) content += `<p class="text-blue-400">MP Cost: ${details.cost}</p>`;
+        if (details.splash) content += `<p>Splash Damage: ${details.splash * 100}%</p>`;
+        if (details.description) content += `<p class="text-gray-400 mt-2 text-sm"><em>${details.description}</em></p>`;
+
+    } else { // Handle Items and Equipment
+        details = getItemDetails(itemKey);
+        if (!details) return;
+
+        content = `<h4 class="font-bold mb-1" style="color: var(--text-accent);">${details.name}</h4>`;
+        if (details.damage) content += `<p>Damage: ${details.damage[0]}d${details.damage[1]}</p>`;
+        if (details.defense) content += `<p>Defense: ${details.defense}</p>`;
+        if (details.blockChance > 0) content += `<p>Block Chance: ${Math.round(details.blockChance * 100)}%</p>`;
+        if (details.effect?.type === 'dodge') content += `<p>Dodge Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
+        if (details.effect?.type === 'parry') content += `<p>Parry Chance: ${Math.round(details.effect.chance * 100)}%</p>`;
+        if (details.amount && details.type === 'healing') content += `<p class="text-green-400">Heals: ${details.amount} HP</p>`;
+        if (details.type === 'mana_restore') content += `<p class="text-blue-400">Restores: ${details.amount} MP</p>`;
+        if (details.uses) content += `<p class="text-purple-300">Uses: ${details.uses}</p>`;
+        content += `<p class="text-gray-400 mt-2 text-sm"><em>${details.description}</em></p>`;
     }
 
     tooltipElement.innerHTML = content;
@@ -380,7 +436,10 @@ function returnFromInventory() {
         case 'town': renderTown(); break;
         case 'quest_board': renderQuestBoard(); break;
         case 'inn': renderInn(); break;
-        case 'magic_shop': renderMagicShop(); break;
+        case 'sage_tower_train': renderSageTowerTrain(); break;
+        case 'sage_tower_menu': renderSageTowerMenu(); break; 
+        case 'sage_tower_buy': renderSageTowerBuy(); break;
+        case 'sage_tower_craft': renderSageTowerCraft(); break;
         case 'shop': renderShop('store'); break;
         case 'blacksmith': renderShop('blacksmith'); break;
         case 'black_market': renderShop('black_market'); break;
@@ -465,7 +524,7 @@ function renderTown() {
         { name: 'General Store', action: "renderShop('store')" }, 
         { name: 'Blacksmith', action: "renderShop('blacksmith')" }, 
         { name: 'Black Market', action: "renderShop('black_market')" },
-        { name: 'Magic Shop', action: "renderMagicShop()" }, 
+        { name: "Sage's Tower", action: "renderSageTowerMenu()" }, 
         { name: 'Alchemist', action: "renderAlchemist()" }, 
         { name: 'Quest Board', action: "renderQuestBoard()" },
         { name: 'The Inn', action: "renderInn()" }, 
@@ -548,6 +607,241 @@ function renderTown() {
     render(container);
 }
 
+function renderSageTowerMenu() {
+    lastViewBeforeInventory = 'sage_tower_menu';
+    gameState.currentView = 'sage_tower_menu';
+
+    let html = `
+        <div class="w-full text-center">
+            <h2 class="font-medieval text-3xl mb-4 text-center">Sage's Tower</h2>
+            <p class="mb-6">The ancient sage offers knowledge of spells and arcane catalysts.</p>
+            <div class="flex flex-col md:flex-row justify-center items-center gap-4">
+                <button onclick="renderSageTowerTrain()" class="btn btn-magic w-full md:w-auto">Train Spells</button>
+                <button onclick="renderSageTowerBuy()" class="btn btn-primary w-full md:w-auto">Purchase Catalysts</button>
+                <button onclick="renderSageTowerCraft()" class="btn btn-primary w-full md:w-auto">Synthesize Catalysts</button>
+            </div>
+             <div class="mt-8">
+                <button onclick="renderTown()" class="btn btn-action">Back to Town</button>
+            </div>
+        </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+function renderSageTowerTrain() {
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
+    lastViewBeforeInventory = 'sage_tower_train';
+    gameState.currentView = 'sage_tower_train';
+    let html = `
+        <div class="text-center w-full">
+            <h2 class="font-medieval text-3xl mb-4">Train Spells</h2>
+            <p class="text-gray-400 mb-6">Here you can learn new spells or upgrade existing ones.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-left max-h-[400px] overflow-y-auto p-2 inventory-scrollbar">
+    `;
+
+    const spellsByElement = {};
+    for (const spellKey in SPELLS) {
+        const spellData = SPELLS[spellKey];
+        if (!spellsByElement[spellData.element]) {
+            spellsByElement[spellData.element] = [];
+        }
+        spellsByElement[spellData.element].push({ key: spellKey, data: spellData });
+    }
+    
+    const elementOrder = ['none', 'fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'dark', 'healing'];
+
+    elementOrder.forEach(element => {
+        if (spellsByElement[element]) {
+            html += `<div class="col-span-1 md:col-span-2 lg:col-span-3"><h3 class="font-bold text-xl text-yellow-300 capitalize mt-4 border-b border-gray-600">${element}</h3></div>`;
+            
+            spellsByElement[element].forEach(spellItem => {
+                const spellKey = spellItem.key;
+                const spellData = spellItem.data;
+                const playerSpell = player.spells[spellKey];
+
+                if (!playerSpell) {
+                    const firstTier = spellData.tiers[0];
+                    const learnCost = spellData.learnCost || 0;
+                    html += `
+                        <div class="bg-slate-800 p-4 rounded-lg" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${spellKey}', event)">
+                            <h4 class="font-bold text-lg">${firstTier.name} (Unlearned)</h4>
+                            <p class="text-sm text-gray-400">${capitalize(element)} / ${spellData.type.toUpperCase()}</p>
+                            <button onclick="upgradeSpell('${spellKey}')" class="btn btn-primary mt-2 w-full" ${player.gold < learnCost ? 'disabled' : ''}>Learn (${learnCost} G)</button>
+                        </div>
+                    `;
+                } else {
+                    const currentTierIndex = playerSpell.tier - 1;
+                    const currentTier = spellData.tiers[currentTierIndex];
+                    const isMaxTier = currentTierIndex >= spellData.tiers.length - 1;
+
+                    let buttonHtml = '';
+                    let requirementsHtml = '';
+
+                    if (isMaxTier) {
+                        buttonHtml = `<button class="btn btn-primary mt-2 w-full" disabled>Max Tier</button>`;
+                    } else {
+                        const nextTier = spellData.tiers[currentTierIndex + 1];
+                        const upgradeCost = currentTier.upgradeCost;
+                        const requiredEssences = currentTier.upgradeEssences || {};
+                        
+                        let hasAllMaterials = player.gold >= upgradeCost;
+                        let essenceReqs = [];
+
+                        for (const essenceKey in requiredEssences) {
+                            const requiredAmount = requiredEssences[essenceKey];
+                            const playerAmount = player.inventory.items[essenceKey] || 0;
+                            if (playerAmount < requiredAmount) {
+                                hasAllMaterials = false;
+                            }
+                            essenceReqs.push(`${requiredAmount}x ${getItemDetails(essenceKey).name}`);
+                        }
+
+                        requirementsHtml = `<p class="text-xs text-gray-400 mt-2">Cost: ${upgradeCost} G, ${essenceReqs.join(', ')}</p>`;
+                        buttonHtml = `<button onclick="upgradeSpell('${spellKey}')" class="btn btn-primary mt-2 w-full" ${!hasAllMaterials ? 'disabled' : ''}>Upgrade to ${nextTier.name}</button>`;
+                    }
+
+                    html += `
+                        <div class="bg-slate-800 p-4 rounded-lg border border-yellow-500" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${spellKey}', event)">
+                             <h4 class="font-bold text-lg">${currentTier.name} <span class="text-sm text-gray-400">(Tier ${playerSpell.tier})</span></h4>
+                             <p class="text-sm text-gray-400">${capitalize(element)} / ${spellData.type.toUpperCase()}</p>
+                             <p class="text-xs mt-2">${currentTier.description || ''}</p>
+                            ${requirementsHtml}
+                            ${buttonHtml}
+                        </div>
+                    `;
+                }
+            });
+        }
+    });
+
+    html += `
+            </div>
+            <div class="mt-8">
+                <button onclick="renderSageTowerMenu()" class="btn btn-action">Back</button>
+            </div>
+        </div>
+    `;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
+}
+
+function renderSageTowerBuy() {
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
+    lastViewBeforeInventory = 'sage_tower_buy';
+    gameState.currentView = 'sage_tower_buy';
+
+    let itemsHtml = '';
+    const catalystInventory = { 'Catalysts': MAGIC_SHOP_INVENTORY['Catalysts'] || [] };
+
+    for (const category in catalystInventory) {
+        if (catalystInventory[category].length === 0) continue;
+        itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
+        itemsHtml += '<div class="space-y-2">';
+        catalystInventory[category].forEach(key => {
+            const details = getItemDetails(key);
+            if (!details) return;
+            const price = details.price;
+            itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${price} G</span><button onclick="buyItem('${key}', 'sage_tower_buy', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button></div></div>`;
+        });
+        itemsHtml += '</div>';
+    }
+
+    if (!itemsHtml) {
+        itemsHtml = `<p class="text-center text-gray-400">The sage has no catalysts for sale at the moment.</p>`;
+    }
+
+    let html = `<div class="w-full">
+                    <h2 class="font-medieval text-3xl mb-4 text-center">Purchase Catalysts</h2>
+                    <div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div>
+                    <div class="flex justify-center gap-4 mt-4">
+                        <button onclick="renderSageTowerMenu()" class="btn btn-primary">Back</button>
+                    </div>
+                </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
+}
+
+function renderSageTowerCraft() {
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
+    lastViewBeforeInventory = 'sage_tower_craft';
+    gameState.currentView = 'sage_tower_craft';
+
+    let recipesHtml = '';
+    for (const recipeKey in MAGIC_SHOP_RECIPES) {
+        const recipe = MAGIC_SHOP_RECIPES[recipeKey];
+        const productDetails = getItemDetails(recipe.output);
+        
+        let hasIngredients = true;
+        let ingredientsList = [];
+        for (const ingredientKey in recipe.ingredients) {
+            const requiredAmount = recipe.ingredients[ingredientKey];
+            
+            let playerAmount = 0;
+            if (ITEMS[ingredientKey]) {
+                 playerAmount = player.inventory.items[ingredientKey] || 0;
+            } else if (ARMOR[ingredientKey]) {
+                playerAmount = player.inventory.armor.filter(i => i === ingredientKey).length;
+            }
+
+            if (playerAmount < requiredAmount) {
+                hasIngredients = false;
+            }
+            const ingredientDetails = getItemDetails(ingredientKey);
+            ingredientsList.push(`<span onmouseover="showTooltip('${ingredientKey}', event)" onmouseout="hideTooltip()">${requiredAmount}x ${ingredientDetails.name}</span>`);
+        }
+
+        const canAfford = player.gold >= recipe.cost;
+        const canCraft = hasIngredients && canAfford;
+
+        recipesHtml += `
+            <div class="p-3 bg-slate-800 rounded-lg">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${recipe.output}', event)" onmouseout="hideTooltip()">${productDetails.name}</h3>
+                    <button onclick="craftGear('${recipeKey}', 'sage_tower_craft')" class="btn btn-primary text-sm py-1 px-3" ${!canCraft ? 'disabled' : ''}>Synthesize</button>
+                </div>
+                <div class="text-sm text-gray-400 mt-1">
+                    <p>Requires: ${ingredientsList.join(', ')}</p>
+                    <p>Cost: <span class="text-yellow-400">${recipe.cost} G</span></p>
+                </div>
+            </div>`;
+    }
+
+    if (!recipesHtml) {
+        recipesHtml = `<p class="text-center text-gray-400">You don't have any catalyst schematics.</p>`;
+    }
+
+    let html = `
+        <div class="w-full">
+            <h2 class="font-medieval text-3xl mb-4 text-center">Catalyst Synthesis</h2>
+            <p class="text-center text-gray-400 mb-4">Fuse powerful catalysts from legendary materials.</p>
+            <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">${recipesHtml}</div>
+            <div class="text-center mt-4">
+                <button onclick="renderSageTowerMenu()" class="btn btn-primary">Back</button>
+            </div>
+        </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
+}
+
 function renderEnchanter(selectedElement = null) {
     lastViewBeforeInventory = 'enchanter';
     gameState.currentView = 'enchanter';
@@ -562,7 +856,7 @@ function renderEnchanter(selectedElement = null) {
     html += `<div class="mb-6 p-4 bg-slate-900/50 rounded-lg">
                 <h3 class="font-bold text-lg text-yellow-300 mb-3 text-center">1. Select an Element</h3>
                 <div class="flex flex-wrap justify-center gap-2">`;
-    const elements = Object.keys(ELEMENTS).filter(e => e !== 'none');
+    const elements = Object.keys(ELEMENTS).filter(e => e !== 'none' && e !== 'healing');
     elements.forEach(key => {
         const isSelected = selectedElement === key;
         html += `<button onclick="renderEnchanter('${key}')" class="btn ${isSelected ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-sm py-1 px-3">${capitalize(key)}</button>`;
@@ -719,134 +1013,7 @@ function renderInn() {
     render(container);
 }
 
-function renderMagicShop() {
-    lastViewBeforeInventory = 'magic_shop';
-    gameState.currentView = 'magic_shop';
-
-    let html = `
-        <div class="w-full text-center">
-            <h2 class="font-medieval text-3xl mb-4 text-center">Whispering Grimoire</h2>
-            <p class="mb-6">The air crackles with arcane energy. What do you seek?</p>
-            <div class="flex flex-col md:flex-row justify-center items-center gap-4">
-                <button onclick="renderMagicShopBuy()" class="btn btn-primary w-full md:w-auto">Buy Spells & Catalysts</button>
-                <button onclick="renderMagicShopCraft()" class="btn btn-primary w-full md:w-auto">Synthesize Catalyst</button>
-                <button onclick="renderTown()" class="btn btn-primary w-full md:w-auto">Back to Town</button>
-            </div>
-        </div>`;
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    render(container);
-}
-
-function renderMagicShopBuy() { 
-    const scrollable = mainView.querySelector('.inventory-scrollbar');
-    const scrollPos = scrollable ? scrollable.scrollTop : 0;
-
-    lastViewBeforeInventory = 'magic_shop';
-    gameState.currentView = 'magic_shop'; 
-    
-    let itemsHtml = '';
-    for (const category in MAGIC_SHOP_INVENTORY) {
-        if (MAGIC_SHOP_INVENTORY[category].length === 0) continue;
-        itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
-        itemsHtml += '<div class="space-y-2">';
-        MAGIC_SHOP_INVENTORY[category].forEach(key => {
-            const details = getItemDetails(key);
-            if (!details) return;
-
-            let buttonHtml;
-            if (category === 'Spells') {
-                const learned = player.spells.includes(key);
-                buttonHtml = `<button onclick="learnSpell('${key}')" class="btn btn-magic text-sm py-1 px-3" ${player.gold < details.price || learned ? 'disabled' : ''}>${learned ? 'Learned' : 'Learn'}</button>`;
-            } else {
-                buttonHtml = `<button onclick="buyItem('${key}', 'magic', ${details.price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < details.price ? 'disabled' : ''}>Buy</button>`;
-            }
-
-            itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${details.price} G</span>${buttonHtml}</div></div>`;
-        });
-        itemsHtml += '</div>';
-    }
-
-    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">Arcane Wares</h2><p class="text-center text-gray-400 mb-4">Purchase spells and catalysts to aid you in your journey.</p><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4"><button onclick="renderMagicShop()" class="btn btn-primary">Back</button></div></div>`;
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    render(container);
-
-    const newScrollable = mainView.querySelector('.inventory-scrollbar');
-    if (newScrollable) newScrollable.scrollTop = scrollPos;
-}
-
-function renderMagicShopCraft() {
-    const scrollable = mainView.querySelector('.inventory-scrollbar');
-    const scrollPos = scrollable ? scrollable.scrollTop : 0;
-
-    let recipesHtml = '';
-    for (const recipeKey in MAGIC_SHOP_RECIPES) {
-        const recipe = MAGIC_SHOP_RECIPES[recipeKey];
-        const productDetails = getItemDetails(recipe.output);
-        
-        let hasIngredients = true;
-        let ingredientsList = [];
-        for (const ingredientKey in recipe.ingredients) {
-            const requiredAmount = recipe.ingredients[ingredientKey];
-            
-            let playerAmount = 0;
-            if (ITEMS[ingredientKey]) {
-                 playerAmount = player.inventory.items[ingredientKey] || 0;
-            } else if (ARMOR[ingredientKey]) {
-                playerAmount = player.inventory.armor.filter(i => i === ingredientKey).length;
-            }
-
-            if (playerAmount < requiredAmount) {
-                hasIngredients = false;
-            }
-            const ingredientDetails = getItemDetails(ingredientKey);
-            ingredientsList.push(`<span onmouseover="showTooltip('${ingredientKey}', event)" onmouseout="hideTooltip()">${requiredAmount}x ${ingredientDetails.name}</span>`);
-        }
-
-        const canAfford = player.gold >= recipe.cost;
-        const canCraft = hasIngredients && canAfford;
-
-        recipesHtml += `
-            <div class="p-3 bg-slate-800 rounded-lg">
-                <div class="flex justify-between items-center">
-                    <h3 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${recipe.output}', event)" onmouseout="hideTooltip()">${productDetails.name}</h3>
-                    <button onclick="craftGear('${recipeKey}', 'magic')" class="btn btn-primary text-sm py-1 px-3" ${!canCraft ? 'disabled' : ''}>Synthesize</button>
-                </div>
-                <div class="text-sm text-gray-400 mt-1">
-                    <p>Requires: ${ingredientsList.join(', ')}</p>
-                    <p>Cost: <span class="text-yellow-400">${recipe.cost} G</span></p>
-                </div>
-            </div>`;
-    }
-
-    if (!recipesHtml) {
-        recipesHtml = `<p class="text-center text-gray-400">You don't have any catalyst schematics.</p>`;
-    }
-
-    let html = `
-        <div class="w-full">
-            <h2 class="font-medieval text-3xl mb-4 text-center">Catalyst Synthesis</h2>
-            <p class="text-center text-gray-400 mb-4">Fuse powerful catalysts from legendary materials.</p>
-            <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">${recipesHtml}</div>
-            <div class="text-center mt-4">
-                <button onclick="renderMagicShop()" class="btn btn-primary">Back</button>
-            </div>
-        </div>`;
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    render(container);
-
-    const newScrollable = mainView.querySelector('.inventory-scrollbar');
-    if (newScrollable) newScrollable.scrollTop = scrollPos;
-}
-
 function renderShop(type) {
-    if (type === 'blacksmith') {
-        renderBlacksmithMenu();
-        return;
-    }
-
     const scrollable = mainView.querySelector('.inventory-scrollbar');
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
 
@@ -1267,9 +1434,34 @@ function renderInventory() {
             }
             return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr} ${equippedText}</span>${buttonHtml}</div>`; }).join(''); 
             html += `</div>`; 
-            return html; 
+        return html; 
     }; 
-    const renderSpellbook = () => { let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-purple-300">Spellbook</h3><div class="space-y-2">`; if (player.spells.length === 0) { html += `<p class="text-gray-400">You have not learned any spells.</p>`; } else { html += player.spells.map(key => { const details = MAGIC[key]; return `<div class="p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><div class="flex justify-between items-center"><span class="font-bold text-purple-200">${details.name}</span><span class="text-blue-400">${details.cost} MP</span></div><p class="text-sm text-gray-400 mt-1">${details.description}</p></div>`; }).join(''); } html += `</div>`; return html; }; 
+    const renderSpellbook = () => {
+        let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-purple-300">Spellbook</h3><div class="space-y-2">`;
+        const knownSpells = Object.keys(player.spells);
+        if (knownSpells.length === 0) {
+            html += `<p class="text-gray-400">You have not learned any spells.</p>`;
+        } else {
+            knownSpells.forEach(key => {
+                const spellTree = SPELLS[key];
+                if (!spellTree) { // Defensive check for old/invalid spell keys in save data
+                    console.warn(`Spell key "${key}" not found in SPELLS data. Skipping render.`);
+                    return;
+                }
+                const playerSpell = player.spells[key];
+                const details = spellTree.tiers[playerSpell.tier - 1];
+                html += `<div class="p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-purple-200">${details.name} (Tier ${playerSpell.tier})</span>
+                                <span class="text-blue-400">${details.cost} MP</span>
+                            </div>
+                            <p class="text-sm text-gray-400 mt-1">${details.description || ''}</p>
+                         </div>`;
+            });
+        }
+        html += `</div>`;
+        return html;
+    };
     let html = `
         <div class="w-full text-left">
             <h2 class="font-medieval text-3xl mb-4 text-center">Inventory & Spells</h2>
@@ -1356,8 +1548,15 @@ function renderBattle(subView = 'main', actionData = null) {
         container.innerHTML = html;
         render(container);
      } else if (subView === 'magic') {
-        let spellsHtml = player.spells.map(key => { const spell = MAGIC[key]; const canCast = player.mp >= spell.cost; return `<button onclick="battleAction('magic_select', {spellKey: '${key}'})" class="btn btn-magic w-full text-left" ${!canCast ? 'disabled' : ''} onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"><div class="flex justify-between"><span>${spell.name}</span><span>${spell.cost} MP</span></div></button>`; }).join('');
-        let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Cast a Spell</h2><div class="grid grid-cols-2 gap-2 mb-4">${spellsHtml}</div><button onclick="renderBattle('main')" class="btn btn-primary">Back</button>`;
+        let spellsHtml = Object.keys(player.spells).map(key => {
+            const spellTree = SPELLS[key];
+            const spell = spellTree.tiers[player.spells[key].tier - 1];
+            const canCast = player.mp >= spell.cost;
+            return `<button onclick="battleAction('magic_select', {spellKey: '${key}'})" class="btn btn-magic w-full text-left" ${!canCast ? 'disabled' : ''} onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
+                        <div class="flex justify-between"><span>${spell.name}</span><span>${spell.cost} MP</span></div>
+                    </button>`;
+        }).join('');
+        let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Cast a Spell</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">${spellsHtml}</div><button onclick="renderBattle('main')" class="btn btn-primary">Back</button>`;
         const container = document.createElement('div');
         container.innerHTML = html;
         render(container);
@@ -1469,4 +1668,8 @@ function renderChangelog() {
     
     changelogScreen.innerHTML = html;
 }
+
+
+
+
 

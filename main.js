@@ -3,7 +3,7 @@ let player;
 let currentEnemies = [];
 let gameState = { currentView: 'main_menu', isPlayerTurn: true, currentBiome: null, playerIsDying: false };
 let lastViewBeforeInventory = 'main_menu';
-let activeTooltipItem = null;
+// let activeTooltipItem = null; // This was the duplicate declaration
 let isDebugVisible = false;
 
 // --- INITIALIZATION ---
@@ -161,6 +161,22 @@ function loadGameFromKey(saveKey) {
             player = new Player(parsedData.name); 
             Object.assign(player, parsedData); 
 
+            // --- Clean invalid spells from save data ---
+            if (player.spells) {
+                const originalSpellCount = Object.keys(player.spells).length;
+                for (const spellKey in player.spells) {
+                    if (!SPELLS[spellKey]) {
+                        delete player.spells[spellKey];
+                        console.warn(`Removed unknown spell '${spellKey}' from save data.`);
+                    }
+                }
+                const newSpellCount = Object.keys(player.spells).length;
+                if (newSpellCount < originalSpellCount) {
+                     addToLog(`An unknown or outdated spell was removed from your spellbook.`, 'text-yellow-500');
+                }
+            }
+
+
             // --- Re-link equipped items to the master objects to fix reference issues ---
             const weaponKey = findKeyByName(parsedData.equippedWeapon?.name, WEAPONS) || 'fists';
             player.equippedWeapon = WEAPONS[weaponKey];
@@ -268,6 +284,21 @@ function importSave(saveString) {
         Object.assign(player, parsedData);
         player.saveKey = generateSaveKey(); 
         gameState.playerIsDying = false; 
+
+        // --- Clean invalid spells from save data ---
+        if (player.spells) {
+            const originalSpellCount = Object.keys(player.spells).length;
+            for (const spellKey in player.spells) {
+                if (!SPELLS[spellKey]) {
+                    delete player.spells[spellKey];
+                    console.warn(`Removed unknown spell '${spellKey}' from imported save data.`);
+                }
+            }
+             const newSpellCount = Object.keys(player.spells).length;
+            if (newSpellCount < originalSpellCount) {
+                 addToLog(`An unknown or outdated spell was removed from your spellbook during import.`, 'text-yellow-500');
+            }
+        }
 
         // --- Re-link equipped items to the master objects to fix reference issues ---
         const weaponKey = findKeyByName(parsedData.equippedWeapon?.name, WEAPONS) || 'fists';
@@ -401,6 +432,17 @@ window.addEventListener('load', () => {
     $('#load-game-btn').addEventListener('click', renderLoadMenu); 
     $('#graveyard-btn').addEventListener('click', renderGraveyard); 
     $('#changelog-btn').addEventListener('click', renderChangelog);
+
+    const volumeSlider = $('#volume-slider');
+    if (volumeSlider) {
+        // Set initial slider position from loaded/default volume
+        const savedVolume = localStorage.getItem('rpgGameVolume');
+        volumeSlider.value = savedVolume ? parseFloat(savedVolume) : 0.3;
+        
+        volumeSlider.addEventListener('input', (e) => {
+            setVolume(e.target.value);
+        });
+    }
 
     const keysPressed = new Set();
     document.addEventListener('keydown', (e) => {

@@ -117,7 +117,9 @@ const ELEMENTS = {
     'lightning': { name: 'Lightning', adjective: 'Thundering', weakness: ['earth'], strength: ['water', 'wind'] },
     'nature': { name: 'Nature', adjective: 'Blossoming', weakness: ['fire', 'wind'], strength: ['water', 'earth'] },
     'light': { name: 'Light', adjective: 'Shining', weakness: ['void'], strength: [] },
-    'void': { name: 'Void', adjective: 'Shrouding', weakness: ['light'], strength: [] }
+    'dark': { name: 'Dark', adjective: 'Shrouding', weakness: ['light'], strength: [] }, // Added Dark element
+    'void': { name: 'Void', adjective: 'Abyssal', weakness: ['light'], strength: [] },
+    'healing': { name: 'Healing', adjective: 'Restorative', weakness: [], strength: [] }
 };
 
 const WEAPONS = {
@@ -130,6 +132,7 @@ const WEAPONS = {
     'steel_longsword': { name: 'Steel Longsword', damage: [1, 8], price: 120, rarity: 'Common', description: "A reliable and sturdy sword. The adventurer's best friend." },
     'rapier': { name: 'Rapier', damage: [1, 8], price: 150, rarity: 'Common', description: "A slender, pointed sword for quick, flashy thrusts." },
     'longbow': { name: 'Longbow', damage: [1, 6], price: 100, rarity: 'Common', description: "A standard bow for attacking from a socially acceptable distance.", effect: { type: 'ranged', chance: 0.3 } },
+    'battleaxe': {nane: 'Battleaxe', damage: [1, 10], price: 200, rarity: 'Common', description: "A simple barbaric weapon capable of high level of destruction. Side effect includes prone to getting hit more.", effect: {type: 'dodge', chance: -0.5}},
     
     // Uncommon
     'heavy_greatsword': { name: 'Heavy Greatsword', damage: [2, 6], price: 350, rarity: 'Uncommon', description: "A weighty sword that requires two hands and a can-do attitude." },
@@ -147,7 +150,7 @@ const WEAPONS = {
     // Epic
     'flaming_sword': { name: 'Flaming Sword', damage: [2, 8], price: 3000, rarity: 'Epic', description: "A blade enchanted with an eternal, unquenchable fire. Great for marshmallows, better for monsters.", effect: { type: 'fire_damage', damage: [2, 6] } },
     'vampiric_dagger': { name: 'Vampiric Dagger', damage: [3, 4], price: 3200, rarity: 'Epic', description: "A cursed, blood-drinking dagger that mends the wielder's wounds. Its thirst is never slaked.", effect: { type: 'lifesteal', amount: 0.25 } },
-    'sunderers_battleaxe': { name: 'Sunderer\'s Battleaxe', damage: [3, 6], price: 3500, rarity: 'Epic', description: "An axe of such brutal weight and design that it treats armor like a minor inconvenience.", effect: { type: 'ignore_defense', amount: 0.5 } },
+    'sunderers_battleaxe': { name: 'Sunderer\'s Battleaxe', damage: [3, 6], price: 3500, rarity: 'Epic', description: "An axe of such brutal weight and design that it treats armor like a minor inconvenience.", effect: { ignore_defense: 0.5 } },
     'obsidian_lamina': { name: 'Obsidian Lamina', damage: [2, 6], price: 3300, rarity: 'Epic', description: "A razor-sharp volcanic blade that instinctively finds and exploits any weakness in a foe's defenses. Tends to be overly critical.", effect: { type: 'crit', chance: 0.3, multiplier: 3.0 } },
     'eye_of_medusa': { name: 'Eye of Medusa', damage: [3, 4], price: 4000, rarity: 'Epic', description: "A bow crafted from the petrified remains of a gorgon, its arrows turning flesh to stone. Try not to look directly at it.", effect: { type: 'ranged', chance: 0.3, petrify_chance: 0.3, duration: 1 } },
     
@@ -206,7 +209,7 @@ const ARMOR = {
     'padded_leather': {name: 'Padded Leather', defense: 5, price: 150, rarity: 'Common', description: "Reinforced leather with thick padding underneath. Surprisingly comfy."},
     'chainmail_armor': {name: 'Chainmail Armor', defense: 8, price: 400, rarity: 'Uncommon', description: "A tunic of interlocking metal rings. Heavy, but better than being stabbed."},
     'half_plate_armor': {name: 'Half-Plate Armor', defense: 10, price: 800, rarity: 'Uncommon', description: "A mix of chainmail and solid metal plates, offering good protection with some mobility.", blockChance: 0.10},
-    'silenced_leather_armor': {name: 'Silenced Leather Armor', defense: 5, price: 750, rarity: 'Rare', description: "Specially treated leather that muffles sound, making you unnervingly quiet. Perfect for sneaking up on people... or refrigerators at midnight.", effect: { type: 'dodge', chance: 0.10 }},
+    'silenced_leather_armor': {name: 'Silenced Leather Armor', defense: 3, price: 750, rarity: 'Rare', description: "Specially treated leather that muffles sound, making you unnervingly quiet. Perfect for sneaking up on people... or refrigerators at midnight.", effect: { type: 'dodge', chance: 0.10 }},
     'steel_plate_armor': {name: 'Steel Plate Armor', defense: 15, price: 1500, rarity: 'Rare', description: "A full suit of articulated steel plates. Makes a lot of noise.", blockChance: 0.15},
     'assassin_cloak_armor': {name: 'Assassin Cloak Armor', defense: 5, price: 2000, rarity: 'Epic', description: "Dark, flowing robes with hidden armor plates, designed for evasion and looking mysterious in dark corners.", effect: { type: 'dodge', chance: 0.20 }},
     'archmages_robes': {name: 'Archmage\'s Robes', defense: 8, price: 5000, rarity: 'Epic', description: "Woven with threads of pure mana, these robes constantly regenerate your magical energy and make spells easier to cast. Also surprisingly comfortable.", effect: { mana_regen: 5, mana_discount: 5 }},
@@ -223,7 +226,6 @@ const ITEMS = {
     'mana_potion': {name: 'Mana Potion', type: 'mana_restore', amount: 20, price: 40, description: "A swirling blue liquid that restores magical energy."},
     'condensed_mana_potion': {name: 'Condensed Mana Potion', type: 'mana_restore', amount: 50, price: 100, description: "An oxidized flask containing a potent brew of crushed celestial beetles and distilled shadow essence. It provides a sharp, invigorating shock to the mind, clearing the fog of battle-weariness."},
     'superior_mana_potion': {name: 'Superion Mana Potion', type: 'mana_restore', amount: 100, price: 250, description: "A masterwork of alchemy. The shimmering liquid is pure, crystallized Arcane Energy, providing not just mana, but a momentary conduit to the raw source of magic itself."},
-
     'goblin_ear': {name: 'Goblin Ear', type: 'junk', price: 5, description: "A grotesque trophy."},
     'wolf_pelt': {name: 'Wolf Pelt', type: 'junk', price: 12, description: "A thick and coarse pelt."},
     'rat_tail': {name: 'Rat Tail', type: 'junk', price: 2, description: "It's... a rat tail."},
@@ -260,12 +262,226 @@ const LURES = {
     'bandit_coin': { name: 'Gilded Coin', price: 100, description: 'A shiny coin that seems to attract the greedy eyes of bandits.', lureTarget: 'bandit', uses: 5 },
     'wolf_musk': { name: 'Wolf Musk', price: 75, description: 'A strong musk that draws in nearby wolves.', lureTarget: 'dire_wolf', uses: 5 }
 };
-const MAGIC = {
-    'fireball': {name: 'Fireball', type:'damage', damage: [2, 6], cost: 10, price: 100, element: 'fire', description: 'Hurls a ball of fire at an enemy.'},
-    'lightning_bolt': {name: 'Lightning Bolt', type:'damage', damage: [1, 8], cost: 15, price: 250, element: 'lightning', description: 'Calls down a bolt of lightning.'},
-    'rain_of_arrow': {name: 'Rain of Arrow', type: 'damage', damage: [3, 4], cost: 12, price: 150, element: 'wind', description: 'Summons a rain of arrow that showers the enemy'},
-    'heal': {name: 'Heal', type:'healing', healing: [2, 8], cost: 20, price: 150, element: 'light', description: 'Mends wounds with soothing magic.'},
-    'greater_heal': {name: 'Greater Heal', type:'healing', healing: [4, 6], cost: 50, price: 500, element: 'light', description: 'Let the moonlight embraces you.'}
+
+const SPELLS = {
+    // Non-Elemental
+    'none_st': {
+        element: 'none', type: 'st', learnCost: 250,
+        tiers: [
+            { name: 'Eldritch Blast', cost: 15, damage: [1, 8], cap: 3, upgradeCost: 750, upgradeEssences: { 'fire_essence': 3, 'water_essence': 3 }, description: "A bolt of raw, crackling arcane energy." },
+            { name: 'Bullet of Force', cost: 30, damage: [2, 8], cap: 5, upgradeCost: 3000, upgradeEssences: { 'earth_essence': 5, 'wind_essence': 5 }, description: "A concentrated projectile of pure kinetic force that punches through defenses." },
+            { name: 'Arcane Unleashed', cost: 50, damage: [3, 8], cap: 8, description: "Release a torrent of untamed magical power, overwhelming a single target." }
+        ]
+    },
+    'none_aoe': {
+        element: 'none', type: 'aoe', learnCost: 250,
+        tiers: [
+            { name: 'Magical Grenade', cost: 22, damage: [1, 6], cap: 3, splash: 0.25, upgradeCost: 1000, upgradeEssences: { 'fire_essence': 3, 'water_essence': 3 }, description: "Lob an explosive sphere of magical energy that damages nearby foes." },
+            { name: 'Rain of Arrow', cost: 42, damage: [2, 6], cap: 5, splash: 0.50, upgradeCost: 4000, upgradeEssences: { 'earth_essence': 5, 'wind_essence': 5 }, description: "Summon a volley of phantom arrows to strike multiple enemies." },
+            { name: 'Meteor Shower', cost: 65, damage: [3, 6], cap: 8, splash: 0.75, description: "Call down a cataclysmic shower of meteors to bombard the battlefield." }
+        ]
+    },
+    // Fire
+    'fire_st': {
+        element: 'fire', type: 'st', learnCost: 250,
+        tiers: [
+            { name: 'Fireshot', cost: 18, damage: [1, 8], cap: 3, upgradeCost: 750, upgradeEssences: { 'fire_essence': 5 }, description: "Launch a simple bolt of searing flame at a target." },
+            { name: 'Fire Arrow', cost: 33, damage: [2, 8], cap: 5, upgradeCost: 3000, upgradeEssences: { 'fire_essence': 10 }, description: "Conjure an arrow of pure fire that seeks its target with burning intensity." },
+            { name: 'Divine Blazing Arrow', cost: 55, damage: [3, 8], cap: 8, description: "Unleash a sacred arrow of white-hot fire that purges foes with righteous flame." }
+        ]
+    },
+    'fire_aoe': {
+        element: 'fire', type: 'aoe', learnCost: 250,
+        tiers: [
+            { name: 'Fireball', cost: 27, damage: [1, 6], cap: 3, splash: 0.25, upgradeCost: 1000, upgradeEssences: { 'fire_essence': 5 }, description: "Hurl a classic exploding sphere of fire, engulfing enemies in a fiery blast." },
+            { name: 'Fire Orb', cost: 45, damage: [2, 6], cap: 5, splash: 0.50, upgradeCost: 4000, upgradeEssences: { 'fire_essence': 10 }, description: "Create a slow-moving but intensely hot orb of fire that detonates with great force." },
+            { name: 'Great Chaos Orb', cost: 70, damage: [3, 6], cap: 8, splash: 0.75, description: "Hurl a massive, churning orb of chaotic flame that leaves a pool of lava in its wake." }
+        ]
+    },
+    'fire_support': {
+        element: 'fire', type: 'support', learnCost: 250,
+        tiers: [
+            { name: 'Flame, Grant me Strength', cost: 38, effect: { type: 'buff_strength', multiplier: 1.5, duration: 3 }, description: "Increase strength by 50% for 3 turns.", upgradeCost: 2000, upgradeEssences: { 'fire_essence': 8 } },
+            { name: 'Chaos, Boil my Blood', cost: 60, effect: { type: 'buff_chaos_strength', strMultiplier: 2.0, defMultiplier: 0.5, duration: 3 }, description: "Increase strength by 100% but decrease all defense by 50% for 3 turns." }
+        ]
+    },
+    // Water
+    'water_st': {
+        element: 'water', type: 'st', learnCost: 250,
+        tiers: [
+            { name: 'Water Gun', cost: 18, damage: [1, 8], cap: 3, upgradeCost: 750, upgradeEssences: { 'water_essence': 5 }, description: "Fire a high-pressure jet of water at an enemy." },
+            { name: 'Surging Strike', cost: 33, damage: [2, 8], cap: 5, upgradeCost: 3000, upgradeEssences: { 'water_essence': 10 }, description: "Command a wave to crash down upon a single foe with the ocean's might." },
+            { name: 'Pressurized Water Laser', cost: 55, damage: [3, 8], cap: 8, description: "Focus a stream of water into a razor-thin laser that slices through armor." }
+        ]
+    },
+    'water_aoe': {
+        element: 'water', type: 'aoe', learnCost: 250,
+        tiers: [
+            { name: 'Water Spout', cost: 27, damage: [1, 6], cap: 3, splash: 0.25, upgradeCost: 1000, upgradeEssences: { 'water_essence': 5 }, description: "Summon a whirling spout of water to drench and damage a group of enemies." },
+            { name: 'Water Surf', cost: 45, damage: [2, 6], cap: 5, splash: 0.50, upgradeCost: 4000, upgradeEssences: { 'water_essence': 10 }, description: "Unleash a massive wave that crashes across the battlefield." },
+            { name: 'Grand Flood', cost: 70, damage: [3, 6], cap: 8, splash: 0.75, description: "Inundate the area with a cataclysmic flood, drowning all who stand against you." }
+        ]
+    },
+    'water_support': {
+        element: 'water', type: 'support', learnCost: 250,
+        tiers: [
+            { name: 'Water Sport', cost: 30, effect: { type: 'debuff_strength', multiplier: 0.75, duration: 3 }, description: "Decrease enemies' strength by 25% for 3 turns.", upgradeCost: 2000, upgradeEssences: { 'water_essence': 8 } },
+            { name: 'Deep Sea Protection', cost: 52, effect: { type: 'debuff_strength', multiplier: 0.5, duration: 3 }, description: "Decrease enemies' strength by 50% for 3 turns." }
+        ]
+    },
+    // Earth
+    'earth_st': {
+        element: 'earth', type: 'st', learnCost: 250,
+        tiers: [
+            { name: 'Rock Throw', cost: 18, damage: [1, 8], cap: 3, upgradeCost: 750, upgradeEssences: { 'earth_essence': 5 }, description: "Magically hurl a heavy chunk of rock at a target." },
+            { name: 'Earth\'s Edge', cost: 33, damage: [2, 8], cap: 5, upgradeCost: 3000, upgradeEssences: { 'earth_essence': 10 }, description: "Summon a jagged spear of rock from the ground to impale an enemy." },
+            { name: 'Ferrum Ira Terrae', cost: 55, damage: [3, 8], cap: 8, description: "Manifest the earth's fury, encasing a foe in super-heated, molten iron." }
+        ]
+    },
+    'earth_aoe': {
+        element: 'earth', type: 'aoe', learnCost: 250,
+        tiers: [
+            { name: 'Tremorstrike', cost: 27, damage: [1, 6], cap: 3, splash: 0.25, upgradeCost: 1000, upgradeEssences: { 'earth_essence': 5 }, description: "Slam your power into the ground, creating a localized tremor to stagger nearby foes." },
+            { name: 'Earthquake', cost: 45, damage: [2, 6], cap: 5, splash: 0.50, upgradeCost: 4000, upgradeEssences: { 'earth_essence': 10 }, description: "Shake the very foundations of the earth, causing the ground to rupture and damage your enemies." },
+            { name: 'Ravine Creation', cost: 70, damage: [3, 6], cap: 8, splash: 0.75, description: "Violently tear the earth asunder, crushing all caught within the cataclysm." }
+        ]
+    },
+    'earth_support': {
+        element: 'earth', type: 'support', learnCost: 250,
+        tiers: [
+            { name: 'Rock Heart', cost: 38, effect: { type: 'buff_defense', multiplier: 1.5, duration: 3 }, description: "Increase physical defense by 50% for 3 turns.", upgradeCost: 2000, upgradeEssences: { 'earth_essence': 8 } },
+            { name: 'Titan\'s Blood', cost: 60, effect: { type: 'buff_titan', defMultiplier: 1.5, strMultiplier: 1.5, duration: 3 }, description: "Increase physical defense and damage by 50% for 3 turns." }
+        ]
+    },
+    // Wind
+    'wind_st': {
+        element: 'wind', type: 'st', learnCost: 250,
+        tiers: [
+            { name: 'Gale Shot', cost: 18, damage: [1, 8], cap: 3, upgradeCost: 750, upgradeEssences: { 'wind_essence': 5 }, description: "Fire a compressed blast of cutting wind at an enemy." },
+            { name: 'Wind Drill', cost: 33, damage: [2, 8], cap: 5, upgradeCost: 3000, upgradeEssences: { 'wind_essence': 10 }, description: "Form a rapidly spinning vortex of wind to drill through a target's defenses." },
+            { name: 'Excalibur\'s Edge', cost: 55, damage: [3, 8], cap: 8, description: "Summon a legendary blade of pure wind, so sharp it can slice through reality itself." }
+        ]
+    },
+    'wind_aoe': {
+        element: 'wind', type: 'aoe', learnCost: 250,
+        tiers: [
+            { name: 'Wind Gust', cost: 27, damage: [1, 6], cap: 3, splash: 0.25, upgradeCost: 1000, upgradeEssences: { 'wind_essence': 5 }, description: "Create a powerful gust of wind to buffet and damage a group of foes." },
+            { name: 'Sweeping Edge', cost: 45, damage: [2, 6], cap: 5, splash: 0.50, upgradeCost: 4000, upgradeEssences: { 'wind_essence': 10 }, description: "Unleash a wide, scythe-like blade of wind that cuts across the battlefield." },
+            { name: 'Hurricane Storm', cost: 70, damage: [3, 6], cap: 8, splash: 0.75, description: "Conjure a ferocious hurricane, trapping and shredding enemies in its chaotic embrace." }
+        ]
+    },
+    'wind_support': {
+        element: 'wind', type: 'support', learnCost: 250,
+        tiers: [
+            { name: 'Haste', cost: 45, effect: { type: 'buff_haste', duration: 3 }, description: "Grants an additional attack per turn for 3 turns.", upgradeCost: 2500, upgradeEssences: { 'wind_essence': 8 } },
+            { name: 'Hermes\' Trickery', cost: 75, effect: { type: 'buff_hermes', duration: 3 }, description: "Grants Haste and doubles dodge/block chance for 3 turns." }
+        ]
+    },
+    // Lightning
+    'lightning_st': {
+        element: 'lightning', type: 'st', learnCost: 250,
+        tiers: [
+            { name: 'Honed Bolt', cost: 18, damage: [1, 8], cap: 3, upgradeCost: 750, upgradeEssences: { 'lightning_essence': 5 }, description: "Launch a simple, crackling bolt of lightning." },
+            { name: 'Concentrated Strike', cost: 33, damage: [2, 8], cap: 5, upgradeCost: 3000, upgradeEssences: { 'lightning_essence': 10 }, description: "Call down a focused, super-heated lightning strike on a single target." },
+            { name: 'Wrath of the Sky', cost: 55, damage: [3, 8], cap: 8, description: "Channel the sky's fury, summoning a colossal thunderbolt that obliterates its target." }
+        ]
+    },
+    'lightning_aoe': {
+        element: 'lightning', type: 'aoe', learnCost: 250,
+        tiers: [
+            { name: 'Plasma Pulse', cost: 27, damage: [1, 6], cap: 3, splash: 0.25, upgradeCost: 1000, upgradeEssences: { 'lightning_essence': 5 }, description: "Release a pulse of raw plasma that arcs between nearby enemies." },
+            { name: 'Electromagnetic Barrier', cost: 45, damage: [2, 6], cap: 5, splash: 0.50, upgradeCost: 4000, upgradeEssences: { 'lightning_essence': 10 }, description: "Create a deadly barrier of electricity that shocks all foes in an area." },
+            { name: 'Thundercloud Form', cost: 70, damage: [3, 6], cap: 8, splash: 0.75, description: "Become a living thundercloud, raining down chaotic lightning strikes across the area." }
+        ]
+    },
+    'lightning_support': {
+        element: 'lightning', type: 'support', learnCost: 250,
+        tiers: [
+            { name: 'Unstable Ion', cost: 38, effect: { type: 'buff_ion_self', duration: 3 }, description: "Weapon attacks may chain to another target (including you) for 50% damage.", upgradeCost: 2000, upgradeEssences: { 'lightning_essence': 8 } },
+            { name: 'Thunderbolt Blessings', cost: 68, effect: { type: 'buff_ion_other', duration: 3 }, description: "Weapon attacks may chain to other enemies. Reflect 25% of damage taken." }
+        ]
+    },
+    // Nature
+    'nature_st': {
+        element: 'nature', type: 'st', learnCost: 250,
+        tiers: [
+            { name: 'Vine Strike', cost: 18, damage: [1, 8], cap: 3, upgradeCost: 750, upgradeEssences: { 'nature_essence': 5 }, description: "Command a thorny vine to lash out and strike a foe." },
+            { name: 'Root Assault', cost: 33, damage: [2, 8], cap: 5, upgradeCost: 3000, upgradeEssences: { 'nature_essence': 10 }, description: "Summon thick, gnarled roots to burst from the earth and crush a target." },
+            { name: 'Cage of the Nature', cost: 55, damage: [3, 8], cap: 8, description: "Entrap a foe in a cage of living, thorny wood that constricts and crushes them." }
+        ]
+    },
+    'nature_aoe': {
+        element: 'nature', type: 'aoe', learnCost: 250,
+        tiers: [
+            { name: 'Seed Bomb', cost: 27, damage: [1, 6], cap: 3, splash: 0.25, upgradeCost: 1000, upgradeEssences: { 'nature_essence': 5 }, description: "Hurl a seed that explodes into a burst of thorny shrapnel." },
+            { name: 'Bamboo Field Strike', cost: 45, damage: [2, 6], cap: 5, splash: 0.50, upgradeCost: 4000, upgradeEssences: { 'nature_essence': 10 }, description: "Instantly grow a dense field of razor-sharp bamboo, impaling enemies in an area." },
+            { name: 'Sea of Vines', cost: 70, damage: [3, 6], cap: 8, splash: 0.75, description: "Transform the ground into a writhing sea of thorny vines that tear at all enemies within." }
+        ]
+    },
+    'nature_support': {
+        element: 'nature', type: 'support', learnCost: 250,
+        tiers: [
+            { name: 'Ingrain', cost: 30, effect: { type: 'buff_ingrain', healing: [1, 6], cap: 5, indefinite: true }, description: "Regenerate HP each turn. Disables fleeing.", upgradeCost: 2000, upgradeEssences: { 'nature_essence': 8 } },
+            { name: 'Blessing of Mother Nature', cost: 52, effect: { type: 'buff_mother_nature', healing: [1, 8], cap: 5, indefinite: true }, description: "Regenerate HP and MP each turn. Disables fleeing." }
+        ]
+    },
+    // Light
+    'light_st': {
+        element: 'light', type: 'st', learnCost: 250,
+        tiers: [
+            { name: 'Photon Shot', cost: 18, damage: [1, 8], cap: 3, upgradeCost: 750, upgradeEssences: { 'light_essence': 5 }, description: "Fire a concentrated shot of pure, searing light." },
+            { name: 'Divine Smite', cost: 33, damage: [2, 8], cap: 5, upgradeCost: 3000, upgradeEssences: { 'light_essence': 10 }, description: "Smite an enemy with a column of holy energy, especially effective against the undead." },
+            { name: 'Light Pillar of Heaven', cost: 55, damage: [3, 8], cap: 8, description: "Call down a massive pillar of sacred light from the heavens to purge a target from existence." }
+        ]
+    },
+    'light_aoe': {
+        element: 'light', type: 'aoe', learnCost: 250,
+        tiers: [
+            { name: 'Lantern Spread', cost: 27, damage: [1, 6], cap: 3, splash: 0.25, upgradeCost: 1000, upgradeEssences: { 'light_essence': 5 }, description: "Release a gentle but searing wave of light, like the glow of a lantern." },
+            { name: 'Beacon of Light', cost: 45, damage: [2, 6], cap: 5, splash: 0.50, upgradeCost: 4000, upgradeEssences: { 'light_essence': 10 }, description: "Erupt in a blinding flash of holy light, damaging and staggering nearby foes." },
+            { name: 'Shine of the Archangel', cost: 70, damage: [3, 6], cap: 8, splash: 0.75, description: "Unfurl ethereal wings and release a devastating wave of archangelic power." }
+        ]
+    },
+    'light_support': {
+        element: 'light', type: 'support', learnCost: 250,
+        tiers: [
+            { name: 'Shield of Faith', cost: 38, effect: { type: 'buff_magic_defense', multiplier: 1.5, duration: 3 }, description: "Increase magical defense by 50% for 3 turns.", upgradeCost: 2000, upgradeEssences: { 'light_essence': 8 } },
+            { name: 'Divine Blessings', cost: 60, effect: { type: 'buff_divine', multiplier: 2.0, duration: 3, cleanse: true }, description: "Increase magical defense by 100% for 3 turns and cleanse all debuffs." }
+        ]
+    },
+    // Dark
+    'dark_st': {
+        element: 'dark', type: 'st', learnCost: 250,
+        tiers: [
+            { name: 'Shadow Sneak', cost: 18, damage: [1, 8], cap: 3, upgradeCost: 750, upgradeEssences: { 'void_essence': 5 }, description: "Launch a bolt of living shadow at an enemy." },
+            { name: 'Hex Strike', cost: 33, damage: [2, 8], cap: 5, upgradeCost: 3000, upgradeEssences: { 'void_essence': 10 }, description: "Strike a foe with a debilitating hex that wracks their body with dark energy." },
+            { name: 'Gate of the Underworld', cost: 55, damage: [3, 8], cap: 8, description: "Tear open a momentary rift to the underworld beneath a foe, pulling them toward oblivion." }
+        ]
+    },
+    'dark_aoe': {
+        element: 'dark', type: 'aoe', learnCost: 250,
+        tiers: [
+            { name: 'Shadow Bolt', cost: 27, damage: [1, 6], cap: 3, splash: 0.25, upgradeCost: 1000, upgradeEssences: { 'void_essence': 5 }, description: "Hurl a bolt of shadow that explodes on impact, damaging nearby enemies." },
+            { name: 'Void Engulf', cost: 45, damage: [2, 6], cap: 5, splash: 0.50, upgradeCost: 4000, upgradeEssences: { 'void_essence': 10 }, description: "Engulf an area in a sphere of pure void, draining the life from those within." },
+            { name: 'Black Hole', cost: 70, damage: [3, 6], cap: 8, splash: 0.75, description: "Conjure a miniature black hole that pulls in and crushes all enemies in its vicinity." }
+        ]
+    },
+    'dark_support': {
+        element: 'dark', type: 'support', learnCost: 250,
+        tiers: [
+            { name: 'Shadow Shroud', cost: 45, effect: { type: 'buff_shroud', duration: 3 }, description: "Increase dodge and critical chance by 50% for 3 turns.", upgradeCost: 2500, upgradeEssences: { 'void_essence': 8 } },
+            { name: 'Blessing of Voidwalker', cost: 75, effect: { type: 'buff_voidwalker', duration: 3 }, description: "Grants Shadow Shroud, +50% critical damage, and guaranteed fleeing." }
+        ]
+    },
+    // Healing
+    'healing_st': {
+        element: 'healing', type: 'st', learnCost: 250,
+        tiers: [
+            { name: 'Heal', cost: 30, damage: [1, 8], cap: 3, upgradeCost: 750, upgradeEssences: { 'light_essence': 5 }, description: "A simple prayer that mends minor wounds and restores vitality." },
+            { name: 'Greater Heal', cost: 52, damage: [2, 8], cap: 5, upgradeCost: 3000, upgradeEssences: { 'light_essence': 10 }, description: "Channel a more powerful divine energy to mend significant injuries." },
+            { name: 'Ichor\'s Blood', cost: 75, damage: [3, 8], cap: 8, description: "Invoke the restorative blood of the gods themselves to perform a miraculous, life-saving healing." }
+        ]
+    },
 };
 
 const MONSTER_SPECIES = {
@@ -287,25 +503,25 @@ const MONSTER_SPECIES = {
     'cockatrice': { key: 'cockatrice', name: 'Cockatrice', class: 'Monstrosity', tier: 3, ability: 'petrification', base_hp: 80, base_strength: 10, base_defense: 5, base_xp: 90, base_gold: 50, spell_resistance: 0.2, loot_table: {'cockatrice_venom_gland': 0.4, 'eye_of_medusa': 0.02, 'arcane_focus': 0.02} },
     'necromancer': { key: 'necromancer', name: 'Necromancer', class: 'Undead', tier: 3, ability: 'necromancy', base_hp: 60, base_strength: 8, base_defense: 2, base_xp: 100, base_gold: 60, spell_resistance: 0.3, loot_table: {'mana_potion': 0.2, 'vampiric_dagger': 0.02, 'assassin_cloak_armor': 0.02, 'staff_of_loss': 0.02, 'archmages_robes': 0.01, 'souldrinker_orb': 0.01} },
     
-    // Tier 4
-    'one_eyed_troll': { key: 'one_eyed_troll', name: 'One-Eyed Troll', class: 'Humanoid', tier: 4, ability: 'ultra_focus', base_hp: 150, base_strength: 20, base_defense: 8, base_xp: 200, base_gold: 100, spell_resistance: 0.1, loot_table: {'superior_health_potion': 0.2, 'obsidian_axe': 0.08, 'sunderers_battleaxe': 0.04, 'heavy_slabshield': 0.03, 'steel_plate_armor': 0.03, 'staff_of_the_magi': 0.01, 'trollblood_shield': 0.03} },
-    'unicorn': { key: 'unicorn', name: 'Unicorn', class: 'Beast', tier: 4, ability: 'healing', base_hp: 170, base_strength: 15, base_defense: 5, base_xp: 180, base_gold: 80, spell_resistance: 0.25, loot_table: {'unicorn_horn_fragment': 0.5, 'golden_greatbow': 0.05, 'obsidian_lamina': 0.02, 'purifying_crystal_shield': 0.02} },
-    'chimera': { key: 'chimera', name: 'Chimera', class: 'Monstrosity', tier: 4, ability: 'true_poison', base_hp: 160, base_strength: 18, base_defense: 10, base_xp: 250, base_gold: 120, spell_resistance: 0.15, loot_table: {'golden_greatbow': 0.03, 'eye_of_medusa': 0.03, 'crystal_ball': 0.01, 'spellblade_of_echoes': 0.03} },
-    'living_armor': { key: 'living_armor', name: 'Living Armor', class: 'Undead', tier: 4, ability: 'living_shield', base_hp: 120, base_strength: 17, base_defense: 15, base_xp: 220, base_gold: 110, spell_resistance: 0.5, loot_table: {'obsidian_axe': 0.05, 'masterwork_spear': 0.08, 'flaming_sword': 0.03, 'tower_greatshield': 0.05, 'exa_reflector': 0.01, 'soul_armor_shard': 0.1, 'steel_plate_armor': 0.05, 'adamantine_armor': 0.01, 'bloodwood_scepter': 0.01, 'spiked_retaliator': 0.02, 'mirror_mail': 0.01} },
+    // Tier 4 - REBALANCED REWARDS
+    'one_eyed_troll': { key: 'one_eyed_troll', name: 'One-Eyed Troll', class: 'Humanoid', tier: 4, ability: 'ultra_focus', base_hp: 150, base_strength: 20, base_defense: 8, base_xp: 350, base_gold: 175, spell_resistance: 0.1, loot_table: {'superior_health_potion': 0.2, 'obsidian_axe': 0.08, 'sunderers_battleaxe': 0.04, 'heavy_slabshield': 0.03, 'steel_plate_armor': 0.03, 'staff_of_the_magi': 0.01, 'trollblood_shield': 0.03} },
+    'unicorn': { key: 'unicorn', name: 'Unicorn', class: 'Beast', tier: 4, ability: 'healing', base_hp: 170, base_strength: 15, base_defense: 5, base_xp: 320, base_gold: 160, spell_resistance: 0.25, loot_table: {'unicorn_horn_fragment': 0.5, 'golden_greatbow': 0.05, 'obsidian_lamina': 0.02, 'purifying_crystal_shield': 0.02} },
+    'chimera': { key: 'chimera', name: 'Chimera', class: 'Monstrosity', tier: 4, ability: 'true_poison', base_hp: 160, base_strength: 18, base_defense: 10, base_xp: 400, base_gold: 200, spell_resistance: 0.15, loot_table: {'golden_greatbow': 0.03, 'eye_of_medusa': 0.03, 'crystal_ball': 0.01, 'spellblade_of_echoes': 0.03} },
+    'living_armor': { key: 'living_armor', name: 'Living Armor', class: 'Undead', tier: 4, ability: 'living_shield', base_hp: 120, base_strength: 17, base_defense: 15, base_xp: 380, base_gold: 190, spell_resistance: 0.5, loot_table: {'obsidian_axe': 0.05, 'masterwork_spear': 0.08, 'flaming_sword': 0.03, 'tower_greatshield': 0.05, 'exa_reflector': 0.01, 'soul_armor_shard': 0.1, 'steel_plate_armor': 0.05, 'adamantine_armor': 0.01, 'bloodwood_scepter': 0.01, 'spiked_retaliator': 0.02, 'mirror_mail': 0.01} },
     
-    // Tier 5
-    'mountain_goliath': { key: 'mountain_goliath', name: 'Mountain Goliath', class: 'Humanoid', tier: 5, ability: 'earthshaker', base_hp: 300, base_strength: 28, base_defense: 12, base_xp: 500, base_gold: 250, spell_resistance: 0.15, loot_table: {'sunderers_battleaxe': 0.05, 'earthshaker_hammer': 0.01, 'heavy_slabshield': 0.02, 'mountain_rock': 0.1} },
-    'livyatan': { key: 'livyatan', name: 'Livyatan', class: 'Beast', tier: 5, ability: 'swallow', base_hp: 400, base_strength: 22, base_defense: 10, base_xp: 450, base_gold: 200, spell_resistance: 0.1, loot_table: {'vacuum_greatbow': 0.01, 'lightning_javelin': 0.05, 'vacuum_lining': 0.2} },
-    'dragon': { key: 'dragon', name: 'Dragon', class: 'Monstrosity', tier: 5, ability: 'scorch_earth', base_hp: 350, base_strength: 25, base_defense: 18, base_xp: 600, base_gold: 300, spell_resistance: 0.2, loot_table: {'dragon_scale': 0.5, 'flaming_sword': 0.05, 'dragon_scale_cragblade': 0.01, 'dragon_heart_item': 0.1} },
-    'dullahan': { key: 'dullahan', name: 'Dullahan', class: 'Undead', tier: 5, ability: 'alive_again', base_hp: 250, base_strength: 26, base_defense: 14, base_xp: 550, base_gold: 280, spell_resistance: 0.25, loot_table: {'flaming_sword': 0.03, 'vampiric_dagger': 0.04, 'obsidian_lamina': 0.03, 'void_greatsword': 0.01, 'adamantine_armor': 0.02, 'void_heart': 0.1} }
+    // Tier 5 - REBALANCED REWARDS
+    'mountain_goliath': { key: 'mountain_goliath', name: 'Mountain Goliath', class: 'Humanoid', tier: 5, ability: 'earthshaker', base_hp: 300, base_strength: 28, base_defense: 12, base_xp: 1200, base_gold: 600, spell_resistance: 0.15, loot_table: {'sunderers_battleaxe': 0.05, 'earthshaker_hammer': 0.01, 'heavy_slabshield': 0.02, 'mountain_rock': 0.1} },
+    'livyatan': { key: 'livyatan', name: 'Livyatan', class: 'Beast', tier: 5, ability: 'swallow', base_hp: 400, base_strength: 22, base_defense: 10, base_xp: 1100, base_gold: 550, spell_resistance: 0.1, loot_table: {'vacuum_greatbow': 0.01, 'lightning_javelin': 0.05, 'vacuum_lining': 0.2} },
+    'dragon': { key: 'dragon', name: 'Dragon', class: 'Monstrosity', tier: 5, ability: 'scorch_earth', base_hp: 350, base_strength: 25, base_defense: 18, base_xp: 1500, base_gold: 750, spell_resistance: 0.2, loot_table: {'dragon_scale': 0.5, 'flaming_sword': 0.05, 'dragon_scale_cragblade': 0.01, 'dragon_heart_item': 0.1} },
+    'dullahan': { key: 'dullahan', name: 'Dullahan', class: 'Undead', tier: 5, ability: 'alive_again', base_hp: 250, base_strength: 26, base_defense: 14, base_xp: 1350, base_gold: 700, spell_resistance: 0.25, loot_table: {'flaming_sword': 0.03, 'vampiric_dagger': 0.04, 'obsidian_lamina': 0.03, 'void_greatsword': 0.01, 'adamantine_armor': 0.02, 'void_heart': 0.1} }
 };
 
 const MONSTER_RARITY = {
-    'common': {name: 'Common', multiplier: 1.0, rarityIndex: 1},
-    'uncommon': {name: 'Uncommon', multiplier: 1.2, rarityIndex: 2},
-    'rare': {name: 'Rare', multiplier: 1.5, rarityIndex: 3},
-    'epic': {name: 'Epic', multiplier: 2.0, rarityIndex: 4},
-    'legendary': {name: 'Legendary', multiplier: 2.5, rarityIndex: 5}
+    'common': {name: 'Common', multiplier: 1.0, rewardMultiplier: 1.0, rarityIndex: 1},
+    'uncommon': {name: 'Uncommon', multiplier: 1.2, rewardMultiplier: 1.5, rarityIndex: 2},
+    'rare': {name: 'Rare', multiplier: 1.5, rewardMultiplier: 2, rarityIndex: 3},
+    'epic': {name: 'Epic', multiplier: 2.0, rewardMultiplier: 3.5, rarityIndex: 4},
+    'legendary': {name: 'Legendary', multiplier: 2.5, rewardMultiplier: 5, rarityIndex: 5}
 };
 
 const MONSTER_CLASS_DAMAGE = {
@@ -318,7 +534,7 @@ const MONSTER_CLASS_DAMAGE = {
 const QUESTS = {
         'exterminate_goblin': { tier: 1, title: 'Goblin Cull', target: 'goblin', required: 10, reward: { xp: 375, gold: 150 }, description: 'The forest is overrun with goblins. Thin their numbers.' },
         'exterminate_rabid_rabbit': { tier: 1, title: 'Rabbit Stew', target: 'rabid_rabbit', required: 10, reward: { xp: 300, gold: 75 }, description: 'A local hunter wants rabid rabbits gone. Permanently.' },
-        'exterminate_slime': { tier: 1, title: 'Slimy Situation', target: 'slime', required: 10, reward: { xp: 330, gold: 120 }, description: 'Clear out the slimes that have infested the old world.' },
+        'exterminate_slime': { tier: 1, title: 'Slimy Situation', target: 'slime', required: 10, reward: { xp: 330, gold: 120 }, description: 'Clear out the slimes that have infested the old cellar.' },
         'exterminate_skeleton': { tier: 1, title: 'Restless Dead', target: 'skeleton', required: 10, reward: { xp: 300, gold: 105 }, description: 'Put the animated skeletons back to their eternal rest.' },
         'exterminate_bandit': { tier: 2, title: 'Bandit Bounties', target: 'bandit', required: 8, reward: { xp: 600, gold: 240 }, description: 'A bounty has been placed on the heads of local bandits.' },
         'exterminate_dire_wolf': { tier: 2, title: 'The Alpha', target: 'dire_wolf', required: 8, reward: { xp: 480, gold: 180 }, description: 'A particularly large pack of dire wolves is threatening the main road.' },
@@ -336,6 +552,7 @@ const QUESTS = {
         'exterminate_livyatan': { tier: 5, title: 'Beast of the Deep', target: 'livyatan', required: 1, reward: { xp: 675, gold: 300 }, description: 'A fisherman\'s guild has posted an enormous bounty for the head of the Livyatan.' },
         'exterminate_dragon': { tier: 5, title: 'Dragon Slayer', target: 'dragon', required: 1, reward: { xp: 900, gold: 450 }, description: 'The ultimate challenge: Slay the great Dragon of the mountains.' },
         'exterminate_dullahan': { tier: 5, title: 'Headless Horseman', target: 'dullahan', required: 1, reward: { xp: 825, gold: 420 }, description: 'A terrifying omen, the Dullahan, rides the plains. Banish it.' },
+        
         'collect_goblin_ears': { tier: 1, title: 'Proof of the Deed', type: 'collection', target: 'goblin_ear', required: 5, reward: { xp: 100, gold: 50 }, description: 'A fearful merchant wants proof that the goblin problem is being handled. Bring him their ears.' },
         'collect_daggers': { tier: 1, title: 'Arming the Militia', type: 'collection', target: 'dagger', required: 3, reward: { xp: 120, gold: 200 }, description: 'The town militia needs daggers for its new recruits. Find or buy them.' },
         'collect_wolf_pelts': { tier: 2, title: 'Warmth for Winter', type: 'collection', target: 'wolf_pelt', required: 5, reward: { xp: 150, gold: 100 }, description: 'A tailor needs quality wolf pelts to make winter cloaks.' },
@@ -346,6 +563,7 @@ const QUESTS = {
         'collect_flaming_swords': { tier: 4, title: 'The Fiery Blade', type: 'collection', target: 'flaming_sword', required: 1, reward: { xp: 1000, gold: 3500 }, description: 'A wealthy noble desires a legendary Flaming Sword for his collection.' },
         'collect_dragon_scales': { tier: 5, title: 'Indestructible Armor', type: 'collection', target: 'dragon_scale', required: 5, reward: { xp: 800, gold: 500 }, description: 'The king\'s blacksmith wants to forge armor from the scales of a dragon.' },
         'collect_earthshaker': { tier: 5, title: 'Might of the Mountain', type: 'collection', target: 'earthshaker_hammer', required: 1, reward: { xp: 5000, gold: 12000 }, description: 'The Dwarven king will pay handsomely for the return of the legendary Earthshaker Hammer.' },
+        
         'brew_health_potions': { tier: 1, title: 'Basic Brewing', type: 'creation', target: 'health_potion', required: 5, reward: { xp: 100, gold: 200 }, description: 'The town alchemist needs a hand brewing a batch of basic Health Potions.' },
         'brew_strength_potions': { tier: 3, title: 'Liquid Courage', type: 'creation', target: 'strength_potion', required: 3, reward: { xp: 300, gold: 500 }, description: 'The captain of the guard wants Strength Potions to give his soldiers an edge.' },
         'brew_cleansing_potions': { tier: 4, title: 'Purification Ritual', type: 'creation', target: 'cleansing_potion', required: 2, reward: { xp: 500, gold: 600 }, description: 'The high priest needs Cleansing Potions for a temple ritual.' },
@@ -362,13 +580,12 @@ const LEGACY_QUESTS = {
 };
 
 const SHOP_INVENTORY = {
-    'Potions & Items': ['health_potion', 'mana_potion', 'condensed_health_potion', 'condensed_mana_potion'],
+    'Potions & Items': ['health_potion', 'mana_potion', 'superior_health_potion'],
     'Weapons': ['rusty_sword', 'wooden_stick'],
     'Gear': ['travelers_garb', 'leather_armor', 'padded_leather', 'wooden_shield']
 };
 
 const MAGIC_SHOP_INVENTORY = {
-    'Spells': ['fireball', 'lightning_bolt', 'rain_of_arrow', 'heal', 'greater_heal'],
     'Catalysts': ['wooden_wand', 'cracked_orb', 'hardwood_staff', 'magical_orb', 'arcane_focus', 'cypresswood_staff', 'staff_of_loss']
 };
 
@@ -420,6 +637,7 @@ const CHANGELOG_DATA = [
         date: "2025-09-28",
         changes: [
             "<strong>0.3.1</strong> - Implemented the foundational Elemental System, preparing the game for deeper magical combat."
+            "<strong>0.3.2</strong> - Implemented Magic and Spell Overhaul. Adding Spell Upgrade System, Elemental Spells, and Support Spells."
         ]
     },
     {
@@ -443,6 +661,4 @@ const CHANGELOG_DATA = [
         ]
     }
 ];
-
-
 

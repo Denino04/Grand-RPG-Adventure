@@ -95,7 +95,11 @@ class Player extends Entity {
             shields: ['no_shield'], 
             lures: { } 
         };
-        this.spells = ['fireball', 'heal'];
+        // New spell tracking system
+        this.spells = {
+            'none_st': { tier: 1 },
+            'healing_st': { tier: 1 }
+        };
         this.activeQuest = null; this.questProgress = 0;
         this.legacyQuestProgress = {};
         this.questsTakenToday = [];
@@ -127,18 +131,51 @@ class Player extends Entity {
     levelUp() { 
         this.level++; 
         this.xp -= this.xpToNextLevel; 
-        this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.5); 
+        this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.1 + this.level * 25); 
         this.maxHp += 10; this.hp = this.maxHp; 
         this.maxMp += 5; this.mp = this.maxMp; 
         this.strength += 2; this.intelligence += 2; 
         addToLog(`*** LEVEL UP! You are now level ${this.level}! ***`, 'text-yellow-200 font-bold text-lg'); 
         updatePlayerTier(); // Update the player's tier after leveling up
     }
+    clearBattleBuffs() {
+        const buffsToClear = [
+            'buff_strength', 'buff_chaos_strength', 'buff_titan',
+            'buff_defense', 'stonehide', 'buff_shroud', 'buff_voidwalker',
+            'buff_haste', 'buff_hermes', 'buff_ion_self', 'buff_ion_other',
+            'buff_magic_defense', 'buff_divine'
+            // 'buff_ingrain' and 'buff_mother_nature' are intentionally left to persist
+        ];
+    
+        let cleared = false;
+        for (const buffKey of buffsToClear) {
+            if (this.statusEffects[buffKey]) {
+                delete this.statusEffects[buffKey];
+                cleared = true;
+            }
+        }
+        
+        if (cleared) {
+            addToLog("The temporary magical effects of the battle wear off.", "text-gray-400");
+        }
+    }
     takeDamage(damage, ignoresDefense = false, attacker = null) { 
         const shield = this.equippedShield;
         const armor = this.equippedArmor;
+        let dodgeChance = 0;
 
-        // Parry logic (Stops attack entirely)
+        // --- Calculate Dodge Chance ---
+        if (armor && armor.effect?.type === 'dodge') {
+            dodgeChance = armor.effect.chance;
+        }
+        if (this.statusEffects.buff_shroud || this.statusEffects.buff_voidwalker) {
+            dodgeChance *= 1.5;
+        }
+        if (this.statusEffects.buff_hermes) {
+            dodgeChance *= 2; // Double total dodge
+        }
+
+        // --- Parry logic (Stops attack entirely) ---
         if (shield && shield.effect?.type === 'parry' && Math.random() < shield.effect.chance && attacker && attacker.isAlive()) {
             attacker.attackParried = true; // Flag that the attack was stopped
             addToLog(`You parried ${attacker.name}'s attack with your ${shield.name}!`, 'text-yellow-300 font-bold');
@@ -156,15 +193,15 @@ class Player extends Entity {
             return 0; // No damage taken
         }
         
-        // Dodge logic (Stops attack entirely)
-        if (armor && armor.effect?.type === 'dodge' && Math.random() < armor.effect.chance) {
+        // --- Dodge logic (Stops attack entirely) ---
+        if (dodgeChance > 0 && Math.random() < dodgeChance) {
             attacker.attackParried = true; // Flag that the attack was stopped
             addToLog(`You dodged ${attacker.name}'s attack!`, 'text-teal-300 font-bold');
             updateStatsView();
             return 0;
         }
 
-        // Block logic (Stops attack entirely)
+        // --- Block logic (Stops attack entirely) ---
         const totalBlockChance = (shield?.blockChance || 0) + (armor?.blockChance || 0);
         if (!ignoresDefense && totalBlockChance > 0 && Math.random() < totalBlockChance) {
             addToLog(`You blocked the attack!`, 'text-cyan-400 font-bold');
@@ -204,11 +241,23 @@ class Player extends Entity {
 
         let totalDefense = armorDefense + shieldDefense;
         
+        // --- Apply status effect defense modifiers ---
         if(this.statusEffects.stonehide) {
             totalDefense = Math.floor(totalDefense * this.statusEffects.stonehide.multiplier);
             addToLog(`Your stone-like skin absorbs the blow!`, `text-gray-400`);
         }
-
+        if(this.statusEffects.buff_defense) {
+            totalDefense = Math.floor(totalDefense * this.statusEffects.buff_defense.multiplier);
+            addToLog(`Your magical shield bolsters your defense!`, `text-yellow-300`);
+        }
+        if(this.statusEffects.buff_titan) {
+            totalDefense = Math.floor(totalDefense * this.statusEffects.buff_titan.defMultiplier);
+        }
+        if(this.statusEffects.buff_chaos_strength) {
+            totalDefense = Math.floor(totalDefense * this.statusEffects.buff_chaos_strength.defMultiplier);
+             addToLog(`Your reckless abandon lowers your defense!`, `text-red-400`);
+        }
+        
         if (ignoresDefense) {
              addToLog(`The attack ignores your defense!`, 'text-yellow-500 font-bold');
         }
@@ -251,10 +300,12 @@ class Player extends Entity {
 
 class Enemy extends Entity {
      constructor(speciesData, rarityData, playerLevel, elementData = { key: 'none', adjective: '' }) {
-        const finalMultiplier = rarityData.multiplier;
-        const finalHp = Math.floor((speciesData.base_hp + (playerLevel * 1.5)) * finalMultiplier);
-        const finalStrength = Math.floor((speciesData.base_strength + Math.floor(playerLevel / 2)) * finalMultiplier);
-        const finalDefense = Math.floor(((speciesData.base_defense || 0) + Math.floor(playerLevel / 3)) * finalMultiplier);
+        const statMultiplier = rarityData.multiplier;
+        const rewardMultiplier = rarityData.rewardMultiplier || rarityData.multiplier; // Fallback for safety
+
+        const finalHp = Math.floor((speciesData.base_hp + (playerLevel * 1.5)) * statMultiplier);
+        const finalStrength = Math.floor((speciesData.base_strength + Math.floor(playerLevel / 2)) * statMultiplier);
+        const finalDefense = Math.floor(((speciesData.base_defense || 0) + Math.floor(playerLevel / 3)) * statMultiplier);
         
         const name = elementData.key !== 'none' 
             ? `${rarityData.name} ${elementData.adjective} ${speciesData.name}`
@@ -272,8 +323,8 @@ class Enemy extends Entity {
         this.defense = finalDefense;
         this.ability = speciesData.ability;
         this.element = elementData.key;
-        this.xpReward = Math.floor(speciesData.base_xp * finalMultiplier * (speciesData.class === 'Monstrosity' ? 1.2 : 1)); 
-        this.goldReward = Math.floor(speciesData.base_gold * finalMultiplier * (speciesData.class === 'Monstrosity' ? 1.2 : 1));
+        this.xpReward = Math.floor(speciesData.base_xp * rewardMultiplier * (speciesData.class === 'Monstrosity' ? 1.2 : 1)); 
+        this.goldReward = Math.floor(speciesData.base_gold * rewardMultiplier * (speciesData.class === 'Monstrosity' ? 1.2 : 1));
         this.lootTable = {...speciesData.loot_table}; // Create a copy to modify
         this.lootChanceMod = (speciesData.class === 'Beast' ? 1.5 : 1);
         this.potionDropChanceMod = (speciesData.class === 'Humanoid' ? 1.5 : 1);
@@ -631,16 +682,67 @@ function restAtInn(cost) {
     } 
 }
 
-function learnSpell(spellKey) { 
-    const details = MAGIC[spellKey]; 
-    if (player.gold >= details.price) { 
-        player.gold -= details.price; 
-        player.spells.push(spellKey); 
-        addToLog(`You have learned the spell: <span class="font-bold text-purple-300">${details.name}</span>!`, 'text-green-400'); 
-        updateStatsView(); 
-        renderMagicShopBuy(); 
-    } 
+function upgradeSpell(spellKey) {
+    const spellData = SPELLS[spellKey];
+    const playerSpell = player.spells[spellKey];
+    
+    // Learning a new spell
+    if (!playerSpell) {
+        const learnCost = spellData.learnCost || 0;
+        if (player.gold >= learnCost) {
+            player.gold -= learnCost;
+            player.spells[spellKey] = { tier: 1 };
+            addToLog(`You have learned the basics of <span class="font-bold text-purple-300">${spellData.tiers[0].name}</span>!`, 'text-green-400');
+        } else {
+            addToLog(`You need ${learnCost} G to learn this spell.`, 'text-red-400');
+        }
+        updateStatsView();
+        renderSageTowerTrain();
+        return;
+    }
+    
+    const currentTierIndex = playerSpell.tier - 1;
+    const currentTierData = spellData.tiers[currentTierIndex];
+    
+    if (currentTierIndex >= spellData.tiers.length - 1) {
+        addToLog("This spell is already at its maximum tier.", 'text-yellow-400');
+        return;
+    }
+    
+    const upgradeCost = currentTierData.upgradeCost;
+    const requiredEssences = currentTierData.upgradeEssences || {};
+    
+    // Check gold and essences
+    if (player.gold < upgradeCost) {
+        addToLog(`You need ${upgradeCost} G to upgrade this spell.`, 'text-red-400');
+        return;
+    }
+    for (const essenceKey in requiredEssences) {
+        const requiredAmount = requiredEssences[essenceKey];
+        const playerAmount = player.inventory.items[essenceKey] || 0;
+        if (playerAmount < requiredAmount) {
+            addToLog(`You need ${requiredAmount}x ${getItemDetails(essenceKey).name}.`, 'text-red-400');
+            return;
+        }
+    }
+
+    // Deduct costs
+    player.gold -= upgradeCost;
+    for (const essenceKey in requiredEssences) {
+        player.inventory.items[essenceKey] -= requiredEssences[essenceKey];
+        if (player.inventory.items[essenceKey] <= 0) {
+            delete player.inventory.items[essenceKey];
+        }
+    }
+
+    // Upgrade spell
+    player.spells[spellKey].tier++;
+    const nextTierData = spellData.tiers[currentTierIndex + 1];
+    addToLog(`You have upgraded to <span class="font-bold text-purple-300">${nextTierData.name}</span>!`, 'text-green-400');
+    updateStatsView();
+    renderSageTowerTrain();
 }
+
 
 function buyItem(itemKey, shopType, priceOverride = null) { 
     const details = getItemDetails(itemKey); 
