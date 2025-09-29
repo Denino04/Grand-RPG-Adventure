@@ -636,7 +636,7 @@ const CHANGELOG_DATA = [
         version: "v0.3 - Magic and Elements",
         date: "2025-09-28",
         changes: [
-            "<strong>0.3.1</strong> - Implemented the foundational Elemental System, preparing the game for deeper magical combat."
+            "<strong>0.3.1</strong> - Implemented the foundational Elemental System, preparing the game for deeper magical combat.",
             "<strong>0.3.2</strong> - Implemented Magic and Spell Overhaul. Adding Spell Upgrade System, Elemental Spells, and Support Spells."
         ]
     },
