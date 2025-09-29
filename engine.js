@@ -401,29 +401,43 @@ class Enemy extends Entity {
         let damageDealt = target.takeDamage(totalDamage, !!this.statusEffects.ultra_focus, this);
 
         const rarityIndex = this.rarityData.rarityIndex;
+        const procChance = rarityIndex * 0.1; // Increased base proc chance from 0.05 to 0.1
+
         if (damageDealt > 0) {
             if (this.element === 'water') {
                 addToLog(`The water attack leaves you drenched, weakening your next attack!`, 'text-blue-400');
                 target.statusEffects.drenched = { duration: 2, multiplier: 0.9 };
             }
-            if (this.element === 'earth' && Math.random() < (rarityIndex * 0.05)) {
+            if (this.element === 'earth' && Math.random() < procChance) {
                 if (!target.statusEffects.paralyzed) {
                     applyStatusEffect(target, 'paralyzed', { duration: 2 }, this.name);
                 }
             }
             if (this.element === 'nature') {
-                const lifestealAmount = Math.floor(damageDealt * (rarityIndex * 0.05));
+                const lifestealAmount = Math.floor(damageDealt * procChance);
                 if (lifestealAmount > 0) {
                     this.hp = Math.min(this.maxHp, this.hp + lifestealAmount);
                     addToLog(`${this.name} drains <span class="font-bold text-green-400">${lifestealAmount}</span> HP from the natural energy.`, 'text-green-300');
                 }
             }
-            if (this.element === 'light' && Math.random() < (rarityIndex * 0.05)) {
+            if (this.element === 'light' && Math.random() < procChance) {
                 const debuffs = Object.keys(this.statusEffects).filter(key => ['paralyzed', 'petrified', 'drenched'].includes(key));
                 if (debuffs.length > 0) {
                     const effectToCleanse = debuffs[0];
                     delete this.statusEffects[effectToCleanse];
                     addToLog(`The light energy cleanses ${this.name} of ${effectToCleanse}!`, 'text-yellow-200');
+                }
+            }
+            if (this.element === 'lightning' && Math.random() < procChance) {
+                const lightningDamage = rollDice(1, 8, 'Enemy Lightning Proc') + Math.floor(this.strength / 2);
+                target.takeDamage(lightningDamage, true, this); // Ignores defense
+                addToLog(`Lightning arcs from the attack, dealing an extra <span class="font-bold text-blue-400">${lightningDamage}</span> damage!`);
+            }
+            if ((this.element === 'dark' || this.element === 'void') && Math.random() < procChance) {
+                const lifestealAmount = Math.floor(damageDealt * procChance);
+                 if (lifestealAmount > 0) {
+                    this.hp = Math.min(this.maxHp, this.hp + lifestealAmount);
+                    addToLog(`${this.name} drains <span class="font-bold text-purple-400">${lifestealAmount}</span> HP with dark energy.`, 'text-purple-300');
                 }
             }
         }
