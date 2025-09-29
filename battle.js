@@ -131,10 +131,10 @@ function performAttack(targetIndex) {
         // --- CRIT CHANCE ---
         let critChance = 0;
         if (weapon.effect?.type === 'crit') {
-            critChance += weapon.effect.chance;
+            critChance = weapon.effect.chance;
         }
         if (player.statusEffects.buff_shroud || player.statusEffects.buff_voidwalker) {
-            critChance += 0.5; // 50% bonus crit chance
+            critChance *= 1.5;
         }
 
 
@@ -242,15 +242,27 @@ function performAttack(targetIndex) {
 
         // --- CHAIN LIGHTNING LOGIC from Buffs ---
         if (player.statusEffects.buff_ion_self || player.statusEffects.buff_ion_other) {
-            const isSelfDamage = !!player.statusEffects.buff_ion_self;
             let potentialTargets = currentEnemies.filter(e => e.isAlive() && e !== attackTarget);
-            if (isSelfDamage) {
-                potentialTargets.push(player); // Add player to potential targets
+            let canHitPlayer = !!player.statusEffects.buff_ion_self;
+            let hitsPlayer = false;
+
+            if (canHitPlayer && potentialTargets.length > 0) {
+                 if (Math.random() < 0.2) { // 20% chance to hit player if other enemies exist
+                    hitsPlayer = true;
+                 }
+            } else if (canHitPlayer) { // Only player is a valid target
+                hitsPlayer = true;
             }
             
-            if (potentialTargets.length > 0) {
+            if (potentialTargets.length > 0 || hitsPlayer) {
                 addToLog("Unstable ions arc from your attack!", "text-blue-300");
-                const chainTarget = potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
+                let chainTarget;
+                if(hitsPlayer) {
+                    chainTarget = player;
+                } else {
+                    chainTarget = potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
+                }
+                
                 const chainDamage = Math.floor(finalDamage / 2);
 
                 if (chainTarget instanceof Player) {
@@ -697,7 +709,8 @@ function handleEnemyEndOfTurn(enemy) {
     }
     updateStatsView();
 }
-function enemyTurn() {
+
+async function enemyTurn() {
     handlePlayerEndOfTurn();
     if (!player.isAlive()) {
         checkPlayerDeath();
@@ -707,130 +720,137 @@ function enemyTurn() {
     if (player.statusEffects.buff_haste || player.statusEffects.buff_hermes) {
         addToLog("Your haste allows you to act again immediately!", "text-cyan-300 font-bold");
         setTimeout(() => endPlayerTurnPhase(), 500);
-        return; // Skip the rest of the enemy turn
+        return; 
     }
 
-    let turnDelay = 500;
     const enemiesActingThisTurn = [...currentEnemies];
+    for (const enemy of enemiesActingThisTurn) {
+        if (gameState.battleEnded || !player.isAlive()) break;
 
-    enemiesActingThisTurn.forEach((enemy, i) => {
-        setTimeout(() => {
-            if (!enemy.isAlive() || !player.isAlive()) return;
+        await new Promise(resolve => {
+            setTimeout(() => {
+                if (!enemy.isAlive() || !player.isAlive()) {
+                    resolve();
+                    return;
+                }
             
-            let tookTurn = false;
-            if (enemy.statusEffects.petrified || enemy.statusEffects.paralyzed) {
-                const status = enemy.statusEffects.petrified ? 'petrified' : 'paralyzed';
-                addToLog(`${enemy.name} is ${status} and cannot move!`);
-                tookTurn = true; 
-            } else {
-                let usedAbility = false;
-                if (enemy.ability) {
-                    switch(enemy.ability) {
-                        case 'enrage':
-                            if (!enemy.statusEffects.enrage && Math.random() < 0.5) {
-                                enemy.statusEffects.enrage = { duration: 3 };
-                                addToLog(`${enemy.name} flies into a rage!`, 'text-red-500 font-bold');
-                                usedAbility = true;
-                            }
-                            break;
-                        case 'poison_web':
-                            if (!player.statusEffects.poison && Math.random() < 0.4) {
-                                const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
-                                applyStatusEffect(player, 'poison', { duration: 3, damage: [rarityDice * 2, 4] }, enemy.name);
-                                usedAbility = true;
-                            }
-                            break;
-                        case 'petrification':
-                            if (!player.statusEffects.petrified && Math.random() < 0.25) {
-                                applyStatusEffect(player, 'petrified', { duration: 2 }, enemy.name);
-                                 usedAbility = true;
-                            }
-                            break;
-                         case 'necromancy':
-                            const hpPercent = enemy.hp / enemy.maxHp;
-                            if ((hpPercent <= 0.5 && !enemy.summonedAt50) || (hpPercent <= 0.1 && !enemy.summonedAt10)) {
-                                 if(hpPercent <= 0.5) enemy.summonedAt50 = true;
-                                 if(hpPercent <= 0.1) enemy.summonedAt10 = true;
-                                 addToLog(`${enemy.name} chants an ancient rite, and skeletons burst from the ground!`, 'text-purple-500');
-                                 for (let j = 0; j < 2; j++) {
-                                     const skeleton = new Enemy(MONSTER_SPECIES['skeleton'], enemy.rarityData, player.level);
-                                     currentEnemies.push(skeleton);
-                                 }
-                                 renderBattle(); 
-                                 usedAbility = true;
-                            }
-                            break;
-                        case 'ultra_focus':
-                            if (!enemy.statusEffects.ultra_focus && Math.random() < 0.4) {
-                                enemy.statusEffects.ultra_focus = { duration: 3 };
-                                addToLog(`${enemy.name}'s eye glows with intense focus! Its attacks will ignore defense.`, 'text-yellow-500 font-bold');
-                                usedAbility = true;
-                            }
-                            break;
-                        case 'healing':
-                            if (enemy.hp < enemy.maxHp && Math.random() < 0.5) {
-                                const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
-                                const healAmount = rollDice(rarityDice * 3, 8, `${enemy.name} Healing`);
-                                addToLog(`${enemy.name} radiates a soothing light!`, 'text-green-400');
-                                currentEnemies.forEach(ally => {
-                                    if (ally.isAlive()) {
-                                        ally.hp = Math.min(ally.maxHp, ally.hp + healAmount);
-                                        addToLog(`${ally.name} is healed for <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-green-300');
-                                    }
-                                });
-                                renderBattle();
-                                usedAbility = true;
-                            }
-                            break;
-                        case 'true_poison':
-                             if (!player.statusEffects.poison && Math.random() < 0.6) {
-                                const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
-                                applyStatusEffect(player, 'poison', { duration: 3, damage: [rarityDice * 3, 8] }, enemy.name);
-                                usedAbility = true;
-                            }
-                            break;
-                        case 'living_shield':
-                            if (!enemy.statusEffects.living_shield && Math.random() < 0.5) {
-                                enemy.statusEffects.living_shield = { duration: 3 };
-                                addToLog(`${enemy.name}'s armor plating grows thicker, doubling its defense!`, 'text-gray-400 font-bold');
-                                usedAbility = true;
-                            }
-                            break;
-                        case 'swallow':
-                            if (!player.statusEffects.swallowed && Math.random() < 0.25) {
-                                applyStatusEffect(player, 'swallowed', { by: enemy.name, swallower: enemy, duration: Infinity }, enemy.name);
-                                usedAbility = true;
-                                renderBattle();
-                            }
-                            break;
-                        case 'scorch_earth':
-                            if (Math.random() < 0.4) {
-                                addToLog(`${enemy.name} unleashes a torrent of flame!`, 'text-orange-600 font-bold');
-                                const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
-                                const fireDamage = rollDice(rarityDice * 4, 8, `${enemy.name} Scorch Earth`) + enemy.strength;
-                                player.takeDamage(fireDamage, true, enemy);
-                                usedAbility = true;
-                            }
-                            break;
+                let tookTurn = false;
+                if (enemy.statusEffects.petrified || enemy.statusEffects.paralyzed) {
+                    const status = enemy.statusEffects.petrified ? 'petrified' : 'paralyzed';
+                    addToLog(`${enemy.name} is ${status} and cannot move!`);
+                    tookTurn = true; 
+                } else {
+                    let usedAbility = false;
+                    if (enemy.ability) {
+                        switch(enemy.ability) {
+                            case 'enrage':
+                                if (!enemy.statusEffects.enrage && Math.random() < 0.5) {
+                                    enemy.statusEffects.enrage = { duration: 3 };
+                                    addToLog(`${enemy.name} flies into a rage!`, 'text-red-500 font-bold');
+                                    usedAbility = true;
+                                }
+                                break;
+                            case 'poison_web':
+                                if (!player.statusEffects.poison && Math.random() < 0.4) {
+                                    const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
+                                    applyStatusEffect(player, 'poison', { duration: 3, damage: [rarityDice * 2, 4] }, enemy.name);
+                                    usedAbility = true;
+                                }
+                                break;
+                            case 'petrification':
+                                if (!player.statusEffects.petrified && Math.random() < 0.25) {
+                                    applyStatusEffect(player, 'petrified', { duration: 2 }, enemy.name);
+                                     usedAbility = true;
+                                }
+                                break;
+                             case 'necromancy':
+                                const hpPercent = enemy.hp / enemy.maxHp;
+                                if ((hpPercent <= 0.5 && !enemy.summonedAt50) || (hpPercent <= 0.1 && !enemy.summonedAt10)) {
+                                     if(hpPercent <= 0.5) enemy.summonedAt50 = true;
+                                     if(hpPercent <= 0.1) enemy.summonedAt10 = true;
+                                     addToLog(`${enemy.name} chants an ancient rite, and skeletons burst from the ground!`, 'text-purple-500');
+                                     for (let j = 0; j < 2; j++) {
+                                         const skeleton = new Enemy(MONSTER_SPECIES['skeleton'], enemy.rarityData, player.level);
+                                         currentEnemies.push(skeleton);
+                                     }
+                                     renderBattle(); 
+                                     usedAbility = true;
+                                }
+                                break;
+                            case 'ultra_focus':
+                                if (!enemy.statusEffects.ultra_focus && Math.random() < 0.4) {
+                                    enemy.statusEffects.ultra_focus = { duration: 3 };
+                                    addToLog(`${enemy.name}'s eye glows with intense focus! Its attacks will ignore defense.`, 'text-yellow-500 font-bold');
+                                    usedAbility = true;
+                                }
+                                break;
+                            case 'healing':
+                                if (enemy.hp < enemy.maxHp && Math.random() < 0.5) {
+                                    const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
+                                    const healAmount = rollDice(rarityDice * 3, 8, `${enemy.name} Healing`);
+                                    addToLog(`${enemy.name} radiates a soothing light!`, 'text-green-400');
+                                    currentEnemies.forEach(ally => {
+                                        if (ally.isAlive()) {
+                                            ally.hp = Math.min(ally.maxHp, ally.hp + healAmount);
+                                            addToLog(`${ally.name} is healed for <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-green-300');
+                                        }
+                                    });
+                                    renderBattle();
+                                    usedAbility = true;
+                                }
+                                break;
+                            case 'true_poison':
+                                 if (!player.statusEffects.poison && Math.random() < 0.6) {
+                                    const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
+                                    applyStatusEffect(player, 'poison', { duration: 3, damage: [rarityDice * 3, 8] }, enemy.name);
+                                    usedAbility = true;
+                                }
+                                break;
+                            case 'living_shield':
+                                if (!enemy.statusEffects.living_shield && Math.random() < 0.5) {
+                                    enemy.statusEffects.living_shield = { duration: 3 };
+                                    addToLog(`${enemy.name}'s armor plating grows thicker, doubling its defense!`, 'text-gray-400 font-bold');
+                                    usedAbility = true;
+                                }
+                                break;
+                            case 'swallow':
+                                if (!player.statusEffects.swallowed && Math.random() < 0.25) {
+                                    applyStatusEffect(player, 'swallowed', { by: enemy.name, swallower: enemy, duration: Infinity }, enemy.name);
+                                    usedAbility = true;
+                                    renderBattle();
+                                }
+                                break;
+                            case 'scorch_earth':
+                                if (Math.random() < 0.4) {
+                                    addToLog(`${enemy.name} unleashes a torrent of flame!`, 'text-orange-600 font-bold');
+                                    const rarityDice = Object.keys(MONSTER_RARITY).indexOf(enemy.rarityData.name.toLowerCase()) + 1;
+                                    const fireDamage = rollDice(rarityDice * 4, 8, `${enemy.name} Scorch Earth`) + enemy.strength;
+                                    player.takeDamage(fireDamage, true, enemy);
+                                    usedAbility = true;
+                                }
+                                break;
+                        }
                     }
+                    if (!usedAbility) {
+                        enemy.attack(player);
+                    }
+                    tookTurn = true;
                 }
-                if (!usedAbility) {
-                    enemy.attack(player);
+                
+                if (tookTurn) {
+                    handleEnemyEndOfTurn(enemy);
+                    checkPlayerDeath();
                 }
-                tookTurn = true;
-            }
-            
-            if (tookTurn) {
-                handleEnemyEndOfTurn(enemy);
-                checkPlayerDeath();
-            }
+                resolve();
+            }, 500);
+        });
+    }
 
-            if (i === enemiesActingThisTurn.length - 1) {
-                 setTimeout(() => endPlayerTurnPhase(), turnDelay);
-            }
-        }, i * turnDelay);
-    });
+    if (!gameState.battleEnded) {
+        endPlayerTurnPhase();
+    }
 }
+
 function endPlayerTurnPhase() {
     if (gameState.battleEnded) return;
     if (!player.isAlive()) {
