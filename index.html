@@ -142,11 +142,11 @@
                 <div class="flex flex-col items-center gap-4">
                     <div class="flex justify-center flex-wrap gap-4">
                         <button onclick="renderShop('store')" class="btn btn-primary w-40">General Store</button>
-                        <button onclick="renderShop('blacksmith')" class="btn btn-primary w-40">Blacksmith</button>
+                        <button onclick="renderBlacksmithMenu()" class="btn btn-primary w-40">Blacksmith</button>
                         <button onclick="renderShop('black_market')" class="btn btn-primary w-40">Black Market</button>
                     </div>
                     <div class="flex justify-center flex-wrap gap-4">
-                        <button onclick="renderMagicShop()" class="btn btn-primary w-40">Magic Shop</button>
+                        <button onclick="renderSageTowerMenu()" class="btn btn-primary w-40">Magic Shop</button>
                         <button onclick="renderAlchemist()" class="btn btn-primary w-40">Alchemist</button>
                         <button onclick="renderQuestBoard()" class="btn btn-primary w-40">Quest Board</button>
                     </div>
@@ -178,14 +178,11 @@
     </div>
 
 <script src="game_data.js" defer></script>
+<script src="ui.js" defer></script>
 <script src="engine.js" defer></script>
 <script src="battle.js" defer></script>
-<script src="ui.js" defer></script>
 <script src="main.js" defer></script>
-<script>
-  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-</script>
-<script src="/_vercel/insights/script.js"></script>
+
 </body>
 </html>
 

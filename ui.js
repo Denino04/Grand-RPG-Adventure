@@ -478,7 +478,9 @@ function returnFromInventory() {
         case 'sage_tower_buy': renderSageTowerBuy(); break;
         case 'sage_tower_craft': renderSageTowerCraft(); break;
         case 'shop': renderShop('store'); break;
-        case 'blacksmith': renderShop('blacksmith'); break;
+        case 'blacksmith': renderBlacksmithMenu(); break;
+        case 'blacksmith_buy': renderBlacksmithBuy(); break;
+        case 'blacksmith_craft': renderBlacksmithCraft(); break;
         case 'black_market': renderShop('black_market'); break;
         case 'alchemist': renderAlchemist(); break;
         case 'sell': renderSell(); break;
@@ -1117,6 +1119,9 @@ function renderBlacksmithBuy() {
     const scrollable = mainView.querySelector('.inventory-scrollbar');
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
     
+    lastViewBeforeInventory = 'blacksmith_buy';
+    gameState.currentView = 'blacksmith_buy';
+
     let itemsHtml = '';
     for (const category in BLACKSMITH_INVENTORY) {
         if (BLACKSMITH_INVENTORY[category].length === 0) continue;
@@ -1142,6 +1147,9 @@ function renderBlacksmithBuy() {
 function renderBlacksmithCraft() {
     const scrollable = mainView.querySelector('.inventory-scrollbar');
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
+    lastViewBeforeInventory = 'blacksmith_craft';
+    gameState.currentView = 'blacksmith_craft';
 
     let recipesHtml = '';
     for (const recipeKey in BLACKSMITH_RECIPES) {
@@ -1705,4 +1713,5 @@ function renderChangelog() {
     
     changelogScreen.innerHTML = html;
 }
+
 
