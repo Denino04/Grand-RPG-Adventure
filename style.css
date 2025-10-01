@@ -38,7 +38,14 @@ body {
 #game-container { background-color: var(--bg-main); border-color: var(--border-main); }
 #stats-view, .bg-slate-800 { background-color: var(--bg-secondary); }
 #main-view { background-color: color-mix(in srgb, var(--bg-secondary) 50%, transparent); }
-#game-log { background-color: var(--bg-log); color: var(--text-main); }
+
+#game-log { 
+    background-color: var(--bg-log); 
+    color: var(--text-main);
+    display: flex;
+    flex-direction: column;
+}
+
 #tooltip { background-color: var(--bg-tooltip); border-color: var(--border-main); }
 #player-name, .text-yellow-300 { color: var(--text-accent); }
 .text-gray-200 { color: var(--text-main); }
@@ -104,3 +111,4 @@ body {
 .btn-flee:hover:not(:disabled) { background-color: var(--btn-flee-bg-hover); border-color: var(--btn-flee-border-hover); }
 
 #tooltip { position: fixed; display: none; z-index: 100; pointer-events: none; transition: opacity 0.2s; }
+

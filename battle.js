@@ -4,6 +4,7 @@ function startBattle(biomeKey) {
     gameState.battleEnded = false;
     gameState.currentBiome = biomeKey;
     $('#inventory-btn').disabled = true;
+    $('#character-sheet-btn').disabled = true;
     currentEnemies = [];
     player.clearBattleBuffs(); // Clear buffs from previous battle
 
@@ -105,7 +106,7 @@ function performAttack(targetIndex) {
     gameState.isPlayerTurn = false; 
 
     const performSingleAttack = (attackTarget, isSecondStrike = false) => {
-        let damage = rollDice(...weapon.damage, `Player Weapon Attack ${isSecondStrike ? '2' : '1'}`) + player.strength; 
+        let damage = rollDice(...weapon.damage, `Player Weapon Attack ${isSecondStrike ? '2' : '1'}`) + player.physicalDamageBonus; 
         let attackEffects = { element: player.weaponElement };
         let messageLog = [];
 
@@ -365,7 +366,7 @@ function castSpell(spellKey, targetIndex) {
         const spellAmp = catalyst.effect?.spell_amp || 0;
         diceCount = Math.min(spell.cap, diceCount + spellAmp);
 
-        let magicDamage = rollDice(diceCount, spell.damage[1], `Player Spell: ${spell.name}`) + player.intelligence;
+        let magicDamage = rollDice(diceCount, spell.damage[1], `Player Spell: ${spell.name}`) + player.magicalDamageBonus;
 
         if (catalyst.effect?.spell_crit_chance && Math.random() < catalyst.effect.spell_crit_chance) {
             magicDamage = Math.floor(magicDamage * (catalyst.effect.spell_crit_multiplier || 1.5));
@@ -538,6 +539,8 @@ function battleAction(type, actionData = null) {
                     addToLog('You slip through the shadows, guaranteeing your escape!', 'text-purple-400');
                 }
                 addToLog(`You successfully escaped!`, 'text-green-400');
+                $('#inventory-btn').disabled = false;
+                $('#character-sheet-btn').disabled = false;
                 setTimeout(renderMainMenu, 1500);
             } else {
                 addToLog(`You failed to escape!`, 'text-red-400');
@@ -872,6 +875,30 @@ function endPlayerTurnPhase() {
 }
 function checkPlayerDeath() {
     if (!player.isAlive() && !gameState.playerIsDying) {
+        
+        // Check for Undying Heart revive
+        if (player.equippedLure === 'undying_heart' && !player.usedReviveToday) {
+            player.hp = Math.floor(player.maxHp * 0.5);
+            player.usedReviveToday = true;
+            
+            // Consume one heart. This part is tricky as it's not a standard stackable item.
+            // Let's assume it's tracked in inventory.items for simplicity of consumption.
+            if (player.inventory.items['undying_heart']) {
+                 player.inventory.items['undying_heart']--;
+                 if (player.inventory.items['undying_heart'] <= 0) {
+                     delete player.inventory.items['undying_heart'];
+                     player.equippedLure = 'no_lure'; // Unequip if all are gone
+                 }
+            } else { // Failsafe if it was equipped but not in items somehow
+                 player.equippedLure = 'no_lure';
+            }
+            
+            addToLog('The Undying Heart shatters, pulling your soul back from the brink!', 'text-purple-400 font-bold');
+            updateStatsView();
+            return; // Stop the death process
+        }
+
+
         gameState.playerIsDying = true;
 
         const weapon = player.equippedWeapon;

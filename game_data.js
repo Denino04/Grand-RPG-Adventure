@@ -1,3 +1,185 @@
+const RACES = {
+    'Human': { Vigor: 10, Focus: 10, Stamina: 5, Strength: 5, Intelligence: 5, Luck: 5, description: "Versatile and well-rounded, adaptable to any path." },
+    'Elf': { Vigor: 3, Focus: 13, Stamina: 4, Strength: 2, Intelligence: 9, Luck: 5, description: "Graceful and magically attuned, but physically frail." },
+    'Dwarf': { Vigor: 13, Focus: 6, Stamina: 10, Strength: 4, Intelligence: 2, Luck: 5, description: "Hardy and resilient, with a natural affinity for defense." },
+    'Orc': { Vigor: 12, Focus: 6, Stamina: 6, Strength: 11, Intelligence: 1, Luck: 4, description: "Fiercely strong and vigorous, favoring brute force over intellect." },
+    'Halfling': { Vigor: 8, Focus: 8, Stamina: 3, Strength: 2, Intelligence: 4, Luck: 15, description: "Surprisingly resilient and unbelievably lucky, though not physically imposing." },
+    'Tiefling': { Vigor: 9, Focus: 10, Stamina: 3, Strength: 2, Intelligence: 8, Luck: 8, description: "Inheritors of a fiendish bloodline, gifted with cunning and intellect." },
+    'Dragonborn': { Vigor: 12, Focus: 7, Stamina: 3, Strength: 8, Intelligence: 8, Luck: 2, description: "A proud lineage of draconic might, balancing physical and magical power." },
+    'Aasimar': { Vigor: 10, Focus: 10, Stamina: 6, Strength: 5, Intelligence: 6, Luck: 3, description: "Celestially touched, with a harmonious balance of mind and body." },
+    'Beastkin': { Vigor: 9, Focus: 4, Stamina: 7, Strength: 9, Intelligence: 3, Luck: 8, description: "Possessing primal strength and instincts, a born survivor." },
+    'Clankers': { Vigor: 10, Focus: 5, Stamina: 11, Strength: 5, Intelligence: 8, Luck: 1, description: "Constructed beings of metal and logic, incredibly durable but stiff." }
+};
+
+const CLASSES = {
+    'barbarian': {
+        name: 'Barbarian',
+        description: 'A pure brute fueled by raw strength and primal fury.',
+        bonusStats: { Strength: 5, Stamina: 3, Intelligence: -2 },
+        startingEquipment: { weapon: 'battleaxe', shield: 'wooden_shield', armor: 'travelers_garb' },
+        startingItems: { 'health_potion': 3 },
+        startingSpells: {}
+    },
+    'cleric': {
+        name: 'Cleric',
+        description: 'A gentle soul who brings healing and faith to the battlefield.',
+        bonusStats: { Focus: 5, Stamina: 3, Strength: -2 },
+        startingEquipment: { catalyst: 'wooden_stick', armor: 'leather_armor' },
+        startingItems: { 'health_potion': 2, 'mana_potion': 2 },
+        startingSpells: { 'light_support': 1, 'healing_st': 1 }
+    },
+    'fighter': {
+        name: 'Fighter',
+        description: 'An all-rounder with a strong sense of justice and martial prowess.',
+        bonusStats: { Strength: 5, Luck: 3, Focus: -2 },
+        startingEquipment: { weapon: 'steel_longsword', shield: 'wooden_shield', armor: 'leather_armor' },
+        startingItems: { 'health_potion': 3 },
+        startingSpells: {}
+    },
+    'paladin': {
+        name: 'Paladin',
+        description: 'The blade of a god, sworn to defend the innocent with holy might.',
+        bonusStats: { Stamina: 5, Vigor: 3, Luck: -2 },
+        startingEquipment: { weapon: 'rusty_sword', catalyst: 'wooden_stick', armor: 'padded_leather' },
+        startingItems: { 'health_potion': 2, 'mana_potion': 1 },
+        startingSpells: { 'light_st': 1, 'light_support': 1 }
+    },
+    'ranger': {
+        name: 'Ranger',
+        description: 'A keeper of the woods, adept with the bow and natural magic.',
+        bonusStats: { Vigor: 5, Focus: 3, Intelligence: -2 },
+        startingEquipment: { weapon: 'longbow', catalyst: 'wooden_stick', armor: 'travelers_garb' },
+        startingItems: { 'health_potion': 2 },
+        startingSpells: { 'nature_support': 1 },
+        randomLures: { count: 2, types: ['beast', 'monstrosity'] }
+    },
+    'rogue': {
+        name: 'Rogue',
+        description: 'A sneaky bastard with an eye for prizes and a penchant for dirty tricks.',
+        bonusStats: { Luck: 5, Intelligence: 3, Stamina: -2 },
+        startingEquipment: { weapon: 'dagger', armor: 'leather_armor', catalyst: 'wooden_stick' },
+        startingItems: { 'health_potion': 1, 'mana_potion': 2 },
+        startingSpells: { 'dark_support': 1 },
+        randomLures: { count: 2, types: ['humanoid', 'undead'] }
+    },
+    'magus': {
+        name: 'Magus',
+        description: 'The quintessential magic user, weaving powerful elemental spells.',
+        bonusStats: { Intelligence: 5, Focus: 3, Strength: -2 },
+        startingEquipment: { catalyst: 'wooden_wand', shield: 'wooden_shield', armor: 'travelers_garb' },
+        startingItems: { 'mana_potion': 3 },
+        startingSpells: { 'none_st': 1 },
+        randomSpells: { count: 2, types: ['fire_st', 'water_st', 'earth_st', 'wind_st', 'lightning_st', 'nature_st'] }
+    },
+    'warlock': {
+        name: 'Warlock',
+        description: 'A master of debilitating hexes and shadowy magic.',
+        bonusStats: { Intelligence: 5, Luck: 3, Focus: -2 },
+        startingEquipment: { catalyst: 'wooden_wand', armor: 'leather_armor' },
+        startingItems: { 'mana_potion': 2 },
+        startingSpells: { 'none_st': 1, 'water_support': 1, 'dark_st': 1 }
+    }
+};
+
+const BACKGROUNDS = {
+    'wretch': {
+        name: 'Wretch',
+        description: 'A blank slate. For every point spent anywhere, gain a small, random bonus to a derived stat.',
+        favoredStats: [],
+        growthBonus: { wretch: true }
+    },
+    'ascetic_monk': {
+        name: 'Ascetic Monk',
+        description: 'Trained in discipline of body and mind.',
+        favoredStats: ['Vigor', 'Focus'],
+        growthBonus: { vigor: { maxHp: 5 }, focus: { maxMp: 5 } }
+    },
+    'gladiator_slave': {
+        name: 'Gladiator Slave',
+        description: 'Forced to fight for survival, your body is conditioned to endure.',
+        favoredStats: ['Vigor', 'Stamina'],
+        growthBonus: { vigor: { maxHp: 5 }, stamina: { physicalDefense: 0.5, magicalDefense: 0.5 } }
+    },
+    'highlander': {
+        name: 'Highlander',
+        description: 'Raised in the harsh mountains, developing peerless strength.',
+        favoredStats: ['Vigor', 'Strength'],
+        growthBonus: { vigor: { maxHp: 5 }, strength: { physicalDamage: 1 } }
+    },
+    'war_student': {
+        name: 'War Student',
+        description: 'A student of tactical warfare, combining physical training with sharp intellect.',
+        favoredStats: ['Vigor', 'Intelligence'],
+        growthBonus: { vigor: { maxHp: 5 }, intelligence: { magicalDamage: 1 } }
+    },
+    'fey_touched': {
+        name: 'Fey-Touched',
+        description: 'Blessed (or cursed) with a connection to the whimsical and dangerous feywild.',
+        favoredStats: ['Vigor', 'Luck'],
+        growthBonus: { vigor: { maxHp: 5 }, luck: { luckStats: 1 } }
+    },
+    'paladins_protege': {
+        name: 'Paladin\'s Protégé',
+        description: 'Schooled in defensive tactics and channeling divine energy.',
+        favoredStats: ['Focus', 'Stamina'],
+        growthBonus: { focus: { maxMp: 5 }, stamina: { physicalDefense: 0.5, magicalDefense: 0.5 } }
+    },
+    'runesmiths_apprentice': {
+        name: 'Runesmith\'s Apprentice',
+        description: 'Learned to imbue physical strikes with magical force.',
+        favoredStats: ['Focus', 'Strength'],
+        growthBonus: { focus: { maxMp: 5 }, strength: { physicalDamage: 1 } }
+    },
+    'sages_apprentice': {
+        name: 'Sage\'s Apprentice',
+        description: 'A dedicated student of the arcane arts.',
+        favoredStats: ['Focus', 'Intelligence'],
+        growthBonus: { focus: { maxMp: 5 }, intelligence: { magicalDamage: 1 } }
+    },
+    'hedge_mage': {
+        name: 'Hedge Mage',
+        description: 'A self-taught magic user with an uncanny knack for making spells work.',
+        favoredStats: ['Focus', 'Luck'],
+        growthBonus: { focus: { maxMp: 5 }, luck: { luckStats: 1 } }
+    },
+    'knights_squire': {
+        name: 'Knight\'s Squire',
+        description: 'Trained in both defense and the art of the blade.',
+        favoredStats: ['Stamina', 'Strength'],
+        growthBonus: { stamina: { physicalDefense: 0.5, magicalDefense: 0.5 }, strength: { physicalDamage: 1 } }
+    },
+    'city_investigator': {
+        name: 'City Investigator',
+        description: 'You survived by knowing your enemy\'s weakness, both physical and magical.',
+        favoredStats: ['Stamina', 'Intelligence'],
+        growthBonus: { stamina: { physicalDefense: 0.5, magicalDefense: 0.5 }, intelligence: { magicalDamage: 1 } }
+    },
+    'alley_brawler': {
+        name: 'Alley Brawler',
+        description: 'You learned to take a punch and got lucky enough to survive.',
+        favoredStats: ['Stamina', 'Luck'],
+        growthBonus: { stamina: { physicalDefense: 0.5, magicalDefense: 0.5 }, luck: { luckStats: 1 } }
+    },
+    'eldritch_knight_initiate': {
+        name: 'Eldritch Knight Initiate',
+        description: 'A warrior who blends martial prowess with arcane power.',
+        favoredStats: ['Strength', 'Intelligence'],
+        growthBonus: { strength: { physicalDamage: 1 }, intelligence: { magicalDamage: 1 } }
+    },
+    'swashbuckler': {
+        name: 'Swashbuckler',
+        description: 'A flamboyant fighter who relies on flair, force, and a bit of fortune.',
+        favoredStats: ['Strength', 'Luck'],
+        growthBonus: { strength: { physicalDamage: 1 }, luck: { luckStats: 1 } }
+    },
+    'street_urchin': {
+        name: 'Street Urchin',
+        description: 'You survived the harsh streets with your wits and a whole lot of luck.',
+        favoredStats: ['Intelligence', 'Luck'],
+        growthBonus: { intelligence: { magicalDamage: 1 }, luck: { luckStats: 1 } }
+    }
+};
+
 const BIOMES = {
     // Tier 1
     'forest': {
@@ -9,7 +191,7 @@ const BIOMES = {
     },
     'catacombs': {
         name: 'Sunken Catacombs',
-        theme: 'cave',
+        theme: 'necropolis',
         tier: 1,
         description: 'A dark, damp tomb where the dead and their grotesque guardians stir.',
         monsters: { 'skeleton': 50, 'slime': 40, 'rabid_rabbit': 10 },
@@ -34,7 +216,7 @@ const BIOMES = {
     // Tier 3
     'necropolis': {
         name: 'Necropolis, the Silent City',
-        theme: 'cave',
+        theme: 'void',
         tier: 3,
         description: 'A haunted city of the dead, ruled by powerful undead and the desperate men who serve them.',
         monsters: { 'necromancer': 35, 'orc_berserker': 35, 'cockatrice': 10, 'cave_spider': 10, 'armored_zombie': 3, 'bandit': 3, 'dullahan': 2, 'mountain_goliath': 2 },
@@ -64,14 +246,14 @@ const BIOMES = {
     },
     'typhons_jaw': {
         name: 'Typhon\'s Jaw',
-        theme: 'mountain',
+        theme: 'volcano',
         tier: 4,
         description: 'A jagged mountain pass filled with legendary monstrosities of immense power.',
         monsters: { 'chimera': 40, 'unicorn': 10, 'living_armor': 5, 'cockatrice': 20, 'cave_spider': 20, 'dullahan': 5 },
     },
     'tomb_of_the_dead': {
         name: 'Tomb of the Dead',
-        theme: 'cave',
+        theme: 'necropolis',
         tier: 4,
         description: 'A grand mausoleum where the most powerful undead guard ancient treasures.',
         monsters: { 'living_armor': 40, 'one_eyed_troll': 10, 'unicorn': 5, 'necromancer': 20, 'orc_berserker': 20, 'mountain_goliath': 5 },
@@ -87,7 +269,7 @@ const BIOMES = {
     },
     'gate_of_hades': {
         name: 'Gate of Hades',
-        theme: 'cave',
+        theme: 'volcano',
         tier: 5,
         description: 'A direct gateway to the underworld, guarded by its eternal, deathless warden.',
         monsters: { 'dullahan': 50, 'livyatan': 20, 'dragon': 20, 'living_armor': 5, 'chimera': 5 },
@@ -132,7 +314,7 @@ const WEAPONS = {
     'steel_longsword': { name: 'Steel Longsword', damage: [1, 8], price: 120, rarity: 'Common', description: "A reliable and sturdy sword. The adventurer's best friend." },
     'rapier': { name: 'Rapier', damage: [1, 8], price: 150, rarity: 'Common', description: "A slender, pointed sword for quick, flashy thrusts." },
     'longbow': { name: 'Longbow', damage: [1, 6], price: 100, rarity: 'Common', description: "A standard bow for attacking from a socially acceptable distance.", effect: { type: 'ranged', chance: 0.3 } },
-    'battleaxe': {nane: 'Battleaxe', damage: [1, 10], price: 200, rarity: 'Common', description: "A simple barbaric weapon capable of high level of destruction. Side effect includes prone to getting hit more.", effect: {type: 'dodge', chance: -0.5}},
+    'battleaxe': {name: 'Battleaxe', damage: [1, 10], price: 200, rarity: 'Common', description: "A simple barbaric weapon capable of high level of destruction. Side effect includes prone to getting hit more.", effect: {type: 'dodge', chance: -0.5}},
     
     // Uncommon
     'heavy_greatsword': { name: 'Heavy Greatsword', damage: [2, 6], price: 350, rarity: 'Uncommon', description: "A weighty sword that requires two hands and a can-do attitude." },
@@ -193,7 +375,7 @@ const SHIELDS = {
     'iron_kite_shield': {name: 'Iron Kite Shield', defense: 2, blockChance: 0.15, price: 250, rarity: 'Common', description: "A sturdy shield shaped for cavalry, offering decent protection."},
     'iron_buckler': { name: 'Iron Buckler', defense: 1, price: 300, rarity: 'Uncommon', description: "A small, agile shield designed for parrying attacks. Or a very large dinner plate.", effect: { type: 'parry', chance: 0.15 } },
     'brass_shield': { name: 'Brass Shield', defense: 3, blockChance: 0.15, price: 500, rarity: 'Uncommon', description: "A polished brass shield that's both durable and stylish." },
-    'trollblood_shield': { name: 'Trollblood Shield', defense: 3, price: 1400, rarity: 'Rare', description: "A shield imbued with the legendary regenerative powers of trolls. Smells faintly of wet dog.", effect: { hp_regen: 15 } },
+    'trollblood_shield': { name: 'Trollblood Shield', defense: 3, price: 1400, rarity: 'Rare', description: "A shield imbued with the legendary regenerative powers of trolls. Smells faintly of wet dog.", effect: { hp_regen: 5 } },
     'titanium_parrying_shield': { name: 'Titanium Parrying Shield', defense: 3, price: 1200, rarity: 'Rare', description: "A lightweight yet incredibly tough shield perfect for turning aside deadly blows.", effect: { type: 'parry', chance: 0.20 } },
     'spiked_retaliator': { name: 'Spiked Retaliator', defense: 2, price: 1500, rarity: 'Rare', description: "A vicious shield that lashes out with a punishing counter-attack whenever you strike an enemy. It has anger issues.", effect: { attack_follow_up: { damage: [1, 4], paralyze_chance: 0.1, duration: 1 } } },
     'tower_greatshield': {name: 'Tower Greatshield', defense: 5, blockChance: 0.4, price: 3500, rarity: 'Epic', description: "A shield so large it has its own zip code, offering immense protection at the cost of seeing where you're going."},
@@ -241,6 +423,7 @@ const ITEMS = {
     'mountain_rock': { name: 'Mountain Rock', type: 'alchemy', price: 1000, description: 'A chunk of rock humming with the power of a mountain.'},
     'dragon_heart_item': { name: 'Dragon Heart', type: 'alchemy', price: 2000, description: 'The still-warm heart of a slain dragon.'},
     'void_heart': { name: 'Void Heart', type: 'alchemy', price: 2000, description: 'A pulsating shard of darkness from a Dullahan.'},
+    'undying_heart': { name: 'Undying Heart', type: 'special', price: 1000, description: 'A pulsating heart that refuses to stop beating. Can be equipped to grant a single revival per day.' },
     'strength_potion': { name: 'Strength Potion', type: 'buff', price: 150, effect: { type: 'strength', multiplier: 1.5, duration: 3 }, description: 'Temporarily increases physical damage.' },
     'stonehide_potion': { name: 'Stonehide Potion', type: 'buff', price: 200, effect: { type: 'stonehide', multiplier: 2, duration: 3 }, description: 'Temporarily increases defense.' },
     'cleansing_potion': { name: 'Cleansing Potion', type: 'cleanse', price: 250, description: 'Removes all negative status effects.' },
@@ -252,6 +435,11 @@ const ITEMS = {
     'nature_essence': { name: 'Nature Essence', type: 'enchant', price: 100, description: 'The pure, vibrant essence of nature.' },
     'light_essence': { name: 'Light Essence', type: 'enchant', price: 100, description: 'The pure, radiant essence of light.' },
     'void_essence': { name: 'Void Essence', type: 'enchant', price: 100, description: 'The pure, silent essence of the void.' },
+    'potion_of_giant_strength': { name: 'Potion of Giant Strength', type: 'buff', encounterDuration: 3, price: 500, effect: { type: 'temp_strength', multiplier: 1.25, duration: 3 }, description: 'Temporarily increases Physical Damage by 25% for 3 encounters.' },
+    'potion_of_fortitude': { name: 'Potion of Fortitude', type: 'buff', encounterDuration: 3, price: 500, effect: { type: 'temp_vigor', multiplier: 1.25, duration: 3 }, description: 'Temporarily increases Max HP by 25% for 3 encounters.' },
+    'potion_of_brilliance': { name: 'Potion of Brilliance', type: 'buff', encounterDuration: 3, price: 500, effect: { type: 'temp_intelligence', multiplier: 1.25, duration: 3 }, description: 'Temporarily increases Magical Damage by 25% for 3 encounters.' },
+    'potion_of_clarity': { name: 'Potion of Clarity', type: 'buff', encounterDuration: 3, price: 500, effect: { type: 'temp_focus', multiplier: 1.25, duration: 3 }, description: 'Temporarily increases Max MP by 25% for 3 encounters.' }
+
 };
 const LURES = {
     'no_lure': { name: 'None', price: 0, description: 'No lure equipped.' },
@@ -488,32 +676,32 @@ const MONSTER_SPECIES = {
     // Tier 1
     'goblin': { key: 'goblin', name: 'Goblin', class: 'Humanoid', tier: 1, base_hp: 20, base_strength: 3, base_defense: 0, base_xp: 25, base_gold: 15, spell_resistance: 0.05, loot_table: {'health_potion': 0.1, 'goblin_ear': 0.5, 'dagger': 0.1, 'rusty_sword': 0.15, 'wooden_shield': 0.05, 'wooden_wand': 0.02} },
     'rabid_rabbit': { key: 'rabid_rabbit', name: 'Rabid Rabbit', class: 'Beast', tier: 1, base_hp: 25, base_strength: 2, base_defense: 1, base_xp: 25, base_gold: 8, spell_resistance: 0, loot_table: {'rabbit_meat': 0.6} },
-    'slime': { key: 'slime', name: 'Slime', class: 'Monstrosity', tier: 1, base_hp: 28, base_strength: 2, base_defense: 2, base_xp: 22, base_gold: 10, spell_resistance: 0.1, loot_table: {'slime_glob': 0.5} },
-    'skeleton': { key: 'skeleton', name: 'Skeleton', class: 'Undead', tier: 1, base_hp: 18, base_strength: 3, base_defense: 2, base_xp: 20, base_gold: 10, spell_resistance: 0.1, loot_table: {'rusty_sword': 0.1, 'dagger': 0.05, 'wooden_shield': 0.05, 'iron_buckler': 0.03, 'cracked_orb': 0.02} },
+    'slime': { key: 'slime', name: 'Slime', class: 'Monstrosity', tier: 1, base_hp: 28, base_strength: 2, base_defense: 2, base_xp: 22, base_gold: 10, spell_resistance: 0.1, loot_table: {'slime_glob': 0.5}, damage_type: 'magical' },
+    'skeleton': { key: 'skeleton', name: 'Skeleton', class: 'Undead', tier: 1, base_hp: 18, base_strength: 3, base_defense: 2, base_xp: 20, base_gold: 10, spell_resistance: 0.1, loot_table: {'rusty_sword': 0.1, 'dagger': 0.05, 'wooden_shield': 0.05, 'iron_buckler': 0.03, 'cracked_orb': 0.02, 'undying_heart': 0.02} },
     
     // Tier 2
     'bandit': { key: 'bandit', name: 'Bandit', class: 'Humanoid', tier: 2, base_hp: 45, base_strength: 8, base_defense: 3, base_xp: 50, base_gold: 30, spell_resistance: 0.05, loot_table: {'health_potion': 0.25, 'dagger': 0.15, 'rusty_sword': 0.1, 'steel_longsword': 0.05, 'iron_kite_shield': 0.05, 'iron_buckler': 0.05, 'padded_leather': 0.08, 'silenced_leather_armor': 0.02, 'hardwood_staff': 0.02} },
     'dire_wolf': { key: 'dire_wolf', name: 'Dire Wolf', class: 'Beast', tier: 2, base_hp: 60, base_strength: 6, base_defense: 2, base_xp: 40, base_gold: 15, spell_resistance: 0, loot_table: {'health_potion': 0.15, 'wolf_pelt': 0.4} },
     'giant_rat': { key: 'giant_rat', name: 'Giant Rat', class: 'Monstrosity', tier: 2, base_hp: 40, base_strength: 5, base_defense: 1, base_xp: 35, base_gold: 10, spell_resistance: 0, loot_table: {'rat_tail': 0.6} },
-    'armored_zombie': { key: 'armored_zombie', name: 'Armored Zombie', class: 'Undead', tier: 2, base_hp: 50, base_strength: 7, base_defense: 5, base_xp: 45, base_gold: 20, spell_resistance: 0.15, loot_table: {'dagger': 0.05, 'steel_longsword': 0.08, 'heavy_greatsword': 0.03, 'iron_kite_shield': 0.05, 'brass_shield': 0.03, 'padded_leather': 0.05, 'chainmail_armor': 0.03, 'magical_orb': 0.02} },
+    'armored_zombie': { key: 'armored_zombie', name: 'Armored Zombie', class: 'Undead', tier: 2, base_hp: 50, base_strength: 7, base_defense: 5, base_xp: 45, base_gold: 20, spell_resistance: 0.15, loot_table: {'dagger': 0.05, 'steel_longsword': 0.08, 'heavy_greatsword': 0.03, 'iron_kite_shield': 0.05, 'brass_shield': 0.03, 'padded_leather': 0.05, 'chainmail_armor': 0.03, 'magical_orb': 0.02, 'undying_heart': 0.05}, damage_type: 'magical' },
     
     // Tier 3
     'orc_berserker': { key: 'orc_berserker', name: 'Orc Berserker', class: 'Humanoid', tier: 3, ability: 'enrage', base_hp: 70, base_strength: 12, base_defense: 4, base_xp: 80, base_gold: 40, spell_resistance: 0.1, loot_table: {'health_potion': 0.3, 'steel_longsword': 0.1, 'heavy_greatsword': 0.08, 'obsidian_axe': 0.05, 'sunderers_battleaxe': 0.02, 'orc_liver': 0.3, 'brass_shield': 0.05, 'titanium_parrying_shield': 0.02, 'chainmail_armor': 0.05, 'half_plate_armor': 0.02, 'cypresswood_staff': 0.02, 'dual_longswords': 0.02} },
     'cave_spider': { key: 'cave_spider', name: 'Cave Spider', class: 'Beast', tier: 3, ability: 'poison_web', base_hp: 90, base_strength: 9, base_defense: 3, base_xp: 75, base_gold: 30, spell_resistance: 0, loot_table: {'spider_venom': 0.5, 'eye_of_medusa': 0.01} },
-    'cockatrice': { key: 'cockatrice', name: 'Cockatrice', class: 'Monstrosity', tier: 3, ability: 'petrification', base_hp: 80, base_strength: 10, base_defense: 5, base_xp: 90, base_gold: 50, spell_resistance: 0.2, loot_table: {'cockatrice_venom_gland': 0.4, 'eye_of_medusa': 0.02, 'arcane_focus': 0.02} },
-    'necromancer': { key: 'necromancer', name: 'Necromancer', class: 'Undead', tier: 3, ability: 'necromancy', base_hp: 60, base_strength: 8, base_defense: 2, base_xp: 100, base_gold: 60, spell_resistance: 0.3, loot_table: {'mana_potion': 0.2, 'vampiric_dagger': 0.02, 'assassin_cloak_armor': 0.02, 'staff_of_loss': 0.02, 'archmages_robes': 0.01, 'souldrinker_orb': 0.01} },
+    'cockatrice': { key: 'cockatrice', name: 'Cockatrice', class: 'Monstrosity', tier: 3, ability: 'petrification', base_hp: 80, base_strength: 10, base_defense: 5, base_xp: 90, base_gold: 50, spell_resistance: 0.2, loot_table: {'cockatrice_venom_gland': 0.4, 'eye_of_medusa': 0.02, 'arcane_focus': 0.02}, damage_type: 'magical' },
+    'necromancer': { key: 'necromancer', name: 'Necromancer', class: 'Undead', tier: 3, ability: 'necromancy', base_hp: 60, base_strength: 8, base_defense: 2, base_xp: 100, base_gold: 60, spell_resistance: 0.3, loot_table: {'mana_potion': 0.2, 'vampiric_dagger': 0.02, 'assassin_cloak_armor': 0.02, 'staff_of_loss': 0.02, 'archmages_robes': 0.01, 'souldrinker_orb': 0.01, 'undying_heart': 0.1}, damage_type: 'magical' },
     
     // Tier 4 - REBALANCED REWARDS
     'one_eyed_troll': { key: 'one_eyed_troll', name: 'One-Eyed Troll', class: 'Humanoid', tier: 4, ability: 'ultra_focus', base_hp: 150, base_strength: 20, base_defense: 8, base_xp: 350, base_gold: 175, spell_resistance: 0.1, loot_table: {'superior_health_potion': 0.2, 'obsidian_axe': 0.08, 'sunderers_battleaxe': 0.04, 'heavy_slabshield': 0.03, 'steel_plate_armor': 0.03, 'staff_of_the_magi': 0.01, 'trollblood_shield': 0.03} },
-    'unicorn': { key: 'unicorn', name: 'Unicorn', class: 'Beast', tier: 4, ability: 'healing', base_hp: 170, base_strength: 15, base_defense: 5, base_xp: 320, base_gold: 160, spell_resistance: 0.25, loot_table: {'unicorn_horn_fragment': 0.5, 'golden_greatbow': 0.05, 'obsidian_lamina': 0.02, 'purifying_crystal_shield': 0.02} },
-    'chimera': { key: 'chimera', name: 'Chimera', class: 'Monstrosity', tier: 4, ability: 'true_poison', base_hp: 160, base_strength: 18, base_defense: 10, base_xp: 400, base_gold: 200, spell_resistance: 0.15, loot_table: {'golden_greatbow': 0.03, 'eye_of_medusa': 0.03, 'crystal_ball': 0.01, 'spellblade_of_echoes': 0.03} },
-    'living_armor': { key: 'living_armor', name: 'Living Armor', class: 'Undead', tier: 4, ability: 'living_shield', base_hp: 120, base_strength: 17, base_defense: 15, base_xp: 380, base_gold: 190, spell_resistance: 0.5, loot_table: {'obsidian_axe': 0.05, 'masterwork_spear': 0.08, 'flaming_sword': 0.03, 'tower_greatshield': 0.05, 'exa_reflector': 0.01, 'soul_armor_shard': 0.1, 'steel_plate_armor': 0.05, 'adamantine_armor': 0.01, 'bloodwood_scepter': 0.01, 'spiked_retaliator': 0.02, 'mirror_mail': 0.01} },
+    'unicorn': { key: 'unicorn', name: 'Unicorn', class: 'Beast', tier: 4, ability: 'healing', base_hp: 170, base_strength: 15, base_defense: 5, base_xp: 320, base_gold: 160, spell_resistance: 0.25, loot_table: {'unicorn_horn_fragment': 0.5, 'golden_greatbow': 0.05, 'obsidian_lamina': 0.02, 'purifying_crystal_shield': 0.02}, damage_type: 'magical' },
+    'chimera': { key: 'chimera', name: 'Chimera', class: 'Monstrosity', tier: 4, ability: 'true_poison', base_hp: 160, base_strength: 18, base_defense: 10, base_xp: 400, base_gold: 200, spell_resistance: 0.15, loot_table: {'golden_greatbow': 0.03, 'eye_of_medusa': 0.03, 'crystal_ball': 0.01, 'spellblade_of_echoes': 0.03}, damage_type: 'magical' },
+    'living_armor': { key: 'living_armor', name: 'Living Armor', class: 'Undead', tier: 4, ability: 'living_shield', base_hp: 120, base_strength: 17, base_defense: 15, base_xp: 380, base_gold: 190, spell_resistance: 0.5, loot_table: {'obsidian_axe': 0.05, 'masterwork_spear': 0.08, 'flaming_sword': 0.03, 'tower_greatshield': 0.05, 'exa_reflector': 0.01, 'soul_armor_shard': 0.1, 'steel_plate_armor': 0.05, 'adamantine_armor': 0.01, 'bloodwood_scepter': 0.01, 'spiked_retaliator': 0.02, 'mirror_mail': 0.01, 'undying_heart': 0.2}, damage_type: 'hybrid' },
     
     // Tier 5 - REBALANCED REWARDS
     'mountain_goliath': { key: 'mountain_goliath', name: 'Mountain Goliath', class: 'Humanoid', tier: 5, ability: 'earthshaker', base_hp: 300, base_strength: 28, base_defense: 12, base_xp: 1200, base_gold: 600, spell_resistance: 0.15, loot_table: {'sunderers_battleaxe': 0.05, 'earthshaker_hammer': 0.01, 'heavy_slabshield': 0.02, 'mountain_rock': 0.1} },
-    'livyatan': { key: 'livyatan', name: 'Livyatan', class: 'Beast', tier: 5, ability: 'swallow', base_hp: 400, base_strength: 22, base_defense: 10, base_xp: 1100, base_gold: 550, spell_resistance: 0.1, loot_table: {'vacuum_greatbow': 0.01, 'lightning_javelin': 0.05, 'vacuum_lining': 0.2} },
-    'dragon': { key: 'dragon', name: 'Dragon', class: 'Monstrosity', tier: 5, ability: 'scorch_earth', base_hp: 350, base_strength: 25, base_defense: 18, base_xp: 1500, base_gold: 750, spell_resistance: 0.2, loot_table: {'dragon_scale': 0.5, 'flaming_sword': 0.05, 'dragon_scale_cragblade': 0.01, 'dragon_heart_item': 0.1} },
-    'dullahan': { key: 'dullahan', name: 'Dullahan', class: 'Undead', tier: 5, ability: 'alive_again', base_hp: 250, base_strength: 26, base_defense: 14, base_xp: 1350, base_gold: 700, spell_resistance: 0.25, loot_table: {'flaming_sword': 0.03, 'vampiric_dagger': 0.04, 'obsidian_lamina': 0.03, 'void_greatsword': 0.01, 'adamantine_armor': 0.02, 'void_heart': 0.1} }
+    'livyatan': { key: 'livyatan', name: 'Livyatan', class: 'Beast', tier: 5, ability: 'swallow', base_hp: 400, base_strength: 22, base_defense: 10, base_xp: 1100, base_gold: 550, spell_resistance: 0.1, loot_table: {'vacuum_greatbow': 0.01, 'lightning_javelin': 0.05, 'vacuum_lining': 0.2}, damage_type: 'magical' },
+    'dragon': { key: 'dragon', name: 'Dragon', class: 'Monstrosity', tier: 5, ability: 'scorch_earth', base_hp: 350, base_strength: 25, base_defense: 18, base_xp: 1500, base_gold: 750, spell_resistance: 0.2, loot_table: {'dragon_scale': 0.5, 'flaming_sword': 0.05, 'dragon_scale_cragblade': 0.01, 'dragon_heart_item': 0.1}, damage_type: 'hybrid' },
+    'dullahan': { key: 'dullahan', name: 'Dullahan', class: 'Undead', tier: 5, ability: 'alive_again', base_hp: 250, base_strength: 26, base_defense: 14, base_xp: 1350, base_gold: 700, spell_resistance: 0.25, loot_table: {'flaming_sword': 0.03, 'vampiric_dagger': 0.04, 'obsidian_lamina': 0.03, 'void_greatsword': 0.01, 'adamantine_armor': 0.02, 'void_heart': 0.1, 'undying_heart': 0.4}, damage_type: 'hybrid' }
 };
 
 const MONSTER_RARITY = {
@@ -580,7 +768,7 @@ const LEGACY_QUESTS = {
 };
 
 const SHOP_INVENTORY = {
-    'Potions & Items': ['health_potion', 'mana_potion', 'condensed_health_potion', 'condensed_mana_potion'],
+    'Potions & Items': ['health_potion', 'mana_potion', 'superior_health_potion'],
     'Weapons': ['rusty_sword', 'wooden_stick'],
     'Gear': ['travelers_garb', 'leather_armor', 'padded_leather', 'wooden_shield']
 };
@@ -600,9 +788,10 @@ const BLACK_MARKET_INVENTORY = {
 };
 
 const ALCHEMY_RECIPES = {
-    'brew_strength': { output: 'strength_potion', ingredients: { 'orc_liver': 1 }, cost: 50 },
-    'brew_stonehide': { output: 'stonehide_potion', ingredients: { 'cockatrice_venom_gland': 1 }, cost: 75 },
-    'brew_cleanse': { output: 'cleansing_potion', ingredients: { 'unicorn_horn_fragment': 1 }, cost: 100 },
+    'potion_giant_strength': { output: 'potion_of_giant_strength', ingredients: { 'orc_liver': 5 }, cost: 250, hearts: 1 },
+    'potion_fortitude': { output: 'potion_of_fortitude', ingredients: { 'cockatrice_venom_gland': 5 }, cost: 250, hearts: 1 },
+    'potion_brilliance': { output: 'potion_of_brilliance', ingredients: { 'spider_venom': 5 }, cost: 250, hearts: 1 },
+    'potion_clarity': { output: 'potion_of_clarity', ingredients: { 'unicorn_horn_fragment': 2 }, cost: 250, hearts: 1 },
     'brew_health': { output: 'health_potion', ingredients: { 'slime_glob': 2 }, cost: 10 },
     'brew_mana': { output: 'mana_potion', ingredients: { 'slime_glob': 2 }, cost: 15 },
 };
@@ -631,13 +820,27 @@ const ENCHANTING_COSTS = {
     'Legendary': { essence: 30, gold: 10000 }
 };
 
+const WITCH_COVEN_RECIPES = {
+    'transmute_fire_essence': { output: 'fire_essence', ingredients: { 'slime_glob': 5, 'goblin_ear': 2 }, cost: 100 },
+    'transmute_water_essence': { output: 'water_essence', ingredients: { 'slime_glob': 5, 'rat_tail': 2 }, cost: 100 },
+    'transmute_earth_essence': { output: 'earth_essence', ingredients: { 'slime_glob': 5, 'rabbit_meat': 2 }, cost: 100 },
+    'transmute_wind_essence': { output: 'wind_essence', ingredients: { 'slime_glob': 5, 'wolf_pelt': 2 }, cost: 100 },
+
+};
+
+const WITCH_COVEN_SERVICES = {
+    resetStats: { gold: 5000, hearts: 5 },
+    changeRace: { gold: 10000, hearts: 10 },
+    changeClass: { gold: 10000, hearts: 10 },
+    changeBackground: { gold: 10000, hearts: 10 }
+};
+
 const CHANGELOG_DATA = [
     {
         version: "v0.3 - Magic and Elements",
         date: "2025-09-28",
         changes: [
-            "<strong>0.3.1</strong> - Implemented the foundational Elemental System, preparing the game for deeper magical combat.",
-            "<strong>0.3.2</strong> - Implemented the Magical System Overhaul, changing how Spells and Catalysts works."
+            "<strong>0.3.1</strong> - Implemented the foundational Elemental System, preparing the game for deeper magical combat."
         ]
     },
     {
@@ -661,4 +864,3 @@ const CHANGELOG_DATA = [
         ]
     }
 ];
-

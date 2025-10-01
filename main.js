@@ -3,21 +3,103 @@ let player;
 let currentEnemies = [];
 let gameState = { currentView: 'main_menu', isPlayerTurn: true, currentBiome: null, playerIsDying: false };
 let lastViewBeforeInventory = 'main_menu';
-// let activeTooltipItem = null; // This was the duplicate declaration
 let isDebugVisible = false;
+let timeOfDayIndex = 0;
+const timeOfDayPalettes = ['noon', 'sunset', 'midnight'];
 
 // --- INITIALIZATION ---
-function initGame(playerName) { 
+function initGame(playerName, gender, raceKey, classKey, backgroundKey) { 
+    $('#character-creation-screen').classList.add('hidden');
     $('#start-screen').classList.add('hidden'); 
     $('#game-container').classList.remove('hidden'); 
-    player = new Player(playerName); 
-    player.seed = Math.floor(Math.random() * 1000000); // Assign a random seed
+    
+    // 1. Create Player with Race stats
+    player = new Player(playerName, raceKey); 
+    player.gender = gender;
+    player.class = CLASSES[classKey].name;
+    player.background = BACKGROUNDS[backgroundKey].name;
+    player.backgroundKey = backgroundKey;
+    player.totalXp = 0; // Initialize totalXp for new characters
+
+    // 2. Apply Class modifications
+    const classData = CLASSES[classKey];
+    
+    // Apply stat bonuses
+    for (const stat in classData.bonusStats) {
+        let statLower = stat.toLowerCase();
+        if (player.hasOwnProperty(statLower)) {
+            player[statLower] += classData.bonusStats[stat];
+        }
+    }
+    
+    // Apply starting equipment, items, and spells
+    player.inventory = { items: {}, weapons: [], catalysts: [], armor: [], shields: [], lures: {} }; // Clear default inventory
+    
+    for (const itemKey in classData.startingItems) {
+        player.addToInventory(itemKey, classData.startingItems[itemKey], false);
+    }
+    
+    if (classData.startingEquipment.weapon) {
+        player.addToInventory(classData.startingEquipment.weapon, 1, false);
+        equipItem(classData.startingEquipment.weapon);
+    }
+    if (classData.startingEquipment.catalyst) {
+        player.addToInventory(classData.startingEquipment.catalyst, 1, false);
+        equipItem(classData.startingEquipment.catalyst);
+    }
+    if (classData.startingEquipment.armor) {
+        player.addToInventory(classData.startingEquipment.armor, 1, false);
+        equipItem(classData.startingEquipment.armor);
+    }
+    if (classData.startingEquipment.shield) {
+        player.addToInventory(classData.startingEquipment.shield, 1, false);
+        equipItem(classData.startingEquipment.shield);
+    }
+
+    player.spells = {}; // Clear default spells
+    for (const spellKey in classData.startingSpells) {
+        player.spells[spellKey] = { tier: classData.startingSpells[spellKey] };
+    }
+    
+    // Handle special random items/spells
+    if (classData.randomLures) {
+        const availableLures = Object.keys(LURES).filter(key => {
+            const lure = LURES[key];
+            if (!lure.lureTarget) return false;
+            const target = MONSTER_SPECIES[lure.lureTarget];
+            return target && classData.randomLures.types.includes(target.class.toLowerCase());
+        });
+        for (let i = 0; i < classData.randomLures.count; i++) {
+            if (availableLures.length > 0) {
+                const randomLureKey = availableLures[Math.floor(Math.random() * availableLures.length)];
+                player.addToInventory(randomLureKey, 1, false);
+            }
+        }
+    }
+    if (classData.randomSpells) {
+         const availableSpells = shuffleArray([...classData.randomSpells.types]);
+         for(let i = 0; i < classData.randomSpells.count; i++) {
+             if (availableSpells.length > 0) {
+                const spellKey = availableSpells.pop();
+                player.spells[spellKey] = { tier: 1 };
+             }
+         }
+    }
+
+
+    // 3. Finalize Player Setup
+    player.hp = player.maxHp;
+    player.mp = player.maxMp;
+    player.baseStats = { Vigor: player.vigor, Focus: player.focus, Stamina: player.stamina, Strength: player.strength, Intelligence: player.intelligence, Luck: player.luck };
+
+
+    player.seed = Math.floor(Math.random() * 1000000);
     gameState.playerIsDying = false; 
     player.saveKey = generateSaveKey();
     generateRandomizedBiomeOrder();
     generateBlackMarketStock();
     updatePlayerTier();
-    addToLog(`Welcome, ${playerName}! Your adventure begins.`); 
+    addToLog(`Welcome, ${playerName} the ${player.class}! Your adventure begins.`); 
     applyTheme('default'); 
     updateStatsView(); 
     saveGame();
@@ -25,10 +107,8 @@ function initGame(playerName) {
 }
 
 function generateRandomizedBiomeOrder() {
-    // Create a seeded random number generator for this character
     const rng = seededRandom(player.seed);
 
-    // Group biomes by tier
     const biomesByTier = {};
     for (const biomeKey in BIOMES) {
         const biome = BIOMES[biomeKey];
@@ -38,15 +118,13 @@ function generateRandomizedBiomeOrder() {
         biomesByTier[biome.tier].push(biomeKey);
     }
 
-    // Shuffle within tiers and create final order
     player.biomeOrder = [];
     const sortedTiers = Object.keys(biomesByTier).sort((a, b) => a - b);
     for (const tier of sortedTiers) {
-        const shuffledBiomesInTier = shuffleArray(biomesByTier[tier], rng); // Use seeded shuffle
+        const shuffledBiomesInTier = shuffleArray(biomesByTier[tier], rng);
         player.biomeOrder.push(...shuffledBiomesInTier);
     }
 
-    // Apply staggered level requirements
     player.biomeUnlockLevels = {};
     let currentLvl = 1;
     let increment = 3;
@@ -64,9 +142,6 @@ function generateRandomizedBiomeOrder() {
     });
 }
 
-/**
- * Calculates and updates the player's tier based on the highest unlocked biome.
- */
 function updatePlayerTier() {
     if (!player) return;
     let maxTier = 0;
@@ -118,7 +193,7 @@ function renderLoadMenu() {
                     <div class="p-3 bg-slate-800 rounded-lg flex justify-between items-center">
                         <div>
                             <p class="font-bold text-yellow-300">${charData.name}</p>
-                            <p class="text-sm text-gray-400">Level ${charData.level}</p>
+                            <p class="text-sm text-gray-400">Level ${charData.level} ${charData.race || ''} ${charData.class || ''}</p>
                         </div>
                         <div>
                             <button onclick="loadGameFromKey('${key}')" class="btn btn-primary text-sm py-1 px-3">Load</button>
@@ -136,7 +211,7 @@ function renderLoadMenu() {
     </div>`;
     
     $('#start-screen').classList.add('hidden');
-    const screenContainer = $('#changelog-screen'); // Re-use this container for load menu as well
+    const screenContainer = $('#changelog-screen');
     screenContainer.innerHTML = html;
     screenContainer.classList.remove('hidden');
 }
@@ -153,101 +228,126 @@ function deleteSave(saveKey) {
      updateLoadGameButtonVisibility();
 }
 
-function loadGameFromKey(saveKey) { 
-    const savedData = localStorage.getItem(`rpgSaveData_${saveKey}`); 
-    if (savedData) { 
-        try { 
-            const parsedData = JSON.parse(savedData); 
-            player = new Player(parsedData.name); 
-            Object.assign(player, parsedData); 
+function loadGameFromKey(saveKey, isImport = false) {
+    const savedData = localStorage.getItem(`rpgSaveData_${saveKey}`);
+    if (savedData) {
+        try {
+            const parsedData = JSON.parse(savedData);
 
-            // --- Clean invalid spells from save data ---
+            if (!parsedData.race) {
+                renderRaceSelectionForOldSave(parsedData, saveKey, isImport);
+                return;
+            }
+            
+            if (!parsedData.class || !parsedData.backgroundKey) {
+                renderClassBackgroundSelectionForOldSave(parsedData, saveKey, isImport);
+                return;
+            }
+
+            player = new Player(parsedData.name, parsedData.race);
+
+            const getterProperties = ['maxHp', 'maxMp', 'physicalDefense', 'magicalDefense', 'physicalDamageBonus', 'magicalDamageBonus', 'resistanceChance', 'critChance', 'evasionChance'];
+            for (const key in parsedData) {
+                if (Object.prototype.hasOwnProperty.call(parsedData, key) && !getterProperties.includes(key)) {
+                    player[key] = parsedData[key];
+                }
+            }
+
+            if (player.totalXp === undefined) {
+                addToLog('Updating old save file to new EXP system...', 'text-yellow-300');
+                let estimatedTotalXp = 0;
+                
+                for (let i = 1; i < player.level; i++) {
+                    estimatedTotalXp += Math.floor(100 * Math.pow(i, 1.5));
+                }
+
+                estimatedTotalXp += player.xp;
+                player.totalXp = estimatedTotalXp;
+            }
+
+            const levelChange = player.recalculateLevelFromTotalXp();
+            if (levelChange !== 0) {
+                const changeText = levelChange > 0 ? `gained ${levelChange}` : `lost ${Math.abs(levelChange)}`;
+                const plural = Math.abs(levelChange) > 1 ? 's' : '';
+                addToLog(`Your level has been re-calibrated! You ${changeText} level${plural}!`, 'text-green-400');
+                if (player.statPoints > 0) {
+                    addToLog(`You have <span class="font-bold text-green-400">${player.statPoints}</span> stat points to allocate!`, 'text-green-300');
+                }
+            }
+            player.recalculateGrowthBonuses();
+            player.hp = Math.min(parsedData.hp, player.maxHp);
+            player.mp = Math.min(parsedData.mp, player.maxMp);
+
+            if (isImport) {
+                player.saveKey = generateSaveKey();
+            }
+
+            if (player.gender === 'Not specified' || !player.gender) {
+                player.gender = 'Neutral';
+            }
+
             if (player.spells) {
-                const originalSpellCount = Object.keys(player.spells).length;
                 for (const spellKey in player.spells) {
                     if (!SPELLS[spellKey]) {
                         delete player.spells[spellKey];
                         console.warn(`Removed unknown spell '${spellKey}' from save data.`);
                     }
                 }
-                const newSpellCount = Object.keys(player.spells).length;
-                if (newSpellCount < originalSpellCount) {
-                     addToLog(`An unknown or outdated spell was removed from your spellbook.`, 'text-yellow-500');
-                }
             }
 
-
-            // --- Re-link equipped items to the master objects to fix reference issues ---
             const weaponKey = findKeyByName(parsedData.equippedWeapon?.name, WEAPONS) || 'fists';
             player.equippedWeapon = WEAPONS[weaponKey];
-
             const catalystKey = findKeyByName(parsedData.equippedCatalyst?.name, CATALYSTS) || 'no_catalyst';
             player.equippedCatalyst = CATALYSTS[catalystKey];
-
             const armorKey = findKeyByName(parsedData.equippedArmor?.name, ARMOR) || 'travelers_garb';
             player.equippedArmor = ARMOR[armorKey];
-
             const shieldKey = findKeyByName(parsedData.equippedShield?.name, SHIELDS) || 'no_shield';
             player.equippedShield = SHIELDS[shieldKey];
             
-            // --- Compatibility Checks for old saves ---
-            if (!LURES[player.equippedLure]) {
-                player.equippedLure = 'no_lure';
-            }
-            if (!player.inventory.catalysts) {
-                player.inventory.catalysts = [];
-            }
+            if (!LURES[player.equippedLure]) player.equippedLure = 'no_lure';
+            if (!player.inventory.catalysts) player.inventory.catalysts = [];
             if (!player.equipmentOrder) {
                 player.equipmentOrder = [];
-                if (player.equippedWeapon && player.equippedWeapon.name !== 'Fists') {
-                    player.equipmentOrder.push('weapon');
-                }
-                if (player.equippedShield && player.equippedShield.name !== 'None') {
-                    player.equipmentOrder.push('shield');
-                }
-                if (player.equippedCatalyst && player.equippedCatalyst.name !== 'None') {
-                    player.equipmentOrder.push('catalyst');
-                }
+                if (player.equippedWeapon && player.equippedWeapon.name !== 'Fists') player.equipmentOrder.push('weapon');
+                if (player.equippedShield && player.equippedShield.name !== 'None') player.equipmentOrder.push('shield');
+                if (player.equippedCatalyst && player.equippedCatalyst.name !== 'None') player.equipmentOrder.push('catalyst');
             }
-            if (!player.legacyQuestProgress) {
-                player.legacyQuestProgress = {};
-            }
-            if (!player.questsTakenToday) {
-                player.questsTakenToday = [];
-            }
+            if (!player.legacyQuestProgress) player.legacyQuestProgress = {};
+            if (!player.questsTakenToday) player.questsTakenToday = [];
             if (!player.blackMarketStock) {
                 player.blackMarketStock = { seasonal: [] };
                 generateBlackMarketStock();
             }
-            gameState.playerIsDying = false; 
+            gameState.playerIsDying = false;
 
-            // Compatibility fix for old save files with the old quest system
             if (typeof player.activeQuest === 'string') {
                 player.activeQuest = null;
                 player.questProgress = 0;
             }
 
-            // Compatibility for saves without a seed
-            if (!player.seed) {
-                player.seed = Math.floor(Math.random() * 1000000);
-            }
-
-            if (!player.biomeOrder || player.biomeOrder.length === 0) {
-                generateRandomizedBiomeOrder();
-            }
+            if (!player.seed) player.seed = Math.floor(Math.random() * 1000000);
+            if (!player.biomeOrder || player.biomeOrder.length === 0) generateRandomizedBiomeOrder();
             
-            updatePlayerTier(); // Calculate tier on load
+            updatePlayerTier();
 
-            $('#start-screen').classList.add('hidden'); 
+            $('#start-screen').classList.add('hidden');
+            $('#character-creation-screen').classList.add('hidden');
+            $('#old-save-race-selection-screen').classList.add('hidden');
+            $('#old-save-class-background-screen').classList.add('hidden'); // This is the fix
             $('#changelog-screen').classList.add('hidden');
-            $('#game-container').classList.remove('hidden'); 
-            addToLog(`Welcome back, ${player.name}!`); 
-            applyTheme('default'); 
-            updateStatsView(); 
-            renderMainMenu(); 
-        } catch (error) { 
-            console.error("Could not load game:", error); 
-        } 
+            $('#game-container').classList.remove('hidden');
+
+            addToLog(`Welcome back, ${player.name}!`);
+            applyTheme('default');
+            updateStatsView();
+            if (player.statPoints > 0) {
+                setTimeout(() => renderCharacterSheet(true), 1500);
+            } else {
+                renderMainMenu();
+            }
+        } catch (error) {
+            console.error("Could not load game:", error);
+        }
     } else {
         alert("Save file not found!");
         showStartScreen();
@@ -276,101 +376,16 @@ function importSave(saveString) {
         const jsonString = atob(saveString);
         const parsedData = JSON.parse(jsonString);
 
-        if (!parsedData || !parsedData.name || !parsedData.hp) {
+        if (!parsedData || !parsedData.name) {
             throw new Error("Invalid save data format.");
         }
-
-        player = new Player(parsedData.name);
-        Object.assign(player, parsedData);
-        player.saveKey = generateSaveKey(); 
-        gameState.playerIsDying = false; 
-
-        // --- Clean invalid spells from save data ---
-        if (player.spells) {
-            const originalSpellCount = Object.keys(player.spells).length;
-            for (const spellKey in player.spells) {
-                if (!SPELLS[spellKey]) {
-                    delete player.spells[spellKey];
-                    console.warn(`Removed unknown spell '${spellKey}' from imported save data.`);
-                }
-            }
-             const newSpellCount = Object.keys(player.spells).length;
-            if (newSpellCount < originalSpellCount) {
-                 addToLog(`An unknown or outdated spell was removed from your spellbook during import.`, 'text-yellow-500');
-            }
-        }
-
-        // --- Re-link equipped items to the master objects to fix reference issues ---
-        const weaponKey = findKeyByName(parsedData.equippedWeapon?.name, WEAPONS) || 'fists';
-        player.equippedWeapon = WEAPONS[weaponKey];
-
-        const catalystKey = findKeyByName(parsedData.equippedCatalyst?.name, CATALYSTS) || 'no_catalyst';
-        player.equippedCatalyst = CATALYSTS[catalystKey];
-
-        const armorKey = findKeyByName(parsedData.equippedArmor?.name, ARMOR) || 'travelers_garb';
-        player.equippedArmor = ARMOR[armorKey];
-
-        const shieldKey = findKeyByName(parsedData.equippedShield?.name, SHIELDS) || 'no_shield';
-        player.equippedShield = SHIELDS[shieldKey];
-
-        // --- Compatibility Checks for old saves ---
-        if (!LURES[player.equippedLure]) {
-            player.equippedLure = 'no_lure';
-        }
-        if (!player.inventory.catalysts) {
-            player.inventory.catalysts = [];
-        }
-         if (!player.equipmentOrder) {
-            player.equipmentOrder = [];
-            if (player.equippedWeapon && player.equippedWeapon.name !== 'Fists') {
-                player.equipmentOrder.push('weapon');
-            }
-            if (player.equippedShield && player.equippedShield.name !== 'None') {
-                player.equipmentOrder.push('shield');
-            }
-            if (player.equippedCatalyst && player.equippedCatalyst.name !== 'None') {
-                player.equipmentOrder.push('catalyst');
-            }
-        }
-        if (!player.legacyQuestProgress) {
-            player.legacyQuestProgress = {};
-        }
-        if (!player.questsTakenToday) {
-            player.questsTakenToday = [];
-        }
-
-        // Compatibility fix for old save files with the old quest system
-        if (typeof player.activeQuest === 'string') {
-            player.activeQuest = null;
-            player.questProgress = 0;
-        }
-
-        // Compatibility for saves without a seed
-        if (!player.seed) {
-            player.seed = Math.floor(Math.random() * 1000000);
-        }
-
-        if (!player.biomeOrder || player.biomeOrder.length === 0) {
-            generateRandomizedBiomeOrder();
-        }
-        if (!player.specialWeaponStates) {
-            player.specialWeaponStates = {};
-        }
-
-        updatePlayerTier(); // Calculate tier on import
-
-        $('#start-screen').classList.add('hidden');
-        $('#changelog-screen').classList.add('hidden');
-        $('#game-container').classList.remove('hidden');
-        logElement.innerHTML = '';
-        addToLog(`Successfully imported character: ${player.name}!`);
-        applyTheme('default');
-        updateStatsView();
-        saveGame(); 
-        renderMainMenu();
+        
+        const tempKey = `rpg_import_${Date.now()}`;
+        localStorage.setItem(`rpgSaveData_${tempKey}`, jsonString);
+        loadGameFromKey(tempKey, true);
 
     } catch (error) {
-        console.error("Could not load game from key:", error);
+        console.error("Could not import save:", error);
         alert("Failed to import save. The key might be invalid or corrupted.");
     }
 }
@@ -380,6 +395,8 @@ function importSave(saveString) {
 function showStartScreen() {
     $('#game-container').classList.add('hidden');
     $('#changelog-screen').classList.add('hidden');
+    $('#character-creation-screen').classList.add('hidden');
+    $('#old-save-race-selection-screen').classList.add('hidden');
     $('#start-screen').classList.remove('hidden');
     logElement.innerHTML = '';
     player = null;
@@ -409,18 +426,7 @@ function generateSaveKey() {
 
 // --- EVENT LISTENERS ---
 window.addEventListener('load', () => { 
-    $('#start-game-btn').addEventListener('click', () => { 
-        const name = $('#player-name-input').value.trim(); 
-        if (name) { 
-            initGame(name); 
-        } else { 
-            $('#player-name-input').classList.add('border-red-500'); 
-        } 
-    });
-
-    $('#player-name-input').addEventListener('keypress', (e) => { 
-        if (e.key === 'Enter') $('#start-game-btn').click(); 
-    });
+    $('#start-game-btn').addEventListener('click', renderCharacterCreation);
 
     $('#import-save-btn').addEventListener('click', () => {
         const saveString = $('#import-save-input').value.trim();
@@ -433,24 +439,13 @@ window.addEventListener('load', () => {
     $('#graveyard-btn').addEventListener('click', renderGraveyard); 
     $('#changelog-btn').addEventListener('click', renderChangelog);
 
-    const volumeSlider = $('#volume-slider');
-    if (volumeSlider) {
-        // Set initial slider position from loaded/default volume
-        const savedVolume = localStorage.getItem('rpgGameVolume');
-        volumeSlider.value = savedVolume ? parseFloat(savedVolume) : 0.3;
-        
-        volumeSlider.addEventListener('input', (e) => {
-            setVolume(e.target.value);
-        });
-    }
-
     const keysPressed = new Set();
     document.addEventListener('keydown', (e) => {
         if (e.key) {
             keysPressed.add(e.key.toLowerCase());
         }
         if (keysPressed.has('d') && keysPressed.has('`')) {
-            e.preventDefault(); // Prevents any default browser action
+            e.preventDefault();
             toggleDebug();
         }
     });
@@ -463,4 +458,5 @@ window.addEventListener('load', () => {
 
     updateLoadGameButtonVisibility();
 });
+
 
