@@ -131,7 +131,7 @@ class Player extends Entity {
     levelUp() { 
         this.level++; 
         this.xp -= this.xpToNextLevel; 
-        this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.1 + this.level * 25); 
+        this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.1); 
         this.maxHp += 10; this.hp = this.maxHp; 
         this.maxMp += 5; this.mp = this.maxMp; 
         this.strength += 2; this.intelligence += 2; 
