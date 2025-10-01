@@ -223,17 +223,18 @@ const PALETTES = {
         '--btn-primary-bg': '#4a3a6b', '--btn-primary-bg-hover': '#6a5a8b', '--btn-primary-border': '#2c215d', '--btn-primary-border-hover': '#4a3a6b',
     },
     'noon': {
-        '--bg-main': '#e0e8f0',
-        '--bg-secondary': '#cbd5e1',
-        '--bg-log': 'rgba(203, 213, 225, 0.6)',
-        '--bg-tooltip': '#cbd5e1',
-        '--border-main': '#94a3b8',
-        '--text-main': '#1e293b',
-        '--text-accent': '#0369a1',
-        '--btn-primary-bg': '#0ea5e9',
-        '--btn-primary-bg-hover': '#38bdf8',
-        '--btn-primary-border': '#075985',
-        '--btn-primary-border-hover': '#0369a1',
+        '--bg-main': '#2aa198',                     /* Deep Teal background */
+        '--bg-secondary': '#248d84',                /* A slightly darker Teal for depth */
+        '--bg-log': 'rgba(36, 141, 132, 0.6)',
+        '--bg-tooltip': '#248d84',
+        '--border-main': '#47b5ab',                 /* Lighter Teal border */
+        '--text-main': '#fdf6e3',                     /* REVERTED: Soft Cream text */
+        '--text-accent': '#facc15',                  /* REVERTED: Bright Gold accent */
+        '--btn-primary-bg': '#073642',               /* CHANGED: Dark Slate for button background */
+        '--btn-primary-bg-hover': '#586e75',         /* CHANGED: Lighter Slate on hover */
+        '--btn-primary-border': '#93a1a1',           /* Kept original border color */
+        '--btn-primary-border-hover': '#eee8d5',     /* Light border on hover for a glow effect */
+        '--btn-primary-text': '#fdf6e3',             /* Added for clarity: Light text for the dark button */
     },
     'sunset': {
         '--bg-main': '#d35400', '--bg-secondary': '#aa4400', '--bg-log': 'rgba(255, 240, 230, 0.3)', '--bg-tooltip': '#aa4400',
