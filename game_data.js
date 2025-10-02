@@ -753,8 +753,8 @@ const QUESTS = {
         'collect_earthshaker': { tier: 5, title: 'Might of the Mountain', type: 'collection', target: 'earthshaker_hammer', required: 1, reward: { xp: 5000, gold: 12000 }, description: 'The Dwarven king will pay handsomely for the return of the legendary Earthshaker Hammer.' },
         
         'brew_health_potions': { tier: 1, title: 'Basic Brewing', type: 'creation', target: 'health_potion', required: 5, reward: { xp: 100, gold: 200 }, description: 'The town alchemist needs a hand brewing a batch of basic Health Potions.' },
-        'brew_strength_potions': { tier: 3, title: 'Liquid Courage', type: 'creation', target: 'strength_potion', required: 3, reward: { xp: 300, gold: 500 }, description: 'The captain of the guard wants Strength Potions to give his soldiers an edge.' },
-        'brew_cleansing_potions': { tier: 4, title: 'Purification Ritual', type: 'creation', target: 'cleansing_potion', required: 2, reward: { xp: 500, gold: 600 }, description: 'The high priest needs Cleansing Potions for a temple ritual.' },
+        'brew_strength_potions': { tier: 3, title: 'Liquid Courage', type: 'creation', target: 'potion_of_giant_strength', required: 3, reward: { xp: 300, gold: 500 }, description: 'The captain of the guard wants Strength Potions to give his soldiers an edge.' },
+        'brew_cleansing_potions': { tier: 4, title: 'Purification Ritual', type: 'creation', target: 'potion_of_clarity', required: 2, reward: { xp: 500, gold: 600 }, description: 'The high priest needs Cleansing Potions for a temple ritual.' },
 };
 
 const LEGACY_QUESTS = {
@@ -768,7 +768,7 @@ const LEGACY_QUESTS = {
 };
 
 const SHOP_INVENTORY = {
-    'Potions & Items': ['health_potion', 'mana_potion', 'superior_health_potion'],
+    'Potions & Items': ['health_potion', 'mana_potion', 'condensed_health_potion', 'condensed_mana_potion'],
     'Weapons': ['rusty_sword', 'wooden_stick'],
     'Gear': ['travelers_garb', 'leather_armor', 'padded_leather', 'wooden_shield']
 };
