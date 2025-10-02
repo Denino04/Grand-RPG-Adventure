@@ -667,6 +667,7 @@ function renderMainMenu() {
     lastViewBeforeInventory = 'main_menu';
     gameState.currentView = 'main_menu';
     $('#inventory-btn').disabled = false;
+    $('#character-sheet-btn').disabled = false; // Re-enable character button
     saveGame();
     const template = document.getElementById('template-main-menu');
     render(template.content.cloneNode(true));
@@ -1806,6 +1807,8 @@ function renderBattle(subView = 'main', actionData = null) {
 }
 
 function renderPostBattleMenu() {
+    $('#inventory-btn').disabled = false;
+    $('#character-sheet-btn').disabled = false;
     player.clearEncounterBuffs(); 
     const biomeKey = gameState.currentBiome;
     if (!biomeKey) { // Safety check
@@ -1931,6 +1934,7 @@ window.castHealingSpellOutsideCombat = function(spellKey) {
     updateStatsView();
     renderInventory(); // Re-render the inventory to update the button states
 }
+
 
 
 
