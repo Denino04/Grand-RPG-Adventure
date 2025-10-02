@@ -796,8 +796,8 @@ const ALCHEMY_RECIPES = {
     'brew_mana': { output: 'mana_potion', ingredients: { 'slime_glob': 2 }, cost: 15 },
     'brew_condensed_health': { output: 'condensed_health_potion', ingredients: { 'slime_glob': 10 }, cost: 50 },
     'brew_condensed_mana': { output: 'condensed_mana_potion', ingredients: { 'slime_glob': 10 }, cost: 60 },
-    'brew_super_health': { output: 'superior_health_potion', ingredients: { 'slime_glob': 20, 'orc_liver' }, cost: 100 },
-    'brew_super_mana': { output: 'superior_mana_potion', ingredients: { 'slime_glob': 20, 'cockatrice_venom_gland' }, cost: 120 },
+    'brew_super_health': { output: 'superior_health_potion', ingredients: { 'slime_glob': 20, 'orc_liver' : 2 }, cost: 100 },
+    'brew_super_mana': { output: 'superior_mana_potion', ingredients: { 'slime_glob': 20, 'cockatrice_venom_gland': 2 }, cost: 120 },
 };
 
 const BLACKSMITH_RECIPES = {
