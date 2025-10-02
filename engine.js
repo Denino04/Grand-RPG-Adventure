@@ -1392,63 +1392,63 @@ function brewPotion(recipeKey) {
 
 function craftGear(recipeKey, sourceShop) {
     const recipe = (sourceShop === 'magic' ? MAGIC_SHOP_RECIPES[recipeKey] : BLACKSMITH_RECIPES[recipeKey]);
+    if (!recipe) return;
+
+    let hasIngredients = true;
+    for (const ingredientKey in recipe.ingredients) {
+        const requiredAmount = recipe.ingredients[ingredientKey];
+        
+        let playerAmount = 0;
+        if (ITEMS[ingredientKey]) {
+            playerAmount = player.inventory.items[ingredientKey] || 0;
+        } else if (ARMOR[ingredientKey]) {
+            playerAmount = player.inventory.armor.filter(i => i === ingredientKey).length;
+        }
+
+        if (playerAmount < requiredAmount) {
+            hasIngredients = false;
+            break;
+        }
+    }
+
+    if (!hasIngredients) {
+        addToLog("You don't have the required materials.", 'text-red-400');
+        return;
+    }
+    if (player.gold < recipe.cost) {
+        addToLog("You can't afford the fee.", 'text-red-400');
+        return;
+    }
+
+    // Subtract materials and gold
+    for (const ingredientKey in recipe.ingredients) {
+        const requiredAmount = recipe.ingredients[ingredientKey];
+        if (ITEMS[ingredientKey]) {
+            player.inventory.items[ingredientKey] -= requiredAmount;
+            if (player.inventory.items[ingredientKey] <= 0) {
+                delete player.inventory.items[ingredientKey];
+            }
+        } else if (ARMOR[ingredientKey]) {
+            for(let i = 0; i < requiredAmount; i++) {
+                const index = player.inventory.armor.indexOf(ingredientKey);
+                if (index > -1) {
+                    player.inventory.armor.splice(index, 1);
+                }
+            }
+        }
+    }
+    player.gold -= recipe.cost;
+
     player.addToInventory(recipe.output);
-    addToLog(`You successfully created a <span class="font-bold text-green-300">${productDetails.name}</span>!`);
+    const craftedItemDetails = getItemDetails(recipe.output);
+    addToLog(`You successfully created a <span class="font-bold text-green-300">${craftedItemDetails.name}</span>!`);
 
-
-    let hasIngredients = true;
-    for (const ingredientKey in recipe.ingredients) {
-        const requiredAmount = recipe.ingredients[ingredientKey];
-        
-        let playerAmount = 0;
-        if (ITEMS[ingredientKey]) {
-            playerAmount = player.inventory.items[ingredientKey] || 0;
-        } else if (ARMOR[ingredientKey]) {
-            playerAmount = player.inventory.armor.filter(i => i === ingredientKey).length;
-        }
-
-        if (playerAmount < requiredAmount) {
-            hasIngredients = false;
-            break;
-        }
-    }
-
-    if (!hasIngredients) {
-        addToLog("You don't have the required materials.", 'text-red-400');
-        return;
-    }
-    if (player.gold < recipe.cost) {
-        addToLog("You can't afford the fee.", 'text-red-400');
-        return;
-    }
-
-    for (const ingredientKey in recipe.ingredients) {
-        const requiredAmount = recipe.ingredients[ingredientKey];
-        if (ITEMS[ingredientKey]) {
-            player.inventory.items[ingredientKey] -= requiredAmount;
-            if (player.inventory.items[ingredientKey] <= 0) {
-                delete player.inventory.items[ingredientKey];
-            }
-        } else if (ARMOR[ingredientKey]) {
-            for(let i = 0; i < requiredAmount; i++) {
-                const index = player.inventory.armor.indexOf(ingredientKey);
-                if (index > -1) {
-                    player.inventory.armor.splice(index, 1);
-                }
-            }
-        }
-    }
-    player.gold -= recipe.cost;
-
-    player.addToInventory(recipe.output);
-    addToLog(`You successfully created a <span class="font-bold text-green-300">${productDetails.name}</span>!`);
-
-    if (player.activeQuest && player.activeQuest.category === 'creation') {
-        const quest = getQuestDetails(player.activeQuest);
-        if (quest && quest.target === recipe.output) {
-            player.questProgress++;
-            addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300');
-        }
+    if (player.activeQuest && player.activeQuest.category === 'creation') {
+        const quest = getQuestDetails(player.activeQuest);
+        if (quest && quest.target === recipe.output) {
+            player.questProgress++;
+            addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300');
+        }
     }
 
     updateStatsView();
@@ -1461,7 +1461,7 @@ function craftGear(recipeKey, sourceShop) {
 
 
 // --- QUESTS ---
-function acceptQuest(category, questKey) { 
+function acceptQuest(category, questKey) { 
     if (!player.activeQuest) { 
         player.activeQuest = { category, key: questKey }; 
         player.questProgress = 0; 
@@ -1538,3 +1538,4 @@ function cancelQuest() {
     updateStatsView();
     renderQuestBoard();
 }
+

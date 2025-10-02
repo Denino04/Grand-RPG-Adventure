@@ -461,7 +461,7 @@ function renderCharacterSheet(isLevelUp = false) {
         addToLog("You cannot access your character sheet during combat!", 'text-red-400');
         return;
     }
-    if (!player) return; // Add a guard clause in case player is null
+    if (!player) return;
     if (!characterSheetOriginalStats) {
         characterSheetOriginalStats = {
             vigor: player.vigor, focus: player.focus, stamina: player.stamina,
@@ -472,7 +472,7 @@ function renderCharacterSheet(isLevelUp = false) {
         };
     }
 
-    // lastViewBeforeInventory = 'character_sheet'; // This was causing issues with the back/done functionality.
+    lastViewBeforeInventory = 'character_sheet';
     gameState.currentView = isLevelUp ? 'character_sheet_levelup' : 'character_sheet';
 
     const mainStats = ['vigor', 'focus', 'stamina', 'strength', 'intelligence', 'luck'];
@@ -483,41 +483,42 @@ function renderCharacterSheet(isLevelUp = false) {
         'Crit Chance': 'critChance', 'Evasion Chance': 'evasionChance', 'Debuff Resist': 'resistanceChance'
     };
 
-    // Check if any changes have been made to stats
     const hasChanges = player.statPoints !== characterSheetOriginalStats.statPoints;
 
     let html = `<div class="w-full text-left">
-        <h2 class="font-medieval text-3xl mb-4 text-center">Character Sheet</h2>
+        <h2 class="font-medieval text-2xl mb-2 text-center">Character Sheet</h2>
         
-        <div class="text-center mb-4 p-2 bg-slate-900/50 rounded-lg">
-            <span class="mr-2 font-semibold">Allocate points by:</span>
-            <button onclick="setStatAllocationAmount(1)" class="btn ${statAllocationAmount === 1 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-sm py-1 px-3 w-16">1x</button>
-            <button onclick="setStatAllocationAmount(5)" class="btn ${statAllocationAmount === 5 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-sm py-1 px-3 w-16">5x</button>
-            <button onclick="setStatAllocationAmount(25)" class="btn ${statAllocationAmount === 25 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-sm py-1 px-3 w-16">25x</button>
+        <div class="flex justify-between items-center mb-2 p-1 bg-slate-900/50 rounded-lg text-sm">
+            <div>
+                <span class="mr-2 font-semibold">Allocate:</span>
+                <button onclick="setStatAllocationAmount(1)" class="btn ${statAllocationAmount === 1 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-12">1x</button>
+                <button onclick="setStatAllocationAmount(5)" class="btn ${statAllocationAmount === 5 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-12">5x</button>
+                <button onclick="setStatAllocationAmount(25)" class="btn ${statAllocationAmount === 25 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-12">25x</button>
+            </div>
+            <p class="text-green-400 font-bold">Points: <span id="stat-points">${player.statPoints}</span></p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6">
             <div>
-                <h3 class="font-bold text-xl text-yellow-300 mb-2">Main Stats</h3>
-                <p class="mb-4 text-green-400 font-bold">Available Points: <span id="stat-points">${player.statPoints}</span></p>
-                <div class="space-y-3">`;
+                <h3 class="font-bold text-lg text-yellow-300 mb-1">Main Stats</h3>
+                <div class="space-y-1">`;
     
     mainStats.forEach(stat => {
         const pointsSpentOnStat = player[stat] - characterSheetOriginalStats[stat];
-        html += `<div class="flex justify-between items-center bg-slate-800 p-2 rounded-lg">
-                    <span class="font-bold capitalize">${stat}</span>
-                    <div class="flex items-center">
-                        <button onclick="deallocatePoint('${stat}', statAllocationAmount)" class="btn btn-action text-lg py-1 px-2 leading-none w-10" ${pointsSpentOnStat < statAllocationAmount ? 'disabled' : ''}>-</button>
-                        <span class="text-lg mx-4 w-8 text-center">${player[stat]}</span>
-                        <button onclick="allocatePoint('${stat}', statAllocationAmount)" class="btn btn-primary text-lg py-1 px-2 leading-none w-10" ${player.statPoints < statAllocationAmount ? 'disabled' : ''}>+</button>
+        html += `<div class="grid grid-cols-3 items-center bg-slate-800 p-1 rounded-lg">
+                    <span class="font-bold capitalize text-sm col-span-1">${stat}</span>
+                    <div class="col-span-2 flex items-center justify-end">
+                        <button onclick="deallocatePoint('${stat}', statAllocationAmount)" class="btn btn-action text-base py-0 px-2 leading-none w-7" ${pointsSpentOnStat < statAllocationAmount ? 'disabled' : ''}>-</button>
+                        <span class="text-base mx-2 w-8 text-center">${player[stat]}</span>
+                        <button onclick="allocatePoint('${stat}', statAllocationAmount)" class="btn btn-primary text-base py-0 px-2 leading-none w-7" ${player.statPoints < statAllocationAmount ? 'disabled' : ''}>+</button>
                     </div>
                  </div>`;
     });
     
     html += `</div></div>
             <div>
-                 <h3 class="font-bold text-xl text-yellow-300 mb-2">Derived Stats</h3>
-                 <div class="space-y-2 text-sm bg-slate-800 p-3 rounded-lg">`;
+                 <h3 class="font-bold text-lg text-yellow-300 mb-1">Derived Stats</h3>
+                 <div class="space-y-0.5 text-xs bg-slate-800 p-2 rounded-lg h-48 overflow-y-auto inventory-scrollbar">`;
 
     Object.entries(derivedStats).forEach(([label, key]) => {
         let value = player[key];
@@ -526,7 +527,7 @@ function renderCharacterSheet(isLevelUp = false) {
     });
 
     html += `</div></div></div>
-        <div class="text-center mt-6 flex justify-center gap-4">
+        <div class="text-center mt-2 flex justify-center gap-4">
             <button onclick="resetStatAllocation()" class="btn btn-action" ${!hasChanges ? 'disabled' : ''}>Reset</button>
             <button onclick="confirmStatAllocation()" class="btn btn-primary">Done</button>
         </div>
@@ -536,6 +537,7 @@ function renderCharacterSheet(isLevelUp = false) {
     container.innerHTML = html;
     render(container);
 }
+
 
 window.setStatAllocationAmount = function(amount) {
     statAllocationAmount = amount;
@@ -561,7 +563,7 @@ window.allocatePoint = function(stat, amount) {
 
 window.deallocatePoint = function(stat, amount) {
     const bonusStatKey = 'bonus' + capitalize(stat);
-    const pointsSpentOnStat = player[bonusStatKey] - characterSheetOriginalStats['bonus' + capitalize(stat)];
+    const pointsSpentOnStat = player[bonusStatKey] - (characterSheetOriginalStats ? characterSheetOriginalStats[bonusStatKey] : 0);
 
 
     if (pointsSpentOnStat >= amount) {
@@ -614,14 +616,19 @@ function confirmStatAllocation() {
     characterSheetOriginalStats = null; // Lock in the new stats
     addToLog("Your attributes have been confirmed.", "text-green-400");
     saveGame();
-    returnFromInventory(); 
+    
+    if (gameState.currentView === 'character_sheet_levelup') {
+        renderMainMenu();
+    } else {
+        returnFromInventory(); 
+    }
 }
 
 
 function returnFromInventory() {
     switch (lastViewBeforeInventory) {
         case 'main_menu': renderMainMenu(); break;
-        case 'character_sheet': renderCharacterSheet(); break;
+        case 'character_sheet': renderMainMenu(); break; // Go to main menu from char sheet
         case 'town': renderTown(); break;
         case 'quest_board': renderQuestBoard(); break;
         case 'inn': renderInn(); break;
@@ -1915,5 +1922,4 @@ window.castHealingSpellOutsideCombat = function(spellKey) {
     updateStatsView();
     renderInventory(); // Re-render the inventory to update the button states
 }
-
 
