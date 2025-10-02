@@ -954,24 +954,68 @@ function upgradeSpell(spellKey) {
     renderSageTowerTrain();
 }
 
-
-function buyItem(itemKey, shopType, priceOverride = null) { 
-    const details = getItemDetails(itemKey); 
-    const finalPrice = priceOverride !== null ? priceOverride : details.price;
-    if (player.gold >= finalPrice) { 
-        player.gold -= finalPrice; 
-        player.addToInventory(itemKey, 1, false); 
-        addToLog(`You bought a ${details.name} for ${finalPrice} G.`, 'text-yellow-400'); 
-        updateStatsView(); 
-        if (shopType === 'blacksmith') {
-            renderBlacksmithBuy();
-        } else if (shopType === 'magic') {
-            renderMagicShopBuy();
-        } else {
-            renderShop(shopType);
-        }
-    } 
+function buyItem(itemKey, shopType, priceOverride = null) { 
+    const details = getItemDetails(itemKey); 
+    const finalPrice = priceOverride !== null ? priceOverride : details.price;
+    if (player.gold >= finalPrice) { 
+        player.gold -= finalPrice; 
+        player.addToInventory(itemKey, 1, false); 
+        addToLog(`You bought a ${details.name} for ${finalPrice} G.`, 'text-yellow-400'); 
+        updateStatsView(); 
+        if (shopType === 'blacksmith') {
+            renderBlacksmithBuy();
+        } else if (shopType === 'magic') {
+            renderSageTowerBuy();
+        } else {
+            renderShop(shopType);
+        }
+    } 
 }
+
+function sellItem(category, itemKey, price) {
+    if (!player) return;
+
+    const details = getItemDetails(itemKey);
+    if (!details) return;
+
+    // Prevent selling equipped items
+    if ((category === 'weapons' && player.equippedWeapon.name === details.name) ||
+        (category === 'armor' && player.equippedArmor.name === details.name) ||
+        (category === 'shields' && player.equippedShield.name === details.name)) {
+        addToLog("You cannot sell an equipped item.", 'text-red-400');
+        return;
+    }
+
+    let itemRemoved = false;
+    if (category === 'items') {
+        if (player.inventory.items[itemKey] && player.inventory.items[itemKey] > 0) {
+            player.inventory.items[itemKey]--;
+            if (player.inventory.items[itemKey] <= 0) {
+                delete player.inventory.items[itemKey];
+            }
+            itemRemoved = true;
+        }
+    } else {
+        const inventoryCategory = player.inventory[category];
+        if (inventoryCategory) {
+            const itemIndex = inventoryCategory.indexOf(itemKey);
+            if (itemIndex > -1) {
+                inventoryCategory.splice(itemIndex, 1);
+                itemRemoved = true;
+            }
+        }
+    }
+
+    if (itemRemoved) {
+        player.gold += price;
+        addToLog(`You sold ${details.name} for ${price} G.`, 'text-yellow-400');
+        updateStatsView();
+        renderSell();
+    } else {
+        addToLog("Could not find the item to sell.", 'text-red-400');
+    }
+}
+
 function useItem(itemKey, inBattle = false, targetIndex = null) {
     if (!player.inventory.items[itemKey] || player.inventory.items[itemKey] < 1) {
         addToLog("You don't have that item!", 'text-red-400');
@@ -1347,8 +1391,10 @@ function brewPotion(recipeKey) {
 }
 
 function craftGear(recipeKey, sourceShop) {
-    const recipe = (sourceShop === 'magic' ? MAGIC_SHOP_RECIPES[recipeKey] : BLACKSMITH_RECIPES[recipeKey]);
-    if (!recipe) return;
+    const recipe = (sourceShop === 'magic' ? MAGIC_SHOP_RECIPES[recipeKey] : BLACKSMITH_RECIPES[recipeKey]);
+    player.addToInventory(recipe.output);
+    addToLog(`You successfully created a <span class="font-bold text-green-300">${productDetails.name}</span>!`);
+
 
     let hasIngredients = true;
     for (const ingredientKey in recipe.ingredients) {
@@ -1395,7 +1441,6 @@ function craftGear(recipeKey, sourceShop) {
     player.gold -= recipe.cost;
 
     player.addToInventory(recipe.output);
-    const productDetails = getItemDetails(recipe.output);
     addToLog(`You successfully created a <span class="font-bold text-green-300">${productDetails.name}</span>!`);
 
     if (player.activeQuest && player.activeQuest.category === 'creation') {
@@ -1404,14 +1449,14 @@ function craftGear(recipeKey, sourceShop) {
             player.questProgress++;
             addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300');
         }
-    }
+    }
 
-    updateStatsView();
-    if (sourceShop === 'magic') {
-        renderMagicShopCraft();
-    } else {
-        renderBlacksmithCraft();
-    }
+    updateStatsView();
+    if (sourceShop === 'magic') {
+        renderSageTowerCraft();
+    } else {
+        renderBlacksmithCraft();
+    }
 }
 
 
@@ -1493,4 +1538,3 @@ function cancelQuest() {
     updateStatsView();
     renderQuestBoard();
 }
-

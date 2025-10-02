@@ -472,7 +472,7 @@ function renderCharacterSheet(isLevelUp = false) {
         };
     }
 
-    lastViewBeforeInventory = 'character_sheet';
+    // lastViewBeforeInventory = 'character_sheet'; // This was causing issues with the back/done functionality.
     gameState.currentView = isLevelUp ? 'character_sheet_levelup' : 'character_sheet';
 
     const mainStats = ['vigor', 'focus', 'stamina', 'strength', 'intelligence', 'luck'];
@@ -528,7 +528,7 @@ function renderCharacterSheet(isLevelUp = false) {
     html += `</div></div></div>
         <div class="text-center mt-6 flex justify-center gap-4">
             <button onclick="resetStatAllocation()" class="btn btn-action" ${!hasChanges ? 'disabled' : ''}>Reset</button>
-            <button onclick="confirmStatAllocation(${isLevelUp && gameState.currentView === 'battle'})" class="btn btn-primary">Done</button>
+            <button onclick="confirmStatAllocation()" class="btn btn-primary">Done</button>
         </div>
     </div>`;
 
@@ -558,6 +558,65 @@ window.allocatePoint = function(stat, amount) {
         renderCharacterSheet(gameState.currentView === 'character_sheet_levelup');
     }
 }
+
+window.deallocatePoint = function(stat, amount) {
+    const bonusStatKey = 'bonus' + capitalize(stat);
+    const pointsSpentOnStat = player[bonusStatKey] - characterSheetOriginalStats['bonus' + capitalize(stat)];
+
+
+    if (pointsSpentOnStat >= amount) {
+        player[stat] -= amount;
+        player[bonusStatKey] -= amount;
+
+        player.recalculateGrowthBonuses();
+
+        player.statPoints += amount;
+        player.hp = player.maxHp;
+        player.mp = player.maxMp;
+        updateStatsView();
+        renderCharacterSheet(gameState.currentView === 'character_sheet_levelup');
+    }
+}
+
+function resetStatAllocation() {
+    if (!characterSheetOriginalStats) return;
+
+    // Restore main stats from the backup
+    player.vigor = characterSheetOriginalStats.vigor;
+    player.focus = characterSheetOriginalStats.focus;
+    player.stamina = characterSheetOriginalStats.stamina;
+    player.strength = characterSheetOriginalStats.strength;
+    player.intelligence = characterSheetOriginalStats.intelligence;
+    player.luck = characterSheetOriginalStats.luck;
+
+    // Restore bonus points from the backup
+    player.bonusVigor = characterSheetOriginalStats.bonusVigor;
+    player.bonusFocus = characterSheetOriginalStats.bonusFocus;
+    player.bonusStamina = characterSheetOriginalStats.bonusStamina;
+    player.bonusStrength = characterSheetOriginalStats.bonusStrength;
+    player.bonusIntelligence = characterSheetOriginalStats.bonusIntelligence;
+    player.bonusLuck = characterSheetOriginalStats.bonusLuck;
+    
+    // Restore stat points
+    player.statPoints = characterSheetOriginalStats.statPoints;
+    
+    player.recalculateGrowthBonuses();
+    player.hp = player.maxHp;
+    player.mp = player.maxMp;
+
+    addToLog("Stat allocation has been reset.", "text-yellow-400");
+    updateStatsView();
+    renderCharacterSheet(gameState.currentView === 'character_sheet_levelup');
+}
+
+function confirmStatAllocation() {
+    if (!player) return;
+    characterSheetOriginalStats = null; // Lock in the new stats
+    addToLog("Your attributes have been confirmed.", "text-green-400");
+    saveGame();
+    returnFromInventory(); 
+}
+
 
 function returnFromInventory() {
     switch (lastViewBeforeInventory) {
@@ -1130,6 +1189,74 @@ function renderBlacksmithBuy() {
     if (newScrollable) newScrollable.scrollTop = scrollPos;
 }
 
+function renderBlacksmithCraft() {
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+    
+    lastViewBeforeInventory = 'blacksmith_craft';
+    gameState.currentView = 'blacksmith_craft';
+
+    let recipesHtml = '';
+    for (const recipeKey in BLACKSMITH_RECIPES) {
+        const recipe = BLACKSMITH_RECIPES[recipeKey];
+        const productDetails = getItemDetails(recipe.output);
+        
+        let hasIngredients = true;
+        let ingredientsList = [];
+        for (const ingredientKey in recipe.ingredients) {
+            const requiredAmount = recipe.ingredients[ingredientKey];
+            let playerAmount = 0;
+
+            if(ITEMS[ingredientKey]) {
+                playerAmount = player.inventory.items[ingredientKey] || 0;
+            } else if (ARMOR[ingredientKey]) { // Special case for crafting with armor
+                playerAmount = player.inventory.armor.filter(i => i === ingredientKey).length;
+            }
+
+            if (playerAmount < requiredAmount) {
+                hasIngredients = false;
+            }
+            const ingredientDetails = getItemDetails(ingredientKey);
+            ingredientsList.push(`<span onmouseover="showTooltip('${ingredientKey}', event)" onmouseout="hideTooltip()">${requiredAmount}x ${ingredientDetails.name}</span>`);
+        }
+
+        const canAfford = player.gold >= recipe.cost;
+        const canCraft = hasIngredients && canAfford;
+
+        recipesHtml += `
+            <div class="p-3 bg-slate-800 rounded-lg">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${recipe.output}', event)" onmouseout="hideTooltip()">${productDetails.name}</h3>
+                    <button onclick="craftGear('${recipeKey}', 'blacksmith')" class="btn btn-primary text-sm py-1 px-3" ${!canCraft ? 'disabled' : ''}>Craft</button>
+                </div>
+                <div class="text-sm text-gray-400 mt-1">
+                    <p>Requires: ${ingredientsList.join(', ')}</p>
+                    <p>Cost: <span class="text-yellow-400">${recipe.cost} G</span></p>
+                </div>
+            </div>`;
+    }
+
+    if (Object.keys(BLACKSMITH_RECIPES).length === 0) {
+        recipesHtml = `<p class="text-center text-gray-400">The blacksmith has no crafting recipes for you at this time.</p>`;
+    }
+
+    let html = `
+        <div class="w-full">
+            <h2 class="font-medieval text-3xl mb-4 text-center">Craft Equipment</h2>
+            <p class="text-center text-gray-400 mb-4">Combine materials to forge powerful gear.</p>
+            <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">${recipesHtml}</div>
+            <div class="text-center mt-4">
+                <button onclick="renderBlacksmithMenu()" class="btn btn-primary">Back</button>
+            </div>
+        </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
+}
+
 function renderAlchemist() {
     applyTheme('swamp');
     const scrollable = mainView.querySelector('.inventory-scrollbar');
@@ -1178,6 +1305,246 @@ function renderAlchemist() {
             <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">${recipesHtml}</div>
             <div class="text-center mt-4">
                 <button onclick="renderTown()" class="btn btn-primary">Back to Town</button>
+            </div>
+        </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
+}
+
+function renderSell() {
+    applyTheme('town');
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
+    lastViewBeforeInventory = 'sell';
+    gameState.currentView = 'sell';
+
+    let sellableHtml = '';
+    const categories = ['items', 'weapons', 'armor', 'shields'];
+    let hasSellableItems = false;
+
+    categories.forEach(category => {
+        let itemsInCategory = [];
+        if (category === 'items') {
+            itemsInCategory = Object.keys(player.inventory.items);
+        } else {
+            itemsInCategory = [...new Set(player.inventory[category])];
+        }
+
+        if (itemsInCategory.length > 0) {
+            let categoryHtml = '';
+            itemsInCategory.forEach(key => {
+                const details = getItemDetails(key);
+                if (details && details.price > 0) { // Can't sell items with no price
+                    const sellPrice = Math.floor(details.price / 4);
+                    let count = 0;
+                     if (category === 'items') {
+                        count = player.inventory.items[key] || 0;
+                    } else {
+                        count = player.inventory[category].filter(i => i === key).length;
+                    }
+
+                    if (count > 0) {
+                        hasSellableItems = true;
+                        categoryHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
+                                        <span>${details.name} (x${count})</span>
+                                        <div>
+                                            <span class="text-yellow-400 font-semibold mr-4">${sellPrice} G</span>
+                                            <button onclick="sellItem('${category}', '${key}', ${sellPrice})" class="btn btn-primary text-sm py-1 px-3">Sell</button>
+                                        </div>
+                                     </div>`;
+                    }
+                }
+            });
+            if (categoryHtml) {
+                 sellableHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${capitalize(category)}</h3><div class="space-y-2">${categoryHtml}</div>`;
+            }
+        }
+    });
+
+    if (!hasSellableItems) {
+        sellableHtml = '<p class="text-center text-gray-400 mt-8">You have nothing of value to sell.</p>';
+    }
+
+    let html = `<div class="w-full">
+                    <h2 class="font-medieval text-3xl mb-4 text-center">Sell Items</h2>
+                    <p class="text-center text-gray-400 mb-4">You get 25% of an item's value when selling.</p>
+                    <div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${sellableHtml}</div>
+                    <div class="text-center mt-4">
+                        <button onclick="renderShop('store')" class="btn btn-primary">Back to Store</button>
+                    </div>
+                </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+    
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
+}
+
+function renderSageTowerTrain() {
+    applyTheme('magic');
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
+    lastViewBeforeInventory = 'sage_tower_train';
+    gameState.currentView = 'sage_tower_train';
+    
+    let html = `<div class="w-full">
+        <h2 class="font-medieval text-3xl mb-4 text-center">Train Spells</h2>
+        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`;
+
+    Object.keys(SPELLS).forEach(spellKey => {
+        const spellTree = SPELLS[spellKey];
+        const playerSpell = player.spells[spellKey];
+        const currentTier = playerSpell ? playerSpell.tier : 0;
+        const spellDetails = spellTree.tiers[currentTier - 1] || spellTree.tiers[0];
+        
+        html += `<div class="p-3 bg-slate-800 rounded-lg text-left">`;
+
+        if (currentTier === 0) { // Spell not learned
+            const canAfford = player.gold >= spellTree.learnCost;
+            html += `<div class="flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name}</h3>
+                        <button onclick="upgradeSpell('${spellKey}')" class="btn btn-primary" ${!canAfford ? 'disabled' : ''}>Learn</button>
+                    </div>
+                    <p class="text-sm text-gray-400">Cost: ${spellTree.learnCost} G</p>`;
+        } else if (currentTier < spellTree.tiers.length) { // Can be upgraded
+            const upgradeData = spellTree.tiers[currentTier - 1];
+            const canAffordGold = player.gold >= upgradeData.upgradeCost;
+            const hasEssences = Object.entries(upgradeData.upgradeEssences || {}).every(([key, val]) => (player.inventory.items[key] || 0) >= val);
+            const canUpgrade = canAffordGold && hasEssences;
+            const essenceList = Object.entries(upgradeData.upgradeEssences || {}).map(([key, val]) => `${val}x ${getItemDetails(key).name}`).join(', ');
+
+            html += `<div class="flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-green-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name} (Tier ${currentTier})</h3>
+                        <button onclick="upgradeSpell('${spellKey}')" class="btn btn-primary" ${!canUpgrade ? 'disabled' : ''}>Upgrade</button>
+                    </div>
+                     <p class="text-sm text-gray-400">Next: ${spellTree.tiers[currentTier].name}</p>
+                     <p class="text-sm text-gray-400">Cost: ${upgradeData.upgradeCost} G, ${essenceList}</p>`;
+        } else { // Max tier
+             html += `<div class="flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-cyan-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name} (Max Tier)</h3>
+                        <span class="text-gray-500">Mastered</span>
+                      </div>`;
+        }
+
+        html += `</div>`;
+    });
+
+    html += `</div>
+        <div class="text-center mt-4">
+            <button onclick="renderSageTowerMenu()" class="btn btn-primary">Back</button>
+        </div>
+    </div>`;
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
+}
+
+function renderSageTowerBuy() {
+    applyTheme('magic');
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
+    lastViewBeforeInventory = 'sage_tower_buy';
+    gameState.currentView = 'sage_tower_buy';
+
+    let itemsHtml = '';
+    for (const category in MAGIC_SHOP_INVENTORY) {
+        if (MAGIC_SHOP_INVENTORY[category].length === 0) continue;
+        itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
+        itemsHtml += '<div class="space-y-2">';
+        MAGIC_SHOP_INVENTORY[category].forEach(key => {
+            const details = getItemDetails(key);
+            if (!details) return;
+            const price = details.price;
+            itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
+                            <span>${details.name}</span>
+                            <div>
+                                <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
+                                <button onclick="buyItem('${key}', 'magic', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
+                            </div>
+                         </div>`;
+        });
+        itemsHtml += '</div>';
+    }
+
+    let html = `<div class="w-full">
+                    <h2 class="font-medieval text-3xl mb-4 text-center">Purchase Catalysts</h2>
+                    <div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div>
+                    <div class="text-center mt-4">
+                        <button onclick="renderSageTowerMenu()" class="btn btn-primary">Back</button>
+                    </div>
+                </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
+}
+
+function renderSageTowerCraft() {
+    applyTheme('magic');
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
+    lastViewBeforeInventory = 'sage_tower_craft';
+    gameState.currentView = 'sage_tower_craft';
+
+    let recipesHtml = '';
+    for (const recipeKey in MAGIC_SHOP_RECIPES) {
+        const recipe = MAGIC_SHOP_RECIPES[recipeKey];
+        const productDetails = getItemDetails(recipe.output);
+        
+        let hasIngredients = true;
+        let ingredientsList = [];
+        for (const ingredientKey in recipe.ingredients) {
+            const requiredAmount = recipe.ingredients[ingredientKey];
+            const playerAmount = player.inventory.items[ingredientKey] || 0;
+            if (playerAmount < requiredAmount) {
+                hasIngredients = false;
+            }
+            const ingredientDetails = getItemDetails(ingredientKey);
+            ingredientsList.push(`<span onmouseover="showTooltip('${ingredientKey}', event)" onmouseout="hideTooltip()">${requiredAmount}x ${ingredientDetails.name}</span>`);
+        }
+
+        const canAfford = player.gold >= recipe.cost;
+        const canCraft = hasIngredients && canAfford;
+
+        recipesHtml += `
+            <div class="p-3 bg-slate-800 rounded-lg">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${recipe.output}', event)" onmouseout="hideTooltip()">${productDetails.name}</h3>
+                    <button onclick="craftGear('${recipeKey}', 'magic')" class="btn btn-primary text-sm py-1 px-3" ${!canCraft ? 'disabled' : ''}>Synthesize</button>
+                </div>
+                <div class="text-sm text-gray-400 mt-1">
+                    <p>Requires: ${ingredientsList.join(', ')}</p>
+                    <p>Cost: <span class="text-yellow-400">${recipe.cost} G</span></p>
+                </div>
+            </div>`;
+    }
+     if (Object.keys(MAGIC_SHOP_RECIPES).length === 0) {
+        recipesHtml = `<p class="text-center text-gray-400">The Sage has no catalyst recipes for you at this time.</p>`;
+    }
+
+
+    let html = `
+        <div class="w-full">
+            <h2 class="font-medieval text-3xl mb-4 text-center">Synthesize Catalysts</h2>
+            <p class="text-center text-gray-400 mb-4">Combine materials to create powerful arcane catalysts.</p>
+            <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">${recipesHtml}</div>
+            <div class="text-center mt-4">
+                <button onclick="renderSageTowerMenu()" class="btn btn-primary">Back</button>
             </div>
         </div>`;
     const container = document.createElement('div');

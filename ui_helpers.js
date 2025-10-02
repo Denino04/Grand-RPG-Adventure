@@ -236,6 +236,7 @@ const PALETTES = {
         '--btn-primary-border-hover': '#eee8d5',     /* Light border on hover for a glow effect */
         '--btn-primary-text': '#fdf6e3',             /* Added for clarity: Light text for the dark button */
     },
+    
     'sunset': {
         '--bg-main': '#d35400', '--bg-secondary': '#aa4400', '--bg-log': 'rgba(255, 240, 230, 0.3)', '--bg-tooltip': '#aa4400',
         '--border-main': '#f39c12', '--text-main': '#fdf6e3', '--text-accent': '#e74c3c',
