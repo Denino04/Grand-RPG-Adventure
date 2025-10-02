@@ -688,7 +688,7 @@ const MONSTER_SPECIES = {
     // Tier 3
     'orc_berserker': { key: 'orc_berserker', name: 'Orc Berserker', class: 'Humanoid', tier: 3, ability: 'enrage', base_hp: 70, base_strength: 12, base_defense: 4, base_xp: 80, base_gold: 40, spell_resistance: 0.1, loot_table: {'health_potion': 0.3, 'steel_longsword': 0.1, 'heavy_greatsword': 0.08, 'obsidian_axe': 0.05, 'sunderers_battleaxe': 0.02, 'orc_liver': 0.3, 'brass_shield': 0.05, 'titanium_parrying_shield': 0.02, 'chainmail_armor': 0.05, 'half_plate_armor': 0.02, 'cypresswood_staff': 0.02, 'dual_longswords': 0.02} },
     'cave_spider': { key: 'cave_spider', name: 'Cave Spider', class: 'Beast', tier: 3, ability: 'poison_web', base_hp: 90, base_strength: 9, base_defense: 3, base_xp: 75, base_gold: 30, spell_resistance: 0, loot_table: {'spider_venom': 0.5, 'eye_of_medusa': 0.01} },
-    'cockatrice': { key: 'cockatrice', name: 'Cockatrice', class: 'Monstrosity', tier: 3, ability: 'petrification', base_hp: 80, base_strength: 10, base_defense: 5, base_xp: 90, base_gold: 50, spell_resistance: 0.2, loot_table: {'cockatrice_venom_gland': 0.4, 'eye_of_medusa': 0.02, 'arcane_focus': 0.02}, damage_type: 'magical' },
+    'cockatrice': { key: 'cockatrice', name: 'Cockatrice', class: 'Monstrosity', tier: 3, ability: 'petrification', base_hp: 80, base_strength: 10, base_defense: 5, base_xp: 90, base_gold: 50, spell_resistance: 0.2, loot_table: {'cockatrice_venom_gland': 0.3, 'eye_of_medusa': 0.02, 'arcane_focus': 0.02}, damage_type: 'magical' },
     'necromancer': { key: 'necromancer', name: 'Necromancer', class: 'Undead', tier: 3, ability: 'necromancy', base_hp: 60, base_strength: 8, base_defense: 2, base_xp: 100, base_gold: 60, spell_resistance: 0.3, loot_table: {'mana_potion': 0.2, 'vampiric_dagger': 0.02, 'assassin_cloak_armor': 0.02, 'staff_of_loss': 0.02, 'archmages_robes': 0.01, 'souldrinker_orb': 0.01, 'undying_heart': 0.1}, damage_type: 'magical' },
     
     // Tier 4 - REBALANCED REWARDS
@@ -794,6 +794,10 @@ const ALCHEMY_RECIPES = {
     'potion_clarity': { output: 'potion_of_clarity', ingredients: { 'unicorn_horn_fragment': 2 }, cost: 250, hearts: 1 },
     'brew_health': { output: 'health_potion', ingredients: { 'slime_glob': 2 }, cost: 10 },
     'brew_mana': { output: 'mana_potion', ingredients: { 'slime_glob': 2 }, cost: 15 },
+    'brew_condensed_health': { output: 'condensed_health_potion', ingredients: { 'slime_glob': 10 }, cost: 50 },
+    'brew_condensed_mana': { output: 'condensed_mana_potion', ingredients: { 'slime_glob': 10 }, cost: 60 },
+    'brew_super_health': { output: 'superior_health_potion', ingredients: { 'slime_glob': 20, 'orc_liver' }, cost: 100 },
+    'brew_super_mana': { output: 'superior_mana_potion', ingredients: { 'slime_glob': 20, 'cockatrice_venom_gland' }, cost: 120 },
 };
 
 const BLACKSMITH_RECIPES = {
