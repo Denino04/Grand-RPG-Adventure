@@ -570,7 +570,7 @@ const SPELLS = {
         element: 'lightning', type: 'st', learnCost: 250,
         tiers: [
             { name: 'Honed Bolt', cost: 18, damage: [1, 8], cap: 3, upgradeCost: 750, upgradeEssences: { 'lightning_essence': 10 }, description: "Launch a simple, crackling bolt of lightning." },
-            { name: 'Lightning Strike', cost: 33, damage: [2, 8], cap: 5, upgradeCost: 3000, upgradeEssences: { 'lightning_essence': 20 }, description: "Call down a focused, super-heated lightning strike on a single target." },
+            { name: 'Lightning Bolt', cost: 33, damage: [2, 8], cap: 5, upgradeCost: 3000, upgradeEssences: { 'lightning_essence': 20 }, description: "Call down a focused, super-heated lightning strike on a single target." },
             { name: 'Wrath of the Sky', cost: 55, damage: [3, 8], cap: 8, description: "Channel the sky's fury, summoning a colossal thunderbolt that obliterates its target." }
         ]
     },
