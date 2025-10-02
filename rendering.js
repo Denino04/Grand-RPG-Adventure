@@ -651,9 +651,18 @@ function returnFromInventory() {
 }
 
 function renderMainMenu() {
-    const theme = timeOfDayPalettes[timeOfDayIndex];
+    const defaultPalettes = ['noon', 'sunset', 'midnight'];
+    const allPalettes = Object.keys(PALETTES);
+    const palettesToUse = useFullPaletteRotation ? allPalettes : defaultPalettes;
+
+    if (timeOfDayIndex >= palettesToUse.length) {
+        timeOfDayIndex = 0;
+    }
+
+    const theme = palettesToUse[timeOfDayIndex];
     applyTheme(theme);
-    timeOfDayIndex = (timeOfDayIndex + 1) % timeOfDayPalettes.length;
+    
+    timeOfDayIndex = (timeOfDayIndex + 1) % palettesToUse.length;
 
     lastViewBeforeInventory = 'main_menu';
     gameState.currentView = 'main_menu';
@@ -1922,4 +1931,6 @@ window.castHealingSpellOutsideCombat = function(spellKey) {
     updateStatsView();
     renderInventory(); // Re-render the inventory to update the button states
 }
+
+
 

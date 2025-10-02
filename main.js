@@ -5,7 +5,7 @@ let gameState = { currentView: 'main_menu', isPlayerTurn: true, currentBiome: nu
 let lastViewBeforeInventory = 'main_menu';
 let isDebugVisible = false;
 let timeOfDayIndex = 0;
-const timeOfDayPalettes = ['noon', 'sunset', 'midnight'];
+let useFullPaletteRotation = false;
 
 // --- INITIALIZATION ---
 function initGame(playerName, gender, raceKey, classKey, backgroundKey) { 
@@ -438,6 +438,20 @@ window.addEventListener('load', () => {
     $('#load-game-btn').addEventListener('click', renderLoadMenu); 
     $('#graveyard-btn').addEventListener('click', renderGraveyard); 
     $('#changelog-btn').addEventListener('click', renderChangelog);
+
+    // Palette Toggle Logic
+    const paletteToggle = $('#palette-toggle');
+    const savedPalettePref = localStorage.getItem('rpgFullPaletteRotation');
+    if (savedPalettePref === 'true') {
+        paletteToggle.checked = true;
+        useFullPaletteRotation = true;
+    }
+
+    paletteToggle.addEventListener('change', () => {
+        useFullPaletteRotation = paletteToggle.checked;
+        localStorage.setItem('rpgFullPaletteRotation', useFullPaletteRotation);
+    });
+
 
     const keysPressed = new Set();
     document.addEventListener('keydown', (e) => {
