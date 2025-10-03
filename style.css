@@ -112,3 +112,16 @@ body {
 
 #tooltip { position: fixed; display: none; z-index: 100; pointer-events: none; transition: opacity 0.2s; }
 
+@keyframes pulse-light {
+  0%, 100% {
+    box-shadow: 0 0 10px 0px rgba(216, 180, 254, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px 8px rgba(216, 180, 254, 0.1);
+  }
+}
+
+#betty-encounter-popup {
+    animation: pulse-light 2.5s infinite;
+}
+

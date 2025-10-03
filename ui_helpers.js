@@ -337,7 +337,12 @@ function showTooltip(itemKey, event) {
             if (effect.mana_regen) content += `<li>Regen: +${effect.mana_regen} MP/turn</li>`;
             if (effect.hp_regen) content += `<li>Regen: +${effect.hp_regen} HP/turn</li>`;
             if (effect.spell_crit_chance) content += `<li>Spell Crit: ${effect.spell_crit_chance * 100}% chance, x${effect.spell_crit_multiplier || 1.5} Dmg</li>`;
-            if (effect.spell_lifesteal) content += `<li>Spell Lifesteal: ${effect.spell_lifesteal * 100}%</li>`;
+            if (effect.spell_vamp) content += `<li>Spell Vamp: Killing with a spell restores ${effect.spell_vamp * 100}% of enemy's max HP and MP.</li>`;
+            if (effect.spell_penetration) content += `<li>Spell Pen: Spells ignore ${effect.spell_penetration * 100}% of enemy magic resist.</li>`;
+            if (effect.spell_sniper) content += `<li>Spell Sniper: Increases effective range by ${effect.spell_sniper * 100}%.</li>`;
+            if (effect.overdrive) content += `<li>Overdrive: ${effect.overdrive.chance * 100}% chance to deal x${effect.overdrive.multiplier} damage, but you take damage equal to ${effect.overdrive.self_damage * 100}% of your Max HP.</li>`;
+            if (effect.battlestaff) content += `<li>Battlestaff: Your melee attacks also scale with your Intelligence.</li>`;
+            if (effect.spell_weaver) content += `<li>Spellweaver: ${effect.spell_weaver * 100}% chance to apply a random elemental effect.</li>`;
             if (effect.ranged_chance) content += `<li>${effect.ranged_chance * 100}% chance to evade ranged attacks</li>`;
 
             // Shield Effects
@@ -390,4 +395,5 @@ function hideTooltip() {
     $('#tooltip').style.display = 'none';
     activeTooltipItem = null;
 }
+
 

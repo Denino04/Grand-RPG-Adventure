@@ -91,6 +91,7 @@ function initGame(playerName, gender, raceKey, classKey, backgroundKey) {
     player.hp = player.maxHp;
     player.mp = player.maxMp;
     player.baseStats = { Vigor: player.vigor, Focus: player.focus, Stamina: player.stamina, Strength: player.strength, Intelligence: player.intelligence, Luck: player.luck };
+    player.dialogueFlags = {};
 
 
     player.seed = Math.floor(Math.random() * 1000000);
@@ -245,6 +246,12 @@ function loadGameFromKey(saveKey, isImport = false) {
             }
 
             player = new Player(parsedData.name, parsedData.race);
+            player.saveKey = saveKey; // FIX: Ensure saveKey is assigned immediately.
+
+            // Bug fix: Initialize new properties on the parsed data for old saves.
+            if (!parsedData.dialogueFlags) parsedData.dialogueFlags = {};
+            if (!parsedData.bettyQuestState) parsedData.bettyQuestState = 'not_started';
+
 
             const getterProperties = ['maxHp', 'maxMp', 'physicalDefense', 'magicalDefense', 'physicalDamageBonus', 'magicalDamageBonus', 'resistanceChance', 'critChance', 'evasionChance'];
             for (const key in parsedData) {
@@ -252,11 +259,16 @@ function loadGameFromKey(saveKey, isImport = false) {
                     player[key] = parsedData[key];
                 }
             }
+            
+            if (isImport) {
+                player.saveKey = generateSaveKey();
+            }
 
             if (player.totalXp === undefined) {
                 addToLog('Updating old save file to new EXP system...', 'text-yellow-300');
                 let estimatedTotalXp = 0;
                 
+                // FIX: Use the OLD formula (power of 1.5) to estimate total XP.
                 for (let i = 1; i < player.level; i++) {
                     estimatedTotalXp += Math.floor(100 * Math.pow(i, 1.5));
                 }
@@ -277,10 +289,6 @@ function loadGameFromKey(saveKey, isImport = false) {
             player.recalculateGrowthBonuses();
             player.hp = Math.min(parsedData.hp, player.maxHp);
             player.mp = Math.min(parsedData.mp, player.maxMp);
-
-            if (isImport) {
-                player.saveKey = generateSaveKey();
-            }
 
             if (player.gender === 'Not specified' || !player.gender) {
                 player.gender = 'Neutral';

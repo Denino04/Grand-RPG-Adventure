@@ -107,6 +107,9 @@ function performAttack(targetIndex) {
 
     const performSingleAttack = (attackTarget, isSecondStrike = false) => {
         let damage = rollDice(...weapon.damage, `Player Weapon Attack ${isSecondStrike ? '2' : '1'}`) + player.physicalDamageBonus; 
+        if (weapon.effect?.battlestaff) {
+            damage += player.intelligence;
+        }
         let attackEffects = { element: player.weaponElement };
         let messageLog = [];
 
@@ -349,6 +352,7 @@ function castSpell(spellKey, targetIndex) {
     }
 
     gameState.isPlayerTurn = false; 
+    gameState.lastActionWasSpell = true;
     player.mp -= spellCost; 
     updateStatsView();
     
@@ -368,46 +372,65 @@ function castSpell(spellKey, targetIndex) {
 
         let magicDamage = rollDice(diceCount, spell.damage[1], `Player Spell: ${spell.name}`) + player.magicalDamageBonus;
 
-        if (catalyst.effect?.spell_crit_chance && Math.random() < catalyst.effect.spell_crit_chance) {
-            magicDamage = Math.floor(magicDamage * (catalyst.effect.spell_crit_multiplier || 1.5));
+        let critChance = catalyst.effect?.spell_crit_chance || 0;
+        let critMultiplier = catalyst.effect?.spell_crit_multiplier || 1.5;
+
+        if (spellData.element === 'none') {
+            critChance += 0.05 + (tierIndex * 0.01); // Innate crit chance for non-elemental spells
+        }
+
+        if (critChance > 0 && Math.random() < critChance) {
+            magicDamage = Math.floor(magicDamage * critMultiplier);
             messageLog.push('SPELL CRITICAL!');
         }
         
+        // Overdrive Logic
+        if (catalyst.effect?.overdrive && Math.random() < catalyst.effect.overdrive.chance) {
+            const bonusDamage = magicDamage * (catalyst.effect.overdrive.multiplier - 1);
+            magicDamage += bonusDamage; // Apply the full damage boost
+            messageLog.push('OVERDRIVE!');
+
+            // New self-damage calculation based on Max HP
+            const selfDamage = Math.floor(player.maxHp * catalyst.effect.overdrive.self_damage);
+            player.takeDamage(selfDamage, true);
+            addToLog(`The power overwhelms you, dealing <span class="font-bold text-red-500">${selfDamage}</span> damage to yourself!`, 'text-red-400');
+        }
+
         if (spellData.element === 'healing') {
             player.hp = Math.min(player.maxHp, player.hp + magicDamage);
             addToLog(`You recover <span class="font-bold text-green-400">${magicDamage}</span> HP.`, 'text-green-300');
         } else {
             // Apply elemental damage fluctuation for Fire spells
             if (spellData.element === 'fire') {
-                const fireMultiplier = 1 + Math.random() * 0.2;
+                const fireMultiplier = 1 + Math.random() * (0.2 + (tierIndex * 0.1));
                 magicDamage = Math.floor(magicDamage * fireMultiplier);
             }
 
             // Main target damage
-            const finalDamage = target.takeDamage(magicDamage, { isMagic: true, element: spellData.element });
+            const finalDamage = target.takeDamage(magicDamage, { isMagic: true, element: spellData.element, tier: tierIndex, spell_penetration: catalyst.effect?.spell_penetration });
             addToLog(`It deals <span class="font-bold text-purple-400">${finalDamage}</span> damage. ${messageLog.join(' ')}`);
 
             // Apply secondary elemental effects after main damage
             if (finalDamage > 0) {
                  if (spellData.element === 'water') {
                     addToLog(`The water from your spell drenches ${target.name}!`, 'text-blue-400');
-                    target.statusEffects.drenched = { duration: 2, multiplier: 0.9 };
+                    target.statusEffects.drenched = { duration: 2 + tierIndex, multiplier: 0.9 - (tierIndex * 0.05) };
                 }
-                if (spellData.element === 'earth' && Math.random() < 0.2) { // 20% chance for paralysis
+                if (spellData.element === 'earth' && Math.random() < (0.2 + (tierIndex * 0.1))) { // 20% chance for paralysis
                     if (!target.statusEffects.paralyzed) {
-                        target.statusEffects.paralyzed = { duration: 2 };
+                        target.statusEffects.paralyzed = { duration: 2 + tierIndex };
                         addToLog(`${target.name} is paralyzed by the force of the earth!`, 'text-yellow-500');
                     }
                 }
                  if (spellData.element === 'nature') {
-                    const lifestealAmount = Math.floor(finalDamage * 0.1); // 10% lifesteal
+                    const lifestealAmount = Math.floor(finalDamage * (0.1 + (tierIndex * 0.05))); // 10% lifesteal
                     if (lifestealAmount > 0) {
                         player.hp = Math.min(player.maxHp, player.hp + lifestealAmount);
                         addToLog(`You drain <span class="font-bold text-green-400">${lifestealAmount}</span> HP.`, 'text-green-300');
                         updateStatsView();
                     }
                 }
-                 if (spellData.element === 'light' && Math.random() < 0.2) { // 20% chance to cleanse
+                 if (spellData.element === 'light' && Math.random() < (0.2 + (tierIndex * 0.15))) { // 20% chance to cleanse
                     const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched'].includes(key));
                     if (debuffs.length > 0) {
                         const effectToCleanse = debuffs[0];
@@ -416,6 +439,31 @@ function castSpell(spellKey, targetIndex) {
                     }
                 }
             }
+             // Spellweaver Logic
+            if (catalyst.effect?.spell_weaver && Math.random() < catalyst.effect.spell_weaver) {
+                const possibleEffects = ['water', 'earth', 'nature', 'light'];
+                const randomEffect = possibleEffects[Math.floor(Math.random() * possibleEffects.length)];
+                addToLog(`The Spellweaver catalyst weaves a random <span class="font-bold text-cyan-300">${randomEffect}</span> effect into your spell!`);
+                switch (randomEffect) {
+                    case 'water':
+                        target.statusEffects.drenched = { duration: 2, multiplier: 0.9 };
+                        break;
+                    case 'earth':
+                        if (!target.statusEffects.paralyzed) {
+                            target.statusEffects.paralyzed = { duration: 2 };
+                        }
+                        break;
+                    case 'nature':
+                        const lifestealAmount = Math.floor(finalDamage * 0.1);
+                        if (lifestealAmount > 0) player.hp = Math.min(player.maxHp, player.hp + lifestealAmount);
+                        break;
+                    case 'light':
+                        const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched'].includes(key));
+                        if (debuffs.length > 0) delete player.statusEffects[debuffs[0]];
+                        break;
+                }
+            }
+
 
             // AoE splash damage
             if (spellData.type === 'aoe') {
@@ -432,7 +480,7 @@ function castSpell(spellKey, targetIndex) {
                 const otherTargets = currentEnemies.filter(e => e.isAlive() && e !== target);
                 if (otherTargets.length > 0) {
                     const chainTarget = otherTargets[Math.floor(Math.random() * otherTargets.length)];
-                    const chainDamage = Math.floor(finalDamage / 2);
+                    const chainDamage = Math.floor(finalDamage * (0.5 + (tierIndex * 0.1)));
                     const finalChainDamage = chainTarget.takeDamage(chainDamage, { isMagic: true, element: 'lightning' });
                     addToLog(`Lightning chains from your spell, hitting ${chainTarget.name} for <span class="font-bold text-blue-300">${finalChainDamage}</span> damage!`, 'text-blue-400');
                 }
@@ -476,7 +524,12 @@ function castSpell(spellKey, targetIndex) {
     if (player.equippedWeapon.effect?.spell_follow_up) {
         setTimeout(() => performSpellFollowUpAttack(target), 200);
     } else {
-        setTimeout(checkBattleStatus, 200);
+        if (spellData.element === 'wind' && Math.random() < (0.1 + (tierIndex * 0.05))) { // 10% base + 5% per tier
+            addToLog("The swirling winds grant you another turn!", 'text-cyan-300 font-bold');
+            setTimeout(endPlayerTurnPhase, 500);
+        } else {
+            setTimeout(checkBattleStatus, 200);
+        }
     }
 }
 
@@ -591,6 +644,17 @@ function checkBattleStatus(isReaction = false) {
 
                 addToLog(`You have defeated ${enemy.name}!`, 'text-green-400 font-bold');
                 
+                // Spell Vamp Logic
+                if (gameState.lastActionWasSpell && player.equippedCatalyst?.effect?.spell_vamp) {
+                    const vampAmount = player.equippedCatalyst.effect.spell_vamp;
+                    const hpGain = Math.floor(enemy.maxHp * vampAmount);
+                    const mpGain = Math.floor(enemy.maxHp * vampAmount); // Assuming maxHP for MP gain as well
+                    player.hp = Math.min(player.maxHp, player.hp + hpGain);
+                    player.mp = Math.min(player.maxMp, player.mp + mpGain);
+                    addToLog(`You absorb the vanquished soul, restoring <span class="font-bold text-green-400">${hpGain}</span> HP and <span class="font-bold text-blue-400">${mpGain}</span> MP!`, 'text-purple-300');
+                }
+
+
                 if (enemy.rarityData.name === 'Legendary') {
                     const speciesKey = enemy.speciesData.key;
                     if (!player.legacyQuestProgress[speciesKey]) {
@@ -950,4 +1014,6 @@ function addToGraveyard(deadPlayer, killer) {
     }
     localStorage.setItem('rpgGraveyard', JSON.stringify(graveyard));
 }
+
+
 

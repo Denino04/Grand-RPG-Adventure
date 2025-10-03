@@ -14,6 +14,12 @@ function getCatalystStatsString(catalyst) {
     if (catalyst.effect?.hp_regen) stats.push(`+${catalyst.effect.hp_regen}HP/t`);
     if (catalyst.effect?.mana_regen) stats.push(`+${catalyst.effect.mana_regen}MP/t`);
     if (catalyst.effect?.spell_crit_chance) stats.push(`${catalyst.effect.spell_crit_chance * 100}% Crit`);
+    if (catalyst.effect?.spell_vamp) stats.push(`Spell Vamp`);
+    if (catalyst.effect?.spell_penetration) stats.push(`Penetration`);
+    if (catalyst.effect?.spell_sniper) stats.push(`Sniper`);
+    if (catalyst.effect?.overdrive) stats.push(`Overdrive`);
+    if (catalyst.effect?.battlestaff) stats.push(`Battlestaff`);
+    if (catalyst.effect?.spell_weaver) stats.push(`Spellweaver`);
     if (stats.length === 0) return `${catalyst.name}`;
     return `${catalyst.name} (${stats.join(', ')})`;
 }
@@ -728,6 +734,31 @@ function renderTown() {
     applyTheme('town');
     lastViewBeforeInventory = 'town';
     gameState.currentView = 'town';
+
+    const bettyPopup = $('#betty-encounter-popup');
+    bettyPopup.classList.add('hidden'); // Hide by default
+    bettyPopup.onclick = null; // Clear previous handlers
+
+    // Betty's first appearance logic
+    if (player.level >= 10 && player.bettyQuestState === 'not_started' && !player.dialogueFlags.bettyEncounterReady) {
+        if (Math.random() < 0.05) {
+            player.dialogueFlags.bettyEncounterReady = true; 
+        }
+    }
+    
+    // Condition to SHOW the Betty popup
+    if (player.dialogueFlags.bettyEncounterReady && player.bettyQuestState === 'not_started') {
+        bettyPopup.classList.remove('hidden');
+        bettyPopup.innerHTML = `<p class="font-bold text-purple-200">A nervous woman whispers...</p><p class="text-gray-300">"Psst... Adventurer... Over here..."</p>`;
+        bettyPopup.onclick = () => {
+            player.dialogueFlags.bettyEncounterReady = false; // Consume the random encounter trigger
+            startBettyDialogue();
+        };
+    } else if (player.bettyQuestState === 'declined') {
+        bettyPopup.classList.remove('hidden');
+        bettyPopup.innerHTML = `<p class="font-bold text-purple-200">Betty is waiting...</p><p class="text-gray-300">She seems to want to talk to you again.</p>`;
+        bettyPopup.onclick = startBettyDialogue;
+    }
     
     const container = document.createElement('div');
     container.className = 'flex flex-col items-center justify-center w-full h-full';
@@ -743,6 +774,10 @@ function renderTown() {
         { name: 'Enchanter', action: "renderEnchanter()" }, 
         { name: "Witch's Coven", action: "renderWitchsCoven()" }
     ];
+
+    if (player.bettyQuestState === 'accepted') {
+        locations.push({ name: 'Betty\'s Corner', action: "startBettyDialogue()" });
+    }
 
     const leaveTownAction = { name: 'Leave Town', action: "renderMainMenu()", isAction: true };
 
@@ -1410,47 +1445,68 @@ function renderSageTowerTrain() {
 
     lastViewBeforeInventory = 'sage_tower_train';
     gameState.currentView = 'sage_tower_train';
+
+    // Group spells by element
+    const spellsByElement = {};
+    for (const spellKey in SPELLS) {
+        const spell = SPELLS[spellKey];
+        if (!spellsByElement[spell.element]) {
+            spellsByElement[spell.element] = [];
+        }
+        spellsByElement[spell.element].push(spellKey);
+    }
+    
+    // Define the order of elements
+    const elementOrder = ['none', 'fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'dark', 'healing'];
     
     let html = `<div class="w-full">
         <h2 class="font-medieval text-3xl mb-4 text-center">Train Spells</h2>
-        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`;
+        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-4">`;
 
-    Object.keys(SPELLS).forEach(spellKey => {
-        const spellTree = SPELLS[spellKey];
-        const playerSpell = player.spells[spellKey];
-        const currentTier = playerSpell ? playerSpell.tier : 0;
-        const spellDetails = spellTree.tiers[currentTier - 1] || spellTree.tiers[0];
-        
-        html += `<div class="p-3 bg-slate-800 rounded-lg text-left">`;
+    elementOrder.forEach(element => {
+        if (spellsByElement[element]) {
+            html += `<div class="space-y-3">
+                        <h3 class="font-medieval text-xl text-yellow-300 border-b-2 border-yellow-300/30 pb-1">${capitalize(element)} Spells</h3>`;
+            
+            spellsByElement[element].forEach(spellKey => {
+                const spellTree = SPELLS[spellKey];
+                const playerSpell = player.spells[spellKey];
+                const currentTier = playerSpell ? playerSpell.tier : 0;
+                const spellDetails = spellTree.tiers[currentTier - 1] || spellTree.tiers[0];
+                
+                html += `<div class="p-3 bg-slate-800 rounded-lg text-left">`;
 
-        if (currentTier === 0) { // Spell not learned
-            const canAfford = player.gold >= spellTree.learnCost;
-            html += `<div class="flex justify-between items-center">
-                        <h3 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name}</h3>
-                        <button onclick="upgradeSpell('${spellKey}')" class="btn btn-primary" ${!canAfford ? 'disabled' : ''}>Learn</button>
-                    </div>
-                    <p class="text-sm text-gray-400">Cost: ${spellTree.learnCost} G</p>`;
-        } else if (currentTier < spellTree.tiers.length) { // Can be upgraded
-            const upgradeData = spellTree.tiers[currentTier - 1];
-            const canAffordGold = player.gold >= upgradeData.upgradeCost;
-            const hasEssences = Object.entries(upgradeData.upgradeEssences || {}).every(([key, val]) => (player.inventory.items[key] || 0) >= val);
-            const canUpgrade = canAffordGold && hasEssences;
-            const essenceList = Object.entries(upgradeData.upgradeEssences || {}).map(([key, val]) => `${val}x ${getItemDetails(key).name}`).join(', ');
+                if (currentTier === 0) { // Spell not learned
+                    const canAfford = player.gold >= spellTree.learnCost;
+                    html += `<div class="flex justify-between items-center">
+                                <h3 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name}</h3>
+                                <button onclick="upgradeSpell('${spellKey}')" class="btn btn-primary" ${!canAfford ? 'disabled' : ''}>Learn</button>
+                            </div>
+                            <p class="text-sm text-gray-400">Cost: ${spellTree.learnCost} G</p>`;
+                } else if (currentTier < spellTree.tiers.length) { // Can be upgraded
+                    const upgradeData = spellTree.tiers[currentTier - 1];
+                    const canAffordGold = player.gold >= upgradeData.upgradeCost;
+                    const hasEssences = Object.entries(upgradeData.upgradeEssences || {}).every(([key, val]) => (player.inventory.items[key] || 0) >= val);
+                    const canUpgrade = canAffordGold && hasEssences;
+                    const essenceList = Object.entries(upgradeData.upgradeEssences || {}).map(([key, val]) => `${val}x ${getItemDetails(key).name}`).join(', ');
 
-            html += `<div class="flex justify-between items-center">
-                        <h3 class="font-bold text-lg text-green-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name} (Tier ${currentTier})</h3>
-                        <button onclick="upgradeSpell('${spellKey}')" class="btn btn-primary" ${!canUpgrade ? 'disabled' : ''}>Upgrade</button>
-                    </div>
-                     <p class="text-sm text-gray-400">Next: ${spellTree.tiers[currentTier].name}</p>
-                     <p class="text-sm text-gray-400">Cost: ${upgradeData.upgradeCost} G, ${essenceList}</p>`;
-        } else { // Max tier
-             html += `<div class="flex justify-between items-center">
-                        <h3 class="font-bold text-lg text-cyan-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name} (Max Tier)</h3>
-                        <span class="text-gray-500">Mastered</span>
-                      </div>`;
+                    html += `<div class="flex justify-between items-center">
+                                <h3 class="font-bold text-lg text-green-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name} (Tier ${currentTier})</h3>
+                                <button onclick="upgradeSpell('${spellKey}')" class="btn btn-primary" ${!canUpgrade ? 'disabled' : ''}>Upgrade</button>
+                            </div>
+                             <p class="text-sm text-gray-400">Next: ${spellTree.tiers[currentTier].name}</p>
+                             <p class="text-sm text-gray-400">Cost: ${upgradeData.upgradeCost} G, ${essenceList}</p>`;
+                } else { // Max tier
+                     html += `<div class="flex justify-between items-center">
+                                <h3 class="font-bold text-lg text-cyan-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name} (Max Tier)</h3>
+                                <span class="text-gray-500">Mastered</span>
+                              </div>`;
+                }
+
+                html += `</div>`;
+            });
+            html += `</div>`;
         }
-
-        html += `</div>`;
     });
 
     html += `</div>
@@ -1581,6 +1637,31 @@ function renderInventory() {
     const scrollPositions = Array.from(scrollables).map(el => el.scrollTop);
 
     gameState.currentView = 'inventory'; 
+
+    const renderKeyItemsList = () => {
+        const keyItems = Object.keys(player.inventory.items).filter(key => {
+            const details = getItemDetails(key);
+            return details && details.type === 'key';
+        });
+
+        if (keyItems.length === 0) return '';
+
+        let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">Key Items</h3><div class="space-y-2">`;
+        html += keyItems.map(key => {
+            const details = getItemDetails(key);
+            if (!details) return '';
+
+            let buttonHtml = '';
+            if (key === 'bestiary_notebook') {
+                buttonHtml = `<button onclick="event.stopPropagation(); renderBestiaryMenu()" class="btn btn-primary text-sm py-1 px-3">Open</button>`;
+            }
+
+            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span>${buttonHtml}</div>`;
+        }).join('');
+        html += `</div>`;
+        return html;
+    };
+
     const renderList = (category, title) => { 
         let list;
         let itemCounts = {};
@@ -1590,7 +1671,6 @@ function renderInventory() {
         } else if (category === 'lures') {
             list = Object.keys(player.inventory.lures);
         } else {
-            // Filter out invalid item keys before processing
             if (!Array.isArray(player.inventory[category])) {
                  player.inventory[category] = [];
             }
@@ -1613,7 +1693,12 @@ function renderInventory() {
         let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${title}</h3><div class="space-y-2">`; 
         html += list.map(key => { 
             const details = getItemDetails(key); 
-            if (!details) return ''; // Should be redundant now, but good for safety
+            if (!details) return '';
+
+            if (category === 'items' && details.type === 'key') {
+                return ''; // Exclude key items from the regular item list
+            }
+
             let countStr = '';
 
             if (category === 'items') {
@@ -1634,8 +1719,9 @@ function renderInventory() {
                              (category === 'lures' && key === player.equippedLure); 
             const equippedText = isEquipped ? '<span class="text-green-400 font-bold ml-2">[Equipped]</span>' : ''; 
             let buttonHtml = ''; 
-            if (category === 'items' && details.type !== 'junk' && details.type !== 'alchemy') { buttonHtml = `<button onclick="useItem('${key}')" class="btn btn-item text-sm py-1 px-3">Use</button>`; } 
-            else if ((category === 'weapons' || category === 'catalysts' || category === 'armor' || category === 'shields' || category === 'lures') && !isEquipped) { 
+            if (category === 'items' && details.type !== 'junk' && details.type !== 'alchemy') { 
+                buttonHtml = `<button onclick="useItem('${key}')" class="btn btn-item text-sm py-1 px-3">Use</button>`; 
+            } else if ((category === 'weapons' || category === 'catalysts' || category === 'armor' || category === 'shields' || category === 'lures') && !isEquipped) { 
                 buttonHtml = `<button onclick="equipItem('${key}')" class="btn btn-primary text-sm py-1 px-3">Equip</button>`; 
             }
             return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr} ${equippedText}</span>${buttonHtml}</div>`; }).join(''); 
@@ -1650,7 +1736,7 @@ function renderInventory() {
         } else {
             knownSpells.forEach(key => {
                 const spellTree = SPELLS[key];
-                if (!spellTree) { // Defensive check for old/invalid spell keys in save data
+                if (!spellTree) { 
                     console.warn(`Spell key "${key}" not found in SPELLS data. Skipping render.`);
                     return;
                 }
@@ -1683,6 +1769,7 @@ function renderInventory() {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 h-80">
                 <div class="h-full overflow-y-auto inventory-scrollbar pr-2">
                     ${renderSpellbook()}
+                    ${renderKeyItemsList()}
                 </div>
                 <div class="h-full overflow-y-auto inventory-scrollbar pr-2">
                     ${renderList('items', 'Items')}
@@ -1777,7 +1864,10 @@ function renderBattle(subView = 'main', actionData = null) {
         render(container);
      } else if (subView === 'item') {
         let itemsHtml = Object.keys(player.inventory.items)
-            .filter(key => ITEMS[key].type !== 'junk' && ITEMS[key].type !== 'alchemy')
+            .filter(key => {
+                const item = ITEMS[key];
+                return item && item.type !== 'junk' && item.type !== 'alchemy' && item.type !== 'key';
+            })
             .map(key => {
                 const item = ITEMS[key];
                 const count = player.inventory.items[key];
@@ -1935,6 +2025,140 @@ window.castHealingSpellOutsideCombat = function(spellKey) {
     renderInventory(); // Re-render the inventory to update the button states
 }
 
+function renderBestiaryMenu() {
+    hideTooltip();
+    gameState.currentView = 'bestiary';
+    let html = `<div class="w-full text-center">
+        <h2 class="font-medieval text-3xl mb-4">Bestiary</h2>
+        <p class="text-gray-400 mb-6">(Work in Progress)</p>
+        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">
+            <p class="text-gray-500">You haven't discovered any creatures yet.</p>
+        </div>
+        <div class="text-center mt-4">
+            <button onclick="renderInventory()" class="btn btn-primary">Back</button>
+        </div>
+    </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+// --- BETTY DIALOGUE FUNCTIONS ---
+
+function startBettyDialogue() {
+    gameState.currentView = 'dialogue'; // Prevent other actions
+    $('#betty-encounter-popup').classList.add('hidden'); // Hide popup once dialogue starts
+
+    // This is the first time the player is interacting with her in any capacity.
+    if (!player.dialogueFlags.bettyMet) {
+        player.dialogueFlags.bettyMet = true;
+    }
+
+    if (player.bettyQuestState === 'not_started' || player.bettyQuestState === 'declined') {
+        renderBettyDialogue('first_encounter');
+    } else if (player.bettyQuestState === 'accepted') {
+        let html = `<div class="w-full text-center">
+            <h2 class="font-medieval text-2xl mb-4">Betty's Corner</h2>
+            <p class="text-gray-400 mb-6">"Oh, hello again! How is the research going?"</p>
+            <div class="flex justify-center gap-4">
+                <button onclick="renderBestiaryMenu()" class="btn btn-primary">View Bestiary</button>
+                <button onclick="renderTown()" class="btn btn-primary">Leave</button>
+            </div>
+        </div>`;
+        const container = document.createElement('div');
+        container.innerHTML = html;
+        render(container);
+    }
+}
 
 
+function renderBettyDialogue(sceneKey) {
+    const scene = BETTY_DIALOGUE[sceneKey];
+    if (!scene) return;
+
+    let dialogueHtml = `<div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
+        <p class="mb-6 italic text-gray-300">"${scene.prompt}"</p>
+        <div class="flex flex-col gap-3">`;
+
+    for (const key in scene.options) {
+        const option = scene.options[key];
+        dialogueHtml += `<button onclick="handleBettyResponse('${sceneKey}', '${key}')" class="btn btn-primary text-left">${option.text}</button>`;
+    }
+    
+    dialogueHtml += `</div></div>`;
+    
+    const container = document.createElement('div');
+    container.innerHTML = dialogueHtml;
+    render(container);
+}
+
+function handleBettyResponse(sceneKey, optionKey) {
+    const scene = BETTY_DIALOGUE[sceneKey];
+    const option = scene.options[optionKey];
+
+    // Display Betty's immediate response
+    let responseHtml = `<div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
+        <p class="mb-6 italic text-gray-300">"${option.response}"</p>
+    </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = responseHtml;
+    render(container);
+
+    // After a delay, move to the next part of the conversation
+    setTimeout(() => {
+        if (sceneKey === 'first_encounter') {
+            renderBettyQuestProposal();
+        } else if (sceneKey === 'quest_proposal') {
+            switch(optionKey) {
+                case 'A': // Accept
+                    player.bettyQuestState = 'accepted';
+                    player.addToInventory('bestiary_notebook');
+                    let acceptHtml = `<div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
+                        <p class="mb-6 italic text-gray-300">"${BETTY_DIALOGUE.quest_proposal.after_accept}"</p>
+                        <button onclick="renderTown()" class="btn btn-primary">Finish</button>
+                    </div>`;
+                    container.innerHTML = acceptHtml;
+                    render(container);
+                    break;
+                case 'B': // Decline
+                    player.bettyQuestState = 'declined';
+                    setTimeout(renderTown, 2000); // Go back to town after a short delay
+                    break;
+                case 'C': // Silent Accept
+                    player.bettyQuestState = 'accepted';
+                    player.addToInventory('bestiary_notebook');
+                    let silentAcceptHtml = `<div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
+                        <p class="mb-6 italic text-gray-300">"${BETTY_DIALOGUE.quest_proposal.after_accept_silent}"</p>
+                        <button onclick="renderTown()" class="btn btn-primary">Finish</button>
+                    </div>`;
+                    container.innerHTML = silentAcceptHtml;
+                    render(container);
+                    break;
+            }
+        }
+    }, 2500); // 2.5 second delay
+}
+
+function renderBettyQuestProposal() {
+    const scene = BETTY_DIALOGUE.quest_proposal;
+    let dialogueHtml = `<div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
+        <div class="space-y-4 mb-6 italic text-gray-300">`;
+
+    scene.intro.forEach(line => {
+        dialogueHtml += `<p>"${line}"</p>`;
+    });
+
+    dialogueHtml += `</div><div class="flex flex-col gap-3">`;
+
+    for (const key in scene.options) {
+        const option = scene.options[key];
+        dialogueHtml += `<button onclick="handleBettyResponse('quest_proposal', '${key}')" class="btn btn-primary text-left">${option.text}</button>`;
+    }
+    
+    dialogueHtml += `</div></div>`;
+    
+    const container = document.createElement('div');
+    container.innerHTML = dialogueHtml;
+    render(container);
+}
 
