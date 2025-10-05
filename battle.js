@@ -535,6 +535,12 @@ function castSpell(spellKey, targetIndex) {
 
 
 function battleAction(type, actionData = null) {
+    // BUG FIX: Check for premature victory at the start of any action
+    if (currentEnemies.every(e => !e.isAlive()) && !gameState.battleEnded) {
+        checkBattleStatus();
+        return; 
+    }
+
     if (!player.isAlive()) {
         checkPlayerDeath();
         return;
@@ -919,6 +925,12 @@ async function enemyTurn() {
 }
 
 function endPlayerTurnPhase() {
+    // BUG FIX: Check for premature victory before starting the next turn phase
+    if (currentEnemies.every(e => !e.isAlive()) && !gameState.battleEnded) {
+        checkBattleStatus();
+        return;
+    }
+
     if (gameState.battleEnded) return;
     if (!player.isAlive()) {
         checkPlayerDeath();
@@ -1014,6 +1026,4 @@ function addToGraveyard(deadPlayer, killer) {
     }
     localStorage.setItem('rpgGraveyard', JSON.stringify(graveyard));
 }
-
-
 
