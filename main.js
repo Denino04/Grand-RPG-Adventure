@@ -245,6 +245,32 @@ function loadGameFromKey(saveKey, isImport = false) {
                 return;
             }
 
+            // Spell format migration for old saves
+            if (Array.isArray(parsedData.spells)) {
+                addToLog('Updating spellbook from an older save version...', 'text-yellow-300');
+                const oldSpellsArray = parsedData.spells;
+                const newSpellsObject = {};
+                
+                for (const oldSpellName of oldSpellsArray) {
+                    let foundSpell = false;
+                    for (const spellKey in SPELLS) {
+                        for (let i = 0; i < SPELLS[spellKey].tiers.length; i++) {
+                            const tier = SPELLS[spellKey].tiers[i];
+                            // Create a comparable key from the tier name (e.g., "Rain of Arrow" -> "rain_of_arrow")
+                            const tierNameAsKey = tier.name.toLowerCase().replace(/ /g, '_');
+                            if (tierNameAsKey === oldSpellName) {
+                                newSpellsObject[spellKey] = { tier: i + 1 };
+                                foundSpell = true;
+                                break;
+                            }
+                        }
+                        if (foundSpell) break;
+                    }
+                }
+                parsedData.spells = newSpellsObject;
+            }
+
+
             player = new Player(parsedData.name, parsedData.race);
             player.saveKey = saveKey; // FIX: Ensure saveKey is assigned immediately.
 
@@ -480,5 +506,4 @@ window.addEventListener('load', () => {
 
     updateLoadGameButtonVisibility();
 });
-
 
