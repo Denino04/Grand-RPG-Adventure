@@ -264,18 +264,28 @@ function updatePlayerTier() {
 
 // --- SAVE & LOAD ---
 async function saveGame(manual = false) { 
-    if (!player || !db || !userId) return; 
-    try {
-        const saveData = JSON.parse(JSON.stringify(player)); 
-        
-        // Add user account info to the save data
-        if (auth.currentUser && !auth.currentUser.isAnonymous) {
-            saveData.userEmail = auth.currentUser.email;
-            saveData.userDisplayName = auth.currentUser.displayName;
-        } else {
-            saveData.userEmail = 'anonymous';
-            saveData.userDisplayName = 'Guest';
+    if (!player) return; 
+    const saveData = JSON.parse(JSON.stringify(player));
+    
+    // If user is anonymous or Firebase isn't available, save to localStorage
+    if (!auth || !auth.currentUser || auth.currentUser.isAnonymous) {
+        try {
+            localStorage.setItem('rpgSaveData_local', JSON.stringify(saveData));
+            if (manual) {
+                addToLog('Game Saved Locally!', 'text-green-400 font-bold');
+            }
+        } catch (error) {
+            console.error("Could not save game to localStorage:", error); 
+            addToLog('Error: Could not save game locally.', 'text-red-400');
         }
+        return; // Stop here for local saves
+    }
+
+    // Otherwise, save to Firestore for logged-in users
+    try {
+        // Add user account info to the save data
+        saveData.userEmail = auth.currentUser.email;
+        saveData.userDisplayName = auth.currentUser.displayName;
 
         const charactersCollection = db.collection(`artifacts/${appId}/users/${userId}/characters`);
 
@@ -291,7 +301,7 @@ async function saveGame(manual = false) {
         } 
     } catch (error) { 
         console.error("Could not save game to Firestore:", error); 
-        addToLog('Error: Could not save game.', 'text-red-400');
+        addToLog('Error: Could not save game to cloud.', 'text-red-400');
     } 
 }
 
@@ -299,32 +309,62 @@ async function renderLoadMenu() {
     let html = `<div class="w-full text-center">
         <h2 class="font-medieval text-3xl mb-4 text-center">Load Character</h2>
         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`;
-    
-    try {
-        const charactersCollection = db.collection(`artifacts/${appId}/users/${userId}/characters`);
-        const querySnapshot = await charactersCollection.get();
 
-        if (querySnapshot.empty) {
-            html += `<p class="text-gray-400">No saved games found.</p>`;
-        } else {
-            querySnapshot.forEach(doc => {
-                const charData = doc.data();
-                html += `
-                    <div class="p-3 bg-slate-800 rounded-lg flex justify-between items-center">
-                        <div>
-                            <p class="font-bold text-yellow-300">${charData.name}</p>
-                            <p class="text-sm text-gray-400">Level ${charData.level} ${charData.race || ''} ${charData.class || ''}</p>
-                        </div>
-                        <div>
-                            <button onclick="loadGameFromKey('${doc.id}')" class="btn btn-primary text-sm py-1 px-3">Load</button>
-                            <button onclick="deleteSave('${doc.id}')" class="btn btn-action text-sm py-1 px-3 ml-2">Delete</button>
-                        </div>
-                    </div>`;
-            });
+    let hasSaves = false;
+
+    // 1. Check for local save (for guests)
+    const localSaveDataString = localStorage.getItem('rpgSaveData_local');
+    if (localSaveDataString) {
+        try {
+            const charData = JSON.parse(localSaveDataString);
+            hasSaves = true;
+            html += `
+                <div class="p-3 bg-slate-800 border-l-4 border-yellow-400 rounded-lg flex justify-between items-center">
+                    <div>
+                        <p class="font-bold text-yellow-300">${charData.name} <span class="text-sm font-normal text-gray-400">(Guest)</span></p>
+                        <p class="text-sm text-gray-400">Level ${charData.level} ${charData.race || ''} ${charData.class || ''}</p>
+                    </div>
+                    <div>
+                        <button onclick="loadGameFromKey('local')" class="btn btn-primary text-sm py-1 px-3">Load</button>
+                        <button onclick="deleteSave('local')" class="btn btn-action text-sm py-1 px-3 ml-2">Delete</button>
+                    </div>
+                </div>`;
+        } catch (e) {
+            console.error("Error parsing local save:", e);
         }
-    } catch (error) {
-        console.error("Error loading characters:", error);
-        html += `<p class="text-red-400">Could not load characters.</p>`;
+    }
+
+    // 2. Check for cloud saves (for logged-in users)
+    if (db && userId) {
+        try {
+            const charactersCollection = db.collection(`artifacts/${appId}/users/${userId}/characters`);
+            const querySnapshot = await charactersCollection.get();
+
+            if (!querySnapshot.empty) {
+                hasSaves = true;
+                querySnapshot.forEach(doc => {
+                    const charData = doc.data();
+                    html += `
+                        <div class="p-3 bg-slate-800 rounded-lg flex justify-between items-center">
+                            <div>
+                                <p class="font-bold text-yellow-300">${charData.name}</p>
+                                <p class="text-sm text-gray-400">Level ${charData.level} ${charData.race || ''} ${charData.class || ''}</p>
+                            </div>
+                            <div>
+                                <button onclick="loadGameFromKey('${doc.id}')" class="btn btn-primary text-sm py-1 px-3">Load</button>
+                                <button onclick="deleteSave('${doc.id}')" class="btn btn-action text-sm py-1 px-3 ml-2">Delete</button>
+                            </div>
+                        </div>`;
+                });
+            }
+        } catch (error) {
+            console.error("Error loading characters:", error);
+            html += `<p class="text-red-400">Could not load cloud characters.</p>`;
+        }
+    }
+    
+    if (!hasSaves) {
+        html += `<p class="text-gray-400">No saved games found.</p>`;
     }
 
     html += `</div>
@@ -340,10 +380,19 @@ async function renderLoadMenu() {
 }
 
 async function deleteSave(docId) {
+    // Handle local save deletion
+     if (docId === 'local') {
+         localStorage.removeItem('rpgSaveData_local');
+         addToLog("Guest save file deleted.", "text-yellow-400");
+         await renderLoadMenu();
+         await updateLoadGameButtonVisibility();
+         return;
+     }
+    // Handle Firestore deletion
      if (!db || !userId) return;
      try {
          await db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId).delete();
-         addToLog("Save file deleted.", "text-yellow-400");
+         addToLog("Cloud save file deleted.", "text-yellow-400");
          await renderLoadMenu();
          await updateLoadGameButtonVisibility();
      } catch (error) {
@@ -352,73 +401,96 @@ async function deleteSave(docId) {
 }
 
 async function loadGameFromKey(docId, isImport = false) {
-    if (!db || !userId) return;
-    
-    const docRef = db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId);
-    
-    try {
-        const docSnap = await docRef.get();
-        if (docSnap.exists) {
-            const parsedData = docSnap.data();
-            
-            player = new Player("Loading...", "Human");
-            Object.assign(player, parsedData);
-            player.firestoreId = docId;
+    let parsedData;
 
-            if (isImport) {
-                player.firestoreId = null;
-                await saveGame();
-            }
-
-            // --- DATA MIGRATION AND VALIDATION ---
-            if (!player.race) {
-                renderRaceSelectionForOldSave(player, player.firestoreId, isImport);
+    // Handle loading from local storage
+    if (docId === 'local') {
+        const localSaveDataString = localStorage.getItem('rpgSaveData_local');
+        if (localSaveDataString) {
+            try {
+                parsedData = JSON.parse(localSaveDataString);
+            } catch (e) {
+                alert("Local save file is corrupted!");
+                showStartScreen();
                 return;
-            }
-            if (!player.class || !player.backgroundKey) {
-                renderClassBackgroundSelectionForOldSave(player, player.firestoreId, isImport);
-                return;
-            }
-            if (player.totalXp === undefined) {
-                let estimatedTotalXp = 0;
-                for (let i = 1; i < player.level; i++) {
-                    estimatedTotalXp += Math.floor(100 * Math.pow(i, 1.5));
-                }
-                estimatedTotalXp += player.xp;
-                player.totalXp = estimatedTotalXp;
-            }
-            player.recalculateLevelFromTotalXp();
-            player.recalculateGrowthBonuses();
-            player.hp = Math.min(parsedData.hp, player.maxHp);
-            player.mp = Math.min(parsedData.mp, player.maxMp);
-            const weaponKey = findKeyByName(parsedData.equippedWeapon?.name, WEAPONS) || 'fists';
-            player.equippedWeapon = WEAPONS[weaponKey];
-            const catalystKey = findKeyByName(parsedData.equippedCatalyst?.name, CATALYSTS) || 'no_catalyst';
-            player.equippedCatalyst = CATALYSTS[catalystKey];
-            const armorKey = findKeyByName(parsedData.equippedArmor?.name, ARMOR) || 'travelers_garb';
-            player.equippedArmor = ARMOR[armorKey];
-            const shieldKey = findKeyByName(parsedData.equippedShield?.name, SHIELDS) || 'no_shield';
-            player.equippedShield = SHIELDS[shieldKey];
-            // --- END MIGRATION ---
-
-            $('#start-screen').classList.add('hidden');
-            $('#changelog-screen').classList.add('hidden');
-            $('#game-container').classList.remove('hidden');
-
-            addToLog(`Welcome back, ${player.name}!`);
-            applyTheme('default');
-            updateStatsView();
-            if (player.statPoints > 0) {
-                setTimeout(() => renderCharacterSheet(true), 1500);
-            } else {
-                renderMainMenu();
             }
         } else {
-            alert("Save file not found in the cloud!");
+            alert("Local save file not found!");
             showStartScreen();
+            return;
         }
-    } catch (error) {
-        console.error("Could not load game:", error);
+    } 
+    // Handle loading from Firestore
+    else {
+        if (!db || !userId) return;
+        const docRef = db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId);
+        try {
+            const docSnap = await docRef.get();
+            if (docSnap.exists) {
+                parsedData = docSnap.data();
+            } else {
+                alert("Save file not found in the cloud!");
+                showStartScreen();
+                return;
+            }
+        } catch (error) {
+            console.error("Could not load game from cloud:", error);
+            return;
+        }
+    }
+    
+    // Now that data is loaded (either from local or cloud), process it
+    if(parsedData) {
+        player = new Player("Loading...", "Human");
+        Object.assign(player, parsedData);
+        if(docId !== 'local') {
+            player.firestoreId = docId;
+        }
+
+
+        // --- DATA MIGRATION AND VALIDATION ---
+        if (!player.race) {
+            renderRaceSelectionForOldSave(player, player.firestoreId || 'local', isImport);
+            return;
+        }
+        if (!player.class || !player.backgroundKey) {
+            renderClassBackgroundSelectionForOldSave(player, player.firestoreId || 'local', isImport);
+            return;
+        }
+        if (player.totalXp === undefined) {
+            let estimatedTotalXp = 0;
+            for (let i = 1; i < player.level; i++) {
+                estimatedTotalXp += Math.floor(100 * Math.pow(i, 1.5));
+            }
+            estimatedTotalXp += player.xp;
+            player.totalXp = estimatedTotalXp;
+        }
+        player.recalculateLevelFromTotalXp();
+        player.recalculateGrowthBonuses();
+        player.hp = Math.min(parsedData.hp, player.maxHp);
+        player.mp = Math.min(parsedData.mp, player.maxMp);
+        const weaponKey = findKeyByName(parsedData.equippedWeapon?.name, WEAPONS) || 'fists';
+        player.equippedWeapon = WEAPONS[weaponKey];
+        const catalystKey = findKeyByName(parsedData.equippedCatalyst?.name, CATALYSTS) || 'no_catalyst';
+        player.equippedCatalyst = CATALYSTS[catalystKey];
+        const armorKey = findKeyByName(parsedData.equippedArmor?.name, ARMOR) || 'travelers_garb';
+        player.equippedArmor = ARMOR[armorKey];
+        const shieldKey = findKeyByName(parsedData.equippedShield?.name, SHIELDS) || 'no_shield';
+        player.equippedShield = SHIELDS[shieldKey];
+        // --- END MIGRATION ---
+
+        $('#start-screen').classList.add('hidden');
+        $('#changelog-screen').classList.add('hidden');
+        $('#game-container').classList.remove('hidden');
+
+        addToLog(`Welcome back, ${player.name}!`);
+        applyTheme('default');
+        updateStatsView();
+        if (player.statPoints > 0) {
+            setTimeout(() => renderCharacterSheet(true), 1500);
+        } else {
+            renderMainMenu();
+        }
     }
 }
 
@@ -474,21 +546,24 @@ function showStartScreen() {
 }
 
 async function updateLoadGameButtonVisibility() {
+    const localSaveExists = !!localStorage.getItem('rpgSaveData_local');
+
     if (!db || !userId) {
-         $('#load-game-btn').classList.add('hidden');
+         $('#load-game-btn').classList.toggle('hidden', !localSaveExists);
          $('#graveyard-btn').classList.add('hidden');
         return;
     }
     
     try {
         const charactersSnapshot = await db.collection(`artifacts/${appId}/users/${userId}/characters`).limit(1).get();
-        $('#load-game-btn').classList.toggle('hidden', charactersSnapshot.empty);
+        // Show button if a cloud save OR a local save exists
+        $('#load-game-btn').classList.toggle('hidden', charactersSnapshot.empty && !localSaveExists);
 
         const graveyardSnapshot = await db.collection(`artifacts/${appId}/public/data/graveyard`).limit(1).get();
         $('#graveyard-btn').classList.toggle('hidden', graveyardSnapshot.empty);
     } catch (error) {
         console.error("Could not check for saved games:", error);
-        $('#load-game-btn').classList.add('hidden');
+        $('#load-game-btn').classList.toggle('hidden', !localSaveExists); // Fallback to local check
         $('#graveyard-btn').classList.add('hidden');
     }
 }

@@ -17,10 +17,10 @@ const PLAYER_EMOJIS = {
     'Dwarf': { 'Male': '🧔‍♂️', 'Female': '🧔‍♀️', 'Neutral': '🧔' },
     'Orc': { 'Male': '👹', 'Female': '👹', 'Neutral': '👹' },
     'Halfling': { 'Male': '👦', 'Female': '👧', 'Neutral': '🧒' },
-    'Tiefling': { 'Male': '😈', 'Female': '😈', 'Neutral': '😈' },
-    'Dragonborn': { 'Male': '🐲', 'Female': '🐲', 'Neutral': '🐲' },
+    'Tiefling': { 'Male': '😈', 'Female': '👹', 'Neutral': '👹' },
+    'Dragonborn': { 'Male': '🐲', 'Female': '🐉', 'Neutral': '🐲' },
     'Aasimar': { 'Male': '😇', 'Female': '😇', 'Neutral': '😇' },
-    'Beastkin': { 'Male': '🐺', 'Female': '🐺', 'Neutral': '🐺' },
+    'Beastkin': { 'Male': '🦁', 'Female': '🐯', 'Neutral': '🐺' },
     'Clankers': { 'Male': '🤖', 'Female': '🤖', 'Neutral': '🤖' }
 };
 
@@ -894,36 +894,64 @@ const WITCH_COVEN_SERVICES = {
 
 const CHANGELOG_DATA = [
     {
+        version: "v0.5.1 - The Grid",
+        date: "2025-10-07",
+        changes: [
+            "Implemented a grid-based battlefield system for more tactical combat.",
+            "Overhauled the battle system to make equipment choices more impactful.",
+            "Added Firebase integration for database and account management.",
+            "Fixed several UI layout issues on mobile devices."
+        ]
+    },
+    {
+        version: "v0.4.2 - Polish and Secrets",
+        date: "2025-10-02",
+        changes: [
+            "Fixed an issue with the UI being too bright (the 'Flashbang' effect).",
+            "Resolved bugs causing UI elements to shift unexpectedly.",
+            "Rebalanced magic-based combat.",
+            "A new secret has been hidden somewhere in the world..."
+        ]
+    },
+    {
+        version: "v0.4.1 - The Adventurer",
+        date: "2025-09-30",
+        changes: [
+            "Introduced a new Level Up system with Base Stats (Vigor, Strength, etc.) and Derived Stats (HP, Damage, etc.). Players now get 5 points per level to allocate to Base Stats.",
+            "Added a full Character Creation system! Choose your Gender, Race, Class, and Background to customize your hero's journey.",
+            "The Witch's Coven is now open! Transmute items, reset your stat points, or even change your character's identity... for a price.",
+            "Adjusted the EXP curve for a smoother leveling experience (1.5x -> 1.1x).",
+            "Reworked enemy attack patterns to distinguish between physical and magical damage types.",
+            "Reduced the gold penalty for resting at the Inn and failing quests.",
+            "Healing spells can now be used outside of combat.",
+            "Minor tweaks to the UI and color palette."
+        ]
+    },
+    {
         version: "v0.3 - Magic and Elements",
         date: "2025-09-28",
         changes: [
-            "<strong>0.3.1</strong> - Implemented the foundational Elemental System, preparing the game for deeper magical combat."
+            "I implemented the foundational Elemental System. Things are about to get spicy."
         ]
     },
     {
         version: "v0.2 - Battle Overhaul",
         date: "2025-09-27",
         changes: [
-            "<strong>0.2.1</strong> - Conducted a major battle overhaul, reworking monster stats, equipment, and biome encounters.",
-            "<strong>0.2.2</strong> - The Alchemist and Black Market were opened, adding new crafting systems and rare items.",
-            "<strong>0.2.4</strong> - Updated the user interface for an improved experience on both PC and mobile.",
-            "<strong>0.2.6</strong> - Fixed critical bugs, including save file incompatibility between major versions."
+            "I conducted a major battle overhaul, reworking monster stats, equipment, and biome encounters.",
+            "The Alchemist and Black Market are now open for business! Go brew something nasty or buy something shiny.",
+            "I tamed the UI for a better experience on both PC and mobile.",
+            "I squashed some nasty save-breaking bugs from older versions. Your old heroes should be safe now!"
         ]
     },
     {
         version: "v0.1 - Creation",
         date: "2025-09-25",
         changes: [
-            "<strong>0.1.1</strong> - Initial game creation and foundation.",
-            "<strong>0.1.3</strong> - Implemented the core Town systems, including shops and the Quest Board.",
-            "<strong>0.1.7</strong> - Overhauled the save system to support robust Save Keys.",
-            "<strong>0.1.8</strong> - Added the endgame 'Legacy Quest' for dedicated players."
+            "The game exists! I pushed the big red button and here we are.",
+            "Towns are now a thing! You can shop, grab quests, and generally not be in the wilderness for a bit.",
+            "The save system has been fortified. Your progress is now etched into the digital stone.",
+            "I added the super-tough 'Legacy Quest' for those of you who like pain. You know who you are."
         ]
     }
 ];
-
-
-
-
-
-
