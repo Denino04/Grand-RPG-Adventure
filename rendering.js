@@ -2092,12 +2092,14 @@ function startBettyDialogue() {
         renderBettyDialogue('first_encounter');
     } else if (player.bettyQuestState === 'accepted') {
         const randomIdle = BETTY_DIALOGUE.betty_idle[Math.floor(Math.random() * BETTY_DIALOGUE.betty_idle.length)];
-        let html = `<div class="w-full text-center">
-            <h2 class="font-medieval text-2xl mb-4">Betty's Corner</h2>
-            <p class="text-gray-400 mb-6 italic">"${randomIdle}"</p>
-            <div class="flex justify-center gap-4">
-                <button onclick="renderBestiaryMenu('betty')" class="btn btn-primary">View Bestiary</button>
-                <button onclick="renderTown()" class="btn btn-primary">Leave</button>
+        let html = `<div class="w-full h-full flex flex-col items-center justify-center p-4">
+            <div class="w-full max-w-lg text-center">
+                <h2 class="font-medieval text-2xl mb-4">Betty's Corner</h2>
+                <p class="text-gray-400 mb-6 italic">"${randomIdle}"</p>
+                <div class="flex justify-center gap-4">
+                    <button onclick="renderBestiaryMenu('betty')" class="btn btn-primary">View Bestiary</button>
+                    <button onclick="renderTown()" class="btn btn-primary">Leave</button>
+                </div>
             </div>
         </div>`;
         const container = document.createElement('div');
@@ -2111,7 +2113,8 @@ function renderBettyDialogue(sceneKey) {
     const scene = BETTY_DIALOGUE[sceneKey];
     if (!scene) return;
 
-    let dialogueHtml = `<div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
+    let dialogueHtml = `<div class="w-full h-full flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
         <p class="mb-6 italic text-gray-300">"${scene.prompt}"</p>
         <div class="flex flex-col gap-3">`;
 
@@ -2120,7 +2123,7 @@ function renderBettyDialogue(sceneKey) {
         dialogueHtml += `<button onclick="handleBettyResponse('${sceneKey}', '${key}')" class="btn btn-primary text-left">${option.text}</button>`;
     }
     
-    dialogueHtml += `</div></div>`;
+    dialogueHtml += `</div></div></div>`;
     
     const container = document.createElement('div');
     container.innerHTML = dialogueHtml;
@@ -2132,8 +2135,10 @@ function handleBettyResponse(sceneKey, optionKey) {
     const option = scene.options[optionKey];
 
     // Display Betty's immediate response
-    let responseHtml = `<div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
-        <p class="mb-6 italic text-gray-300">"${option.response}"</p>
+    let responseHtml = `<div class="w-full h-full flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
+            <p class="mb-6 italic text-gray-300">"${option.response}"</p>
+        </div>
     </div>`;
     const container = document.createElement('div');
     container.innerHTML = responseHtml;
@@ -2144,15 +2149,16 @@ function handleBettyResponse(sceneKey, optionKey) {
         if (sceneKey === 'first_encounter') {
             renderBettyQuestProposal();
         } else if (sceneKey === 'quest_proposal') {
+            let nextHtml = '';
             switch(optionKey) {
                 case 'A': // Accept
                     player.bettyQuestState = 'accepted';
                     player.addToInventory('bestiary_notebook');
-                    let acceptHtml = `<div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
+                    nextHtml = `<div class="w-full h-full flex flex-col items-center justify-center p-4"><div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
                         <p class="mb-6 italic text-gray-300">"${BETTY_DIALOGUE.quest_proposal.after_accept}"</p>
                         <button onclick="renderTown()" class="btn btn-primary">Finish</button>
-                    </div>`;
-                    container.innerHTML = acceptHtml;
+                    </div></div>`;
+                    container.innerHTML = nextHtml;
                     render(container);
                     break;
                 case 'B': // Decline
@@ -2162,11 +2168,11 @@ function handleBettyResponse(sceneKey, optionKey) {
                 case 'C': // Silent Accept
                     player.bettyQuestState = 'accepted';
                     player.addToInventory('bestiary_notebook');
-                    let silentAcceptHtml = `<div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
+                    nextHtml = `<div class="w-full h-full flex flex-col items-center justify-center p-4"><div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
                         <p class="mb-6 italic text-gray-300">"${BETTY_DIALOGUE.quest_proposal.after_accept_silent}"</p>
                         <button onclick="renderTown()" class="btn btn-primary">Finish</button>
-                    </div>`;
-                    container.innerHTML = silentAcceptHtml;
+                    </div></div>`;
+                    container.innerHTML = nextHtml;
                     render(container);
                     break;
             }
@@ -2176,7 +2182,7 @@ function handleBettyResponse(sceneKey, optionKey) {
 
 function renderBettyQuestProposal() {
     const scene = BETTY_DIALOGUE.quest_proposal;
-    let dialogueHtml = `<div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
+    let dialogueHtml = `<div class="w-full h-full flex flex-col items-center justify-center p-4"><div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
         <div class="space-y-4 mb-6 italic text-gray-300">`;
 
     scene.intro.forEach(line => {
@@ -2190,9 +2196,10 @@ function renderBettyQuestProposal() {
         dialogueHtml += `<button onclick="handleBettyResponse('quest_proposal', '${key}')" class="btn btn-primary text-left">${option.text}</button>`;
     }
     
-    dialogueHtml += `</div></div>`;
+    dialogueHtml += `</div></div></div>`;
     
     const container = document.createElement('div');
     container.innerHTML = dialogueHtml;
     render(container);
 }
+

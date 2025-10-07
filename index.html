@@ -25,7 +25,7 @@
     <script src="main.js" defer></script>
     <style>
         html {
-            font-size: 13px; /* This will scale down the entire UI a bit */
+            font-size: 14px; /* Slightly increase base font size for better readability */
         }
     </style>
 </head>
@@ -206,10 +206,11 @@
         </div>
     </div>
 
-    <div id="game-container" class="w-full max-w-6xl flex flex-col border-2 rounded-lg shadow-2xl hidden my-auto" style="border-color: var(--border-main); background-color: var(--bg-main); max-height: 95vh;">
-        <div class="flex-grow grid grid-cols-1 md:grid-cols-4 gap-4 p-4 min-h-0">
-            <div class="col-span-1 bg-slate-800 p-4 rounded-lg flex flex-col">
-                <div id="stats-view" class="flex-grow overflow-y-auto inventory-scrollbar pr-2">
+    <div id="game-container" class="w-full max-w-7xl mx-auto h-auto md:h-screen flex flex-col hidden my-4 md:my-0 border-2 rounded-lg shadow-2xl" style="border-color: var(--border-main); background-color: var(--bg-main);">
+        <div class="flex-grow flex flex-col md:flex-row gap-4 p-4 min-h-0">
+            <!-- Stats Panel -->
+            <div class="md:w-80 lg:w-96 md:flex-shrink-0 bg-slate-800 p-4 rounded-lg flex flex-col">
+                <div id="stats-view" class="flex-grow md:overflow-y-auto inventory-scrollbar pr-2">
                      <h2 id="player-name" class="font-medieval text-2xl text-center mb-1" style="color: var(--text-accent);">Player Name</h2>
                      <p id="player-details" class="text-center text-sm text-gray-400 mb-4">Gender | Race</p>
                     
@@ -265,8 +266,9 @@
                      <button id="character-sheet-btn" onclick="gameState.currentView !== 'character_sheet' ? renderCharacterSheet() : returnFromInventory()" class="btn btn-primary w-full">Character</button>
                 </div>
             </div>
-            <div class="col-span-1 md:col-span-3 flex flex-col min-h-0">
-                <div id="main-view" class="bg-slate-900/50 p-6 rounded-lg overflow-y-auto inventory-scrollbar flex-grow">
+            <!-- Main Content & Log -->
+            <div class="flex flex-col min-h-0 flex-1">
+                <div id="main-view" class="bg-slate-900/50 p-6 rounded-lg flex-1 md:overflow-y-auto inventory-scrollbar">
                     <!-- Main game content (town, battle, etc.) -->
                 </div>
                 <div id="game-log-container" class="h-48 mt-4 bg-black/30 p-4 rounded-lg flex flex-col flex-shrink-0">
@@ -315,14 +317,16 @@
     
     <!-- Templates -->
     <template id="template-main-menu">
-        <div class="text-center">
-            <h2 class="font-medieval text-3xl mb-8">Main Menu</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md mx-auto">
-                <button onclick="renderWildernessMenu()" class="btn btn-primary">Explore Wilderness</button>
-                <button onclick="renderTown()" class="btn btn-primary">Go to Town</button>
-                <button onclick="saveGame(true)" class="btn btn-primary">Save Game</button>
-                <button onclick="exportSave()" class="btn btn-primary">Export Save</button>
-                <button onclick="exitGame()" class="btn btn-action col-span-1 sm:col-span-2">Save & Exit</button>
+        <div class="w-full h-full flex flex-col items-center justify-center p-4">
+            <div class="w-full max-w-lg">
+                <h2 class="font-medieval text-3xl mb-8 text-center">Main Menu</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <button onclick="renderWildernessMenu()" class="btn btn-primary">Explore Wilderness</button>
+                    <button onclick="renderTown()" class="btn btn-primary">Go to Town</button>
+                    <button onclick="saveGame(true)" class="btn btn-primary">Save Game</button>
+                    <button onclick="exportSave()" class="btn btn-primary">Export Save</button>
+                    <button onclick="exitGame()" class="btn btn-action col-span-1 sm:col-span-2">Save & Exit</button>
+                </div>
             </div>
         </div>
     </template>
