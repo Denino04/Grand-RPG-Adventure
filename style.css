@@ -31,6 +31,10 @@
 body {
     font-family: 'Inter', sans-serif;
     background-color: #1a1a1a;
+    -webkit-user-select: none; /* Safari */
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* IE10+/Edge */
+    user-select: none; /* Standard */
 }
 .font-medieval {
     font-family: 'MedievalSharp', cursive;
@@ -123,5 +127,65 @@ body {
 
 #betty-encounter-popup {
     animation: pulse-light 2.5s infinite;
+}
+
+/* Grid Styles */
+.grid-cell {
+    border: 1px solid #4a5568;
+    background-color: #2d3748;
+    display: flex;
+    flex-direction: column; /* Stack emoji and hp bar */
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    position: relative; /* For HP bar positioning */
+    font-size: 1.5rem; /* Slightly smaller emoji */
+    line-height: 1;
+}
+
+.enemy-emoji {
+    /* Emoji takes up most of the space */
+}
+
+
+.enemy-hp-bar-bg {
+    position: absolute;
+    bottom: 4px; /* Move it up a bit */
+    left: 10%;
+    width: 80%;
+    height: 5px; /* A bit thicker to be visible */
+    background-color: rgba(0,0,0,0.7);
+    border-radius: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.enemy-hp-bar {
+    height: 100%;
+    background-color: #ef4444;
+    border-radius: 2px;
+    transition: width 0.3s ease-out;
+}
+
+.grid-cell-empty {
+    background-color: transparent;
+    border: none;
+}
+
+
+.grid-cell.player { background-color: #3b82f6; }
+.grid-cell.enemy { background-color: #b91c1c; }
+.grid-cell.obstacle { background-color: #78716c; font-size: 1.25rem; }
+.grid-cell.walkable { background-color: #22c55e; opacity: 0.7; }
+.grid-cell.attackable { background-color: #f97316; opacity: 0.7; }
+.grid-cell.magic-attackable { background-color: #a855f7; opacity: 0.7; }
+.grid-cell.splash-targetable { background-color: #f87171; opacity: 0.6; }
+.grid-cell.terrain {
+    background-color: #4a5568; /* A solid, visible grey from the palette */
+    opacity: 0.8;
+    cursor: not-allowed;
+    border: 1px solid #2d3748;
 }
 

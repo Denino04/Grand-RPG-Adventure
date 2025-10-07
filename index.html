@@ -9,9 +9,23 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=MedievalSharp&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <!-- Game Scripts -->
+    <script src="game_data.js" defer></script>
+    <script src="dialogue.js" defer></script>
+    <script src="engine.js" defer></script>
+    <script src="battle.js" defer></script>
+    <script src="ui_helpers.js" defer></script>
+    <script src="rendering.js" defer></script>
+    <script src="main.js" defer></script>
     <style>
         html {
-            font-size: 14px; /* This will scale down the entire UI a bit */
+            font-size: 13px; /* This will scale down the entire UI a bit */
         }
     </style>
 </head>
@@ -20,8 +34,24 @@
     <div id="start-screen" class="text-center p-4">
         <h1 class="font-medieval text-6xl text-yellow-300 mb-8">Chronicles of Cocytus</h1>
         <div class="space-y-4">
-            <button id="start-game-btn" class="btn btn-primary text-2xl px-8 py-4">New Game</button>
-            <button id="load-game-btn" class="btn btn-primary text-2xl px-8 py-4 hidden">Load Game</button>
+            <div id="auth-buttons">
+                <button id="google-signin-btn" class="btn btn-primary text-2xl px-8 py-4">
+                    <div class="flex items-center justify-center">
+                        <svg class="w-6 h-6 mr-3" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"></path><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"></path><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.222 0-9.618-3.499-11.181-8.234l-6.573 4.817C9.042 39.52 15.935 44 24 44z"></path><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C44.272 36.845 48 30.825 48 24c0-1.341-.138-2.65-.389-3.917z"></path></svg>
+                        Sign in with Google
+                    </div>
+                </button>
+                 <button id="anonymous-signin-btn" class="btn btn-primary text-xl px-8 py-3 mt-2">Play as Guest</button>
+            </div>
+            <div id="game-buttons" class="hidden">
+                 <button id="start-game-btn" class="btn btn-primary text-2xl px-8 py-4">New Game</button>
+                 <button id="load-game-btn" class="btn btn-primary text-2xl px-8 py-4">Load Game</button>
+            </div>
+            <div id="user-info" class="hidden text-center pt-4">
+                <p id="user-display" class="text-gray-300 mb-2"></p>
+                <button id="sign-out-btn" class="btn btn-action text-lg px-6 py-2">Sign Out</button>
+            </div>
+
             <div class="flex items-center justify-center space-x-2 pt-4">
                 <input type="text" id="import-save-input" placeholder="Paste Save Key..." class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 w-64">
                 <button id="import-save-btn" class="btn btn-primary text-lg">Import</button>
@@ -176,77 +206,80 @@
         </div>
     </div>
 
-    <div id="game-container" class="w-full max-w-6xl h-[90vh] grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border-2 rounded-lg shadow-2xl hidden" style="border-color: var(--border-main); background-color: var(--bg-main);">
-        <div class="col-span-1 bg-slate-800 p-4 rounded-lg flex flex-col">
-            <div id="stats-view" class="flex-grow overflow-y-auto inventory-scrollbar pr-2">
-                 <h2 id="player-name" class="font-medieval text-2xl text-center mb-1" style="color: var(--text-accent);">Player Name</h2>
-                 <p id="player-details" class="text-center text-sm text-gray-400 mb-4">Gender | Race</p>
-                
-                 <div class="grid grid-cols-3 gap-2 text-center mb-4">
+    <div id="game-container" class="w-full max-w-6xl flex flex-col border-2 rounded-lg shadow-2xl hidden my-auto" style="border-color: var(--border-main); background-color: var(--bg-main); max-height: 95vh;">
+        <div class="flex-grow grid grid-cols-1 md:grid-cols-4 gap-4 p-4 min-h-0">
+            <div class="col-span-1 bg-slate-800 p-4 rounded-lg flex flex-col">
+                <div id="stats-view" class="flex-grow overflow-y-auto inventory-scrollbar pr-2">
+                     <h2 id="player-name" class="font-medieval text-2xl text-center mb-1" style="color: var(--text-accent);">Player Name</h2>
+                     <p id="player-details" class="text-center text-sm text-gray-400 mb-4">Gender | Race</p>
+                    
+                     <div class="grid grid-cols-3 gap-2 text-center mb-4">
+                         <div>
+                             <p class="font-bold text-lg" id="player-level">1</p>
+                             <p class="text-xs text-gray-400">Level</p>
+                         </div>
+                         <div>
+                             <p class="font-bold text-lg" id="player-gold">100</p>
+                             <p class="text-xs text-gray-400">Gold</p>
+                         </div>
+                     </div>
+                     <div class="mb-2">
+                         <p class="text-xs text-gray-400 flex justify-between"><span>HP</span><span id="player-hp-text">50 / 50</span></p>
+                         <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-hp-bar" class="bg-red-600 h-2.5 rounded-full" style="width: 100%"></div></div>
+                     </div>
+                     <div class="mb-2">
+                         <p class="text-xs text-gray-400 flex justify-between"><span>MP</span><span id="player-mp-text">50 / 50</span></p>
+                         <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-mp-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 100%"></div></div>
+                     </div>
+                     <div class="mb-4">
+                         <p class="text-xs text-gray-400 flex justify-between"><span>XP</span><span id="player-xp-text">0 / 100</span></p>
+                         <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-xp-bar" class="bg-yellow-400 h-2.5 rounded-full" style="width: 0%"></div></div>
+                     </div>
+    
+                     <hr class="border-gray-600 my-4">
+    
                      <div>
-                         <p class="font-bold text-lg" id="player-level">1</p>
-                         <p class="text-xs text-gray-400">Level</p>
+                         <h3 class="font-bold text-lg mb-2 text-yellow-300">Equipment</h3>
+                         <div class="space-y-2 text-sm">
+                             <p><strong>Weapon:</strong> <span id="equipped-weapon"></span></p>
+                             <p><strong>Catalyst:</strong> <span id="equipped-catalyst"></span></p>
+                             <p><strong>Armor:</strong> <span id="equipped-armor"></span></p>
+                             <p><strong>Shield:</strong> <span id="equipped-shield"></span></p>
+                             <p><strong>Lure:</strong> <span id="equipped-lure"></span></p>
+                         </div>
                      </div>
-                     <div>
-                         <p class="font-bold text-lg" id="player-gold">100</p>
-                         <p class="text-xs text-gray-400">Gold</p>
-                     </div>
-                 </div>
-                 <div class="mb-2">
-                     <p class="text-xs text-gray-400 flex justify-between"><span>HP</span><span id="player-hp-text">50 / 50</span></p>
-                     <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-hp-bar" class="bg-red-600 h-2.5 rounded-full" style="width: 100%"></div></div>
-                 </div>
-                 <div class="mb-2">
-                     <p class="text-xs text-gray-400 flex justify-between"><span>MP</span><span id="player-mp-text">50 / 50</span></p>
-                     <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-mp-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 100%"></div></div>
-                 </div>
-                 <div class="mb-4">
-                     <p class="text-xs text-gray-400 flex justify-between"><span>XP</span><span id="player-xp-text">0 / 100</span></p>
-                     <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-xp-bar" class="bg-yellow-400 h-2.5 rounded-full" style="width: 0%"></div></div>
-                 </div>
-
-                 <hr class="border-gray-600 my-4">
-
-                 <div>
-                     <h3 class="font-bold text-lg mb-2 text-yellow-300">Equipment</h3>
-                     <div class="space-y-2 text-sm">
-                         <p><strong>Weapon:</strong> <span id="equipped-weapon"></span></p>
-                         <p><strong>Catalyst:</strong> <span id="equipped-catalyst"></span></p>
-                         <p><strong>Armor:</strong> <span id="equipped-armor"></span></p>
-                         <p><strong>Shield:</strong> <span id="equipped-shield"></span></p>
-                         <p><strong>Lure:</strong> <span id="equipped-lure"></span></p>
-                     </div>
-                 </div>
-
-                 <hr class="border-gray-600 my-4">
-                 
-                  <div>
-                    <h3 class="font-bold text-lg mb-2 text-yellow-300">Quests</h3>
-                    <div class="space-y-2 text-sm">
-                        <p id="quest-tracker" class="text-amber-300"></p>
-                        <p id="legacy-quest-tracker" class="text-purple-400"></p>
+    
+                     <hr class="border-gray-600 my-4">
+                     
+                      <div>
+                        <h3 class="font-bold text-lg mb-2 text-yellow-300">Quests</h3>
+                        <div class="space-y-2 text-sm">
+                            <p id="quest-tracker" class="text-amber-300"></p>
+                            <p id="legacy-quest-tracker" class="text-purple-400"></p>
+                        </div>
                     </div>
+    
                 </div>
-
+                <div class="pt-4 border-t border-gray-600 flex flex-col gap-2">
+                     <button id="inventory-btn" onclick="gameState.currentView !== 'inventory' ? renderInventory() : returnFromInventory()" class="btn btn-primary w-full">Inventory</button>
+                     <button id="character-sheet-btn" onclick="gameState.currentView !== 'character_sheet' ? renderCharacterSheet() : returnFromInventory()" class="btn btn-primary w-full">Character</button>
+                </div>
             </div>
-            <div class="pt-4 border-t border-gray-600 flex flex-col gap-2">
-                 <button id="inventory-btn" onclick="gameState.currentView !== 'inventory' ? renderInventory() : returnFromInventory()" class="btn btn-primary w-full">Inventory</button>
-                 <button id="character-sheet-btn" onclick="gameState.currentView !== 'character_sheet' ? renderCharacterSheet() : returnFromInventory()" class="btn btn-primary w-full">Character</button>
-            </div>
-        </div>
-        <div class="col-span-1 md:col-span-3 grid h-full" style="grid-template-rows: 1fr auto;">
-            <div id="main-view" class="bg-slate-900/50 p-6 rounded-lg overflow-y-auto inventory-scrollbar min-h-0">
-                <!-- Main game content (town, battle, etc.) -->
-            </div>
-            <div id="game-log-container" class="h-48 mt-4 bg-black/30 p-4 rounded-lg flex flex-col">
-                <div id="game-log" class="flex-grow overflow-y-auto flex flex-col-reverse">
-                    <!-- Game log messages will appear here -->
+            <div class="col-span-1 md:col-span-3 flex flex-col min-h-0">
+                <div id="main-view" class="bg-slate-900/50 p-6 rounded-lg overflow-y-auto inventory-scrollbar flex-grow">
+                    <!-- Main game content (town, battle, etc.) -->
+                </div>
+                <div id="game-log-container" class="h-48 mt-4 bg-black/30 p-4 rounded-lg flex flex-col flex-shrink-0">
+                    <div id="game-log" class="flex-grow overflow-y-auto flex flex-col-reverse">
+                        <!-- Game log messages will appear here -->
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <div id="tooltip" class="hidden fixed p-3 rounded-lg text-sm shadow-xl w-64 z-50 pointer-events-none" style="background-color: var(--bg-tooltip); border: 1px solid var(--border-main);"></div>
+    <div id="enemy-info-display" class="hidden fixed bg-slate-800/80 p-2 rounded-lg text-sm border border-slate-600 z-10"></div>
 
     <div id="betty-encounter-popup" class="hidden fixed bottom-5 right-5 bg-slate-800 border-2 border-purple-400 p-4 rounded-lg shadow-2xl max-w-sm cursor-pointer z-20">
         <p class="font-bold text-purple-200">A nervous woman whispers...</p>
@@ -301,29 +334,16 @@
     </template>
 
     <template id="template-battle">
-        <div class="flex flex-col h-full justify-between items-center">
-            <div id="enemy-display" class="flex-grow flex items-center justify-center gap-8">
-                <!-- Enemy info rendered here -->
+        <div class="flex flex-col h-full justify-center items-center relative">
+            <div id="battle-grid" class="grid gap-1 w-full max-w-md aspect-square mb-4">
+                <!-- Grid cells will be generated by JS -->
             </div>
-            <div id="battle-actions" class="flex flex-wrap justify-center items-center gap-4 p-4">
+            <div id="battle-actions" class="flex flex-wrap justify-center items-center gap-4">
                 <!-- Battle action buttons rendered here -->
             </div>
         </div>
     </template>
 
-    <!-- Scripts -->
-    <script src="game_data.js"></script>
-    <script src="dialogue.js"></script>
-    <script src="engine.js"></script>
-    <script src="battle.js"></script>
-    <script src="ui_helpers.js"></script>
-    <script src="rendering.js"></script>
-    <script src="main.js"></script>
-
-<script>
-  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-</script>
-<script src="/_vercel/insights/script.js"></script>
 </body>
 </html>
 

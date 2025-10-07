@@ -25,10 +25,112 @@ function addToLog(message, colorClass = '') { const p = document.createElement('
 function getItemDetails(itemKey) { if (itemKey in ITEMS) return ITEMS[itemKey]; if (itemKey in WEAPONS) return WEAPONS[itemKey]; if (itemKey in CATALYSTS) return CATALYSTS[itemKey]; if (itemKey in ARMOR) return ARMOR[itemKey]; if (itemKey in SHIELDS) return SHIELDS[itemKey]; if (itemKey in LURES) return LURES[itemKey]; return null; }
 function render(viewElement) { 
     hideTooltip();
+    hideEnemyInfo();
     mainView.innerHTML = ''; 
     mainView.appendChild(viewElement); 
     updateDebugView();
 }
+
+/**
+ * Calculates the damage modifier based on elemental interactions.
+ * @param {string} attackerElement - The element of the attacker.
+ * @param {string} defenderElement - The element of the defender.
+ * @returns {number} 2 for super effective, 0.5 for not effective, 1 for neutral.
+ */
+function calculateElementalModifier(attackerElement, defenderElement) {
+    if (!attackerElement || attackerElement === 'none' || !defenderElement || defenderElement === 'none') {
+        return 1;
+    }
+    const attackerData = ELEMENTS[attackerElement];
+    const defenderData = ELEMENTS[defenderElement];
+    if (!attackerData || !defenderData) return 1;
+
+    if (attackerData.strength.includes(defenderElement)) {
+        return 2; // Attacker is strong against defender
+    }
+    if (attackerData.weakness.includes(defenderElement)) {
+        return 0.5; // Attacker is weak against defender
+    }
+    return 1;
+}
+
+// --- UI BUILDER FUNCTIONS ---
+
+/**
+ * Creates a standard button for UI menus.
+ * @param {object} config - Configuration for the button.
+ * @param {string} config.text - The text content of the button.
+ * @param {string} config.onclick - The string for the onclick event.
+ * @param {string} [config.classes='btn-primary'] - Additional CSS classes.
+ * @param {boolean} [config.disabled=false] - Whether the button is disabled.
+ * @returns {string} The HTML string for the button.
+ */
+function createButton(config) {
+    const { text, onclick, classes = 'btn-primary', disabled = false } = config;
+    return `<button onclick="${onclick}" class="btn ${classes}" ${disabled ? 'disabled' : ''}>${text}</button>`;
+}
+
+/**
+ * Creates a generic list of items for shops or crafting menus.
+ * @param {object} config - Configuration for the list.
+ * @param {string[]} config.items - Array of item keys.
+ * @param {function(string): object} config.detailsFn - Function to get details for an item.
+ * @param {function(string, object): string} config.actionsHtmlFn - Function that returns the HTML for item actions (buy/craft buttons).
+ * @returns {string} The HTML string for the list.
+ */
+function createItemList(config) {
+    const { items, detailsFn, actionsHtmlFn } = config;
+    if (!items || items.length === 0) return '';
+
+    return items.map(key => {
+        const details = detailsFn(key);
+        if (!details) return '';
+        const actionsHtml = actionsHtmlFn(key, details);
+        return `
+            <div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)">
+                <span>${details.name}</span>
+                <div>${actionsHtml}</div>
+            </div>`;
+    }).join('');
+}
+
+/**
+ * Creates a generic selection list with a details pane, used in character creation.
+ * @param {object} config - Configuration object.
+ * @param {string} config.containerId - The ID of the main container div.
+ * @param {string} config.listId - The ID for the button list container.
+ * @param {string} config.detailsId - The ID for the details pane container.
+ * @param {object} config.data - The data object to iterate over (e.g., RACES, CLASSES).
+ * @param {function(string, object): string} config.buttonTextFn - Function to get the text for each button.
+ * @param {function(string, object): void} config.onHoverFn - Function to execute on button mouseenter.
+ * @param {function(string): void} config.onClickFn - Function to execute on button click.
+ */
+function createSelectionListWithDetails(config) {
+    const { data, listId, buttonTextFn, onHoverFn, onClickFn } = config;
+    const listContainer = $(`#${listId}`);
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+    Object.keys(data).forEach(key => {
+        const itemData = data[key];
+        const button = document.createElement('button');
+        button.className = 'btn btn-primary w-full text-left';
+        button.dataset.key = key;
+        button.textContent = buttonTextFn(key, itemData);
+        button.onmouseenter = () => onHoverFn(key, itemData);
+        button.onclick = () => {
+            document.querySelectorAll(`#${listId} button`).forEach(btn => {
+                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
+                btn.classList.add('btn-primary');
+            });
+            button.classList.add('bg-yellow-600', 'border-yellow-800');
+            button.classList.remove('btn-primary');
+            onClickFn(key);
+        };
+        listContainer.appendChild(button);
+    });
+}
+
 
 // --- DEBUG FUNCTIONS ---
 function toggleDebug() {
@@ -276,7 +378,7 @@ function applyTheme(themeName = 'default') {
     }
 }
 
-// --- TOOLTIP FUNCTIONS ---
+// --- TOOLTIP & INFO FUNCTIONS ---
 let activeTooltipItem = null;
 function showTooltip(itemKey, event) {
     const tooltipElement = $('#tooltip');
@@ -308,6 +410,7 @@ function showTooltip(itemKey, event) {
         content = `<h4 class="font-bold mb-1" style="color: var(--text-accent);">${details.name}</h4>`;
         if (details.rarity) content += `<p class="text-xs mb-2 text-gray-400">${details.rarity}</p>`;
         if (details.damage) content += `<p>Damage: ${details.damage[0]}d${details.damage[1]}</p>`;
+        if (details.range > 0) content += `<p>Range: ${details.range}</p>`;
         if (details.defense) content += `<p>Defense: ${details.defense}</p>`;
         if (details.blockChance > 0) content += `<p>Block Chance: ${Math.round(details.blockChance * 100)}%</p>`;
         if (details.amount && details.type === 'healing') content += `<p class="text-green-400">Heals: ${details.amount} HP</p>`;
@@ -330,6 +433,8 @@ function showTooltip(itemKey, event) {
             if (effect.revive) content += `<li>Revives you upon death (once per battle)</li>`;
             if (effect.spell_follow_up) content += `<li>Launches a phantom strike after casting a spell</li>`;
             if (effect.petrify_chance) content += `<li>On Hit: ${effect.petrify_chance * 100}% chance to Petrify</li>`;
+            if (effect.type === 'godslayer') content += `<li>Godslayer: Deals bonus damage equal to ${effect.percent_hp_damage * 100}% of the target's max HP.</li>`;
+
 
             // Catalyst Effects
             if (effect.spell_amp) content += `<li>Spell Power: +${effect.spell_amp} Dice</li>`;
@@ -396,4 +501,33 @@ function hideTooltip() {
     activeTooltipItem = null;
 }
 
+function showEnemyInfo(enemy, event, forceShow = false) {
+    const tooltipElement = $('#tooltip');
+    if (event.type === 'click' && tooltipElement.style.display === 'block' && activeTooltipItem === `enemy-${enemy.name}`) {
+        hideEnemyInfo();
+        return;
+    }
+
+    if (!enemy) return;
+
+    let content = `<h4 class="font-bold text-red-400 mb-1">${enemy.name}</h4>`;
+    content += `<p>HP: ${enemy.hp} / ${enemy.maxHp}</p>`;
+    
+    tooltipElement.innerHTML = content;
+    tooltipElement.style.display = 'block';
+    activeTooltipItem = `enemy-${enemy.name}`;
+
+    let x = event.clientX + 15;
+    let y = event.clientY + 15;
+    if (x + tooltipElement.offsetWidth > window.innerWidth) x = event.clientX - tooltipElement.offsetWidth - 15;
+    if (y + tooltipElement.offsetHeight > window.innerHeight) y = event.clientY - tooltipElement.offsetHeight - 15;
+    
+    tooltipElement.style.left = `${x}px`;
+    tooltipElement.style.top = `${y}px`;
+}
+
+function hideEnemyInfo() {
+    $('#tooltip').style.display = 'none';
+    activeTooltipItem = null;
+}
 

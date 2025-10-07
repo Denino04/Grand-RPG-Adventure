@@ -20,9 +20,10 @@ function getCatalystStatsString(catalyst) {
     if (catalyst.effect?.overdrive) stats.push(`Overdrive`);
     if (catalyst.effect?.battlestaff) stats.push(`Battlestaff`);
     if (catalyst.effect?.spell_weaver) stats.push(`Spellweaver`);
-    if (stats.length === 0) return `${catalyst.name}`;
-    return `${catalyst.name} (${stats.join(', ')})`;
+    if (catalyst.effect?.ranged_chance) stats.push(`Ranged Evasion`);
+    return `${catalyst.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
 }
+
 
 function updateStatsView() {
     if (!player) return;
@@ -635,7 +636,10 @@ function returnFromInventory() {
     switch (lastViewBeforeInventory) {
         case 'main_menu': renderMainMenu(); break;
         case 'character_sheet': renderMainMenu(); break; // Go to main menu from char sheet
-        case 'town': renderTown(); break;
+        case 'town': renderTownSquare(); break;
+        case 'commercial_district': renderCommercialDistrict(); break;
+        case 'arcane_quarter': renderArcaneQuarter(); break;
+        case 'residential_district': renderResidentialDistrict(); break;
         case 'quest_board': renderQuestBoard(); break;
         case 'inn': renderInn(); break;
         case 'sage_tower_train': renderSageTowerTrain(); break;
@@ -650,7 +654,7 @@ function returnFromInventory() {
         case 'alchemist': renderAlchemist(); break;
         case 'witchs_coven': renderWitchsCoven(); break;
         case 'sell': renderSell(); break;
-        case 'battle': renderBattle('main'); break;
+        case 'battle': renderBattleGrid(); break;
         case 'wilderness': renderWildernessMenu(); break;
         default: renderMainMenu();
     }
@@ -731,27 +735,29 @@ function renderWildernessMenu() {
 }
 
 function renderTown() {
+    renderTownSquare();
+}
+
+function renderTownSquare() {
     applyTheme('town');
     lastViewBeforeInventory = 'town';
     gameState.currentView = 'town';
 
     const bettyPopup = $('#betty-encounter-popup');
-    bettyPopup.classList.add('hidden'); // Hide by default
-    bettyPopup.onclick = null; // Clear previous handlers
+    bettyPopup.classList.add('hidden');
+    bettyPopup.onclick = null;
 
-    // Betty's first appearance logic
     if (player.level >= 10 && player.bettyQuestState === 'not_started' && !player.dialogueFlags.bettyEncounterReady) {
         if (Math.random() < 0.05) {
             player.dialogueFlags.bettyEncounterReady = true; 
         }
     }
     
-    // Condition to SHOW the Betty popup
     if (player.dialogueFlags.bettyEncounterReady && player.bettyQuestState === 'not_started') {
         bettyPopup.classList.remove('hidden');
         bettyPopup.innerHTML = `<p class="font-bold text-purple-200">A nervous woman whispers...</p><p class="text-gray-300">"Psst... Adventurer... Over here..."</p>`;
         bettyPopup.onclick = () => {
-            player.dialogueFlags.bettyEncounterReady = false; // Consume the random encounter trigger
+            player.dialogueFlags.bettyEncounterReady = false;
             startBettyDialogue();
         };
     } else if (player.bettyQuestState === 'declined') {
@@ -759,85 +765,123 @@ function renderTown() {
         bettyPopup.innerHTML = `<p class="font-bold text-purple-200">Betty is waiting...</p><p class="text-gray-300">She seems to want to talk to you again.</p>`;
         bettyPopup.onclick = startBettyDialogue;
     }
+
+    const container = document.createElement('div');
+    container.className = 'flex flex-col items-center justify-center w-full h-full';
+
+    const locations = [
+        { name: 'Commercial District', action: "renderCommercialDistrict()" },
+        { name: 'Arcane Quarter', action: "renderArcaneQuarter()" },
+        { name: 'Residential Area', action: "renderResidentialDistrict()" },
+    ];
     
+     if (player.bettyQuestState === 'accepted') {
+        locations.push({ name: 'Betty\'s Corner', action: "startBettyDialogue()" });
+    }
+
+    let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Town Square</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-md">`;
+    
+    locations.forEach(loc => {
+        html += `<button onclick="${loc.action}" class="btn btn-primary">${loc.name}</button>`;
+    });
+
+    html += `</div>
+             <div class="mt-8">
+                <button onclick="renderMainMenu()" class="btn btn-action">Leave Town</button>
+             </div>`;
+    
+    container.innerHTML = html;
+    render(container);
+}
+
+function renderResidentialDistrict() {
+    applyTheme('town');
+    lastViewBeforeInventory = 'residential_district';
+    gameState.currentView = 'residential_district';
+
+    const container = document.createElement('div');
+    container.className = 'flex flex-col items-center justify-center w-full h-full';
+
+    const locations = [
+        { name: 'The Inn', action: "renderInn()" },
+        { name: 'Quest Board', action: "renderQuestBoard()" },
+        { name: 'Your House', action: "addToLog('Sorry, the housing market has yet to crash.', 'text-yellow-400')" },
+    ];
+
+    let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Residential District</h2>
+                <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
+    
+    locations.forEach(loc => {
+        html += `<button onclick="${loc.action}" class="btn btn-primary">${loc.name}</button>`;
+    });
+
+    html += `</div>
+             <div class="mt-8">
+                <button onclick="renderTownSquare()" class="btn btn-action">Back to Town Square</button>
+             </div>`;
+    
+    container.innerHTML = html;
+    render(container);
+}
+
+function renderCommercialDistrict() {
+    applyTheme('town');
+    lastViewBeforeInventory = 'commercial_district';
+    gameState.currentView = 'commercial_district';
+
     const container = document.createElement('div');
     container.className = 'flex flex-col items-center justify-center w-full h-full';
 
     const locations = [
         { name: 'General Store', action: "renderShop('store')" }, 
         { name: 'Blacksmith', action: "renderBlacksmithMenu()" }, 
-        { name: 'Black Market', action: "renderShop('black_market')" },
+        { name: 'Black Market', action: "renderShop('black_market')" }
+    ];
+
+    let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Commercial District</h2>
+                <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
+    
+    locations.forEach(loc => {
+        html += `<button onclick="${loc.action}" class="btn btn-primary">${loc.name}</button>`;
+    });
+
+    html += `</div>
+             <div class="mt-8">
+                <button onclick="renderTownSquare()" class="btn btn-action">Back to Town Square</button>
+             </div>`;
+    
+    container.innerHTML = html;
+    render(container);
+}
+
+function renderArcaneQuarter() {
+    applyTheme('magic');
+    lastViewBeforeInventory = 'arcane_quarter';
+    gameState.currentView = 'arcane_quarter';
+
+    const container = document.createElement('div');
+    container.className = 'flex flex-col items-center justify-center w-full h-full';
+
+    const locations = [
         { name: "Sage's Tower", action: "renderSageTowerMenu()" }, 
-        { name: 'Alchemist', action: "renderAlchemist()" }, 
-        { name: 'Quest Board', action: "renderQuestBoard()" },
-        { name: 'The Inn', action: "renderInn()" }, 
         { name: 'Enchanter', action: "renderEnchanter()" }, 
         { name: "Witch's Coven", action: "renderWitchsCoven()" }
     ];
 
-    if (player.bettyQuestState === 'accepted') {
-        locations.push({ name: 'Betty\'s Corner', action: "startBettyDialogue()" });
-    }
-
-    const leaveTownAction = { name: 'Leave Town', action: "renderMainMenu()", isAction: true };
-
-    const title = document.createElement('h2');
-    title.className = 'font-medieval text-3xl mb-8 text-center';
-    title.textContent = 'You are in town.';
+    let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Arcane Quarter</h2>
+                <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
     
-    const desktopContainer = document.createElement('div');
-    desktopContainer.className = 'hidden md:flex flex-col items-center gap-4';
-    const desktopButtonContainer = document.createElement('div');
-    desktopButtonContainer.className = 'flex flex-col items-center gap-4';
-    const locationRows = [ locations.slice(0, 3), locations.slice(3, 6), locations.slice(6, 9) ];
-    locationRows.forEach(row => {
-        const rowDiv = document.createElement('div');
-        rowDiv.className = 'flex justify-center flex-wrap gap-4';
-        row.forEach(loc => {
-            const button = document.createElement('button');
-            button.className = 'btn btn-primary w-40';
-            button.textContent = loc.name;
-            button.setAttribute('onclick', loc.action);
-            rowDiv.appendChild(button);
-        });
-        desktopButtonContainer.appendChild(rowDiv);
-    });
-    const leaveTownRow = document.createElement('div');
-    leaveTownRow.className = 'flex justify-center flex-wrap gap-4 mt-4';
-    const leaveTownBtnDesktop = document.createElement('button');
-    leaveTownBtnDesktop.className = 'btn btn-action w-40';
-    leaveTownBtnDesktop.textContent = leaveTownAction.name;
-    leaveTownBtnDesktop.setAttribute('onclick', leaveTownAction.action);
-    leaveTownRow.appendChild(leaveTownBtnDesktop);
-    desktopButtonContainer.appendChild(leaveTownRow);
-    
-    desktopContainer.appendChild(title.cloneNode(true));
-    desktopContainer.appendChild(desktopButtonContainer);
-    
-    const mobileContainer = document.createElement('div');
-    mobileContainer.className = 'md:hidden w-full h-full flex flex-col items-center';
-    const mobileTitle = title.cloneNode(true);
-    mobileTitle.classList.remove('mb-8');
-    mobileTitle.classList.add('mb-4');
-    const scrollableDiv = document.createElement('div');
-    scrollableDiv.className = 'w-full flex-grow overflow-y-auto inventory-scrollbar pr-2 space-y-3';
     locations.forEach(loc => {
-        const button = document.createElement('button');
-        button.className = 'btn btn-primary w-full';
-        button.textContent = loc.name;
-        button.setAttribute('onclick', loc.action);
-        scrollableDiv.appendChild(button);
+        html += `<button onclick="${loc.action}" class="btn btn-magic">${loc.name}</button>`;
     });
-    const leaveTownBtnMobile = document.createElement('button');
-    leaveTownBtnMobile.className = 'btn btn-action w-full mt-4';
-    leaveTownBtnMobile.textContent = leaveTownAction.name;
-    leaveTownBtnMobile.setAttribute('onclick', leaveTownAction.action);
-    mobileContainer.appendChild(mobileTitle);
-    mobileContainer.appendChild(scrollableDiv);
-    mobileContainer.appendChild(leaveTownBtnMobile);
 
-    container.appendChild(desktopContainer);
-    container.appendChild(mobileContainer);
+    html += `</div>
+             <div class="mt-8">
+                <button onclick="renderTownSquare()" class="btn btn-action">Back to Town Square</button>
+             </div>`;
+    
+    container.innerHTML = html;
     render(container);
 }
 
@@ -936,7 +980,7 @@ function renderWitchsCoven(subView = 'main') {
     }
 
     html += `<div class="mt-8">
-                <button onclick="${subView === 'main' ? 'renderTown()' : 'renderWitchsCoven()'}" class="btn btn-primary">Back</button>
+                <button onclick="${subView === 'main' ? 'renderArcaneQuarter()' : 'renderWitchsCoven()'}" class="btn btn-primary">Back</button>
             </div>
     </div>`;
 
@@ -961,7 +1005,7 @@ function renderSageTowerMenu() {
                 <button onclick="renderSageTowerCraft()" class="btn btn-primary w-full md:w-auto">Synthesize Catalysts</button>
             </div>
              <div class="mt-8">
-                <button onclick="renderTown()" class="btn btn-action">Back to Town</button>
+                <button onclick="renderArcaneQuarter()" class="btn btn-action">Back</button>
             </div>
         </div>`;
     const container = document.createElement('div');
@@ -1035,7 +1079,7 @@ function renderEnchanter(selectedElement = null) {
         html += `</div></div>`;
     }
 
-    html += `<div class="text-center mt-6"><button onclick="renderTown()" class="btn btn-primary">Back to Town</button></div>`;
+    html += `<div class="text-center mt-6"><button onclick="renderArcaneQuarter()" class="btn btn-primary">Back</button></div>`;
     container.innerHTML = html;
     render(container);
 }
@@ -1123,7 +1167,7 @@ function renderQuestBoard() {
         }
         html += `</div>`;
     }
-    html += `<div class="text-center mt-4"><button onclick="renderTown()" class="btn btn-primary">Back to Town</button></div></div>`; 
+    html += `<div class="text-center mt-4"><button onclick="renderResidentialDistrict()" class="btn btn-primary">Back</button></div></div>`; 
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -1137,7 +1181,7 @@ function renderInn() {
     lastViewBeforeInventory = 'inn';
     gameState.currentView = 'inn'; 
     const cost = 10 + 5 * player.level; 
-    let html = `<h2 class="font-medieval text-3xl mb-4 text-center">The Weary Traveler Inn</h2><p class="mb-4 text-center">A night's rest costs ${cost} G. You will be fully restored.</p><div class="flex justify-center gap-4"><button onclick="restAtInn(${cost})" class="btn btn-primary" ${player.gold < cost ? 'disabled' : ''}>Rest for the night</button><button onclick="renderTown()" class="btn btn-primary">Leave</button></div>${player.gold < cost ? '<p class="text-red-400 mt-2 text-center">You cannot afford a room.</p>' : ''}`;
+    let html = `<h2 class="font-medieval text-3xl mb-4 text-center">The Weary Traveler Inn</h2><p class="mb-4 text-center">A night's rest costs ${cost} G. You will be fully restored.</p><div class="flex justify-center gap-4"><button onclick="restAtInn(${cost})" class="btn btn-primary" ${player.gold < cost ? 'disabled' : ''}>Rest for the night</button><button onclick="renderResidentialDistrict()" class="btn btn-primary">Back</button></div>${player.gold < cost ? '<p class="text-red-400 mt-2 text-center">You cannot afford a room.</p>' : ''}`;
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -1183,7 +1227,7 @@ function renderShop(type) {
         });
         itemsHtml += '</div>';
     }
-    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderTown()" class="btn btn-primary">Back to Town</button></div></div>`;
+    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderCommercialDistrict()" class="btn btn-primary">Back</button></div></div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -1204,7 +1248,7 @@ function renderBlacksmithMenu() {
             <div class="flex justify-center gap-4">
                 <button onclick="renderBlacksmithBuy()" class="btn btn-primary">Buy Equipment</button>
                 <button onclick="renderBlacksmithCraft()" class="btn btn-primary">Craft Equipment</button>
-                <button onclick="renderTown()" class="btn btn-primary">Back to Town</button>
+                <button onclick="renderCommercialDistrict()" class="btn btn-primary">Back</button>
             </div>
         </div>`;
     const container = document.createElement('div');
@@ -1356,7 +1400,7 @@ function renderAlchemist() {
             <p class="text-center text-gray-400 mb-4">Brew powerful potions from monster parts.</p>
             <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">${recipesHtml}</div>
             <div class="text-center mt-4">
-                <button onclick="renderTown()" class="btn btn-primary">Back to Town</button>
+                <button onclick="renderCommercialDistrict()" class="btn btn-primary">Back</button>
             </div>
         </div>`;
     const container = document.createElement('div');
@@ -1653,7 +1697,7 @@ function renderInventory() {
 
             let buttonHtml = '';
             if (key === 'bestiary_notebook') {
-                buttonHtml = `<button onclick="event.stopPropagation(); renderBestiaryMenu()" class="btn btn-primary text-sm py-1 px-3">Open</button>`;
+                buttonHtml = `<button onclick="event.stopPropagation(); renderBestiaryMenu('inventory')" class="btn btn-primary text-sm py-1 px-3">Open</button>`;
             }
 
             return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span>${buttonHtml}</div>`;
@@ -1719,9 +1763,23 @@ function renderInventory() {
                              (category === 'lures' && key === player.equippedLure); 
             const equippedText = isEquipped ? '<span class="text-green-400 font-bold ml-2">[Equipped]</span>' : ''; 
             let buttonHtml = ''; 
-            if (category === 'items' && details.type !== 'junk' && details.type !== 'alchemy') { 
+            if (category === 'items' && details.type !== 'junk' && details.type !== 'alchemy' && details.type !== 'key') { 
                 buttonHtml = `<button onclick="useItem('${key}')" class="btn btn-item text-sm py-1 px-3">Use</button>`; 
-            } else if ((category === 'weapons' || category === 'catalysts' || category === 'armor' || category === 'shields' || category === 'lures') && !isEquipped) { 
+            } else if (isEquipped) {
+                let itemType = category.slice(0, -1);
+                if (category === 'armor') itemType = 'armor';
+                if (category === 'lures') itemType = 'lure';
+
+                const isDefaultItem = (itemType === 'weapon' && player.equippedWeapon.name === WEAPONS['fists'].name) ||
+                                      (itemType === 'catalyst' && player.equippedCatalyst.name === CATALYSTS['no_catalyst'].name) ||
+                                      (itemType === 'armor' && player.equippedArmor.name === ARMOR['travelers_garb'].name) ||
+                                      (itemType === 'shield' && player.equippedShield.name === SHIELDS['no_shield'].name) ||
+                                      (itemType === 'lure' && player.equippedLure === 'no_lure');
+
+                if (!isDefaultItem) {
+                    buttonHtml = `<button onclick="unequipItem('${itemType}')" class="btn btn-action text-sm py-1 px-3">Unequip</button>`;
+                }
+            } else if (['weapons', 'catalysts', 'armor', 'shields', 'lures'].includes(category)) { 
                 buttonHtml = `<button onclick="equipItem('${key}')" class="btn btn-primary text-sm py-1 px-3">Equip</button>`; 
             }
             return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr} ${equippedText}</span>${buttonHtml}</div>`; }).join(''); 
@@ -1801,39 +1859,7 @@ function renderBattle(subView = 'main', actionData = null) {
      if (currentEnemies.length === 0 && subView !== 'item') return; // Allow item menu after battle
 
      if (subView === 'main') {
-        const template = document.getElementById('template-battle');
-        const view = template.content.cloneNode(true);
-        const enemyDisplay = view.querySelector('#enemy-display');
-        enemyDisplay.innerHTML = '';
-
-        currentEnemies.forEach((enemy, index) => {
-            if (enemy.isAlive()) {
-                const enemyDiv = document.createElement('div');
-                enemyDiv.className = 'text-center';
-                enemyDiv.innerHTML = `
-                    <h2 class="font-medieval text-xl mb-1 text-red-400">${enemy.name}</h2>
-                    <p class="text-sm">${enemy.hp} / ${enemy.maxHp} HP</p>
-                `;
-                enemyDisplay.appendChild(enemyDiv);
-            }
-        });
-
-        const actionsContainer = view.querySelector('#battle-actions');
-        let actionsHtml = '';
-        if (player.statusEffects.swallowed) {
-            actionsHtml = `<button onclick="struggleSwallow()" class="btn btn-action w-48 rounded-full">Struggle!</button>`;
-        } else {
-            actionsHtml = `
-                <button onclick="battleAction('attack')" class="btn btn-action w-28 rounded-full">Attack</button>
-                <button onclick="battleAction('magic')" class="btn btn-magic w-28 rounded-full">Magic</button>
-                <button onclick="battleAction('item')" class="btn btn-item w-28 rounded-full">Item</button>
-                <button onclick="battleAction('flee')" class="btn btn-flee w-28 rounded-full">Flee</button>
-            `;
-        }
-        actionsContainer.innerHTML = actionsHtml;
-
-        render(view);
-
+        renderBattleGrid();
      } else if (subView === 'attack' || subView === 'magic_target') {
         let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Choose a Target</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
         currentEnemies.forEach((enemy, index) => {
@@ -1845,7 +1871,7 @@ function renderBattle(subView = 'main', actionData = null) {
                 }
             }
         });
-        html += `</div><button onclick="renderBattle('main')" class="btn btn-primary">Back</button>`;
+        html += `</div><button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>`;
         const container = document.createElement('div');
         container.innerHTML = html;
         render(container);
@@ -1858,7 +1884,7 @@ function renderBattle(subView = 'main', actionData = null) {
                         <div class="flex justify-between"><span>${spell.name}</span><span>${spell.cost} MP</span></div>
                     </button>`;
         }).join('');
-        let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Cast a Spell</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">${spellsHtml}</div><button onclick="renderBattle('main')" class="btn btn-primary">Back</button>`;
+        let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Cast a Spell</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">${spellsHtml}</div><button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>`;
         const container = document.createElement('div');
         container.innerHTML = html;
         render(container);
@@ -1878,7 +1904,7 @@ function renderBattle(subView = 'main', actionData = null) {
                 return `<button onclick="${action}" class="btn btn-item w-full text-left" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"><div class="flex justify-between"><span>${item.name}</span><span>x${count}</span></div></button>`;
             }).join('');
         if (!itemsHtml) { itemsHtml = `<p class="text-gray-400 text-center col-span-2">You have no usable items.</p>`; }
-        let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Use an Item</h2><div class="grid grid-cols-2 gap-2 mb-4">${itemsHtml}</div><button onclick="renderBattle('main')" class="btn btn-primary">Back</button>`;
+        let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Use an Item</h2><div class="grid grid-cols-2 gap-2 mb-4">${itemsHtml}</div><button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>`;
         const container = document.createElement('div');
         container.innerHTML = html;
         render(container);
@@ -2025,9 +2051,16 @@ window.castHealingSpellOutsideCombat = function(spellKey) {
     renderInventory(); // Re-render the inventory to update the button states
 }
 
-function renderBestiaryMenu() {
+function renderBestiaryMenu(origin = 'inventory') {
     hideTooltip();
     gameState.currentView = 'bestiary';
+    let backAction;
+    if (origin === 'betty') {
+        backAction = "startBettyDialogue()";
+    } else {
+        backAction = "renderInventory()";
+    }
+
     let html = `<div class="w-full text-center">
         <h2 class="font-medieval text-3xl mb-4">Bestiary</h2>
         <p class="text-gray-400 mb-6">(Work in Progress)</p>
@@ -2035,13 +2068,14 @@ function renderBestiaryMenu() {
             <p class="text-gray-500">You haven't discovered any creatures yet.</p>
         </div>
         <div class="text-center mt-4">
-            <button onclick="renderInventory()" class="btn btn-primary">Back</button>
+            <button onclick="${backAction}" class="btn btn-primary">Back</button>
         </div>
     </div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
 }
+
 
 // --- BETTY DIALOGUE FUNCTIONS ---
 
@@ -2057,11 +2091,12 @@ function startBettyDialogue() {
     if (player.bettyQuestState === 'not_started' || player.bettyQuestState === 'declined') {
         renderBettyDialogue('first_encounter');
     } else if (player.bettyQuestState === 'accepted') {
+        const randomIdle = BETTY_DIALOGUE.betty_idle[Math.floor(Math.random() * BETTY_DIALOGUE.betty_idle.length)];
         let html = `<div class="w-full text-center">
             <h2 class="font-medieval text-2xl mb-4">Betty's Corner</h2>
-            <p class="text-gray-400 mb-6">"Oh, hello again! How is the research going?"</p>
+            <p class="text-gray-400 mb-6 italic">"${randomIdle}"</p>
             <div class="flex justify-center gap-4">
-                <button onclick="renderBestiaryMenu()" class="btn btn-primary">View Bestiary</button>
+                <button onclick="renderBestiaryMenu('betty')" class="btn btn-primary">View Bestiary</button>
                 <button onclick="renderTown()" class="btn btn-primary">Leave</button>
             </div>
         </div>`;
@@ -2161,4 +2196,3 @@ function renderBettyQuestProposal() {
     container.innerHTML = dialogueHtml;
     render(container);
 }
-

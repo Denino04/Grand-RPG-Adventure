@@ -1,4 +1,24 @@
 /**
+ * Calculates the damage modifier based on elemental strengths and weaknesses.
+ * @param {string} attackElement The element of the incoming attack.
+ * @param {string} defenseElement The element of the defending entity/gear.
+ * @returns {number} 2 for strong, 0.5 for weak, 1 for neutral.
+ */
+function calculateElementalModifier(attackElement, defenseElement) {
+    if (!attackElement || !defenseElement || attackElement === 'none' || defenseElement === 'none') {
+        return 1;
+    }
+    const attackData = ELEMENTS[attackElement];
+    if (attackData.weakness.includes(defenseElement)) {
+        return 2; // Defensive element is strong against the attack
+    }
+    if (attackData.strength.includes(defenseElement)) {
+        return 0.5; // Defensive element is weak against the attack
+    }
+    return 1;
+}
+
+/**
  * Creates a seeded pseudo-random number generator.
  * @param {number} seed The seed for the generator.
  * @returns {function(): number} A function that returns a random number between 0 and 1.
@@ -56,12 +76,126 @@ function findKeyByName(name, object) {
 }
 
 /**
+ * Gets the appropriate emoji for the player based on their race and gender.
+ * @returns {string} The player's emoji.
+ */
+function getPlayerEmoji() {
+    if (!player || !player.race || !player.gender) return '🧑';
+    const raceEmojis = PLAYER_EMOJIS[player.race];
+    if (!raceEmojis) return '🧑';
+    return raceEmojis[player.gender] || raceEmojis['Neutral'] || '🧑';
+}
+
+
+/**
  * A centralized function to get details for any item from any category.
  * @param {string} itemKey The key of the item to find.
  * @returns {object|null} The details object for the item, or null if not found.
  */
 function getItemDetails(itemKey) {
     return WEAPONS[itemKey] || ARMOR[itemKey] || SHIELDS[itemKey] || CATALYSTS[itemKey] || ITEMS[itemKey] || LURES[itemKey] || SPELLS[itemKey] || null;
+}
+
+
+// --- A* Pathfinding ---
+function findPath(start, end, isFlying = false) {
+    const openSet = [start];
+    const cameFrom = {};
+    const gScore = {};
+    const fScore = {};
+
+    for (let y = 0; y < gameState.gridHeight; y++) {
+        for (let x = 0; x < gameState.gridWidth; x++) {
+            gScore[`${x},${y}`] = Infinity;
+            fScore[`${x},${y}`] = Infinity;
+        }
+    }
+
+    gScore[`${start.x},${start.y}`] = 0;
+    fScore[`${start.x},${start.y}`] = Math.abs(start.x - end.x) + Math.abs(start.y - end.y);
+
+    while (openSet.length > 0) {
+        let current = openSet.reduce((a, b) => fScore[`${a.x},${a.y}`] < fScore[`${b.x},${b.y}`] ? a : b);
+
+        if (current.x === end.x && current.y === end.y) {
+            const path = [];
+            while (current) {
+                path.unshift(current);
+                current = cameFrom[`${current.x},${current.y}`];
+            }
+            return path;
+        }
+
+        openSet.splice(openSet.indexOf(current), 1);
+
+        const neighbors = [
+            { x: current.x, y: current.y - 1 }, { x: current.x, y: current.y + 1 },
+            { x: current.x - 1, y: current.y }, { x: current.x + 1, y: current.y }
+        ];
+
+        for (const neighbor of neighbors) {
+            if (neighbor.x < 0 || neighbor.x >= gameState.gridWidth || neighbor.y < 0 || neighbor.y >= gameState.gridHeight) continue;
+            if (gameState.gridLayout[neighbor.y * gameState.gridWidth + neighbor.x] !== 1) continue;
+            
+            // Check for blocking entities (player or other enemies)
+            const isOccupiedByEntity = (currentEnemies.some(e => e.x === neighbor.x && e.y === neighbor.y) || (player.x === neighbor.x && player.y === neighbor.y));
+            if (isOccupiedByEntity && !(neighbor.x === end.x && neighbor.y === end.y)) continue;
+
+            // Check for blocking objects (obstacles/terrain) if not flying
+            if (!isFlying) {
+                const isBlockedByObject = gameState.gridObjects.some(o => o.x === neighbor.x && o.y === neighbor.y);
+                if (isBlockedByObject && !(neighbor.x === end.x && neighbor.y === end.y)) continue;
+            }
+
+            const tentativeGScore = gScore[`${current.x},${current.y}`] + 1;
+            if (tentativeGScore < gScore[`${neighbor.x},${neighbor.y}`]) {
+                cameFrom[`${neighbor.x},${neighbor.y}`] = current;
+                gScore[`${neighbor.x},${neighbor.y}`] = tentativeGScore;
+                fScore[`${neighbor.x},${neighbor.y}`] = tentativeGScore + Math.abs(neighbor.x - end.x) + Math.abs(neighbor.y - end.y);
+                if (!openSet.some(node => node.x === neighbor.x && node.y === neighbor.y)) {
+                    openSet.push(neighbor);
+                }
+            }
+        }
+    }
+    return null; // No path found
+}
+
+
+function findReachableCells(start, maxDistance) {
+    const reachable = [];
+    const visited = new Set();
+    const queue = [{ x: start.x, y: start.y, dist: 0 }];
+    visited.add(`${start.x},${start.y}`);
+
+    while (queue.length > 0) {
+        const current = queue.shift();
+
+        if (current.dist > 0) {
+            reachable.push(current);
+        }
+
+        if (current.dist < maxDistance) {
+            const neighbors = [
+                { x: current.x, y: current.y - 1 }, { x: current.x, y: current.y + 1 },
+                { x: current.x - 1, y: current.y }, { x: current.x + 1, y: current.y }
+            ];
+
+            for (const neighbor of neighbors) {
+                const key = `${neighbor.x},${neighbor.y}`;
+                if (!visited.has(key) &&
+                    neighbor.x >= 0 && neighbor.x < gameState.gridWidth &&
+                    neighbor.y >= 0 && neighbor.y < gameState.gridHeight &&
+                    gameState.gridLayout[neighbor.y * gameState.gridWidth + neighbor.x] === 1 &&
+                    !isCellBlocked(neighbor.x, neighbor.y)) {
+                    
+                    visited.add(key);
+                    queue.push({ x: neighbor.x, y: neighbor.y, dist: current.dist + 1 });
+                }
+            }
+        }
+    }
+    return reachable;
 }
 
 
@@ -77,6 +211,8 @@ class Entity {
 class Player extends Entity {
     constructor(name, raceKey) {
         super(name);
+        this.x = 0;
+        this.y = 0;
         // Core Attributes
         this.level = 1;
         this.xp = 0;
@@ -127,7 +263,7 @@ class Player extends Entity {
         // Game State & Equipment
                             this.usedReviveToday = false;
                             this.temporaryBuffs = {};
-        this.saveKey = null;
+        this.firestoreId = null;
         this.seed = null;
         this.playerTier = 1;
         this.specialWeaponStates = {};
@@ -417,28 +553,22 @@ class Player extends Entity {
         let shieldDefense = ignoresDefense ? 0 : (shield?.defense || 0);
 
         if (attacker?.element && attacker.element !== 'none' && !ignoresDefense) {
-            const attackerElement = ELEMENTS[attacker.element];
-
-            // Armor elemental check
-            if (this.armorElement !== 'none') {
-                if (attackerElement.weakness.includes(this.armorElement)) { // Armor is strong vs attack
-                    armorDefense *= 2;
-                    addToLog(`Your armor's enchantment resists the attack, doubling its effectiveness!`, 'text-green-400');
-                } else if (attackerElement.strength.includes(this.armorElement)) { // Armor is weak vs attack
-                    armorDefense = 0;
-                    addToLog(`Your armor's enchantment is weak to the attack, offering no protection!`, 'text-red-500');
-                }
+            const armorMod = calculateElementalModifier(attacker.element, this.armorElement);
+            if (armorMod > 1) {
+                armorDefense *= armorMod;
+                addToLog(`Your armor's enchantment resists the attack!`, 'text-green-400');
+            } else if (armorMod < 1) {
+                armorDefense *= armorMod;
+                addToLog(`Your armor's enchantment is weak to the attack!`, 'text-red-500');
             }
-            
-            // Shield elemental check
-            if (this.shieldElement !== 'none') {
-                if (attackerElement.weakness.includes(this.shieldElement)) { // Shield is strong vs attack
-                    shieldDefense *= 2;
-                    addToLog(`Your shield's enchantment resists the attack, doubling its effectiveness!`, 'text-green-400');
-                } else if (attackerElement.strength.includes(this.shieldElement)) { // Shield is weak vs attack
-                    shieldDefense = 0;
-                    addToLog(`Your shield's enchantment is weak to the attack, offering no protection!`, 'text-red-500');
-                }
+
+            const shieldMod = calculateElementalModifier(attacker.element, this.shieldElement);
+             if (shieldMod > 1) {
+                shieldDefense *= shieldMod;
+                addToLog(`Your shield's enchantment resists the attack!`, 'text-green-400');
+            } else if (shieldMod < 1) {
+                shieldDefense *= shieldMod;
+                addToLog(`Your shield's enchantment is weak to the attack!`, 'text-red-500');
             }
         }
 
@@ -471,7 +601,7 @@ class Player extends Entity {
             effectiveDefense *= 0.5;
             addToLog(`The void attack partially bypasses your defense!`, 'text-purple-400');
         }
-        const finalDamage = Math.max(0, damage - effectiveDefense);
+        const finalDamage = Math.max(0, Math.floor(damage - effectiveDefense));
         this.hp -= finalDamage;
         
         let damageType = '';
@@ -512,11 +642,13 @@ class Enemy extends Entity {
         const finalStrength = Math.floor((speciesData.base_strength + Math.floor(playerLevel / 2)) * statMultiplier);
         const finalDefense = Math.floor(((speciesData.base_defense || 0) + Math.floor(playerLevel / 3)) * statMultiplier);
         
-        const name = elementData.key !== 'none' 
+        const name = elementData.key !== 'none'
             ? `${rarityData.name} ${elementData.adjective} ${speciesData.name}`
             : `${rarityData.name} ${speciesData.name}`;
 
         super(name);
+        this.x = 0;
+        this.y = 0;
         this.hp = finalHp;
         this.maxHp = finalHp;
         this.strength = finalStrength;
@@ -531,6 +663,8 @@ class Enemy extends Entity {
         this.defense = finalDefense;
         this.ability = speciesData.ability;
         this.element = elementData.key;
+        this.range = speciesData.range || 1;
+        this.movement = speciesData.movement || { speed: 2, type: 'ground' };
         this.xpReward = Math.floor(speciesData.base_xp * rewardMultiplier * (speciesData.class === 'Monstrosity' ? 1.2 : 1)); 
         this.goldReward = Math.floor(speciesData.base_gold * rewardMultiplier * (speciesData.class === 'Monstrosity' ? 1.2 : 1));
         this.lootTable = {...speciesData.loot_table};
@@ -557,8 +691,16 @@ class Enemy extends Entity {
             this.reviveChance = 1.0;
         }
     }
-    attack(target) {
+    async attack(target) {
         this.attackParried = false;
+
+        const distance = Math.abs(this.x - target.x) + Math.abs(this.y - target.y);
+
+        if (distance > this.range) {
+            await this.moveTowards(target);
+            return; // End turn after moving
+        }
+
         addToLog(`${this.name} attacks ${target.name}!`); 
         this._performAttack(target);
         if (this.attackParried) return;
@@ -686,13 +828,12 @@ class Enemy extends Entity {
 
         // --- Elemental Calculation ---
         if (effects.element && effects.element !== 'none' && this.element !== 'none') {
-            const monsterElement = ELEMENTS[this.element];
-            if (monsterElement.weakness.includes(effects.element)) {
-                damageTaken *= 2;
+            const modifier = calculateElementalModifier(effects.element, this.element);
+            if (modifier > 1) {
+                damageTaken = Math.floor(damageTaken * modifier);
                 addToLog("It's super effective!", 'text-green-400');
-            }
-            if (monsterElement.strength.includes(effects.element)) {
-                damageTaken = Math.floor(damageTaken / 2);
+            } else if (modifier < 1) {
+                damageTaken = Math.floor(damageTaken * modifier);
                 addToLog("It's not very effective...", 'text-red-500');
             }
         }
@@ -711,9 +852,81 @@ class Enemy extends Entity {
         this.hp -= finalDamage;
 
         if (gameState.currentView === 'battle') {
-            renderBattle();
+            renderBattleGrid();
         }
         return finalDamage;
+    }
+    async moveTowards(target) {
+        const path = findPath({x: this.x, y: this.y}, {x: target.x, y: target.y}, true);
+        
+        if (path && path.length > 1) {
+            addToLog(`${this.name} moves closer!`);
+             for (let i = 1; i < path.length; i++) {
+                // Stop if adjacent to the player
+                const dx = Math.abs(path[i].x - target.x);
+                const dy = Math.abs(path[i].y - target.y);
+                if (dx + dy <= this.range) {
+                     break;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 200));
+                this.x = path[i].x;
+                this.y = path[i].y;
+                renderBattleGrid();
+            }
+        } else {
+            addToLog(`${this.name} is blocked and cannot move!`);
+        }
+    }
+    async moveTowards(target) {
+        const isFlying = this.movement.type === 'flying';
+        const path = findPath({x: this.x, y: this.y}, {x: target.x, y: target.y}, isFlying);
+        
+        if (path && path.length > 1) {
+            addToLog(`${this.name} moves closer!`);
+            const stepsToTake = Math.min(path.length - 1, this.movement.speed);
+
+            for (let i = 1; i <= stepsToTake; i++) {
+                const nextStep = path[i];
+                
+                // Check if moving into this cell would put it in range
+                const distanceAfterMove = Math.abs(nextStep.x - target.x) + Math.abs(nextStep.y - target.y);
+                
+                this.x = nextStep.x;
+                this.y = nextStep.y;
+                renderBattleGrid();
+                await new Promise(resolve => setTimeout(resolve, 150));
+
+                if (distanceAfterMove <= this.range) {
+                    break; // In range, stop moving
+                }
+            }
+        } else {
+            addToLog(`${this.name} is blocked and cannot move!`);
+        }
+    }
+    isValidMove(x, y) {
+        // Check grid bounds
+        if (x < 0 || x >= gameState.gridWidth || y < 0 || y >= gameState.gridHeight) {
+            return false;
+        }
+        // Check if the cell is part of the layout
+        if (gameState.gridLayout[y * gameState.gridWidth + x] !== 1) {
+            return false;
+        }
+        // Check if player is there
+        if (player.x === x && player.y === y) {
+            return false;
+        }
+        // Check if another enemy is there
+        if (currentEnemies.some(e => e !== this && e.x === x && e.y === y)) {
+            return false;
+        }
+         // Check for obstacles
+        if (gameState.gridObjects.some(o => o.x === x && o.y === y && o.type === 'obstacle')) {
+            return false;
+        }
+        return true;
     }
 }
 
@@ -1159,6 +1372,58 @@ function equipItem(itemKey) {
     }
 }
 
+function unequipItem(itemType) {
+    if (!player) return;
+
+    let unequippedItemName = '';
+
+    switch (itemType) {
+        case 'weapon':
+            if (player.equippedWeapon.name === WEAPONS['fists'].name) return;
+            unequippedItemName = player.equippedWeapon.name;
+            player.equippedWeapon = WEAPONS['fists'];
+            player.weaponElement = 'none';
+            break;
+        case 'catalyst':
+            if (player.equippedCatalyst.name === CATALYSTS['no_catalyst'].name) return;
+            unequippedItemName = player.equippedCatalyst.name;
+            player.equippedCatalyst = CATALYSTS['no_catalyst'];
+            break;
+        case 'armor':
+            if (player.equippedArmor.name === ARMOR['travelers_garb'].name) return;
+            unequippedItemName = player.equippedArmor.name;
+            player.equippedArmor = ARMOR['travelers_garb'];
+            player.armorElement = 'none';
+            break;
+        case 'shield':
+            if (player.equippedShield.name === SHIELDS['no_shield'].name) return;
+            unequippedItemName = player.equippedShield.name;
+            player.equippedShield = SHIELDS['no_shield'];
+            player.shieldElement = 'none';
+            break;
+        case 'lure':
+            if (player.equippedLure === 'no_lure') return;
+            unequippedItemName = LURES[player.equippedLure].name;
+            player.equippedLure = 'no_lure';
+            break;
+        default:
+            return;
+    }
+
+    if (['weapon', 'catalyst', 'shield'].includes(itemType)) {
+        const typeIndex = player.equipmentOrder.indexOf(itemType);
+        if (typeIndex > -1) {
+            player.equipmentOrder.splice(typeIndex, 1);
+        }
+    }
+
+    addToLog(`You unequipped the <span class="font-bold text-cyan-300">${unequippedItemName}</span>.`);
+    updateStatsView();
+    if (gameState.currentView === 'inventory') {
+        renderInventory();
+    }
+}
+
 
 function brewWitchPotion(recipeKey) {
     const recipe = WITCH_COVEN_RECIPES[recipeKey];
@@ -1539,6 +1804,4 @@ function cancelQuest() {
     updateStatsView();
     renderQuestBoard();
 }
-
-
 

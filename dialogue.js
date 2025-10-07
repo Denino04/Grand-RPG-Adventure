@@ -24,5 +24,14 @@ const BETTY_DIALOGUE = {
     },
     re_engage: {
         prompt: "Oh, h-hello again. I... I don't suppose you've reconsidered my offer? I s-still need help with my research…",
-    }
+    },
+    betty_idle: [
+        "Oh, hello again! How is the research going?",
+        "I was just organizing my notes... it's quite a task!",
+        "Did you know some slimes are... sweet? It's in my preliminary findings!",
+        "Please be careful out there. Some of these creatures are terribly dangerous.",
+        "Every little bit of information helps complete the picture. Thank you again!",
+        "I saw a... a very large rabbit earlier. I hope it wasn't one of the rabid ones."
+    ]
 };
+
