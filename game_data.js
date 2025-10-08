@@ -25,7 +25,7 @@ const PLAYER_EMOJIS = {
 };
 
 const CLASSES = {
-    'barbarian': {
+    'barbarian': {  
         name: 'Barbarian',
         description: 'A pure brute fueled by raw strength and primal fury. Your answer to "why?" is usually "RAAAGH!"',
         bonusStats: { Strength: 5, Stamina: 3, Intelligence: -2 },

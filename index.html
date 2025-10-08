@@ -25,7 +25,14 @@
     <script src="main.js" defer></script>
     <style>
         html {
-            font-size: 14px; /* Slightly increase base font size for better readability */
+            font-size: 14px; /* Slightly increase base font size for readability */
+        }
+        /* Allow vertical scrolling on the body for smaller screens */
+        @media (max-width: 768px) {
+            body {
+                display: block; /* Override flex to allow natural document flow */
+                padding: 1rem 0;
+            }
         }
     </style>
 </head>
@@ -34,6 +41,8 @@
     <div id="start-screen" class="text-center p-4">
         <h1 class="font-medieval text-6xl text-yellow-300 mb-8">Chronicles of Cocytus</h1>
         <div class="space-y-4">
+            
+            <!-- Pre-Authentication Buttons -->
             <div id="auth-buttons">
                 <button id="google-signin-btn" class="btn btn-primary text-2xl px-8 py-4">
                     <div class="flex items-center justify-center">
@@ -43,13 +52,17 @@
                 </button>
                  <button id="anonymous-signin-btn" class="btn btn-primary text-xl px-8 py-3 mt-2">Play as Guest</button>
             </div>
-            <div id="game-buttons" class="hidden">
-                 <button id="start-game-btn" class="btn btn-primary text-2xl px-8 py-4">New Game</button>
-                 <button id="load-game-btn" class="btn btn-primary text-2xl px-8 py-4">Load Game</button>
-            </div>
-            <div id="user-info" class="hidden text-center pt-4">
-                <p id="user-display" class="text-gray-300 mb-2"></p>
-                <button id="sign-out-btn" class="btn btn-action text-lg px-6 py-2">Sign Out</button>
+            
+            <!-- Post-Authentication Section -->
+            <div id="post-auth-section">
+                <div class="space-y-4">
+                     <button id="start-game-btn" class="btn btn-primary text-2xl px-8 py-4">New Game</button>
+                     <button id="load-game-btn" class="btn btn-primary text-2xl px-8 py-4">Load Game</button>
+                </div>
+                <div class="text-center pt-4">
+                    <p id="user-display" class="text-gray-300 mb-2"></p>
+                    <button id="sign-out-btn" class="btn btn-action text-lg px-6 py-2">Sign Out</button>
+                </div>
             </div>
 
             <div class="flex items-center justify-center space-x-2 pt-4">
@@ -58,7 +71,7 @@
             </div>
              <div class="flex justify-center space-x-4 pt-4">
                 <button id="changelog-btn" class="btn btn-primary">Changelog</button>
-                <button id="graveyard-btn" class="btn btn-primary hidden">Graveyard</button>
+                <button id="graveyard-btn" class="btn btn-primary">Graveyard</button>
             </div>
             <div class="flex justify-center items-center space-x-2 mt-4 text-gray-400">
                 <input type="checkbox" id="palette-toggle" class="form-checkbox h-5 w-5 rounded bg-gray-700 border-gray-600 text-yellow-400 focus:ring-yellow-500">
@@ -206,75 +219,71 @@
         </div>
     </div>
 
-    <div id="game-container" class="w-full max-w-7xl mx-auto h-auto md:h-screen flex flex-col hidden my-4 md:my-0 border-2 rounded-lg shadow-2xl" style="border-color: var(--border-main); background-color: var(--bg-main);">
-        <div class="flex-grow flex flex-col md:flex-row gap-4 p-4 min-h-0">
-            <!-- Stats Panel -->
-            <div class="md:w-80 lg:w-96 md:flex-shrink-0 bg-slate-800 p-4 rounded-lg flex flex-col">
-                <div id="stats-view" class="flex-grow md:overflow-y-auto inventory-scrollbar pr-2">
-                     <h2 id="player-name" class="font-medieval text-2xl text-center mb-1" style="color: var(--text-accent);">Player Name</h2>
-                     <p id="player-details" class="text-center text-sm text-gray-400 mb-4">Gender | Race</p>
-                    
-                     <div class="grid grid-cols-3 gap-2 text-center mb-4">
-                         <div>
-                             <p class="font-bold text-lg" id="player-level">1</p>
-                             <p class="text-xs text-gray-400">Level</p>
-                         </div>
-                         <div>
-                             <p class="font-bold text-lg" id="player-gold">100</p>
-                             <p class="text-xs text-gray-400">Gold</p>
-                         </div>
-                     </div>
-                     <div class="mb-2">
-                         <p class="text-xs text-gray-400 flex justify-between"><span>HP</span><span id="player-hp-text">50 / 50</span></p>
-                         <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-hp-bar" class="bg-red-600 h-2.5 rounded-full" style="width: 100%"></div></div>
-                     </div>
-                     <div class="mb-2">
-                         <p class="text-xs text-gray-400 flex justify-between"><span>MP</span><span id="player-mp-text">50 / 50</span></p>
-                         <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-mp-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 100%"></div></div>
-                     </div>
-                     <div class="mb-4">
-                         <p class="text-xs text-gray-400 flex justify-between"><span>XP</span><span id="player-xp-text">0 / 100</span></p>
-                         <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-xp-bar" class="bg-yellow-400 h-2.5 rounded-full" style="width: 0%"></div></div>
-                     </div>
-    
-                     <hr class="border-gray-600 my-4">
-    
+    <div id="game-container" class="w-full max-w-7xl md:h-screen md:max-h-[900px] flex flex-col md:flex-row border-2 rounded-lg shadow-2xl hidden my-auto" style="border-color: var(--border-main); background-color: var(--bg-main);">
+        <div class="w-full md:w-1/3 bg-slate-800 p-4 rounded-l-lg flex flex-col">
+            <div id="stats-view" class="flex-grow overflow-y-auto inventory-scrollbar pr-2">
+                 <h2 id="player-name" class="font-medieval text-2xl text-center mb-1" style="color: var(--text-accent);">Player Name</h2>
+                 <p id="player-details" class="text-center text-sm text-gray-400 mb-4">Gender | Race</p>
+                
+                 <div class="grid grid-cols-3 gap-2 text-center mb-4">
                      <div>
-                         <h3 class="font-bold text-lg mb-2 text-yellow-300">Equipment</h3>
-                         <div class="space-y-2 text-sm">
-                             <p><strong>Weapon:</strong> <span id="equipped-weapon"></span></p>
-                             <p><strong>Catalyst:</strong> <span id="equipped-catalyst"></span></p>
-                             <p><strong>Armor:</strong> <span id="equipped-armor"></span></p>
-                             <p><strong>Shield:</strong> <span id="equipped-shield"></span></p>
-                             <p><strong>Lure:</strong> <span id="equipped-lure"></span></p>
-                         </div>
+                         <p class="font-bold text-lg" id="player-level">1</p>
+                         <p class="text-xs text-gray-400">Level</p>
                      </div>
-    
-                     <hr class="border-gray-600 my-4">
-                     
-                      <div>
-                        <h3 class="font-bold text-lg mb-2 text-yellow-300">Quests</h3>
-                        <div class="space-y-2 text-sm">
-                            <p id="quest-tracker" class="text-amber-300"></p>
-                            <p id="legacy-quest-tracker" class="text-purple-400"></p>
-                        </div>
+                     <div>
+                         <p class="font-bold text-lg" id="player-gold">100</p>
+                         <p class="text-xs text-gray-400">Gold</p>
+                     </div>
+                 </div>
+                 <div class="mb-2">
+                     <p class="text-xs text-gray-400 flex justify-between"><span>HP</span><span id="player-hp-text">50 / 50</span></p>
+                     <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-hp-bar" class="bg-red-600 h-2.5 rounded-full" style="width: 100%"></div></div>
+                 </div>
+                 <div class="mb-2">
+                     <p class="text-xs text-gray-400 flex justify-between"><span>MP</span><span id="player-mp-text">50 / 50</span></p>
+                     <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-mp-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 100%"></div></div>
+                 </div>
+                 <div class="mb-4">
+                     <p class="text-xs text-gray-400 flex justify-between"><span>XP</span><span id="player-xp-text">0 / 100</span></p>
+                     <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-xp-bar" class="bg-yellow-400 h-2.5 rounded-full" style="width: 0%"></div></div>
+                 </div>
+
+                 <hr class="border-gray-600 my-4">
+
+                 <div>
+                     <h3 class="font-bold text-lg mb-2 text-yellow-300">Equipment</h3>
+                     <div class="space-y-2 text-sm">
+                         <p><strong>Weapon:</strong> <span id="equipped-weapon"></span></p>
+                         <p><strong>Catalyst:</strong> <span id="equipped-catalyst"></span></p>
+                         <p><strong>Armor:</strong> <span id="equipped-armor"></span></p>
+                         <p><strong>Shield:</strong> <span id="equipped-shield"></span></p>
+                         <p><strong>Lure:</strong> <span id="equipped-lure"></span></p>
+                     </div>
+                 </div>
+
+                 <hr class="border-gray-600 my-4">
+                 
+                  <div>
+                    <h3 class="font-bold text-lg mb-2 text-yellow-300">Quests</h3>
+                    <div class="space-y-2 text-sm">
+                        <p id="quest-tracker" class="text-amber-300"></p>
+                        <p id="legacy-quest-tracker" class="text-purple-400"></p>
                     </div>
-    
                 </div>
-                <div class="pt-4 border-t border-gray-600 flex flex-col gap-2">
-                     <button id="inventory-btn" onclick="gameState.currentView !== 'inventory' ? renderInventory() : returnFromInventory()" class="btn btn-primary w-full">Inventory</button>
-                     <button id="character-sheet-btn" onclick="gameState.currentView !== 'character_sheet' ? renderCharacterSheet() : returnFromInventory()" class="btn btn-primary w-full">Character</button>
-                </div>
+
             </div>
-            <!-- Main Content & Log -->
-            <div class="flex flex-col min-h-0 flex-1">
-                <div id="main-view" class="bg-slate-900/50 p-6 rounded-lg flex-1 md:overflow-y-auto inventory-scrollbar">
-                    <!-- Main game content (town, battle, etc.) -->
-                </div>
-                <div id="game-log-container" class="h-48 mt-4 bg-black/30 p-4 rounded-lg flex flex-col flex-shrink-0">
-                    <div id="game-log" class="flex-grow overflow-y-auto flex flex-col-reverse">
-                        <!-- Game log messages will appear here -->
-                    </div>
+            <div class="pt-4 border-t border-gray-600 flex flex-col gap-2">
+                 <button id="inventory-btn" onclick="gameState.currentView !== 'inventory' ? renderInventory() : returnFromInventory()" class="btn btn-primary w-full">Inventory</button>
+                 <button id="character-sheet-btn" onclick="gameState.currentView !== 'character_sheet' ? renderCharacterSheet() : returnFromInventory()" class="btn btn-primary w-full">Character</button>
+            </div>
+        </div>
+        <div class="w-full md:w-2/3 flex flex-col p-4">
+            <div id="main-view" class="bg-slate-900/50 rounded-lg flex-grow flex items-center justify-center p-6 min-h-[300px] md:min-h-0">
+                <!-- Main game content (town, battle, etc.) -->
+            </div>
+            <div id="game-log-container" class="h-48 mt-4 bg-black/30 p-4 rounded-lg flex flex-col flex-shrink-0">
+                <div id="game-log" class="flex-grow overflow-y-auto flex flex-col-reverse">
+                    <!-- Game log messages will appear here -->
                 </div>
             </div>
         </div>
@@ -316,21 +325,6 @@
     </div>
     
     <!-- Templates -->
-    <template id="template-main-menu">
-        <div class="w-full h-full flex flex-col items-center justify-center p-4">
-            <div class="w-full max-w-lg">
-                <h2 class="font-medieval text-3xl mb-8 text-center">Main Menu</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <button onclick="renderWildernessMenu()" class="btn btn-primary">Explore Wilderness</button>
-                    <button onclick="renderTown()" class="btn btn-primary">Go to Town</button>
-                    <button onclick="saveGame(true)" class="btn btn-primary">Save Game</button>
-                    <button onclick="exportSave()" class="btn btn-primary">Export Save</button>
-                    <button onclick="exitGame()" class="btn btn-action col-span-1 sm:col-span-2">Save & Exit</button>
-                </div>
-            </div>
-        </div>
-    </template>
-    
     <template id="template-death">
          <div class="text-center">
             <h1 class="font-medieval text-8xl text-red-700">YOU DIED</h1>
@@ -347,10 +341,7 @@
             </div>
         </div>
     </template>
-<script>
-  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-</script>
-<script defer src="/_vercel/insights/script.js"></script>
+
 </body>
 </html>
 

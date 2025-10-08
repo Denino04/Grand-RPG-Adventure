@@ -625,7 +625,7 @@ function confirmStatAllocation() {
     saveGame();
     
     if (gameState.currentView === 'character_sheet_levelup') {
-        renderMainMenu();
+        renderTownSquare();
     } else {
         returnFromInventory(); 
     }
@@ -634,9 +634,8 @@ function confirmStatAllocation() {
 
 function returnFromInventory() {
     switch (lastViewBeforeInventory) {
-        case 'main_menu': renderMainMenu(); break;
-        case 'character_sheet': renderMainMenu(); break; // Go to main menu from char sheet
         case 'town': renderTownSquare(); break;
+        case 'character_sheet': renderTownSquare(); break; 
         case 'commercial_district': renderCommercialDistrict(); break;
         case 'arcane_quarter': renderArcaneQuarter(); break;
         case 'residential_district': renderResidentialDistrict(); break;
@@ -656,31 +655,8 @@ function returnFromInventory() {
         case 'sell': renderSell(); break;
         case 'battle': renderBattleGrid(); break;
         case 'wilderness': renderWildernessMenu(); break;
-        default: renderMainMenu();
+        default: renderTownSquare();
     }
-}
-
-function renderMainMenu() {
-    const defaultPalettes = ['noon', 'sunset', 'midnight'];
-    const allPalettes = Object.keys(PALETTES);
-    const palettesToUse = useFullPaletteRotation ? allPalettes : defaultPalettes;
-
-    if (timeOfDayIndex >= palettesToUse.length) {
-        timeOfDayIndex = 0;
-    }
-
-    const theme = palettesToUse[timeOfDayIndex];
-    applyTheme(theme);
-    
-    timeOfDayIndex = (timeOfDayIndex + 1) % palettesToUse.length;
-
-    lastViewBeforeInventory = 'main_menu';
-    gameState.currentView = 'main_menu';
-    $('#inventory-btn').disabled = false;
-    $('#character-sheet-btn').disabled = false; // Re-enable character button
-    saveGame();
-    const template = document.getElementById('template-main-menu');
-    render(template.content.cloneNode(true));
 }
 
 function exitGame() {
@@ -727,7 +703,7 @@ function renderWildernessMenu() {
     });
 
     html += `</div>
-        <div class="text-center mt-4"><button onclick="renderMainMenu()" class="btn btn-primary">Back</button></div>
+        <div class="text-center mt-4"><button onclick="renderTownSquare()" class="btn btn-primary">Back to Town</button></div>
     </div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
@@ -739,9 +715,22 @@ function renderTown() {
 }
 
 function renderTownSquare() {
-    applyTheme('town');
+    const defaultPalettes = ['noon', 'sunset', 'midnight'];
+    const allPalettes = Object.keys(PALETTES);
+    const palettesToUse = useFullPaletteRotation ? allPalettes : defaultPalettes;
+
+    if (timeOfDayIndex >= palettesToUse.length) {
+        timeOfDayIndex = 0;
+    }
+    const theme = palettesToUse[timeOfDayIndex];
+    applyTheme(theme);
+    timeOfDayIndex = (timeOfDayIndex + 1) % palettesToUse.length;
+
     lastViewBeforeInventory = 'town';
     gameState.currentView = 'town';
+    $('#inventory-btn').disabled = false;
+    $('#character-sheet-btn').disabled = false;
+    saveGame();
 
     const bettyPopup = $('#betty-encounter-popup');
     bettyPopup.classList.add('hidden');
@@ -767,29 +756,29 @@ function renderTownSquare() {
     }
 
     const container = document.createElement('div');
-    container.className = 'flex flex-col items-center justify-center w-full h-full';
+    container.className = 'relative flex flex-col items-center justify-center w-full h-full';
 
-    const locations = [
-        { name: 'Commercial District', action: "renderCommercialDistrict()" },
-        { name: 'Arcane Quarter', action: "renderArcaneQuarter()" },
-        { name: 'Residential Area', action: "renderResidentialDistrict()" },
+    let buttons = [
+        { name: 'Explore Wilderness', action: "renderWildernessMenu()", class: 'btn-action' },
+        { name: 'Commercial District', action: "renderCommercialDistrict()", class: 'btn-primary' },
+        { name: 'Arcane Quarter', action: "renderArcaneQuarter()", class: 'btn-primary' },
+        { name: 'Residential Area', action: "renderResidentialDistrict()", class: 'btn-primary' },
     ];
-    
      if (player.bettyQuestState === 'accepted') {
-        locations.push({ name: 'Betty\'s Corner', action: "startBettyDialogue()" });
+        buttons.push({ name: 'Betty\'s Corner', action: "startBettyDialogue()", class: 'btn-primary' });
     }
+    buttons.push({ name: 'Save Game', action: "saveGame(true)", class: 'btn-primary' });
+    buttons.push({ name: 'Export Save', action: "exportSave()", class: 'btn-primary' });
 
-    let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Town Square</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-md">`;
-    
-    locations.forEach(loc => {
-        html += `<button onclick="${loc.action}" class="btn btn-primary">${loc.name}</button>`;
-    });
 
-    html += `</div>
-             <div class="mt-8">
-                <button onclick="renderMainMenu()" class="btn btn-action">Leave Town</button>
-             </div>`;
+    let html = `
+        <button onclick="exitGame()" class="absolute top-2 right-2 btn btn-action !p-2 !rounded-full w-10 h-10 text-xl leading-none" title="Leave Game">
+            &times;
+        </button>
+        <h2 class="font-medieval text-3xl mb-8 text-center">Town Square</h2>
+        <div class="grid grid-cols-1 gap-4 w-full max-w-xs">
+            ${buttons.map(btn => `<button onclick="${btn.action}" class="btn ${btn.class}">${btn.name}</button>`).join('')}
+        </div>`;
     
     container.innerHTML = html;
     render(container);
@@ -1884,7 +1873,15 @@ function renderBattle(subView = 'main', actionData = null) {
                         <div class="flex justify-between"><span>${spell.name}</span><span>${spell.cost} MP</span></div>
                     </button>`;
         }).join('');
-        let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Cast a Spell</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">${spellsHtml}</div><button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>`;
+        
+        let html = `<div class="w-full text-center">
+                        <h2 class="font-medieval text-3xl mb-4">Cast a Spell</h2>
+                        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 mb-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">${spellsHtml}</div>
+                        </div>
+                        <button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>
+                    </div>`;
+
         const container = document.createElement('div');
         container.innerHTML = html;
         render(container);
@@ -1904,7 +1901,15 @@ function renderBattle(subView = 'main', actionData = null) {
                 return `<button onclick="${action}" class="btn btn-item w-full text-left" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"><div class="flex justify-between"><span>${item.name}</span><span>x${count}</span></div></button>`;
             }).join('');
         if (!itemsHtml) { itemsHtml = `<p class="text-gray-400 text-center col-span-2">You have no usable items.</p>`; }
-        let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Use an Item</h2><div class="grid grid-cols-2 gap-2 mb-4">${itemsHtml}</div><button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>`;
+        
+        let html = `<div class="w-full text-center">
+                        <h2 class="font-medieval text-3xl mb-4">Use an Item</h2>
+                        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 mb-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">${itemsHtml}</div>
+                        </div>
+                        <button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>
+                    </div>`;
+
         const container = document.createElement('div');
         container.innerHTML = html;
         render(container);
@@ -1928,7 +1933,7 @@ function renderPostBattleMenu() {
     player.clearEncounterBuffs(); 
     const biomeKey = gameState.currentBiome;
     if (!biomeKey) { // Safety check
-        renderMainMenu();
+        renderTownSquare();
         return;
     }
     const biome = BIOMES[biomeKey];
@@ -1937,7 +1942,7 @@ function renderPostBattleMenu() {
         <p class="mb-6">You have cleared the area. What will you do next?</p>
         <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
             <button onclick="startBattle('${biomeKey}')" class="btn btn-primary w-full sm:w-auto">Continue Exploring ${biome.name}</button>
-            <button onclick="renderMainMenu()" class="btn btn-primary w-full sm:w-auto">Return to Menu</button>
+            <button onclick="renderTownSquare()" class="btn btn-primary w-full sm:w-auto">Return to Town</button>
         </div>
     </div>`;
     const container = document.createElement('div');
@@ -2202,4 +2207,6 @@ function renderBettyQuestProposal() {
     container.innerHTML = dialogueHtml;
     render(container);
 }
+
+
 

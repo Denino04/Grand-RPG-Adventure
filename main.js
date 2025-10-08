@@ -45,21 +45,20 @@ async function initFirebase() {
         db = firebase.firestore();
         firebaseInitialized = true;
         console.log("Firebase Initialized. Waiting for auth state...");
+        
+        document.body.classList.add('logged-out'); 
 
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 userId = user.uid;
                 console.log("User is signed in with UID:", userId);
-                addToLog("Connected to game services.", "text-green-400");
                 
-                $('#auth-buttons').classList.add('hidden');
-                $('#game-buttons').classList.remove('hidden');
+                document.body.classList.remove('logged-out');
+                document.body.classList.add('logged-in');
 
                 if (!user.isAnonymous) {
-                    $('#user-info').classList.remove('hidden');
                     $('#user-display').textContent = `Welcome, ${user.displayName}!`;
                 } else {
-                     $('#user-info').classList.add('hidden');
                      $('#user-display').textContent = `Playing as Guest`;
                 }
 
@@ -68,9 +67,9 @@ async function initFirebase() {
                 userId = null;
                 console.log("User is signed out.");
                 
-                $('#auth-buttons').classList.remove('hidden');
-                $('#game-buttons').classList.add('hidden');
-                $('#user-info').classList.add('hidden');
+                document.body.classList.remove('logged-in');
+                document.body.classList.add('logged-out');
+                
                 $('#user-display').textContent = '';
                 await updateLoadGameButtonVisibility();
             }
@@ -108,7 +107,7 @@ async function signOutUser() {
     if (!auth) return;
     try {
         await auth.signOut();
-        showStartScreen(); // Reset the game view
+        showStartScreen(); 
     } catch (error) {
         console.error("Sign out failed:", error);
     }
@@ -120,18 +119,15 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey) {
     $('#start-screen').classList.add('hidden'); 
     $('#game-container').classList.remove('hidden'); 
     
-    // 1. Create Player with Race stats
     player = new Player(playerName, raceKey); 
     player.gender = gender;
     player.class = CLASSES[classKey].name;
     player.background = BACKGROUNDS[backgroundKey].name;
     player.backgroundKey = backgroundKey;
-    player.totalXp = 0; // Initialize totalXp for new characters
+    player.totalXp = 0; 
 
-    // 2. Apply Class modifications
     const classData = CLASSES[classKey];
     
-    // Apply stat bonuses
     for (const stat in classData.bonusStats) {
         let statLower = stat.toLowerCase();
         if (player.hasOwnProperty(statLower)) {
@@ -139,8 +135,7 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey) {
         }
     }
     
-    // Apply starting equipment, items, and spells
-    player.inventory = { items: {}, weapons: [], catalysts: [], armor: [], shields: [], lures: {} }; // Clear default inventory
+    player.inventory = { items: {}, weapons: [], catalysts: [], armor: [], shields: [], lures: {} }; 
     
     for (const itemKey in classData.startingItems) {
         player.addToInventory(itemKey, classData.startingItems[itemKey], false);
@@ -163,12 +158,11 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey) {
         equipItem(classData.startingEquipment.shield);
     }
 
-    player.spells = {}; // Clear default spells
+    player.spells = {}; 
     for (const spellKey in classData.startingSpells) {
         player.spells[spellKey] = { tier: classData.startingSpells[spellKey] };
     }
     
-    // Handle special random items/spells
     if (classData.randomLures) {
         const availableLures = Object.keys(LURES).filter(key => {
             const lure = LURES[key];
@@ -193,8 +187,6 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey) {
          }
     }
 
-
-    // 3. Finalize Player Setup
     player.hp = player.maxHp;
     player.mp = player.maxMp;
     player.baseStats = { Vigor: player.vigor, Focus: player.focus, Stamina: player.stamina, Strength: player.strength, Intelligence: player.intelligence, Luck: player.luck };
@@ -210,7 +202,7 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey) {
     applyTheme('default'); 
     updateStatsView(); 
     await saveGame();
-    renderMainMenu(); 
+    renderTownSquare(); 
 }
 
 function generateRandomizedBiomeOrder() {
@@ -267,7 +259,6 @@ async function saveGame(manual = false) {
     if (!player) return; 
     const saveData = JSON.parse(JSON.stringify(player));
     
-    // If user is anonymous or Firebase isn't available, save to localStorage
     if (!auth || !auth.currentUser || auth.currentUser.isAnonymous) {
         try {
             localStorage.setItem('rpgSaveData_local', JSON.stringify(saveData));
@@ -278,12 +269,10 @@ async function saveGame(manual = false) {
             console.error("Could not save game to localStorage:", error); 
             addToLog('Error: Could not save game locally.', 'text-red-400');
         }
-        return; // Stop here for local saves
+        return; 
     }
 
-    // Otherwise, save to Firestore for logged-in users
     try {
-        // Add user account info to the save data
         saveData.userEmail = auth.currentUser.email;
         saveData.userDisplayName = auth.currentUser.displayName;
 
@@ -312,7 +301,6 @@ async function renderLoadMenu() {
 
     let hasSaves = false;
 
-    // 1. Check for local save (for guests)
     const localSaveDataString = localStorage.getItem('rpgSaveData_local');
     if (localSaveDataString) {
         try {
@@ -334,7 +322,6 @@ async function renderLoadMenu() {
         }
     }
 
-    // 2. Check for cloud saves (for logged-in users)
     if (db && userId) {
         try {
             const charactersCollection = db.collection(`artifacts/${appId}/users/${userId}/characters`);
@@ -380,7 +367,6 @@ async function renderLoadMenu() {
 }
 
 async function deleteSave(docId) {
-    // Handle local save deletion
      if (docId === 'local') {
          localStorage.removeItem('rpgSaveData_local');
          addToLog("Guest save file deleted.", "text-yellow-400");
@@ -388,7 +374,6 @@ async function deleteSave(docId) {
          await updateLoadGameButtonVisibility();
          return;
      }
-    // Handle Firestore deletion
      if (!db || !userId) return;
      try {
          await db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId).delete();
@@ -403,7 +388,6 @@ async function deleteSave(docId) {
 async function loadGameFromKey(docId, isImport = false) {
     let parsedData;
 
-    // Handle loading from local storage
     if (docId === 'local') {
         const localSaveDataString = localStorage.getItem('rpgSaveData_local');
         if (localSaveDataString) {
@@ -420,7 +404,6 @@ async function loadGameFromKey(docId, isImport = false) {
             return;
         }
     } 
-    // Handle loading from Firestore
     else {
         if (!db || !userId) return;
         const docRef = db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId);
@@ -439,7 +422,6 @@ async function loadGameFromKey(docId, isImport = false) {
         }
     }
     
-    // Now that data is loaded (either from local or cloud), process it
     if(parsedData) {
         player = new Player("Loading...", "Human");
         Object.assign(player, parsedData);
@@ -447,8 +429,6 @@ async function loadGameFromKey(docId, isImport = false) {
             player.firestoreId = docId;
         }
 
-
-        // --- DATA MIGRATION AND VALIDATION ---
         if (!player.race) {
             renderRaceSelectionForOldSave(player, player.firestoreId || 'local', isImport);
             return;
@@ -477,7 +457,6 @@ async function loadGameFromKey(docId, isImport = false) {
         player.equippedArmor = ARMOR[armorKey];
         const shieldKey = findKeyByName(parsedData.equippedShield?.name, SHIELDS) || 'no_shield';
         player.equippedShield = SHIELDS[shieldKey];
-        // --- END MIGRATION ---
 
         $('#start-screen').classList.add('hidden');
         $('#changelog-screen').classList.add('hidden');
@@ -489,7 +468,7 @@ async function loadGameFromKey(docId, isImport = false) {
         if (player.statPoints > 0) {
             setTimeout(() => renderCharacterSheet(true), 1500);
         } else {
-            renderMainMenu();
+            renderTownSquare();
         }
     }
 }
@@ -547,24 +526,25 @@ function showStartScreen() {
 
 async function updateLoadGameButtonVisibility() {
     const localSaveExists = !!localStorage.getItem('rpgSaveData_local');
+    const loadGameBtn = $('#load-game-btn');
+    const graveyardBtn = $('#graveyard-btn');
+    graveyardBtn.classList.toggle('hidden', true); // Hide by default
 
     if (!db || !userId) {
-         $('#load-game-btn').classList.toggle('hidden', !localSaveExists);
-         $('#graveyard-btn').classList.add('hidden');
+        loadGameBtn.classList.toggle('hidden', !localSaveExists);
         return;
     }
     
     try {
         const charactersSnapshot = await db.collection(`artifacts/${appId}/users/${userId}/characters`).limit(1).get();
-        // Show button if a cloud save OR a local save exists
-        $('#load-game-btn').classList.toggle('hidden', charactersSnapshot.empty && !localSaveExists);
+        const showLoadBtn = !charactersSnapshot.empty || localSaveExists;
+        loadGameBtn.classList.toggle('hidden', !showLoadBtn);
 
         const graveyardSnapshot = await db.collection(`artifacts/${appId}/public/data/graveyard`).limit(1).get();
-        $('#graveyard-btn').classList.toggle('hidden', graveyardSnapshot.empty);
+        if(!graveyardSnapshot.empty) graveyardBtn.classList.toggle('hidden', false);
     } catch (error) {
         console.error("Could not check for saved games:", error);
-        $('#load-game-btn').classList.toggle('hidden', !localSaveExists); // Fallback to local check
-        $('#graveyard-btn').classList.add('hidden');
+        loadGameBtn.classList.toggle('hidden', !localSaveExists);
     }
 }
 

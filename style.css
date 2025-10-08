@@ -36,6 +36,23 @@ body {
     -ms-user-select: none; /* IE10+/Edge */
     user-select: none; /* Standard */
 }
+
+/* --- Authentication Visibility Rules --- */
+body.logged-out #post-auth-section {
+    display: none;
+}
+body.logged-in #auth-buttons {
+    display: none;
+}
+/* By default, post-auth is hidden until the body gets the 'logged-in' class */
+#post-auth-section {
+    display: none;
+}
+body.logged-in #post-auth-section {
+    display: block;
+}
+
+
 .font-medieval {
     font-family: 'MedievalSharp', cursive;
 }
