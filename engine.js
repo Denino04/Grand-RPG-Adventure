@@ -19,6 +19,65 @@ function calculateElementalModifier(attackElement, defenseElement) {
 }
 
 /**
+ * Calculates dynamic rarity weights based on player level and monster class.
+ * @param {number} playerLevel The player's current level.
+ * @param {string} monsterClass The class of the monster being generated.
+ * @returns {Array<number>} An array of weights for [common, uncommon, rare, epic, legendary].
+ */
+function getDynamicRarityWeights(playerLevel, monsterClass) {
+    // Base weights
+    let weights = {
+        common: 50,
+        uncommon: 25,
+        rare: 15,
+        epic: 9,
+        legendary: 1
+    };
+
+    // Monstrosities are inherently more dangerous and have a higher chance of being rare.
+    if (monsterClass === 'Monstrosity') {
+        weights = {
+            common: 35,
+            uncommon: 30,
+            rare: 18,
+            epic: 12,
+            legendary: 5
+        };
+    }
+
+    // Start shifting weights more significantly after level 5
+    if (playerLevel > 5) {
+        // Determine how many percentage points to shift away from 'common' based on level.
+        // This caps out to ensure common enemies never disappear entirely.
+        const transferPoints = Math.min(35, Math.floor((playerLevel - 5) / 1.5));
+
+        weights.common -= transferPoints;
+
+        // Distribute the transferred points to higher rarities.
+        weights.uncommon += Math.ceil(transferPoints * 0.5);  // 50% of points
+        weights.rare += Math.ceil(transferPoints * 0.3);      // 30% of points
+        weights.epic += Math.floor(transferPoints * 0.2);     // 20% of points
+        // The base legendary chance is preserved for that "oh shit" factor at all levels.
+    }
+    
+    // Normalize weights to ensure they sum to 100.
+    const finalWeights = Object.values(weights);
+    const currentTotal = finalWeights.reduce((a, b) => a + b, 0);
+    const difference = 100 - currentTotal;
+    finalWeights[0] += difference; // Add/remove any rounding errors to/from common chance.
+
+    // Final sanity check to prevent negative chances.
+    if (finalWeights[0] < 5) {
+        const excess = 5 - finalWeights[0];
+        finalWeights[0] = 5;
+        finalWeights[1] -= excess; // Take from uncommon if common goes too low.
+    }
+
+    return finalWeights;
+}
+
+
+/**
  * Creates a seeded pseudo-random number generator.
  * @param {number} seed The seed for the generator.
  * @returns {function(): number} A function that returns a random number between 0 and 1.
@@ -988,12 +1047,9 @@ function generateEnemy(biomeKey) {
     const speciesKey = choices(Object.keys(monsterPool), Object.values(monsterPool));
     const speciesData = MONSTER_SPECIES[speciesKey];
 
-    // Determine Rarity
+    // Determine Rarity dynamically based on player level and monster class
     const rarityKeys = Object.keys(MONSTER_RARITY);
-    let rarityWeights = [60, 25, 10, 4, 1];
-    if (speciesData.class === 'Monstrosity') {
-        rarityWeights = [40, 30, 15, 10, 5];
-    }
+    const rarityWeights = getDynamicRarityWeights(player.level, speciesData.class);
     const chosenRarityKey = choices(rarityKeys, rarityWeights);
     const rarityData = MONSTER_RARITY[chosenRarityKey];
 
