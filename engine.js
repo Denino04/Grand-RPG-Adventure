@@ -1044,7 +1044,17 @@ function applyStatusEffect(target, effectType, effectData, sourceName) {
 function generateEnemy(biomeKey) {
     const biomeData = BIOMES[biomeKey];
     const monsterPool = biomeData.monsters;
-    const speciesKey = choices(Object.keys(monsterPool), Object.values(monsterPool));
+    let speciesKey;
+
+    // --- LURE LOGIC ---
+    const lureDetails = LURES[player.equippedLure];
+    if (player.equippedLure !== 'no_lure' && lureDetails && monsterPool[lureDetails.lureTarget] && Math.random() < 0.75) {
+        speciesKey = lureDetails.lureTarget;
+        addToLog(`Your ${lureDetails.name} attracts a monster!`, 'text-yellow-300');
+    } else {
+        speciesKey = choices(Object.keys(monsterPool), Object.values(monsterPool));
+    }
+
     const speciesData = MONSTER_SPECIES[speciesKey];
 
     // Determine Rarity dynamically based on player level and monster class
