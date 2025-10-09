@@ -53,7 +53,7 @@ function startBattle(biomeKey) {
         } else {
             console.error("No valid cell to spawn player!");
             addToLog("Error: Could not find a valid spot to start the battle. Returning to menu.", "text-red-500");
-            setTimeout(renderMainMenu, 2000);
+            setTimeout(showStartScreen, 2000);
             return;
         }
     }
@@ -981,7 +981,7 @@ function battleAction(type, actionData = null) {
                 addToLog(`You successfully escaped!`, 'text-green-400');
                 $('#inventory-btn').disabled = false;
                 $('#character-sheet-btn').disabled = false;
-                setTimeout(renderMainMenu, 1500);
+                setTimeout(renderTownSquare, 1500);
             } else {
                 addToLog(`You failed to escape!`, 'text-red-400');
                 setTimeout(enemyTurn, 400);
@@ -1454,4 +1454,5 @@ async function addToGraveyard(deadPlayer, killer) {
         console.error("Could not add to graveyard:", error);
     }
 }
+
 
