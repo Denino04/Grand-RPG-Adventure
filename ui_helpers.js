@@ -23,9 +23,15 @@ function rollDice(numDice, sides, purpose = 'Generic Roll') {
 }
 function addToLog(message, colorClass = '') { const p = document.createElement('p'); p.innerHTML = message; p.className = `mb-1 ${colorClass}`; logElement.appendChild(p); logElement.scrollTop = logElement.scrollHeight; }
 function getItemDetails(itemKey) { if (itemKey in ITEMS) return ITEMS[itemKey]; if (itemKey in WEAPONS) return WEAPONS[itemKey]; if (itemKey in CATALYSTS) return CATALYSTS[itemKey]; if (itemKey in ARMOR) return ARMOR[itemKey]; if (itemKey in SHIELDS) return SHIELDS[itemKey]; if (itemKey in LURES) return LURES[itemKey]; return null; }
+
 function render(viewElement) { 
     hideTooltip();
     hideEnemyInfo();
+
+    // The main view is always a centered flex container.
+    const baseClasses = "bg-slate-900/50 rounded-lg flex-grow flex items-center justify-center p-6 min-h-[300px] md:min-h-0 overflow-y-auto inventory-scrollbar";
+    mainView.className = baseClasses;
+
     mainView.innerHTML = ''; 
     mainView.appendChild(viewElement); 
     updateDebugView();
@@ -82,9 +88,20 @@ function createItemList(config) {
     const { items, detailsFn, actionsHtmlFn } = config;
     if (!items || items.length === 0) return '';
 
-    return items.map(key => {
+    // Create an array of objects with key and price for sorting
+    const itemsToSort = items.map(key => {
         const details = detailsFn(key);
-        if (!details) return '';
+        return { key, price: details ? (details.price || 0) : 0 };
+    });
+
+    // Sort the items by price, cheapest first
+    itemsToSort.sort((a, b) => a.price - b.price);
+
+    // Now map over the sorted array to create the HTML
+    return itemsToSort.map(itemObj => {
+        const key = itemObj.key;
+        const details = detailsFn(key);
+        if (!details) return ''; // Should not happen, but good practice
         const actionsHtml = actionsHtmlFn(key, details);
         return `
             <div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)">
@@ -247,24 +264,69 @@ function populateDebugStatInputs() {
     $('#debug-level').value = player.level;
     $('#debug-gold').value = player.gold;
     $('#debug-xp').value = player.xp;
+    $('#debug-statPoints').value = player.statPoints;
     $('#debug-hp').value = player.hp;
     $('#debug-mp').value = player.mp;
-    $('#debug-str').value = player.strength;
-    $('#debug-int').value = player.intelligence;
+
+    // Base Stats
+    $('#debug-vigor').value = player.vigor;
+    $('#debug-focus').value = player.focus;
+    $('#debug-stamina').value = player.stamina;
+    $('#debug-strength').value = player.strength;
+    $('#debug-intelligence').value = player.intelligence;
+    $('#debug-luck').value = player.luck;
+
+    // Bonus Stats
+    $('#debug-bonusHp').value = player.bonusHp;
+    $('#debug-bonusMp').value = player.bonusMp;
+    $('#debug-bonusPhysicalDamage').value = player.bonusPhysicalDamage;
+    $('#debug-bonusMagicalDamage').value = player.bonusMagicalDamage;
+    $('#debug-bonusPhysicalDefense').value = player.bonusPhysicalDefense;
+    $('#debug-bonusMagicalDefense').value = player.bonusMagicalDefense;
+    $('#debug-bonusCritChance').value = player.bonusCritChance;
+    $('#debug-bonusEvasion').value = player.bonusEvasion;
 }
 
 function debugUpdateVariables() {
     if (!player) return;
-    player.level = parseInt($('#debug-level').value) || player.level;
-    player.gold = parseInt($('#debug-gold').value) || player.gold;
-    player.xp = parseInt($('#debug-xp').value) || player.xp;
-    player.hp = parseInt($('#debug-hp').value) || player.hp;
-    player.mp = parseInt($('#debug-mp').value) || player.mp;
-    player.strength = parseInt($('#debug-str').value) || player.strength;
-    player.intelligence = parseInt($('#debug-int').value) || player.intelligence;
+    const int = (id) => parseInt($(`#${id}`).value) || 0;
+    const float = (id) => parseFloat($(`#${id}`).value) || 0;
+
+    // General
+    player.level = int('debug-level') || player.level;
+    player.gold = int('debug-gold') || player.gold;
+    player.xp = int('debug-xp') || player.xp;
+    player.statPoints = int('debug-statPoints') || player.statPoints;
+    
+    // Vitals
+    player.hp = int('debug-hp') || player.hp;
+    player.mp = int('debug-mp') || player.mp;
+
+    // Base Stats
+    player.vigor = int('debug-vigor') || player.vigor;
+    player.focus = int('debug-focus') || player.focus;
+    player.stamina = int('debug-stamina') || player.stamina;
+    player.strength = int('debug-strength') || player.strength;
+    player.intelligence = int('debug-intelligence') || player.intelligence;
+    player.luck = int('debug-luck') || player.luck;
+
+    // Bonus Stats
+    player.bonusHp = int('debug-bonusHp');
+    player.bonusMp = int('debug-bonusMp');
+    player.bonusPhysicalDamage = int('debug-bonusPhysicalDamage');
+    player.bonusMagicalDamage = int('debug-bonusMagicalDamage');
+    player.bonusPhysicalDefense = int('debug-bonusPhysicalDefense');
+    player.bonusMagicalDefense = int('debug-bonusMagicalDefense');
+    player.bonusCritChance = float('debug-bonusCritChance');
+    player.bonusEvasion = float('debug-bonusEvasion');
+
+    // Ensure HP/MP are not over max after changes
+    player.hp = Math.min(player.hp, player.maxHp);
+    player.mp = Math.min(player.mp, player.maxMp);
     
     addToLog('DEBUG: Player stats updated.', 'text-gray-500');
     updateStatsView();
+    populateDebugStatInputs(); // Re-populate to show current values
 }
 
 // --- THEME & PALETTES ---
@@ -422,25 +484,33 @@ function showTooltip(itemKey, event) {
             const effect = details.effect;
 
             // Weapon Effects
-            if (effect.type === 'crit') content += `<li>Crit: ${effect.chance * 100}% chance, x${effect.multiplier} Dmg</li>`;
-            if (effect.type === 'lifesteal') content += `<li>Lifesteal: ${effect.amount * 100}%</li>`;
-            if (effect.type === 'paralyze') content += `<li>On Hit: ${effect.chance * 100}% chance to Paralyze</li>`;
-            if (effect.type === 'fire_damage') content += `<li>On Hit: +${effect.damage.join('-')} Fire Dmg</li>`;
-            if (effect.type === 'lightning_damage') content += `<li>On Hit: +${effect.damage.join('-')} Lightning Dmg</li>`;
-            if (effect.ignore_defense) content += `<li>Ignores ${effect.ignore_defense * 100}% of enemy defense</li>`;
+            if (effect.critChance) content += `<li>Crit: +${effect.critChance * 100}% chance, x${effect.critMultiplier || 1.5} Dmg</li>`;
+            if (effect.lifesteal) content += `<li>Lifesteal: ${effect.lifesteal * 100}%</li>`;
+            if (effect.paralyzeChance) content += `<li>On Hit: ${effect.paralyzeChance * 100}% chance to Paralyze</li>`;
+            if (effect.toxicChance) content += `<li>On Hit: ${effect.toxicChance * 100}% chance to apply a deadly toxin.</li>`;
+            if (effect.fire_damage) content += `<li>On Hit: +${effect.damage.join('-')} Fire Dmg</li>`;
+            if (effect.lightning_damage) content += `<li>On Hit: +${effect.damage.join('-')} Lightning Dmg</li>`;
+            if (effect.armorPierce) content += `<li>Armor Pierce: Ignores ${effect.armorPierce * 100}% of enemy defense</li>`;
             if (effect.bonus_vs_dragon) content += `<li>Deals x${effect.bonus_vs_dragon} damage to Dragons</li>`;
-            if (effect.double_strike) content += `<li>Attacks twice</li>`;
+            if (effect.bonusVsLegendary) content += `<li>Deals x${effect.bonusVsLegendary} damage to Legendary enemies.</li>`;
+            if (effect.doubleStrike) content += `<li>Double Strike: Attacks twice per action.</li>`;
+            if (effect.doubleStrikeChance) content += `<li>Has a ${effect.doubleStrikeChance * 100}% chance to strike twice.</li>`;
             if (effect.revive) content += `<li>Revives you upon death (once per battle)</li>`;
-            if (effect.spell_follow_up) content += `<li>Launches a phantom strike after casting a spell</li>`;
+            if (effect.spellFollowUp) content += `<li>Launches a phantom strike after casting a spell</li>`;
             if (effect.petrify_chance) content += `<li>On Hit: ${effect.petrify_chance * 100}% chance to Petrify</li>`;
             if (effect.type === 'godslayer') content += `<li>Godslayer: Deals bonus damage equal to ${effect.percent_hp_damage * 100}% of the target's max HP.</li>`;
-
+            if (effect.intScaling) content += `<li>Arcane Edge: Damage scales with Intelligence.</li>`;
+            if (effect.elementalBolt) content += `<li>On Hit: Chance to fire a bolt of the last used spell element.</li>`;
+            if (effect.uncapCombo) content += `<li>Uncapped Combo: Successive hits deal increasing damage.</li>`;
+            if (effect.healOnKill) content += `<li>On Kill: Heals for ${effect.healOnKill * 100}% of your Max HP.</li>`;
+            if (effect.execute) content += `<li>Execute: Chance to instantly kill enemies below ${effect.execute * 100}% HP.</li>`;
+            if (effect.cleanseChance) content += `<li>On Hit: ${effect.cleanseChance * 100}% chance to cleanse a debuff.</li>`;
+            if (effect.lootBonus) content += `<li>On Kill: Increases chance of finding rare materials.</li>`;
 
             // Catalyst Effects
             if (effect.spell_amp) content += `<li>Spell Power: +${effect.spell_amp} Dice</li>`;
             if (effect.mana_discount) content += `<li>Spell Cost: -${effect.mana_discount} MP</li>`;
             if (effect.mana_regen) content += `<li>Regen: +${effect.mana_regen} MP/turn</li>`;
-            if (effect.hp_regen) content += `<li>Regen: +${effect.hp_regen} HP/turn</li>`;
             if (effect.spell_crit_chance) content += `<li>Spell Crit: ${effect.spell_crit_chance * 100}% chance, x${effect.spell_crit_multiplier || 1.5} Dmg</li>`;
             if (effect.spell_vamp) content += `<li>Spell Vamp: Killing with a spell restores ${effect.spell_vamp * 100}% of enemy's max HP and MP.</li>`;
             if (effect.spell_penetration) content += `<li>Spell Pen: Spells ignore ${effect.spell_penetration * 100}% of enemy magic resist.</li>`;
@@ -450,13 +520,12 @@ function showTooltip(itemKey, event) {
             if (effect.spell_weaver) content += `<li>Spellweaver: ${effect.spell_weaver * 100}% chance to apply a random elemental effect.</li>`;
             if (effect.ranged_chance) content += `<li>${effect.ranged_chance * 100}% chance to evade ranged attacks</li>`;
 
-            // Shield Effects
-            if (effect.type === 'parry') content += `<li>Parry Chance: ${Math.round(effect.chance * 100)}%</li>`;
+            // Shield & Armor Effects
+            if (effect.hp_regen) content += `<li>Regen: +${effect.hp_regen} HP/turn</li>`;
+            if (effect.parry) content += `<li>Parry Chance: ${Math.round(effect.parry * 100)}%</li>`;
             if (effect.attack_follow_up) content += `<li>Retaliates for ${effect.attack_follow_up.damage.join('-')} damage</li>`;
             if (effect.type === 'debuff_resist') content += `<li>+${effect.chance * 100}% Debuff Resistance</li>`;
             if (effect.type === 'reflect') content += `<li>Reflects ${effect.amount * 100}% of damage taken</li>`;
-            
-            // Armor Effects
             if (effect.type === 'dodge') content += `<li>Dodge Chance: +${Math.round(effect.chance * 100)}%</li>`;
             if (effect.reflect_damage) content += `<li>Reflects ${effect.reflect_damage * 100}% of damage taken</li>`;
 

@@ -323,6 +323,7 @@ const BATTLE_GRIDS = {
     'square_5x5': { width: 5, height: 5, layout: [1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1] },
     'square_6x6': { width: 6, height: 6, layout: [1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1] },
     'l_shape_5': { width: 5, height: 5, layout: [1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,1, 1,0,0,0,0] },
+    'x_shape_5': { width: 5, height: 5, layout: [1,0,0,0,1, 0,1,0,1,0, 0,0,1,0,0, 0,1,0,1,0, 1,0,0,0,1] },
     'h_shape_5': { width: 5, height: 5, layout: [1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1] },
     'rect_6x4': { width: 6, height: 4, layout: [1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1] },
     'rect_4x6': { width: 4, height: 6, layout: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1] },
@@ -343,44 +344,78 @@ const ELEMENTS = {
 };
 
 const WEAPONS = {
-    // Broken
-    'fists': { name: 'Fists', damage: [2, 2], price: 0, rarity: 'Broken', type: 'melee', range: 1, description: "Just your bare hands." },
-    'rusty_sword': { name: 'Rusty Sword', damage: [1, 6], price: 20, rarity: 'Broken', type: 'melee', range: 1, description: "A sword well past its prime. Probably a tetanus risk." },
+    // --- Fists ---
+    'fists': { name: 'Fists', class: 'Hand-to-Hand', damage: [2, 2], price: 0, rarity: 'Broken', description: "Just your bare hands." },
+    'caestus': { name: 'Caestus', class: 'Hand-to-Hand', damage: [2, 2], price: 50, rarity: 'Common', description: "A simple caestus made for brawling. Made from hardened leather and soft cotton, designed to protect the hand of a fighter while they tenderize someone's face." },
+    'iron_ball': { name: 'Iron Ball', class: 'Hand-to-Hand', damage: [1, 6], price: 200, rarity: 'Uncommon', description: "Two iron balls fashioned in the shape of a boxing glove. Heavy, hefty, and they hit like... well, two iron balls." },
+    'assassins_claw': { name: 'Assassin’s Claw', class: 'Hand-to-Hand', damage: [2, 4], price: 1000, rarity: 'Rare', description: "Claws resembling those of a feline, used by a gang of underworld assassins on their jobs. Its sharp designs are meant to strike at weak points.", effect: { critChance: 0.1, critMultiplier: 2.0 } },
+    'claw_of_chimera': { name: 'Claw of Chimera', class: 'Hand-to-Hand', damage: [3, 4], damageType: 'physical', price: 4000, rarity: 'Epic', description: "Freshly cut, minimally modified claws of a Chimera, its tip still dripping with fresh poison. No one knows if this is ethical, to the monster or the target.", effect: { toxicChance: 0.15 } },
+    'livyatans_scaleclaw': { name: 'Livyatan’s Scaleclaw', class: 'Hand-to-Hand', damage: [3, 6], damageType: 'void', price: 20000, rarity: 'Legendary', description: "A claw made from the reality-shifting scales of a Livyatan, capable of ignoring the armor and shield of an enemy to strike their soft flesh with ease. Quote: \"Why knock on the door when you can just phase through the wall?\"", effect: { armorPierce: 0.5 } },
 
-    // Common
-    'dagger': { name: 'Dagger', damage: [2, 4], price: 50, rarity: 'Common', type: 'melee', range: 1, description: "A simple, sharp blade. Good for stabbing things, or perhaps spreading butter." },
-    'steel_longsword': { name: 'Steel Longsword', damage: [1, 8], price: 120, rarity: 'Common', type: 'melee', range: 1, description: "A reliable and sturdy sword. The adventurer's best friend." },
-    'rapier': { name: 'Rapier', damage: [1, 8], price: 150, rarity: 'Common', type: 'piercing', range: 2, description: "A slender, pointed sword for quick, flashy thrusts." },
-    'longbow': { name: 'Longbow', damage: [1, 6], price: 100, rarity: 'Common', type: 'ranged', range: 6, description: "A standard bow for attacking from a socially acceptable distance.", effect: { type: 'ranged', chance: 0.3 } },
-    'battleaxe': {name: 'Battleaxe', damage: [1, 10], price: 200, rarity: 'Common', type: 'melee', range: 1, description: "A simple barbaric weapon capable of high level of destruction. Side effect includes prone to getting hit more.", effect: {type: 'dodge', chance: -0.5}},
-    
-    // Uncommon
-    'battlestaff': { name: 'Battlestaff', damage: [1, 8], price: 300, rarity: 'Uncommon', type: 'melee', range: 1, description: "A sturdy staff reinforced for physical combat. Your melee attacks scale with both Strength and Intelligence.", effect: { battlestaff: true } },
-    'heavy_greatsword': { name: 'Heavy Greatsword', damage: [2, 6], price: 350, rarity: 'Uncommon', type: 'melee', range: 1, description: "A weighty sword that requires two hands and a can-do attitude." },
-    'obsidian_axe': { name: 'Obsidian Axe', damage: [1, 12], price: 400, rarity: 'Uncommon', type: 'melee', range: 1, description: "A brutal axe made of volcanic glass. Impractical, but very stylish." },
-    'masterwork_spear': { name: 'Masterwork Spear', damage: [3, 4], price: 500, rarity: 'Uncommon', type: 'piercing', range: 2, description: "A finely crafted spear with a sharp point. Excellent for keeping monsters at arm's length." },
-    'golden_greatbow': { name: 'Golden Greatbow', damage: [1, 10], price: 600, rarity: 'Uncommon', type: 'ranged', range: 6, description: "An elegant and powerful bow. Probably worth more than you are.", effect: { type: 'ranged', chance: 0.3 } },
-    
-    // Rare
-    'elven_saber': { name: 'Elven Saber', damage: [4, 4], price: 1200, rarity: 'Rare', type: 'melee', range: 1, description: "A gracefully curved blade, humming with an energy that seems to guide it to vital points.", effect: { type: 'crit', chance: 0.1, multiplier: 2.0 } },
-    'lightning_javelin': { name: 'Lightning Javelin', damage: [3, 6], price: 1500, rarity: 'Rare', type: 'ranged', range: 4, description: "A spear forged in a storm, crackling with raw, untamed lightning.", effect: { type: 'lightning_damage', damage: [1, 8] } },
-    'dwarven_warhammer': { name: 'Dwarven Warhammer', damage: [2, 8], price: 1300, rarity: 'Rare', type: 'melee', range: 1, description: "A hammer of immense weight and perfect balance, capable of staggering even the largest foes.", effect: { type: 'paralyze', chance: 0.15, duration: 1 } },
-    'spellblade_of_echoes': { name: 'Spellblade of Echoes', damage: [2, 8], price: 1600, rarity: 'Rare', type: 'melee', range: 1, description: "A blade that resonates with magical energy, unleashing a phantom strike whenever a spell is cast.", effect: { spell_follow_up: true } },
-    'dual_longswords': { name: 'Dual Longswords', damage: [1, 8], price: 1800, rarity: 'Rare', type: 'melee', range: 1, description: "A perfectly matched pair of swords that flow in a whirlwind of steel, attacking twice. Requires both hands, obviously.", effect: { double_strike: true, dual_wield: true } },
-    
-    // Epic
-    'flaming_sword': { name: 'Flaming Sword', damage: [2, 8], price: 3000, rarity: 'Epic', type: 'melee', range: 1, description: "A blade enchanted with an eternal, unquenchable fire. Great for marshmallows, better for monsters.", effect: { type: 'fire_damage', damage: [2, 6] } },
-    'vampiric_dagger': { name: 'Vampiric Dagger', damage: [3, 4], price: 3200, rarity: 'Epic', type: 'melee', range: 1, description: "A cursed, blood-drinking dagger that mends the wielder's wounds. Its thirst is never slaked.", effect: { type: 'lifesteal', amount: 0.25 } },
-    'sunderers_battleaxe': { name: 'Sunderer\'s Battleaxe', damage: [3, 6], price: 3500, rarity: 'Epic', type: 'melee', range: 1, description: "An axe of such brutal weight and design that it treats armor like a minor inconvenience.", effect: { ignore_defense: 0.5 } },
-    'obsidian_lamina': { name: 'Obsidian Lamina', damage: [2, 6], price: 3300, rarity: 'Epic', type: 'melee', range: 1, description: "A razor-sharp volcanic blade that instinctively finds and exploits any weakness in a foe's defenses. Tends to be overly critical.", effect: { type: 'crit', chance: 0.3, multiplier: 3.0 } },
-    'eye_of_medusa': { name: 'Eye of Medusa', damage: [3, 4], price: 4000, rarity: 'Epic', type: 'ranged', range: 6, description: "A bow crafted from the petrified remains of a gorgon, its arrows turning flesh to stone. Try not to look directly at it.", effect: { type: 'ranged', chance: 0.3, petrify_chance: 0.3, duration: 1 } },
-    
-    // Legendary
-    'earthshaker_hammer': { name: 'Earthshaker Hammer', damage: [2, 12], price: 10000, rarity: 'Legendary', type: 'melee', range: 1, description: "A hammer of mythical power, each blow striking with the force of an earthquake, leaving foes paralyzed and questioning their life choices.", effect: { type: 'paralyze', chance: 0.3, duration: 1 } },
-    'vacuum_greatbow': { name: 'Vacuum Greatbow', damage: [1, 12], price: 12000, rarity: 'Legendary', type: 'ranged', range: 8, description: "Arrows from this bow tear through the very fabric of space, ignoring all defenses as they seek their target. Spatially confusing for everyone involved.", effect: { type: 'ranged', chance: 0.3, ignore_defense: 1.0 } },
-    'dragon_scale_cragblade': { name: 'Dragon Scale Cragblade', damage: [2, 8], price: 15000, rarity: 'Legendary', type: 'melee', range: 1, description: "A greatsword forged from the scales of an ancient dragon, it hums with the fury of a lightning storm and thirsts for the blood of its kin.", effect: { type: 'lightning_damage', damage: [2, 8], bonus_vs_dragon: 1.5 } },
-    'void_greatsword': { name: 'Void Greatsword', damage: [3, 8], price: 20000, rarity: 'Legendary', type: 'melee', range: 1, description: "A blade that whispers of the abyss, tethering your soul to the world and cheating death itself. Comes with a complimentary existential crisis.", effect: { type: 'lifesteal', amount: 0.25, revive: true } },
-    'the_greatsword': {name: 'The Greatsword', damage: [5,8], price: 25000, rarity: 'Legendary', type: 'melee', range: 1, description: "A Hunk of metal, barely even a sword. And yet, capable of slaying even Gods themselves.", effect: { type: 'godslayer', percent_hp_damage: 0.1 } }
+    // --- Daggers ---
+    'dagger': { name: 'Dagger', class: 'Dagger', damage: [1, 4], price: 50, rarity: 'Common', description: "Simple hunting daggers for new adventurers. It's not glamorous, but the pointy end reliably goes into the other guy." },
+    'parrying_dagger': { name: 'Parrying Dagger', class: 'Dagger', damage: [2, 4], price: 250, rarity: 'Uncommon', description: "A finely crafted dagger capable of parrying and striking in a single movement. For those who believe the best offense is not getting a sword stuck in your face.", effect: { parry: 0.2 } },
+    'psychic_blade': { name: 'Psychic Blade', class: 'Dagger', damage: [2, 6], damageType: 'psychic', price: 1200, rarity: 'Rare', range: 4, description: "A blade made from the beating hearts of the undead. Capable of coming back to its user after being thrown, which saves a lot of awkward searching mid-battle." },
+    'vampiric_dagger': { name: 'Vampiric Dagger', class: 'Dagger', damage: [3, 4], price: 3200, rarity: 'Epic', description: "A dagger with a mind of its own, demanding blood sacrifice in exchange for an unending life. It's a high-maintenance relationship, but the health benefits are undeniable.", effect: { lifesteal: 0.25 } },
+    'the_black_knife': { name: 'The Black Knife', class: 'Dagger', damage: [3, 6], damageType: 'void', price: 18000, rarity: 'Legendary', description: "A knife made of the void skin of Livyatan, capable of phasing in and out of reality to strike the most important target at will. Quote: \"...To this blade, armor is merely a suggestion.\"", effect: { critChance: 0.15, critMultiplier: 2.5, armorPierce: 0.25 } },
+
+    // --- Longswords ---
+    'rusty_sword': { name: 'Rusty Sword', class: 'Longsword', damage: [1, 6], price: 20, rarity: 'Broken', description: "A sword well past its prime. Probably a tetanus risk." },
+    'steel_longsword': { name: 'Steel Longsword', class: 'Longsword', damage: [1, 8], price: 120, rarity: 'Common', description: "Standard issue Longsword used by soldiers and adventurers alike. Unremarkable, dependable, and unlikely to get you arrested for practicing dark magic." },
+    'heavy_greatsword': { name: 'Heavy Greatsword', class: 'Longsword', damage: [2, 6], price: 350, rarity: 'Uncommon', description: "A heavy and hefty greatsword capable of dishing out heavy strikes. Preferably held by both hands, unless you enjoy dislocating your shoulder." },
+    'dual_longswords': { name: 'Dual Longswords', class: 'Longsword', damage: [2, 4], price: 1800, rarity: 'Rare', description: "Two longswords to cover both sides with double the attack power. People advised adventurers against using them like this, but it does look very cool.", effect: { doubleStrike: true, dualWield: true } },
+    'trolls_knight_sword': { name: 'Troll’s Knight Sword', class: 'Longsword', damage: [3, 8], price: 4500, rarity: 'Epic', description: "A heavy greatsword made from the blood of a troll, capable of resonating with the soul of its user. The more understanding the user has, the stronger it is.", effect: { intScaling: 0.2 } },
+    'void_greatsword': { name: 'Void Greatsword', class: 'Longsword', damage: [3, 10], damageType: 'void', price: 20000, rarity: 'Legendary', description: "A greatsword ripped straight out of a Dullahan’s possession. It sucks the soul out of your enemy and can even possess you when you die, just long enough to get you back on your feet. Quote: \"Death is a contract, and this blade is an expert in renegotiation.\"", effect: { lifesteal: 0.25, revive: true } },
+
+    // --- Thrusting Swords ---
+    'rapier': { name: 'Rapier', class: 'Thrusting Sword', damage: [1, 6], price: 150, rarity: 'Common', description: "A finely crafted piercing armament capable of piercing armors, especially the gaps that most adventurers forget to cover." },
+    'great_epee': { name: 'Great Épée', class: 'Thrusting Sword', damage: [1, 10], price: 400, rarity: 'Uncommon', description: "A heavy Épée blade, capable of delivering heavier strikes on a single pinpoint target with rather unsubtle force." },
+    'spellblade_of_echoes': { name: 'Spellblade of Echoes', class: 'Thrusting Sword', damage: [2, 8], damageType: 'physical', price: 1600, rarity: 'Rare', description: "A blade created using empty essence shells so it can resonate with the elements. Perfect for the indecisive mage who wants to cast a fireball and stab someone in the same turn.", effect: { spellFollowUp: true } },
+    'the_bloodletter': { name: 'The Bloodletter', class: 'Thrusting Sword', damage: [3, 6], price: 3800, rarity: 'Epic', description: "A sinister twisting thrusting blade, capable of easily piercing skins and rendering the insides perfect for a bloodletting ritual. Messy, but highly effective.", effect: { lifesteal: 0.25 } },
+    'dragonscale_cragblade': { name: 'Dragonscale Cragblade', class: 'Thrusting Sword', damage: [3, 8], damageType: 'lightning', price: 15000, rarity: 'Legendary', range: 3, description: "A straight cragblade made from the reversed scale of a dragon and imbued with lightning. It's capable of piercing even a Dragon’s mighty impenetrable scales. Quote: \"Fighting fire with fire is cliché. Fight dragons with something they're made of.\"", effect: { bonusVsDragon: 1.5, doubleStrikeChance: 0.25 } },
+
+    // --- Curved Swords ---
+    'shamshir': { name: 'Shamshir', class: 'Curved Sword', damage: [1, 6], price: 100, rarity: 'Common', description: "A simple curved blade, often used in festivities and self-defense. One of those is significantly more dangerous than the other." },
+    'flowing_blade': { name: 'Flowing Blade', class: 'Curved Sword', damage: [1, 8], price: 300, rarity: 'Uncommon', description: "A finely crafted curved sword, intended to be used alongside sword dance traditions. It also allows the user to strike the same place multiple times with ease." },
+    'elven_saber': { name: 'Elven Saber', class: 'Curved Sword', damage: [3, 4], price: 1200, rarity: 'Rare', description: "A traditional elven saber, made by using their special Cold Smithing techniques. It combines the power of a flowing river and growing forest into one very sharp object.", effect: { critChance: 0.1, critMultiplier: 2.0 } },
+    'elemental_sword': { name: 'Elemental Sword', class: 'Curved Sword', damage: [2, 8], damageType: 'elemental', price: 5000, rarity: 'Epic', description: "Made using active essences of all elements, this blade is unstable and will pursue whatever element it has touched last. Handle with care, and preferably with gloves.", effect: { intScaling: 1.0, elementalBolt: true } },
+    'unending_dance': { name: 'Unending Dance', class: 'Curved Sword', damage: [3, 6], price: 22000, rarity: 'Legendary', description: "A legendary blade made to ignore the laws of the universe, capable of speeding up unceasingly until it can cut the very fabric of reality apart. Quote: \"Strike once. Then strike again, faster. Repeat until the problem is solved.\"", effect: { uncapCombo: true } },
+
+    // --- Axes ---
+    'battleaxe': { name: 'Battleaxe', class: 'Axe', damage: [1, 10], price: 200, rarity: 'Common', description: "A hefty battleaxe. The proud choice for a barbarian, or anyone who sees a problem that can be solved with a single, forceful application of sharpened metal." },
+    'obsidian_axe': { name: 'Obsidian Axe', class: 'Axe', damage: [2, 8], price: 400, rarity: 'Uncommon', description: "A sharp and brittle Axe made of volcanic glass. It's designed to break inside the flesh of its target, adding pain, suffering, and a very bad day." },
+    'bloody_butchering_knife': { name: 'Bloody Butchering Knife', class: 'Axe', damage: [2, 10], price: 1400, rarity: 'Rare', description: "A giant cleaver made specifically to butcher humanoids and monsters alike. Its groove is made so blood easily flows from the prey to its butcher.", effect: { healOnKill: 0.1 } },
+    'sunderers_battleaxe': { name: 'Sunderer’s Battleaxe', class: 'Axe', damage: [4, 6], price: 3500, rarity: 'Epic', description: "A heroic battleaxe made to sunder earth and break open armors. Its power rivals that of an earthquake, making it a terrible choice for delicate negotiations.", effect: { armorPierce: 0.5 } },
+    'headless_executioner': { name: 'Headless Executioner', class: 'Axe', damage: [3, 10], damageType: 'necrotic', price: 17000, rarity: 'Legendary', description: "The execution weapon for those unwilling to die, capable of severing life from death in a single heavy swing. It slowly pulses as if it has a soul of its own. Quote: \"There are no appeals.\"", effect: { execute: 0.25 } },
+
+    // --- Hammers ---
+    'steel_mace': { name: 'Steel Mace', class: 'Hammer', damage: [1, 8], price: 180, rarity: 'Common', description: "A simple steel mace made for both domestic and adventuring duty. Equally good at bashing helmets and stubborn tent pegs." },
+    'bone_club': { name: 'Bone Club', class: 'Hammer', damage: [1, 12], price: 380, rarity: 'Uncommon', description: "A club made of the hardened bone of an unidentified monster. Often wielded by Orc Barbarians, hence the unwieldy size for a normal humanoid user." },
+    'battlestaff': { name: 'Battlestaff', class: 'Hammer', damage: [1, 8], price: 300, rarity: 'Uncommon', description: "A sturdy staff reinforced for physical combat. Your melee attacks scale with both Strength and Intelligence.", effect: { intScaling: 1.0 } },
+    'dwarven_warhammer': { name: 'Dwarven Warhammer', class: 'Hammer', damage: [2, 8], price: 1300, rarity: 'Rare', description: "A prized possession of the Dwarves. A hammer so heavy and dense, every time it is swung, the earth quakes and the wind blows.", effect: { paralyzeChance: 0.1 } },
+    'blacksmiths_workhammer': { name: 'Blacksmith’s Workhammer', class: 'Hammer', damage: [3, 8], price: 4800, rarity: 'Epic', description: "An enchanted hammer usually only used by a Blacksmith. Magic that dwells inside it can recognize armors and weapons, letting it seek weak points and potential prizes.", effect: { armorPierce: 0.3, lootBonus: true } },
+    'earthshaker_hammer': { name: 'Earthshaker Hammer', class: 'Hammer', damage: [3, 10], price: 10000, rarity: 'Legendary', description: "A hammer made of the bone of a Goliath. Its heft is so otherworldly that a single slam to the ground would shake the Earth so hard Mother Gaia herself will wake up. Quote: \"If violence doesn't solve it, you aren't using a big enough hammer.\"", effect: { paralyzeChance: 0.2 } },
+
+    // --- Lances ---
+    'soldiers_spear': { name: 'Soldier’s Spear', class: 'Lance', damage: [1, 6], price: 90, rarity: 'Common', description: "Standard issue soldier’s spear. Often used in war conscription, and now often used for keeping monsters at a comfortable, non-mauling distance." },
+    'masterwork_spear': { name: 'Masterwork Spear', class: 'Lance', damage: [3, 4], price: 500, rarity: 'Uncommon', description: "A masterfully made spear. A talented user will be able to use this spear to keep a very safe distance between themself and the enemy." },
+    'lightning_javelin': { name: 'Lightning Javelin', class: 'Lance', damage: [3, 6], price: 1500, rarity: 'Rare', range: 4, description: "A thunderous javelin, said to be the crystallization of a thunderbolt. Capable of being thrown, reenacting the Battle of Gods on a much smaller, more mortal scale." },
+    'holy_beast_halberd': { name: 'Holy Beast Halberd', class: 'Lance', damage: [2, 10], damageType: 'holy', price: 5200, rarity: 'Epic', range: 3, description: "A golden halberd blessed by a Holy Beast. Its power smites down the evil and monstrous while protecting those worthy of its divinity.", effect: { cleanseChance: 0.25 } },
+    'giant_hunter': { name: 'Giant Hunter', class: 'Lance', damage: [3, 8], price: 16000, rarity: 'Legendary', description: "An ancient Lance rediscovered after the melting of Cocytus. It is said that its shape and size is the direct result of its frequent usage of slaying Gods and Monsters alike. Quote: \"Sure, it's overkill for goblins, but you don't bring a flyswatter to a dragon fight.\"", effect: { bonusVsLegendary: 1.5 } },
+
+    // --- Bows ---
+    'longbow': { name: 'Longbow', class: 'Bow', damage: [1, 6], price: 100, rarity: 'Common', range: 6, description: "The quintessential weapon for a hunter. Simple, easy to use, and keeps you far away from the teeth and claws." },
+    'golden_greatbow': { name: 'Golden Greatbow', class: 'Bow', damage: [1, 10], price: 600, rarity: 'Uncommon', range: 6, description: "A heavy, gold-coated greatbow. While mostly used for display, it turns out that being shot by a very expensive arrow hurts just as much." },
+    'sharpshots_beloved': { name: 'Sharpshot’s Beloved', class: 'Bow', damage: [2, 6], price: 1700, rarity: 'Rare', range: 7, description: "A seemingly simple shortbow, jet-black in color. It has a particular quality for helping its user find their target’s weak points.", effect: { critChance: 0.15, critMultiplier: 2.5 } },
+    'eye_of_medusa': { name: 'Eye of Medusa', class: 'Bow', damage: [4, 4], price: 4000, rarity: 'Epic', range: 6, description: "A crossbow made of the eye of a Cockatrice, but called the Eye of Medusa because it has a better ring to it. Capable of turning its targets into statues from a long range.", effect: { petrifyChance: 0.3 } },
+    'vacuum_greatbow': { name: 'Vacuum Greatbow', class: 'Bow', damage: [2, 10], damageType: 'void', price: 12000, rarity: 'Legendary', range: 8, description: "A vacuous greatbow made from the vacuum lining and hollow bone of a Livyatan. Its shot blinks in and out of existence, piercing reality itself to hit its target. Quote: \"Why shoot through armor when you can just shoot around it in the fourth dimension?\"", effect: { armorPierce: 0.5 } },
+
+    // --- Reapers ---
+    'farmers_glaive': { name: 'Farmer’s Glaive', class: 'Reaper', damage: [1, 6], price: 80, rarity: 'Common', description: "A simple glaive easily found in a farmer’s shed. Sometimes used as a defensive weapon when wolves get a little too interested in the sheep." },
+    'light_scythe': { name: 'Light Scythe', class: 'Reaper', damage: [1, 8], price: 280, rarity: 'Uncommon', description: "A light scythe given to military personnel for use on both the battlefield and the actual field. Sharp, light, and easily stored." },
+    'grave_scythe': { name: 'Grave Scythe', class: 'Reaper', damage: [2, 8], damageType: 'necrotic', price: 1100, rarity: 'Rare', range: 2, description: "A scythe of those who live in death. Probably a side effect of them being a farmer back in their life. Old habits die hard. Or, in this case, they don't." },
+    'obsidian_lamina': { name: 'Obsidian Lamina', class: 'Reaper', damage: [3, 6], price: 3300, rarity: 'Epic', description: "A sharp volcanic glass made to reap the life of its opponent cleanly. Nobody knows if its jet-black appearance is from its material or the heaps of dried blood.", effect: { critChance: 0.25, critMultiplier: 2.0 } },
+    'grims_beloved': { name: 'Grim’s Beloved', class: 'Reaper', damage: [3, 8], damageType: 'necrotic', price: 19000, rarity: 'Legendary', description: "A beloved weapon of the Grim Reaper. People say it was a normal scythe before the Reaper got a handle on it. Now, it has certain... performance expectations. Quote: \"Borrowing it is fine. Just be sure to give it back.\"", effect: { lifesteal: 0.4 } }
 };
 
 const CATALYSTS = {
@@ -446,17 +481,21 @@ const ARMOR = {
 
 const ITEMS = {
     'health_potion': {name: 'Health Potion', type: 'healing', amount: 20, price: 30, description: "A simple vial that restores a small amount of health."},
-    'condensed_health_potion': {name: 'Condesed Health Potion', type: 'healing', amount: 50, price: 75, description: "A heavy, concentrated mixture of refined herbs and purified mountain water. This potion is thicker and more potent than its normal counterpart, designed to provide substantial, immediate relief."},
+    // MODIFICATION: Fixed typo "Condesed"
+    'condensed_health_potion': {name: 'Condensed Health Potion', type: 'healing', amount: 50, price: 75, description: "A heavy, concentrated mixture of refined herbs and purified mountain water. This potion is thicker and more potent than its normal counterpart, designed to provide substantial, immediate relief."},
     'superior_health_potion': {name: 'Superior Health Potion', type: 'healing', amount: 100, price: 200, description: "A potent draught that restores a moderate amount of health."},
     'mana_potion': {name: 'Mana Potion', type: 'mana_restore', amount: 50, price: 40, description: "A swirling blue liquid that restores magical energy."},
+    // MODIFICATION: Fixed typo "Condesed"
     'condensed_mana_potion': {name: 'Condensed Mana Potion', type: 'mana_restore', amount: 100, price: 100, description: "An oxidized flask containing a potent brew of crushed celestial beetles and distilled shadow essence. It provides a sharp, invigorating shock to the mind, clearing the fog of battle-weariness."},
-    'superior_mana_potion': {name: 'Superion Mana Potion', type: 'mana_restore', amount: 150, price: 250, description: "A masterwork of alchemy. The shimmering liquid is pure, crystallized Arcane Energy, providing not just mana, but a momentary conduit to the raw source of magic itself."},
+    // MODIFICATION: Fixed typo "Superion"
+    'superior_mana_potion': {name: 'Superior Mana Potion', type: 'mana_restore', amount: 150, price: 250, description: "A masterwork of alchemy. The shimmering liquid is pure, crystallized Arcane Energy, providing not just mana, but a momentary conduit to the raw source of magic itself."},
     'goblin_ear': {name: 'Goblin Ear', type: 'junk', price: 5, description: "A grotesque trophy."},
     'wolf_pelt': {name: 'Wolf Pelt', type: 'junk', price: 12, description: "A thick and coarse pelt."},
     'rat_tail': {name: 'Rat Tail', type: 'junk', price: 2, description: "It's... a rat tail."},
     'spider_venom': {name: 'Spider Venom', type: 'junk', price: 10, description: "A vial of potent venom."},
     'dragon_scale': {name: 'Dragon Scale', type: 'junk', price: 50, description: "A shimmering, nigh-indestructible scale."},
     'rabbit_meat': {name: 'Rabbit Meat', type: 'junk', price: 4, description: "Could make a good stew."},
+    'chimera_claw': {name: 'Chimera Claw', type: 'alchemy', price: 200, description: 'A razor-sharp claw from a Chimera, still dripping with poison.'},
     'orc_liver': { name: 'Orc Liver', type: 'alchemy', price: 25, description: 'A key ingredient for strength potions.' },
     'cockatrice_venom_gland': { name: 'Cockatrice Venom Gland', type: 'alchemy', price: 40, description: 'Can be used to create potions that harden the skin.' },
     'unicorn_horn_fragment': { name: 'Unicorn Horn Fragment', type: 'alchemy', price: 100, description: 'A shard of a unicorn horn, brimming with purifying magic.' },
@@ -492,7 +531,11 @@ const LURES = {
     'chemical_lure': { name: 'Chemical Lure', price: 70, description: 'The inexplicable stench of chemical that lures in slimes.', lureTarget: 'slime', uses: 5 },
     'rotten_cheese': { name: 'Rotten Cheese', price: 80, description: 'The pungent smell of rotten cheese that attracts the hunger of rats.', lureTarget: 'giant_rat', uses: 5 },
     'bandit_coin': { name: 'Gilded Coin', price: 100, description: 'A shiny coin that seems to attract the greedy eyes of bandits.', lureTarget: 'bandit', uses: 5 },
-    'wolf_musk': { name: 'Wolf Musk', price: 75, description: 'A strong musk that draws in nearby wolves.', lureTarget: 'dire_wolf', uses: 5 }
+    'wolf_musk': { name: 'Wolf Musk', price: 75, description: 'A strong musk that draws in nearby wolves.', lureTarget: 'dire_wolf', uses: 5 },
+    'war_horn_fragment': { name: 'War Horn Fragment', price: 150, description: 'The sound from this broken horn fragment seems to enrage nearby orcs.', lureTarget: 'orc_berserker', uses: 5 },
+    'silken_cocoon': { name: 'Silken Cocoon', price: 150, description: 'A pulsating cocoon that attracts large, hungry spiders.', lureTarget: 'cave_spider', uses: 5 },
+    'petrified_field_mouse': { name: 'Petrified Field Mouse', price: 175, description: 'The sight of this statue seems to attract the territorial gaze of a Cockatrice.', lureTarget: 'cockatrice', uses: 5 },
+    'grave_dust': { name: 'Grave Dust', price: 200, description: 'A pouch of dust from a desecrated grave. It calls to those who command the dead.', lureTarget: 'necromancer', uses: 5 }
 };
 
 const SPELLS = {
@@ -718,34 +761,34 @@ const SPELLS = {
 
 const MONSTER_SPECIES = {
     // Tier 1
-    'goblin': { key: 'goblin', emoji: '👺', name: 'Goblin', class: 'Humanoid', tier: 1, base_hp: 20, base_strength: 7, base_defense: 0, range: 1, movement: { speed: 2, type: 'ground' }, base_xp: 25, base_gold: 15, spell_resistance: 0.05, loot_table: {'health_potion': 0.1, 'goblin_ear': 0.5, 'dagger': 0.1, 'rusty_sword': 0.15, 'wooden_shield': 0.05, 'wooden_wand': 0.02} },
-    'rabid_rabbit': { key: 'rabid_rabbit', emoji: '🐇', name: 'Rabid Rabbit', class: 'Beast', tier: 1, base_hp: 25, base_strength: 5, base_defense: 1, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 25, base_gold: 8, spell_resistance: 0, loot_table: {'rabbit_meat': 0.6} },
-    'slime': { key: 'slime', emoji: '🦠', name: 'Slime', class: 'Monstrosity', tier: 1, base_hp: 28, base_strength: 2, base_defense: 6, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 22, base_gold: 10, spell_resistance: 0.1, loot_table: {'slime_glob': 0.5}, damage_type: 'magical' },
-    'skeleton': { key: 'skeleton', emoji: '💀', name: 'Skeleton', class: 'Undead', tier: 1, base_hp: 18, base_strength: 7, base_defense: 2, range: 1, movement: { speed: 2, type: 'ground' }, base_xp: 20, base_gold: 10, spell_resistance: 0.1, loot_table: {'rusty_sword': 0.1, 'dagger': 0.05, 'wooden_shield': 0.05, 'iron_buckler': 0.03, 'cracked_orb': 0.02, 'undying_heart': 0.02} },
+    'goblin': { key: 'goblin', emoji: '👺', name: 'Goblin', class: 'Humanoid', tier: 1, base_hp: 20, base_strength: 3, base_defense: 0, range: 1, movement: { speed: 2, type: 'ground' }, base_xp: 25, base_gold: 15, spell_resistance: 0.05, loot_table: {'health_potion': 0.1, 'goblin_ear': 0.5, 'dagger': 0.1, 'rusty_sword': 0.15, 'wooden_shield': 0.05, 'wooden_wand': 0.02} },
+    'rabid_rabbit': { key: 'rabid_rabbit', emoji: '🐇', name: 'Rabid Rabbit', class: 'Beast', tier: 1, base_hp: 25, base_strength: 2, base_defense: 1, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 25, base_gold: 8, spell_resistance: 0, loot_table: {'rabbit_meat': 0.6} },
+    'slime': { key: 'slime', emoji: '🦠', name: 'Slime', class: 'Monstrosity', tier: 1, base_hp: 28, base_strength: 2, base_defense: 2, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 22, base_gold: 10, spell_resistance: 0.1, loot_table: {'slime_glob': 0.5}, damage_type: 'magical' },
+    'skeleton': { key: 'skeleton', emoji: '💀', name: 'Skeleton', class: 'Undead', tier: 1, base_hp: 18, base_strength: 3, base_defense: 2, range: 1, movement: { speed: 2, type: 'ground' }, base_xp: 20, base_gold: 10, spell_resistance: 0.1, loot_table: {'rusty_sword': 0.1, 'dagger': 0.05, 'wooden_shield': 0.05, 'iron_buckler': 0.03, 'cracked_orb': 0.02, 'undying_heart': 0.02, 'grave_scythe': 0.005} },
     
     // Tier 2
-    'bandit': { key: 'bandit', emoji: '🤠', name: 'Bandit', class: 'Humanoid', tier: 2, base_hp: 45, base_strength: 10, base_defense: 3, range: 4, movement: { speed: 2, type: 'ground' }, base_xp: 50, base_gold: 30, spell_resistance: 0.05, loot_table: {'health_potion': 0.25, 'dagger': 0.15, 'rusty_sword': 0.1, 'steel_longsword': 0.05, 'iron_kite_shield': 0.05, 'iron_buckler': 0.05, 'padded_leather': 0.08, 'silenced_leather_armor': 0.02, 'hardwood_staff': 0.02} },
-    'dire_wolf': { key: 'dire_wolf', emoji: '🐺', name: 'Dire Wolf', class: 'Beast', tier: 2, base_hp: 60, base_strength: 8, base_defense: 2, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 40, base_gold: 15, spell_resistance: 0, loot_table: {'health_potion': 0.15, 'wolf_pelt': 0.4} },
-    'giant_rat': { key: 'giant_rat', emoji: '🐀', name: 'Giant Rat', class: 'Monstrosity', tier: 2, base_hp: 40, base_strength: 7, base_defense: 1, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 35, base_gold: 10, spell_resistance: 0, loot_table: {'rat_tail': 0.6} },
-    'armored_zombie': { key: 'armored_zombie', emoji: '🧟', name: 'Armored Zombie', class: 'Undead', tier: 2, base_hp: 50, base_strength: 10, base_defense: 5, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 45, base_gold: 20, spell_resistance: 0.15, loot_table: {'dagger': 0.05, 'steel_longsword': 0.08, 'heavy_greatsword': 0.03, 'iron_kite_shield': 0.05, 'brass_shield': 0.03, 'padded_leather': 0.05, 'chainmail_armor': 0.03, 'magical_orb': 0.02, 'undying_heart': 0.05}, damage_type: 'magical' },
+    'bandit': { key: 'bandit', emoji: '🤠', name: 'Bandit', class: 'Humanoid', tier: 2, base_hp: 45, base_strength: 8, base_defense: 3, range: 4, movement: { speed: 2, type: 'ground' }, base_xp: 50, base_gold: 30, spell_resistance: 0.05, loot_table: {'health_potion': 0.25, 'dagger': 0.15, 'rusty_sword': 0.1, 'steel_longsword': 0.05, 'iron_kite_shield': 0.05, 'iron_buckler': 0.05, 'padded_leather': 0.08, 'silenced_leather_armor': 0.02, 'hardwood_staff': 0.02} },
+    'dire_wolf': { key: 'dire_wolf', emoji: '🐺', name: 'Dire Wolf', class: 'Beast', tier: 2, base_hp: 60, base_strength: 6, base_defense: 2, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 40, base_gold: 15, spell_resistance: 0, loot_table: {'health_potion': 0.15, 'wolf_pelt': 0.4} },
+    'giant_rat': { key: 'giant_rat', emoji: '🐀', name: 'Giant Rat', class: 'Monstrosity', tier: 2, base_hp: 40, base_strength: 5, base_defense: 1, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 35, base_gold: 10, spell_resistance: 0, loot_table: {'rat_tail': 0.6} },
+    'armored_zombie': { key: 'armored_zombie', emoji: '🧟', name: 'Armored Zombie', class: 'Undead', tier: 2, base_hp: 50, base_strength: 7, base_defense: 5, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 45, base_gold: 20, spell_resistance: 0.15, loot_table: {'dagger': 0.05, 'steel_longsword': 0.08, 'heavy_greatsword': 0.03, 'iron_kite_shield': 0.05, 'brass_shield': 0.03, 'padded_leather': 0.05, 'chainmail_armor': 0.03, 'magical_orb': 0.02, 'undying_heart': 0.05, 'grave_scythe': 0.02, 'elemental_sword': 0.01}, damage_type: 'magical' },
     
     // Tier 3
-    'orc_berserker': { key: 'orc_berserker', emoji: '👹', name: 'Orc Berserker', class: 'Humanoid', tier: 3, ability: 'enrage', base_hp: 70, base_strength: 15, base_defense: 4, range: 1, movement: { speed: 2, type: 'ground' }, base_xp: 80, base_gold: 40, spell_resistance: 0.1, loot_table: {'health_potion': 0.3, 'steel_longsword': 0.1, 'heavy_greatsword': 0.08, 'obsidian_axe': 0.05, 'sunderers_battleaxe': 0.02, 'orc_liver': 0.3, 'brass_shield': 0.05, 'titanium_parrying_shield': 0.02, 'chainmail_armor': 0.05, 'half_plate_armor': 0.02, 'cypresswood_staff': 0.02, 'dual_longswords': 0.02} },
-    'cave_spider': { key: 'cave_spider', emoji: '🕷️', name: 'Cave Spider', class: 'Beast', tier: 3, ability: 'poison_web', base_hp: 90, base_strength: 12, base_defense: 3, range: 3, movement: { speed: 2, type: 'ground' }, base_xp: 75, base_gold: 30, spell_resistance: 0, loot_table: {'spider_venom': 0.5, 'eye_of_medusa': 0.01} },
-    'cockatrice': { key: 'cockatrice', emoji: '🐔', name: 'Cockatrice', class: 'Monstrosity', tier: 3, ability: 'petrification', base_hp: 80, base_strength: 14, base_defense: 5, range: 1, movement: { speed: 3, type: 'flying' }, base_xp: 90, base_gold: 50, spell_resistance: 0.2, loot_table: {'cockatrice_venom_gland': 0.3, 'eye_of_medusa': 0.02, 'arcane_focus': 0.02}, damage_type: 'magical' },
-    'necromancer': { key: 'necromancer', emoji: '🧙', name: 'Necromancer', class: 'Undead', tier: 3, ability: 'necromancy', base_hp: 60, base_strength: 10, base_defense: 2, range: 5, movement: { speed: 1, type: 'ground' }, base_xp: 100, base_gold: 60, spell_resistance: 0.3, loot_table: {'mana_potion': 0.2, 'vampiric_dagger': 0.02, 'assassin_cloak_armor': 0.02, 'staff_of_loss': 0.02, 'archmages_robes': 0.01, 'undying_heart': 0.1}, damage_type: 'magical' },
+    'orc_berserker': { key: 'orc_berserker', emoji: '👹', name: 'Orc Berserker', class: 'Humanoid', tier: 3, ability: 'enrage', base_hp: 70, base_strength: 12, base_defense: 4, range: 1, movement: { speed: 2, type: 'ground' }, base_xp: 80, base_gold: 40, spell_resistance: 0.1, loot_table: {'health_potion': 0.3, 'steel_longsword': 0.1, 'heavy_greatsword': 0.08, 'obsidian_axe': 0.05, 'sunderers_battleaxe': 0.02, 'orc_liver': 0.3, 'brass_shield': 0.05, 'titanium_parrying_shield': 0.02, 'chainmail_armor': 0.05, 'half_plate_armor': 0.02, 'cypresswood_staff': 0.02, 'dual_longswords': 0.02, 'bone_club': 0.1} },
+    'cave_spider': { key: 'cave_spider', emoji: '🕷️', name: 'Cave Spider', class: 'Beast', tier: 3, ability: 'poison_web', base_hp: 90, base_strength: 9, base_defense: 3, range: 3, movement: { speed: 2, type: 'ground' }, base_xp: 75, base_gold: 30, spell_resistance: 0, loot_table: {'spider_venom': 0.5, 'eye_of_medusa': 0.01} },
+    'cockatrice': { key: 'cockatrice', emoji: '🐔', name: 'Cockatrice', class: 'Monstrosity', tier: 3, ability: 'petrification', base_hp: 80, base_strength: 10, base_defense: 5, range: 1, movement: { speed: 3, type: 'flying' }, base_xp: 90, base_gold: 50, spell_resistance: 0.2, loot_table: {'cockatrice_venom_gland': 0.3, 'eye_of_medusa': 0.02, 'arcane_focus': 0.02, 'elemental_sword': 0.02}, damage_type: 'magical' },
+    'necromancer': { key: 'necromancer', emoji: '🧙', name: 'Necromancer', class: 'Undead', tier: 3, ability: 'necromancy', base_hp: 60, base_strength: 8, base_defense: 2, range: 5, movement: { speed: 1, type: 'ground' }, base_xp: 100, base_gold: 60, spell_resistance: 0.3, loot_table: {'mana_potion': 0.2, 'vampiric_dagger': 0.02, 'assassin_cloak_armor': 0.02, 'staff_of_loss': 0.02, 'archmages_robes': 0.01, 'undying_heart': 0.1, 'grave_scythe': 0.03, 'headless_executioner': 0.01, 'elemental_sword': 0.02}, damage_type: 'magical' },
     
-    // Tier 4 - REBALANCED REWARDS
-    'one_eyed_troll': { key: 'one_eyed_troll', emoji: '👺', name: 'One-Eyed Troll', class: 'Humanoid', tier: 4, ability: 'ultra_focus', base_hp: 150, base_strength: 20, base_defense: 8, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 350, base_gold: 175, spell_resistance: 0.1, loot_table: {'superior_health_potion': 0.2, 'obsidian_axe': 0.08, 'sunderers_battleaxe': 0.04, 'heavy_slabshield': 0.03, 'steel_plate_armor': 0.03, 'staff_of_the_magi': 0.01, 'trollblood_shield': 0.03} },
-    'unicorn': { key: 'unicorn', emoji: '🦄', name: 'Unicorn', class: 'Beast', tier: 4, ability: 'healing', base_hp: 170, base_strength: 16, base_defense: 5, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 320, base_gold: 160, spell_resistance: 0.25, loot_table: {'unicorn_horn_fragment': 0.5, 'golden_greatbow': 0.05, 'obsidian_lamina': 0.02, 'purifying_crystal_shield': 0.02}, damage_type: 'magical' },
-    'chimera': { key: 'chimera', emoji: '🦁', name: 'Chimera', class: 'Monstrosity', tier: 4, ability: 'true_poison', base_hp: 160, base_strength: 18, base_defense: 10, range: 3, movement: { speed: 3, type: 'flying' }, base_xp: 400, base_gold: 200, spell_resistance: 0.15, loot_table: {'golden_greatbow': 0.03, 'eye_of_medusa': 0.03, 'crystal_ball': 0.01, 'spellblade_of_echoes': 0.03}, damage_type: 'magical' },
-    'living_armor': { key: 'living_armor', emoji: '🛡️', name: 'Living Armor', class: 'Undead', tier: 4, ability: 'living_shield', base_hp: 120, base_strength: 17, base_defense: 15, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 380, base_gold: 190, spell_resistance: 0.5, loot_table: {'obsidian_axe': 0.05, 'masterwork_spear': 0.08, 'flaming_sword': 0.03, 'tower_greatshield': 0.05, 'exa_reflector': 0.01, 'soul_armor_shard': 0.1, 'steel_plate_armor': 0.05, 'adamantine_armor': 0.01, 'spiked_retaliator': 0.02, 'mirror_mail': 0.01, 'undying_heart': 0.2}, damage_type: 'hybrid' },
+    // Tier 4
+    'one_eyed_troll': { key: 'one_eyed_troll', emoji: '👺', name: 'One-Eyed Troll', class: 'Humanoid', tier: 4, ability: 'ultra_focus', base_hp: 150, base_strength: 20, base_defense: 8, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 350, base_gold: 175, spell_resistance: 0.1, loot_table: {'superior_health_potion': 0.2, 'obsidian_axe': 0.08, 'sunderers_battleaxe': 0.04, 'heavy_slabshield': 0.03, 'steel_plate_armor': 0.03, 'staff_of_the_magi': 0.01, 'trollblood_shield': 0.03, 'bone_club': 0.15, 'trolls_knight_sword': 0.05} },
+    'unicorn': { key: 'unicorn', emoji: '🦄', name: 'Unicorn', class: 'Beast', tier: 4, ability: 'healing', base_hp: 170, base_strength: 15, base_defense: 5, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 320, base_gold: 160, spell_resistance: 0.25, loot_table: {'unicorn_horn_fragment': 0.5, 'golden_greatbow': 0.05, 'obsidian_lamina': 0.02, 'purifying_crystal_shield': 0.02, 'elemental_sword': 0.03}, damage_type: 'magical' },
+    'chimera': { key: 'chimera', emoji: '🦁', name: 'Chimera', class: 'Monstrosity', tier: 4, ability: 'true_poison', base_hp: 160, base_strength: 18, base_defense: 10, range: 3, movement: { speed: 3, type: 'flying' }, base_xp: 400, base_gold: 200, spell_resistance: 0.15, loot_table: {'golden_greatbow': 0.03, 'eye_of_medusa': 0.03, 'crystal_ball': 0.01, 'spellblade_of_echoes': 0.03, 'chimera_claw': 0.3, 'elemental_sword': 0.03, 'condensed_health_potion': 0.3}, damage_type: 'magical' },
+    'living_armor': { key: 'living_armor', emoji: '🛡️', name: 'Living Armor', class: 'Undead', tier: 4, ability: 'living_shield', base_hp: 120, base_strength: 17, base_defense: 15, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 380, base_gold: 190, spell_resistance: 0.5, loot_table: {'obsidian_axe': 0.05, 'masterwork_spear': 0.08, 'tower_greatshield': 0.05, 'exa_reflector': 0.01, 'soul_armor_shard': 0.1, 'steel_plate_armor': 0.05, 'adamantine_armor': 0.01, 'spiked_retaliator': 0.02, 'mirror_mail': 0.01, 'undying_heart': 0.2, 'the_bloodletter': 0.03, 'unending_dance': 0.005, 'headless_executioner': 0.02, 'elemental_sword': 0.03, 'superior_health_potion': 0.1}, damage_type: 'hybrid' },
     
-    // Tier 5 - REBALANCED REWARDS
-    'mountain_goliath': { key: 'mountain_goliath', emoji: '⛰️', name: 'Mountain Goliath', class: 'Humanoid', tier: 5, ability: 'earthshaker', base_hp: 300, base_strength: 28, base_defense: 12, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 1200, base_gold: 600, spell_resistance: 0.15, loot_table: {'sunderers_battleaxe': 0.05, 'earthshaker_hammer': 0.01, 'heavy_slabshield': 0.02, 'mountain_rock': 0.1} },
-    'livyatan': { key: 'livyatan', emoji: '🐳', name: 'Livyatan', class: 'Beast', tier: 5, ability: 'swallow', base_hp: 400, base_strength: 22, base_defense: 10, range: 1, movement: { speed: 2, type: 'flying' }, base_xp: 1100, base_gold: 550, spell_resistance: 0.1, loot_table: {'vacuum_greatbow': 0.01, 'lightning_javelin': 0.05, 'vacuum_lining': 0.2}, damage_type: 'magical' },
-    'dragon': { key: 'dragon', emoji: '🐉', name: 'Dragon', class: 'Monstrosity', tier: 5, ability: 'scorch_earth', base_hp: 350, base_strength: 25, base_defense: 18, range: 5, movement: { speed: 3, type: 'flying' }, base_xp: 1500, base_gold: 750, spell_resistance: 0.2, loot_table: {'dragon_scale': 0.5, 'flaming_sword': 0.05, 'dragon_scale_cragblade': 0.01, 'dragon_heart_item': 0.1}, damage_type: 'hybrid' },
-    'dullahan': { key: 'dullahan', emoji: '👻', name: 'Dullahan', class: 'Undead', tier: 5, ability: 'alive_again', base_hp: 250, base_strength: 26, base_defense: 14, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 1350, base_gold: 700, spell_resistance: 0.25, loot_table: {'flaming_sword': 0.03, 'vampiric_dagger': 0.04, 'obsidian_lamina': 0.03, 'void_greatsword': 0.01, 'adamantine_armor': 0.02, 'void_heart': 0.1, 'undying_heart': 0.4}, damage_type: 'hybrid' }
+    // Tier 5
+    'mountain_goliath': { key: 'mountain_goliath', emoji: '⛰️', name: 'Mountain Goliath', class: 'Humanoid', tier: 5, ability: 'earthshaker', base_hp: 300, base_strength: 28, base_defense: 12, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 1200, base_gold: 600, spell_resistance: 0.15, loot_table: {'sunderers_battleaxe': 0.05, 'earthshaker_hammer': 0.01, 'heavy_slabshield': 0.02, 'mountain_rock': 0.1, 'bone_club': 0.2, 'giant_hunter': 0.005, 'superior_health_potion': 0.5} },
+    'livyatan': { key: 'livyatan', emoji: '🐳', name: 'Livyatan', class: 'Beast', tier: 5, ability: 'swallow', base_hp: 400, base_strength: 22, base_defense: 10, range: 1, movement: { speed: 2, type: 'flying' }, base_xp: 1100, base_gold: 550, spell_resistance: 0.1, loot_table: {'vacuum_greatbow': 0.01, 'lightning_javelin': 0.05, 'vacuum_lining': 0.2, 'giant_hunter': 0.005, 'elemental_sword': 0.05, 'superior_mana_potion': 0.4}, damage_type: 'magical' },
+    'dragon': { key: 'dragon', emoji: '🐉', name: 'Dragon', class: 'Monstrosity', tier: 5, ability: 'scorch_earth', base_hp: 350, base_strength: 25, base_defense: 18, range: 5, movement: { speed: 3, type: 'flying' }, base_xp: 1500, base_gold: 750, spell_resistance: 0.2, loot_table: {'dragon_scale': 0.5, 'dragon_scale_cragblade': 0.01, 'dragon_heart_item': 0.1, 'giant_hunter': 0.005, 'elemental_sword': 0.05, 'superior_health_potion': 0.5}, damage_type: 'hybrid' },
+    'dullahan': { key: 'dullahan', emoji: '👻', name: 'Dullahan', class: 'Undead', tier: 5, ability: 'alive_again', base_hp: 250, base_strength: 26, base_defense: 14, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 1350, base_gold: 700, spell_resistance: 0.25, loot_table: {'vampiric_dagger': 0.04, 'obsidian_lamina': 0.03, 'void_greatsword': 0.01, 'adamantine_armor': 0.02, 'void_heart': 0.1, 'undying_heart': 0.4, 'the_bloodletter': 0.04, 'headless_executioner': 0.03, 'giant_hunter': 0.005, 'elemental_sword': 0.05, 'superior_mana_potion': 0.4}, damage_type: 'hybrid' }
 };
 
 const MONSTER_RARITY = {
@@ -792,7 +835,6 @@ const QUESTS = {
         'collect_spider_venom': { tier: 3, title: 'Potent Poisons', type: 'collection', target: 'spider_venom', required: 10, reward: { xp: 250, gold: 150 }, description: 'The alchemist requires a large quantity of spider venom for his experiments.' },
         'collect_obsidian_axes': { tier: 3, title: 'Orcish Weaponry', type: 'collection', target: 'obsidian_axe', required: 1, reward: { xp: 300, gold: 500 }, description: 'A collector is fascinated by orcish culture and wants a pristine obsidian axe.' },
         'collect_unicorn_horns': { tier: 4, title: 'A Noble Cure', type: 'collection', target: 'unicorn_horn_fragment', required: 3, reward: { xp: 500, gold: 400 }, description: 'The royal physician believes unicorn horns can cure the ailing king.' },
-        'collect_flaming_swords': { tier: 4, title: 'The Fiery Blade', type: 'collection', target: 'flaming_sword', required: 1, reward: { xp: 1000, gold: 3500 }, description: 'A wealthy noble desires a legendary Flaming Sword for his collection.' },
         'collect_dragon_scales': { tier: 5, title: 'Indestructible Armor', type: 'collection', target: 'dragon_scale', required: 5, reward: { xp: 800, gold: 500 }, description: 'The king\'s blacksmith wants to forge armor from the scales of a dragon.' },
         'collect_earthshaker': { tier: 5, title: 'Might of the Mountain', type: 'collection', target: 'earthshaker_hammer', required: 1, reward: { xp: 5000, gold: 12000 }, description: 'The Dwarven king will pay handsomely for the return of the legendary Earthshaker Hammer.' },
         
@@ -806,11 +848,13 @@ const LEGACY_QUESTS = {
         title: 'Collector of Legend',
         type: 'legacy_extermination',
         targets: Object.keys(MONSTER_SPECIES),
-        reward: { xp: 5000, gold: 10000, item: 'legend_slayer' },
+        // MODIFICATION: Changed reward to a real item.
+        reward: { xp: 5000, gold: 10000, item: 'giant_hunter' },
         description: 'Defeat a legendary version of every creature in the land.'
     },
     'Godslayer': {
-        title: 'Godslayer Greasword',
+        // MODIFICATION: Fixed typo "Greasword"
+        title: 'Godslayer Greatsword',
         type: 'legacy_creation',
         targets: 'the_greatsword',
         reward: {xp: 2500, gold: 5000},
@@ -820,22 +864,27 @@ const LEGACY_QUESTS = {
 
 const SHOP_INVENTORY = {
     'Potions & Items': ['health_potion', 'mana_potion', 'condensed_health_potion', 'condensed_mana_potion'],
-    'Weapons': ['rusty_sword', 'wooden_stick'],
+    'Weapons': ['rusty_sword', 'wooden_stick', 'soldiers_spear', 'farmers_glaive', 'parrying_dagger', 'light_scythe', 'flowing_blade'],
     'Gear': ['travelers_garb', 'leather_armor', 'padded_leather', 'wooden_shield']
 };
 
 const MAGIC_SHOP_INVENTORY = {
-    'Catalysts': ['wooden_wand', 'cracked_orb', 'hardwood_staff', 'magical_orb', 'arcane_focus', 'cypresswood_staff']
+    'Catalysts': ['wooden_wand', 'cracked_orb', 'hardwood_staff', 'magical_orb', 'arcane_focus', 'cypresswood_staff'],
+    // MODIFICATION: Removed 'battlestaff'
+    'Weapons': []
 };
 
 const BLACKSMITH_INVENTORY = {
-    'Weapons': ['steel_longsword', 'rapier', 'longbow', 'heavy_greatsword', 'masterwork_spear', 'dual_longswords', 'elven_saber', 'dwarven_warhammer'],
+    // MODIFICATION: Removed 'blacksmiths_workhammer'
+    'Weapons': ['steel_longsword', 'rapier', 'longbow', 'heavy_greatsword', 'masterwork_spear', 'dual_longswords', 'elven_saber', 'dwarven_warhammer', 'caestus', 'shamshir', 'steel_mace', 'iron_ball', 'great_epee', 'sharpshots_beloved'],
     'Armor': ['chainmail_armor', 'half_plate_armor', 'steel_plate_armor'],
     'Shields': ['iron_kite_shield', 'iron_buckler', 'brass_shield', 'trollblood_shield', 'titanium_parrying_shield', 'maxwellian_dueling_shield', 'tower_greatshield']
 };
 const BLACK_MARKET_INVENTORY = {
+    // MODIFICATION: Added 'battlestaff'
+    'Weapons': ['assassins_claw', 'psychic_blade', 'bloody_butchering_knife', 'battlestaff'],
     'Armor': ['silenced_leather_armor', 'assassin_cloak_armor'],
-    'Lures': ['goblin_scent_gland', 'sweet_grass_scent', 'rotten_cheese', 'chemical_lure', 'bandit_coin', 'wolf_musk']
+    'Lures': ['goblin_scent_gland', 'sweet_grass_scent', 'rotten_cheese', 'chemical_lure', 'bandit_coin', 'wolf_musk', 'war_horn_fragment', 'silken_cocoon', 'petrified_field_mouse', 'grave_dust']
 };
 
 const ALCHEMY_RECIPES = {
@@ -857,7 +906,14 @@ const BLACKSMITH_RECIPES = {
     'brew_exa_reflector': { output: 'exa_reflector', ingredients: { 'soul_armor_shard': 1 }, cost: 2500 },
     'craft_soul_steel': { output: 'soul_steel_armor', ingredients: { 'soul_armor_shard': 5, 'adamantine_armor': 1 }, cost: 5000},
     'craft_vacuum_encaser': { output: 'vacuum_encaser', ingredients: { 'vacuum_lining': 3 }, cost: 3000},
-    'create_greatsword': {output: 'the_greatsword', ingredients: {'mountain_rock': 3, 'dragon_scale': 3, 'vacuum_lining': 3, 'void_heart': 3}, cost: 10000}
+    'craft_claw_of_chimera': { output: 'claw_of_chimera', ingredients: { 'chimera_claw': 2 }, cost: 1000 },
+    'craft_holy_beast_halberd': { output: 'holy_beast_halberd', ingredients: { 'unicorn_horn_fragment': 5 }, cost: 2500 },
+    'craft_livyatans_scaleclaw': { output: 'livyatans_scaleclaw', ingredients: { 'soul_armor_shard': 3, 'vacuum_lining': 2 }, cost: 8000 },
+    'craft_the_black_knife': { output: 'the_black_knife', ingredients: { 'void_heart': 1, 'vacuum_lining': 4 }, cost: 9000 },
+    'craft_grims_beloved': { output: 'grims_beloved', ingredients: { 'void_heart': 2, 'soul_armor_shard': 4 }, cost: 10000 },
+    'craft_giant_hunter': { output: 'giant_hunter', ingredients: { 'mountain_rock': 2, 'vacuum_lining': 2, 'dragon_scale': 2, 'void_heart': 2 }, cost: 15000 },
+    // MODIFICATION: Added recipe for blacksmith's hammer
+    'craft_blacksmiths_hammer': { output: 'blacksmiths_workhammer', ingredients: { 'dwarven_warhammer': 1, 'soul_armor_shard': 2 }, cost: 3000 }
 };
 
 const MAGIC_SHOP_RECIPES = {
@@ -892,6 +948,16 @@ const WITCH_COVEN_SERVICES = {
 };
 
 const CHANGELOG_DATA = [
+    {
+        version: "v0.5.2 - The Arsenal",
+        date: "2025-10-11",
+        changes: [
+            "Conducted a full audit of the armory, making dozens of previously unobtainable 'ghost' weapons available via monster loot, crafting recipes, and merchants.",
+            "Introduced a new set of high-tier lures, allowing cunning adventurers to specifically hunt dangerous tier 3 monsters.",
+            "Squashed a nasty save file corruption bug related to legacy character imports.",
+            "Various minor bug fixes and quality-of-life adjustments."
+        ]
+    },
     {
         version: "v0.5.1 - The Grid",
         date: "2025-10-07",
@@ -954,3 +1020,7 @@ const CHANGELOG_DATA = [
         ]
     }
 ];
+
+
+
+

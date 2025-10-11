@@ -4,19 +4,9 @@
  * @param {string} defenseElement The element of the defending entity/gear.
  * @returns {number} 2 for strong, 0.5 for weak, 1 for neutral.
  */
-function calculateElementalModifier(attackElement, defenseElement) {
-    if (!attackElement || !defenseElement || attackElement === 'none' || defenseElement === 'none') {
-        return 1;
-    }
-    const attackData = ELEMENTS[attackElement];
-    if (attackData.weakness.includes(defenseElement)) {
-        return 2; // Defensive element is strong against the attack
-    }
-    if (attackData.strength.includes(defenseElement)) {
-        return 0.5; // Defensive element is weak against the attack
-    }
-    return 1;
-}
+// MODIFICATION: This entire function has been removed to eliminate redundancy.
+// The same function in ui_helpers.js will be used globally.
+
 
 /**
  * Calculates dynamic rarity weights based on player level and monster class.
@@ -561,6 +551,11 @@ class Player extends Entity {
         const armor = this.equippedArmor;
         let dodgeChance = this.evasionChance; // Base evasion from Luck
 
+        // --- WEAPON CLASS DRAWBACKS ---
+        if (this.equippedWeapon.class === 'Axe' || this.equippedWeapon.class === 'Hammer') {
+            dodgeChance *= 0.5;
+        }
+
         // --- Calculate Dodge Chance ---
         if (armor && armor.effect?.type === 'dodge') {
             dodgeChance += armor.effect.chance;
@@ -573,9 +568,14 @@ class Player extends Entity {
         }
 
         // --- Parry logic (Stops attack entirely) ---
-        if (shield && shield.effect?.type === 'parry' && Math.random() < shield.effect.chance && attacker && attacker.isAlive()) {
+        let totalParryChance = 0;
+        if (shield && shield.effect?.type === 'parry') totalParryChance += shield.effect.chance;
+        // MODIFICATION: Added check for weapon parry.
+        if (this.equippedWeapon.effect?.parry) totalParryChance += this.equippedWeapon.effect.parry;
+
+        if (totalParryChance > 0 && Math.random() < totalParryChance && attacker && attacker.isAlive()) {
             attacker.attackParried = true;
-            addToLog(`You parried ${attacker.name}'s attack with your ${shield.name}!`, 'text-yellow-300 font-bold');
+            addToLog(`You parried ${attacker.name}'s attack!`, 'text-yellow-300 font-bold');
             setTimeout(() => {
                 addToLog(`You launch a swift counter-attack!`, 'text-yellow-300');
                 const weapon = this.equippedWeapon;
@@ -753,30 +753,35 @@ class Enemy extends Entity {
     async attack(target) {
         this.attackParried = false;
 
-        const distance = Math.abs(this.x - target.x) + Math.abs(this.y - target.y);
+        let distance = Math.abs(this.x - target.x) + Math.abs(this.y - target.y);
 
+        // If not in range, try to move closer first.
         if (distance > this.range) {
             await this.moveTowards(target);
-            return; // End turn after moving
+            // After moving, update the distance to see if an attack is now possible.
+            distance = Math.abs(this.x - target.x) + Math.abs(this.y - target.y);
         }
 
-        addToLog(`${this.name} attacks ${target.name}!`); 
-        this._performAttack(target);
-        if (this.attackParried) return;
+        // Only proceed with the attack if the target is now in range.
+        if (distance <= this.range) {
+            addToLog(`${this.name} attacks ${target.name}!`);
+            this._performAttack(target);
+            if (this.attackParried) return;
 
-        const rarityIndex = this.rarityData.rarityIndex;
-        if (this.element === 'wind' && !this.attackParried && Math.random() < (rarityIndex * 0.05)) {
-            addToLog(`The swirling winds grant ${this.name} another strike!`, 'text-gray-300');
-            setTimeout(() => {
-                let followUpDamage = Math.floor((rollDice(this.damage[0], this.damage[1], `${this.name} Wind Follow-up`) + this.strength) / 2);
-                if (this.element === 'fire') {
-                    followUpDamage = Math.floor(followUpDamage * (1 + Math.random() * 0.2));
-                }
-                target.takeDamage(followUpDamage, !!this.statusEffects.ultra_focus, this);
-            }, 500);
-        } else if (this.ability === 'double_strike' && Math.random() < 0.33) { 
-            addToLog(`${this.name}'s fury lets it attack again!`, 'text-red-500 font-bold'); 
-            setTimeout(() => this._performAttack(target), 500); 
+            const rarityIndex = this.rarityData.rarityIndex;
+            if (this.element === 'wind' && !this.attackParried && Math.random() < (rarityIndex * 0.05)) {
+                addToLog(`The swirling winds grant ${this.name} another strike!`, 'text-gray-300');
+                setTimeout(() => {
+                    let followUpDamage = Math.floor((rollDice(this.damage[0], this.damage[1], `${this.name} Wind Follow-up`) + this.strength) / 2);
+                    if (this.element === 'fire') {
+                        followUpDamage = Math.floor(followUpDamage * (1 + Math.random() * 0.2));
+                    }
+                    target.takeDamage(followUpDamage, !!this.statusEffects.ultra_focus, this);
+                }, 500);
+            } else if (this.ability === 'double_strike' && Math.random() < 0.33) {
+                addToLog(`${this.name}'s fury lets it attack again!`, 'text-red-500 font-bold');
+                setTimeout(() => this._performAttack(target), 500);
+            }
         }
     }
     _performAttack(target) {
@@ -1051,6 +1056,22 @@ function generateEnemy(biomeKey) {
     if (player.equippedLure !== 'no_lure' && lureDetails && monsterPool[lureDetails.lureTarget] && Math.random() < 0.75) {
         speciesKey = lureDetails.lureTarget;
         addToLog(`Your ${lureDetails.name} attracts a monster!`, 'text-yellow-300');
+        // MODIFICATION: Consume one use of the lure.
+        player.inventory.lures[player.equippedLure]--;
+        if (player.inventory.lures[player.equippedLure] <= 0) {
+            addToLog(`Your ${lureDetails.name} has been fully used.`, 'text-gray-400');
+            delete player.inventory.lures[player.equippedLure];
+            if (player.equippedLure === lureDetails.lureTarget) { // This seems wrong, should be the key
+                 player.equippedLure = 'no_lure';
+            }
+             // Let's find the key of the lure and unequip if it matches
+            const lureKey = Object.keys(LURES).find(k => LURES[k].name === lureDetails.name);
+            if(player.equippedLure === lureKey) {
+                player.equippedLure = 'no_lure';
+            }
+
+        }
+        updateStatsView();
     } else {
         speciesKey = choices(Object.keys(monsterPool), Object.values(monsterPool));
     }
@@ -1383,23 +1404,23 @@ function equipItem(itemKey) {
 
         if (isCurrentlyEquipped) return;
 
-        if (details.effect?.dual_wield) {
-            if (player.equippedShield.name !== 'None') {
-                addToLog(`You unequip your ${player.equippedShield.name} to wield two swords.`, 'text-yellow-500');
-                player.equippedShield = SHIELDS['no_shield'];
-                const shieldIndex = player.equipmentOrder.indexOf('shield');
-                if (shieldIndex > -1) player.equipmentOrder.splice(shieldIndex, 1);
-            }
-            if (player.equippedCatalyst.name !== 'None') {
-                addToLog(`You unequip your ${player.equippedCatalyst.name} to wield two swords.`, 'text-yellow-500');
-                player.equippedCatalyst = CATALYSTS['no_catalyst'];
-                 const catalystIndex = player.equipmentOrder.indexOf('catalyst');
-                if (catalystIndex > -1) player.equipmentOrder.splice(catalystIndex, 1);
+        // --- Two-Handed Weapon Logic ---
+        if (itemType === 'weapon') {
+            const isTwoHanded = details.class === 'Hand-to-Hand' || details.effect?.dualWield;
+            if (isTwoHanded) {
+                if (player.equippedShield.name !== 'None') {
+                    addToLog(`You unequip your ${player.equippedShield.name} to wield your ${details.name}.`, 'text-yellow-500');
+                    unequipItem('shield');
+                }
+                if (player.equippedCatalyst.name !== 'None') {
+                    addToLog(`You unequip your ${player.equippedCatalyst.name} to wield your ${details.name}.`, 'text-yellow-500');
+                    unequipItem('catalyst');
+                }
             }
         }
         
-        if ((itemType === 'shield' || itemType === 'catalyst') && player.equippedWeapon.effect?.dual_wield) {
-            addToLog(`You cannot use a ${itemType} while dual wielding.`, 'text-red-400');
+        if ((itemType === 'shield' || itemType === 'catalyst') && (player.equippedWeapon.class === 'Hand-to-Hand' || player.equippedWeapon.effect?.dualWield)) {
+            addToLog(`You cannot use a ${itemType} while using a two-handed weapon.`, 'text-red-400');
             return;
         }
 
@@ -1870,4 +1891,5 @@ function cancelQuest() {
     updateStatsView();
     renderQuestBoard();
 }
+
 

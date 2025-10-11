@@ -1208,12 +1208,20 @@ function renderShop(type) {
         if (inventory[category].length === 0) continue;
         itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
         itemsHtml += '<div class="space-y-2">';
-        inventory[category].forEach(key => {
-            const details = getItemDetails(key);
-            if (!details) return;
-            const price = Math.floor(details.price * (type === 'black_market' ? 1.5 : 1)); // 50% markup for black market
-            itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${price} G</span><button onclick="buyItem('${key}', '${type}', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button></div></div>`;
+        
+        // Refactored to use createItemList
+        itemsHtml += createItemList({
+            items: inventory[category],
+            detailsFn: getItemDetails,
+            actionsHtmlFn: (key, details) => {
+                const price = Math.floor(details.price * (type === 'black_market' ? 1.5 : 1));
+                return `
+                    <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
+                    <button onclick="buyItem('${key}', '${type}', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
+                `;
+            }
         });
+        
         itemsHtml += '</div>';
     }
     let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderCommercialDistrict()" class="btn btn-primary">Back</button></div></div>`;
@@ -1257,12 +1265,20 @@ function renderBlacksmithBuy() {
         if (BLACKSMITH_INVENTORY[category].length === 0) continue;
         itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
         itemsHtml += '<div class="space-y-2">';
-        BLACKSMITH_INVENTORY[category].forEach(key => {
-            const details = getItemDetails(key);
-            if (!details) return;
-            const price = details.price;
-            itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span><div><span class="text-yellow-400 font-semibold mr-4">${price} G</span><button onclick="buyItem('${key}', 'blacksmith', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button></div></div>`;
+        
+        // Refactored to use createItemList
+        itemsHtml += createItemList({
+            items: BLACKSMITH_INVENTORY[category],
+            detailsFn: getItemDetails,
+            actionsHtmlFn: (key, details) => {
+                const price = details.price;
+                return `
+                    <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
+                    <button onclick="buyItem('${key}', 'blacksmith', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
+                `;
+            }
         });
+        
         itemsHtml += '</div>';
     }
     let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">Buy Equipment</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4"><button onclick="renderBlacksmithMenu()" class="btn btn-primary">Back</button></div></div>`;
@@ -1569,18 +1585,20 @@ function renderSageTowerBuy() {
         if (MAGIC_SHOP_INVENTORY[category].length === 0) continue;
         itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
         itemsHtml += '<div class="space-y-2">';
-        MAGIC_SHOP_INVENTORY[category].forEach(key => {
-            const details = getItemDetails(key);
-            if (!details) return;
-            const price = details.price;
-            itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
-                            <span>${details.name}</span>
-                            <div>
-                                <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
-                                <button onclick="buyItem('${key}', 'magic', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
-                            </div>
-                         </div>`;
+        
+        // Refactored to use createItemList
+        itemsHtml += createItemList({
+            items: MAGIC_SHOP_INVENTORY[category],
+            detailsFn: getItemDetails,
+            actionsHtmlFn: (key, details) => {
+                const price = details.price;
+                return `
+                    <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
+                    <button onclick="buyItem('${key}', 'magic', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
+                `;
+            }
         });
+        
         itemsHtml += '</div>';
     }
 
@@ -1921,10 +1939,8 @@ function renderBattle(subView = 'main', actionData = null) {
             }
         });
         html += `</div><button onclick="renderBattle('item')" class="btn btn-primary">Back</button>`;
-        const container = document.createElement('div');
-        container.innerHTML = html;
-        render(container);
-     }
+        renderBattle('item_target', actionData);
+    }
 }
 
 function renderPostBattleMenu() {
@@ -1941,7 +1957,9 @@ function renderPostBattleMenu() {
         <h2 class="font-medieval text-3xl mb-4 text-yellow-200">Victory!</h2>
         <p class="mb-6">You have cleared the area. What will you do next?</p>
         <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
-            <button onclick="startBattle('${biomeKey}')" class="btn btn-primary w-full sm:w-auto">Continue Exploring ${biome.name}</button>
+            <button onclick="startBattle('${biomeKey}')" class="btn btn-primary w-full sm:w-auto">Continue Exploring</button>
+            <button onclick="renderInventory()" class="btn btn-primary w-full sm:w-auto">Inventory</button>
+            <button onclick="renderCharacterSheet()" class="btn btn-primary w-full sm:w-auto">Character</button>
             <button onclick="renderTownSquare()" class="btn btn-primary w-full sm:w-auto">Return to Town</button>
         </div>
     </div>`;
@@ -2207,6 +2225,4 @@ function renderBettyQuestProposal() {
     container.innerHTML = dialogueHtml;
     render(container);
 }
-
-
 

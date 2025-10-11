@@ -219,7 +219,7 @@
         </div>
     </div>
 
-    <div id="game-container" class="w-full max-w-7xl md:h-screen md:max-h-[900px] flex flex-col md:flex-row border-2 rounded-lg shadow-2xl hidden my-auto" style="border-color: var(--border-main); background-color: var(--bg-main);">
+    <div id="game-container" class="w-full max-w-7xl md:h-screen md:max-h-[900px] flex flex-col md:flex-row border-2 rounded-lg shadow-2xl hidden" style="border-color: var(--border-main); background-color: var(--bg-main);">
         <div class="w-full md:w-1/3 bg-slate-800 p-4 rounded-l-lg flex flex-col">
             <div id="stats-view" class="flex-grow overflow-y-auto inventory-scrollbar pr-2">
                  <h2 id="player-name" class="font-medieval text-2xl text-center mb-1" style="color: var(--text-accent);">Player Name</h2>
@@ -278,7 +278,7 @@
             </div>
         </div>
         <div class="w-full md:w-2/3 flex flex-col p-4">
-            <div id="main-view" class="bg-slate-900/50 rounded-lg flex-grow flex items-center justify-center p-6 min-h-[300px] md:min-h-0">
+            <div id="main-view" class="bg-slate-900/50 rounded-lg flex-grow flex items-center justify-center p-6 min-h-[300px] md:min-h-0 overflow-y-auto inventory-scrollbar">
                 <!-- Main game content (town, battle, etc.) -->
             </div>
             <div id="game-log-container" class="h-48 mt-4 bg-black/30 p-4 rounded-lg flex flex-col flex-shrink-0">
@@ -302,14 +302,72 @@
         <div class="flex-grow overflow-y-auto text-xs pr-2 inventory-scrollbar">
             <div class="mb-2">
                 <h4 class="font-bold mb-1">Modify Stats</h4>
-                <div class="grid grid-cols-2 gap-2 text-black">
-                    <input type="number" id="debug-level" placeholder="Level">
-                    <input type="number" id="debug-gold" placeholder="Gold">
-                    <input type="number" id="debug-xp" placeholder="XP">
-                    <input type="number" id="debug-hp" placeholder="HP">
-                    <input type="number" id="debug-mp" placeholder="MP">
-                    <input type="number" id="debug-str" placeholder="Strength">
-                    <input type="number" id="debug-int" placeholder="Intelligence">
+                <div class="space-y-3">
+                    
+                    <div>
+                        <h5 class="font-semibold text-white mb-1">General</h5>
+                        <div class="grid grid-cols-2 gap-x-2 gap-y-1 items-center">
+                            <label for="debug-level" class="text-white text-right text-xs">Level:</label>
+                            <input type="number" id="debug-level" class="text-black rounded px-1">
+                            <label for="debug-xp" class="text-white text-right text-xs">XP:</label>
+                            <input type="number" id="debug-xp" class="text-black rounded px-1">
+                            <label for="debug-gold" class="text-white text-right text-xs">Gold:</label>
+                            <input type="number" id="debug-gold" class="text-black rounded px-1">
+                            <label for="debug-statPoints" class="text-white text-right text-xs">Stat Points:</label>
+                            <input type="number" id="debug-statPoints" class="text-black rounded px-1">
+                        </div>
+                    </div>
+    
+                    <div>
+                        <h5 class="font-semibold text-white mb-1">Vitals</h5>
+                        <div class="grid grid-cols-2 gap-x-2 gap-y-1 items-center">
+                            <label for="debug-hp" class="text-white text-right text-xs">Current HP:</label>
+                            <input type="number" id="debug-hp" class="text-black rounded px-1">
+                            <label for="debug-mp" class="text-white text-right text-xs">Current MP:</label>
+                            <input type="number" id="debug-mp" class="text-black rounded px-1">
+                             <label for="debug-bonusHp" class="text-white text-right text-xs">Bonus HP:</label>
+                            <input type="number" id="debug-bonusHp" class="text-black rounded px-1">
+                            <label for="debug-bonusMp" class="text-white text-right text-xs">Bonus MP:</label>
+                            <input type="number" id="debug-bonusMp" class="text-black rounded px-1">
+                        </div>
+                    </div>
+    
+                    <div>
+                        <h5 class="font-semibold text-white mb-1">Base Attributes</h5>
+                        <div class="grid grid-cols-2 gap-x-2 gap-y-1 items-center">
+                            <label for="debug-vigor" class="text-white text-right text-xs">Vigor:</label>
+                            <input type="number" id="debug-vigor" class="text-black rounded px-1">
+                            <label for="debug-focus" class="text-white text-right text-xs">Focus:</label>
+                            <input type="number" id="debug-focus" class="text-black rounded px-1">
+                            <label for="debug-stamina" class="text-white text-right text-xs">Stamina:</label>
+                            <input type="number" id="debug-stamina" class="text-black rounded px-1">
+                            <label for="debug-strength" class="text-white text-right text-xs">Strength:</label>
+                            <input type="number" id="debug-strength" class="text-black rounded px-1">
+                            <label for="debug-intelligence" class="text-white text-right text-xs">Intelligence:</label>
+                            <input type="number" id="debug-intelligence" class="text-black rounded px-1">
+                            <label for="debug-luck" class="text-white text-right text-xs">Luck:</label>
+                            <input type="number" id="debug-luck" class="text-black rounded px-1">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h5 class="font-semibold text-white mb-1">Derived Bonuses</h5>
+                        <div class="grid grid-cols-2 gap-x-2 gap-y-1 items-center">
+                            <label for="debug-bonusPhysicalDamage" class="text-white text-right text-xs">Bonus Phys Dmg:</label>
+                            <input type="number" id="debug-bonusPhysicalDamage" class="text-black rounded px-1">
+                            <label for="debug-bonusMagicalDamage" class="text-white text-right text-xs">Bonus Mag Dmg:</label>
+                            <input type="number" id="debug-bonusMagicalDamage" class="text-black rounded px-1">
+                            <label for="debug-bonusPhysicalDefense" class="text-white text-right text-xs">Bonus Phys Def:</label>
+                            <input type="number" id="debug-bonusPhysicalDefense" class="text-black rounded px-1">
+                            <label for="debug-bonusMagicalDefense" class="text-white text-right text-xs">Bonus Mag Def:</label>
+                            <input type="number" id="debug-bonusMagicalDefense" class="text-black rounded px-1">
+                            <label for="debug-bonusCritChance" class="text-white text-right text-xs">Bonus Crit %:</label>
+                            <input type="number" id="debug-bonusCritChance" step="0.01" class="text-black rounded px-1">
+                            <label for="debug-bonusEvasion" class="text-white text-right text-xs">Bonus Evade %:</label>
+                            <input type="number" id="debug-bonusEvasion" step="0.01" class="text-black rounded px-1">
+                        </div>
+                    </div>
+    
                 </div>
                 <button onclick="debugUpdateVariables()" class="btn btn-primary w-full mt-2 text-sm">Update</button>
             </div>
@@ -332,8 +390,8 @@
     </template>
 
     <template id="template-battle">
-        <div class="flex flex-col h-full justify-center items-center relative">
-            <div id="battle-grid" class="grid gap-1 w-full max-w-md aspect-square mb-4">
+        <div class="flex flex-col justify-center items-center">
+            <div id="battle-grid" class="grid gap-1 w-full max-w-sm aspect-square mb-4">
                 <!-- Grid cells will be generated by JS -->
             </div>
             <div id="battle-actions" class="flex flex-wrap justify-center items-center gap-4">
@@ -344,4 +402,5 @@
 
 </body>
 </html>
+
 
