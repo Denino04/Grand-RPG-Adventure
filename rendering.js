@@ -654,6 +654,7 @@ function returnFromInventory() {
         case 'witchs_coven': renderWitchsCoven(); break;
         case 'sell': renderSell(); break;
         case 'battle': renderBattleGrid(); break;
+        case 'post_battle': renderPostBattleMenu(); break;
         case 'wilderness': renderWildernessMenu(); break;
         default: renderTownSquare();
     }
@@ -1946,7 +1947,9 @@ function renderBattle(subView = 'main', actionData = null) {
 function renderPostBattleMenu() {
     $('#inventory-btn').disabled = false;
     $('#character-sheet-btn').disabled = false;
-    player.clearEncounterBuffs(); 
+    player.clearEncounterBuffs();
+    gameState.currentView = 'post_battle';
+    lastViewBeforeInventory = 'post_battle';
     const biomeKey = gameState.currentBiome;
     if (!biomeKey) { // Safety check
         renderTownSquare();
@@ -1958,8 +1961,6 @@ function renderPostBattleMenu() {
         <p class="mb-6">You have cleared the area. What will you do next?</p>
         <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
             <button onclick="startBattle('${biomeKey}')" class="btn btn-primary w-full sm:w-auto">Continue Exploring</button>
-            <button onclick="renderInventory()" class="btn btn-primary w-full sm:w-auto">Inventory</button>
-            <button onclick="renderCharacterSheet()" class="btn btn-primary w-full sm:w-auto">Character</button>
             <button onclick="renderTownSquare()" class="btn btn-primary w-full sm:w-auto">Return to Town</button>
         </div>
     </div>`;
@@ -2225,4 +2226,5 @@ function renderBettyQuestProposal() {
     container.innerHTML = dialogueHtml;
     render(container);
 }
+
 

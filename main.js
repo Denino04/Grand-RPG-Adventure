@@ -600,6 +600,14 @@ window.addEventListener('load', async () => {
         }
     });
 
+    // Mobile debug toggle: three-finger tap
+    document.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 3) {
+            e.preventDefault();
+            toggleDebug();
+        }
+    });
+
     await updateLoadGameButtonVisibility();
 });
 

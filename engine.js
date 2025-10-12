@@ -785,6 +785,12 @@ class Enemy extends Entity {
         }
     }
     _performAttack(target) {
+        const calcLog = {
+            source: `${this.name} Attack`,
+            targetName: target.name,
+            steps: []
+        };
+
         let damageDealt = 0;
         const catalyst = player.equippedCatalyst;
         if (catalyst && catalyst.effect?.ranged_chance && Math.random() < catalyst.effect.ranged_chance) {
@@ -795,22 +801,39 @@ class Enemy extends Entity {
         let diceCount = this.damage[0];
         if (this.statusEffects.enrage) {
             diceCount++;
+            calcLog.steps.push({ description: "Enrage Buff", value: "+1 Dice", result: `(Now ${diceCount}d${this.damage[1]})` });
         }
-        let totalDamage = rollDice(diceCount, this.damage[1], `${this.name} Attack`) + this.strength; 
+        let totalDamage = rollDice(diceCount, this.damage[1], `${this.name} Attack`); 
+        calcLog.baseDamage = totalDamage;
+
+        const statBonus = this.strength;
+
+        // Apply the same formula as the player
+        const statMultiplier = 1 + statBonus / 20;
+        totalDamage = Math.floor(totalDamage * statMultiplier);
+        calcLog.steps.push({ description: `Stat Multiplier (1 + ${statBonus}/20)`, value: `x${statMultiplier.toFixed(2)}`, result: totalDamage });
+
+        const strengthFlatBonus = Math.floor(this.strength / 5);
+        totalDamage += strengthFlatBonus;
+        calcLog.steps.push({ description: "Strength Flat Bonus (Str/5)", value: `+${strengthFlatBonus}`, result: totalDamage });
         
         if (this.statusEffects.drenched) {
-            totalDamage = Math.floor(totalDamage * this.statusEffects.drenched.multiplier);
+            const multiplier = this.statusEffects.drenched.multiplier;
+            totalDamage = Math.floor(totalDamage * multiplier);
             addToLog(`${this.name}'s attack is weakened by the water!`, 'text-blue-300');
+            calcLog.steps.push({ description: "Drenched Debuff", value: `x${multiplier}`, result: totalDamage });
         }
 
         if (this.element === 'fire') {
             const fireMultiplier = 1 + Math.random() * 0.2;
             totalDamage = Math.floor(totalDamage * fireMultiplier);
+            calcLog.steps.push({ description: "Fire Element Bonus", value: `x${fireMultiplier.toFixed(2)}`, result: totalDamage });
         }
         
         if (target.statusEffects.swallowed && target.statusEffects.swallower === this) {
             totalDamage *= 2;
             addToLog(`${this.name}'s attack is amplified from within!`, 'text-red-600');
+            calcLog.steps.push({ description: "Swallowed Target Bonus", value: `x2`, result: totalDamage });
         }
         
         let attackOptions = { isMagic: false };
@@ -829,6 +852,9 @@ class Enemy extends Entity {
         }
 
         damageDealt = target.takeDamage(totalDamage, !!this.statusEffects.ultra_focus, this, attackOptions);
+        
+        calcLog.finalDamage = damageDealt;
+        logDamageCalculation(calcLog);
 
         const rarityIndex = this.rarityData.rarityIndex;
         const procChance = rarityIndex * 0.1;
@@ -1869,14 +1895,16 @@ function completeQuest() {
 
 function cancelQuest() {
     if (!player.activeQuest) return;
-    const penalty = 15 * player.level;
+    const quest = getQuestDetails(player.activeQuest);
+    if (!quest) return;
+
+    const penalty = (quest.tier || 1) * 25; // Tier-based penalty
 
     if (player.gold < penalty) {
         addToLog(`You cannot afford the ${penalty} G fee to cancel the quest.`, 'text-red-400');
         return;
     }
 
-    const quest = getQuestDetails(player.activeQuest);
     player.gold -= penalty;
     addToLog(`You paid a ${penalty} G fee and abandoned the quest: <span class="font-bold text-yellow-300">${quest.title}</span>.`, 'text-red-400');
     

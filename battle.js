@@ -424,7 +424,15 @@ function performAttack(targetIndex) {
     gameState.isPlayerTurn = false; 
 
     const performSingleAttack = (attackTarget, isSecondStrike = false) => {
+        const calcLog = {
+            source: `Player Attack ${isSecondStrike ? '(2)' : ''}`,
+            targetName: attackTarget.name,
+            steps: []
+        };
+
         const baseWeaponDamage = rollDice(...weapon.damage, `Player Weapon Attack ${isSecondStrike ? '2' : '1'}`);
+        calcLog.baseDamage = baseWeaponDamage;
+        
         let statBonus = player.physicalDamageBonus;
         
         // --- WEAPON CLASS PERKS ---
@@ -441,8 +449,19 @@ function performAttack(targetIndex) {
             comboBonus = 1 + (Math.min(gameState.comboCount - 1, maxCombo) * 0.1);
         }
 
-        let damage = Math.floor(baseWeaponDamage * (1 + statBonus / 20)) + Math.floor(player.strength / 5);
-        damage = Math.floor(damage * comboBonus); // Apply combo bonus
+        let damage = baseWeaponDamage;
+        const statMultiplier = 1 + statBonus / 20;
+        damage = Math.floor(damage * statMultiplier);
+        calcLog.steps.push({ description: `Stat Multiplier (1 + ${statBonus}/20)`, value: `x${statMultiplier.toFixed(2)}`, result: damage });
+
+        const strengthFlatBonus = Math.floor(player.strength / 5);
+        damage += strengthFlatBonus;
+        calcLog.steps.push({ description: "Strength Flat Bonus (Str/5)", value: `+${strengthFlatBonus}`, result: damage });
+        
+        if (comboBonus > 1.0) {
+            damage = Math.floor(damage * comboBonus);
+            calcLog.steps.push({ description: `Curved Sword Combo (${gameState.comboCount}x)`, value: `x${comboBonus.toFixed(2)}`, result: damage });
+        }
 
         let attackEffects = { element: player.weaponElement };
         let messageLog = [];
@@ -454,22 +473,30 @@ function performAttack(targetIndex) {
             if (chosenElement !== 'none') {
                 attackEffects.element = chosenElement;
             }
-            damage += player.intelligence; // Add int scaling
+            const intBonus = player.intelligence;
+            damage += intBonus; // Add int scaling
+            calcLog.steps.push({ description: "Elemental Sword Bonus", value: `+${intBonus} (INT)`, result: damage });
         }
         // Troll's Knight Sword
         if (weapon.effect?.intScaling) {
-            damage += Math.floor(player.intelligence * weapon.effect.intScaling);
+            const intBonus = Math.floor(player.intelligence * weapon.effect.intScaling);
+            damage += intBonus;
+            calcLog.steps.push({ description: `${weapon.name} Bonus`, value: `+${intBonus} (INT Scale)`, result: damage });
         }
 
         // --- STATUS EFFECT MODIFIERS ---
         if (player.statusEffects.drenched) {
-            damage = Math.floor(damage * player.statusEffects.drenched.multiplier);
+            const multiplier = player.statusEffects.drenched.multiplier;
+            damage = Math.floor(damage * multiplier);
             messageLog.push(`Your attack is weakened!`);
+            calcLog.steps.push({ description: "Drenched Debuff", value: `x${multiplier}`, result: damage });
         }
 
         if(player.statusEffects.buff_strength) {
-            damage = Math.floor(damage * player.statusEffects.buff_strength.multiplier);
+            const multiplier = player.statusEffects.buff_strength.multiplier;
+            damage = Math.floor(damage * multiplier);
             if (!isSecondStrike) messageLog.push(`Your strength is augmented!`);
+            calcLog.steps.push({ description: "Strength Buff", value: `x${multiplier}`, result: damage });
         }
 
         // --- CRITICAL HIT CALCULATION (REWORKED) ---
@@ -486,6 +513,7 @@ function performAttack(targetIndex) {
         
                 damage = Math.floor(damage * critMultiplier);
                 messageLog.push(`CRITICAL HIT!`);
+                calcLog.steps.push({ description: "Critical Hit", value: `x${critMultiplier}`, result: damage });
             }
         }
         
@@ -493,16 +521,24 @@ function performAttack(targetIndex) {
         if (weapon.class === 'Thrusting Sword') attackEffects.armorPierce = 0.2;
         if (weapon.effect?.armorPierce) attackEffects.armorPierce = (attackEffects.armorPierce || 0) + weapon.effect.armorPierce;
         if (weapon.effect?.bonusVsDragon && attackTarget.speciesData.name === 'Dragon') {
-            damage = Math.floor(damage * weapon.effect.bonusVsDragon);
+            const multiplier = weapon.effect.bonusVsDragon;
+            damage = Math.floor(damage * multiplier);
             if (!isSecondStrike) messageLog.push(`Your weapon glows with power against the dragon!`);
+            calcLog.steps.push({ description: "Bonus vs. Dragon", value: `x${multiplier}`, result: damage });
         }
         if (weapon.effect?.bonusVsLegendary && attackTarget.rarityData.name === 'Legendary') {
-            damage = Math.floor(damage * weapon.effect.bonusVsLegendary);
+            const multiplier = weapon.effect.bonusVsLegendary;
+            damage = Math.floor(damage * multiplier);
              if (!isSecondStrike) messageLog.push(`Your weapon feels destined to slay this foe!`);
+            calcLog.steps.push({ description: "Bonus vs. Legendary", value: `x${multiplier}`, result: damage });
         }
         
         // --- FINAL DAMAGE & LOGGING ---
         const finalDamage = attackTarget.takeDamage(damage, attackEffects);
+        
+        calcLog.finalDamage = finalDamage;
+        logDamageCalculation(calcLog);
+
         let damageType = weapon.damageType || 'physical';
         if (attackEffects.element && attackEffects.element !== 'none') {
             damageType = ELEMENTS[attackEffects.element].name;
@@ -652,14 +688,29 @@ function castSpell(spellKey, targetIndex) {
     let messageLog = [];
 
     if (spellData.type === 'st' || spellData.type === 'aoe' || spellData.element === 'healing') {
+        const calcLog = {
+            source: `Player Spell: ${spell.name}`,
+            targetName: target ? target.name : 'Self',
+            steps: []
+        };
+
         let diceCount = spell.damage[0];
         const spellAmp = catalyst.effect?.spell_amp || 0;
         diceCount = Math.min(spell.cap, diceCount + spellAmp);
 
         const baseMagicDamage = rollDice(diceCount, spell.damage[1], `Player Spell: ${spell.name}`);
+        calcLog.baseDamage = baseMagicDamage;
         const magicStat = player.intelligence + Math.floor(player.focus / 2);
         
-        let magicDamage = Math.floor(baseMagicDamage * (1 + magicStat / 20)) + Math.floor(player.intelligence / 5);
+        let magicDamage = baseMagicDamage;
+        const statMultiplier = 1 + magicStat / 20;
+        magicDamage = Math.floor(magicDamage * statMultiplier);
+        calcLog.steps.push({ description: `Magic Stat Multiplier (1 + ${magicStat}/20)`, value: `x${statMultiplier.toFixed(2)}`, result: magicDamage });
+
+        const intFlatBonus = Math.floor(player.intelligence / 5);
+        magicDamage += intFlatBonus;
+        calcLog.steps.push({ description: "Intelligence Flat Bonus (INT/5)", value: `+${intFlatBonus}`, result: magicDamage });
+
 
         let critChance = catalyst.effect?.spell_crit_chance || 0;
         let critMultiplier = catalyst.effect?.spell_crit_multiplier || 1.5;
@@ -667,12 +718,15 @@ function castSpell(spellKey, targetIndex) {
         if (critChance > 0 && Math.random() < critChance) {
             magicDamage = Math.floor(magicDamage * critMultiplier);
             messageLog.push('SPELL CRITICAL!');
+            calcLog.steps.push({ description: "Spell Critical Hit", value: `x${critMultiplier}`, result: magicDamage });
         }
         
         if (catalyst.effect?.overdrive && Math.random() < catalyst.effect.overdrive.chance) {
-            const bonusDamage = magicDamage * (catalyst.effect.overdrive.multiplier - 1);
-            magicDamage += bonusDamage;
+            const multiplier = catalyst.effect.overdrive.multiplier;
+            magicDamage = Math.floor(magicDamage * multiplier);
             messageLog.push('OVERDRIVE!');
+            calcLog.steps.push({ description: "Overdrive", value: `x${multiplier}`, result: magicDamage });
+
             const selfDamage = Math.floor(player.maxHp * catalyst.effect.overdrive.self_damage);
             player.takeDamage(selfDamage, true);
             addToLog(`The power overwhelms you, dealing <span class="font-bold text-red-500">${selfDamage}</span> damage to yourself!`, 'text-red-400');
@@ -680,14 +734,21 @@ function castSpell(spellKey, targetIndex) {
 
         if (spellData.element === 'healing') {
             player.hp = Math.min(player.maxHp, player.hp + magicDamage);
+            calcLog.finalDamage = magicDamage;
+            logDamageCalculation(calcLog);
             addToLog(`You recover <span class="font-bold text-green-400">${magicDamage}</span> HP.`, 'text-green-300');
         } else {
             if (spellData.element === 'fire') {
                 const fireMultiplier = 1 + Math.random() * (0.2 + (tierIndex * 0.1));
                 magicDamage = Math.floor(magicDamage * fireMultiplier);
+                calcLog.steps.push({ description: "Fire Element Bonus", value: `x${fireMultiplier.toFixed(2)}`, result: magicDamage });
             }
 
             const finalDamage = target.takeDamage(magicDamage, { isMagic: true, element: spellData.element, tier: tierIndex, spell_penetration: catalyst.effect?.spell_penetration });
+            
+            calcLog.finalDamage = finalDamage;
+            logDamageCalculation(calcLog);
+
             addToLog(`It deals <span class="font-bold text-purple-400">${finalDamage}</span> damage. ${messageLog.join(' ')}`);
 
             if (finalDamage > 0) {
@@ -1385,4 +1446,5 @@ async function addToGraveyard(deadPlayer, killer) {
         console.error("Could not add to graveyard:", error);
     }
 }
+
 

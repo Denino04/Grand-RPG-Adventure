@@ -17,12 +17,39 @@ function rollDice(numDice, sides, purpose = 'Generic Roll') {
     }
     const total = rolls.reduce((a, b) => a + b, 0);
     if (isDebugVisible) {
-        addToLog(`DEBUG: ${purpose} - Rolled ${numDice}d${sides} -> [${rolls.join(', ')}] = ${total}`, 'text-gray-500');
+        const purposeText = typeof purpose === 'string' ? purpose : purpose.source;
+        addToLog(`DEBUG (Dice): ${purposeText} - Rolled ${numDice}d${sides} -> [${rolls.join(', ')}] = ${total}`, 'text-gray-500');
     }
     return total; 
 }
 function addToLog(message, colorClass = '') { const p = document.createElement('p'); p.innerHTML = message; p.className = `mb-1 ${colorClass}`; logElement.appendChild(p); logElement.scrollTop = logElement.scrollHeight; }
 function getItemDetails(itemKey) { if (itemKey in ITEMS) return ITEMS[itemKey]; if (itemKey in WEAPONS) return WEAPONS[itemKey]; if (itemKey in CATALYSTS) return CATALYSTS[itemKey]; if (itemKey in ARMOR) return ARMOR[itemKey]; if (itemKey in SHIELDS) return SHIELDS[itemKey]; if (itemKey in LURES) return LURES[itemKey]; return null; }
+
+/**
+ * Logs a detailed breakdown of a damage calculation to the game log for debugging.
+ * @param {object} calc - The calculation details object.
+ * @param {string} calc.source - The origin of the damage (e.g., 'Player Weapon Attack').
+ * @param {string} calc.targetName - The name of the target.
+ * @param {number} calc.baseDamage - The initial damage from dice rolls.
+ * @param {Array<object>} calc.steps - An array of calculation step objects. Each object should have 'description' and 'result'.
+ * @param {number} calc.finalDamage - The final calculated damage.
+ */
+function logDamageCalculation({ source, targetName, baseDamage, steps, finalDamage }) {
+    if (!isDebugVisible) return;
+
+    let logMessage = `<div class="text-xs p-2 bg-slate-900/50 rounded border border-slate-700">`;
+    logMessage += `<strong class="text-yellow-300">DEBUG: [${source}] -> ${targetName}</strong><br>`;
+    logMessage += `<strong>Base Damage (Dice Roll):</strong> ${baseDamage}<br>`;
+    
+    steps.forEach(step => {
+        logMessage += `<strong>${step.description}:</strong> ${step.value} => <span class="text-cyan-400">${step.result}</span><br>`;
+    });
+
+    logMessage += `<strong>Final Damage Applied (after defense):</strong> <strong class="text-red-400">${finalDamage}</strong>`;
+    logMessage += `</div>`;
+    
+    addToLog(logMessage, 'text-gray-400');
+}
 
 function render(viewElement) { 
     hideTooltip();

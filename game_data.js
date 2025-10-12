@@ -318,8 +318,6 @@ const BIOMES = {
 };
 
 const BATTLE_GRIDS = {
-    'square_3x3': { width: 3, height: 3, layout: [1,1,1, 1,1,1, 1,1,1] },
-    'square_4x4': { width: 4, height: 4, layout: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1] },
     'square_5x5': { width: 5, height: 5, layout: [1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1] },
     'square_6x6': { width: 6, height: 6, layout: [1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1] },
     'l_shape_5': { width: 5, height: 5, layout: [1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,1, 1,0,0,0,0] },
@@ -327,6 +325,8 @@ const BATTLE_GRIDS = {
     'h_shape_5': { width: 5, height: 5, layout: [1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1] },
     'rect_6x4': { width: 6, height: 4, layout: [1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1] },
     'rect_4x6': { width: 4, height: 6, layout: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1] },
+    'rect_5x6': { width: 5, height: 6, layout: [1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1] },
+    'rect_6x5': { width: 6, height: 5, layout: [1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1] },
 };
 
 const ELEMENTS = {
@@ -366,6 +366,7 @@ const WEAPONS = {
     'dual_longswords': { name: 'Dual Longswords', class: 'Longsword', damage: [2, 4], price: 1800, rarity: 'Rare', description: "Two longswords to cover both sides with double the attack power. People advised adventurers against using them like this, but it does look very cool.", effect: { doubleStrike: true, dualWield: true } },
     'trolls_knight_sword': { name: 'Troll’s Knight Sword', class: 'Longsword', damage: [3, 8], price: 4500, rarity: 'Epic', description: "A heavy greatsword made from the blood of a troll, capable of resonating with the soul of its user. The more understanding the user has, the stronger it is.", effect: { intScaling: 0.2 } },
     'void_greatsword': { name: 'Void Greatsword', class: 'Longsword', damage: [3, 10], damageType: 'void', price: 20000, rarity: 'Legendary', description: "A greatsword ripped straight out of a Dullahan’s possession. It sucks the soul out of your enemy and can even possess you when you die, just long enough to get you back on your feet. Quote: \"Death is a contract, and this blade is an expert in renegotiation.\"", effect: { lifesteal: 0.25, revive: true } },
+    'the_greatsword': { name: 'The Greatsword', class: 'Longsword', damage: [4, 12], price: 50000, rarity: 'Legendary', description: "A colossal slab of iron, more a monument than a weapon. Said to have been used to slay a god... or at least give one a very bad headache.", effect: { type: 'godslayer', percent_hp_damage: 0.1 } },
 
     // --- Thrusting Swords ---
     'rapier': { name: 'Rapier', class: 'Thrusting Sword', damage: [1, 6], price: 150, rarity: 'Common', description: "A finely crafted piercing armament capable of piercing armors, especially the gaps that most adventurers forget to cover." },
@@ -851,14 +852,6 @@ const LEGACY_QUESTS = {
         // MODIFICATION: Changed reward to a real item.
         reward: { xp: 5000, gold: 10000, item: 'giant_hunter' },
         description: 'Defeat a legendary version of every creature in the land.'
-    },
-    'Godslayer': {
-        // MODIFICATION: Fixed typo "Greasword"
-        title: 'Godslayer Greatsword',
-        type: 'legacy_creation',
-        targets: 'the_greatsword',
-        reward: {xp: 2500, gold: 5000},
-        description: 'Create this hunk of Metal, and you shall slay God.'
     }
 };
 
@@ -949,23 +942,23 @@ const WITCH_COVEN_SERVICES = {
 
 const CHANGELOG_DATA = [
     {
+        version: "v0.5.3 - The Smartass Patch",
+        date: "2025-10-12",
+        changes: [
+            "Rebalanced monster damage formulas to scale more appropriately with player stats, ensuring a consistent challenge.",
+            "QoL Update: Players can now access their Inventory and Character Sheet from the post-battle screen using the standard side-panel buttons.",
+            "Fixed a critical bug that prevented the player from taking any actions after the enemy's first turn.",
+        ]
+    },
+    {
         version: "v0.5.2 - The Arsenal",
         date: "2025-10-11",
         changes: [
+            "Adding a myriad of weaponries and weapon classes to choose from",
             "Conducted a full audit of the armory, making dozens of previously unobtainable 'ghost' weapons available via monster loot, crafting recipes, and merchants.",
             "Introduced a new set of high-tier lures, allowing cunning adventurers to specifically hunt dangerous tier 3 monsters.",
             "Squashed a nasty save file corruption bug related to legacy character imports.",
             "Various minor bug fixes and quality-of-life adjustments."
-        ]
-    },
-    {
-        version: "v0.5.1 - The Grid",
-        date: "2025-10-07",
-        changes: [
-            "Implemented a grid-based battlefield system for more tactical combat.",
-            "Overhauled the battle system to make equipment choices more impactful.",
-            "Added Firebase integration for database and account management.",
-            "Fixed several UI layout issues on mobile devices."
         ]
     },
     {
@@ -1020,7 +1013,4 @@ const CHANGELOG_DATA = [
         ]
     }
 ];
-
-
-
 
