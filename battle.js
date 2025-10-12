@@ -409,8 +409,8 @@ function performAttack(targetIndex) {
     // Determine weapon range, including class perks
     let weaponRange = weapon.range || 1;
     if (weapon.class === 'Lance') {
-        weaponRange = weapon.range || 2;
-        if (weapon.name === 'Holy Beast Halberd') weaponRange = 3;
+         weaponRange = weapon.range || 2;
+         if(weapon.name === 'Holy Beast Halberd') weaponRange = 3;
     }
     
     const dx = Math.abs(player.x - target.x);
@@ -834,7 +834,7 @@ function castSpell(spellKey, targetIndex) {
     } else {
         if (spellData.element === 'wind' && Math.random() < (0.1 + (tierIndex * 0.05))) {
             addToLog("The swirling winds grant you another turn!", "text-cyan-300 font-bold");
-            setTimeout(endPlayerTurnPhase, 500);
+            setTimeout(beginPlayerTurn, 500);
         } else {
             setTimeout(checkBattleStatus, 200);
         }
@@ -1187,7 +1187,7 @@ async function enemyTurn() {
 
     if (player.statusEffects.buff_haste || player.statusEffects.buff_hermes) {
         addToLog("Your haste allows you to act again immediately!", "text-cyan-300 font-bold");
-        setTimeout(() => endPlayerTurnPhase(), 500);
+        setTimeout(() => beginPlayerTurn(), 500);
         return; 
     }
 
@@ -1317,11 +1317,11 @@ async function enemyTurn() {
     }
 
     if (!gameState.battleEnded) {
-        endPlayerTurnPhase();
+        beginPlayerTurn();
     }
 }
 
-function endPlayerTurnPhase() {
+function beginPlayerTurn() {
     if (checkVictory()) return;
     if (gameState.battleEnded) return;
     if (!player.isAlive()) {
@@ -1329,11 +1329,14 @@ function endPlayerTurnPhase() {
         return;
     }
 
-    gameState.action = null; // Reset action at the end of the turn phase
+    gameState.action = null; 
 
     if (player.statusEffects.petrified) {
         addToLog("You are petrified and cannot move!", 'text-gray-400');
-        setTimeout(enemyTurn, 500);
+        setTimeout(enemyTurn, 500); // Skip player turn
+    } else {
+        gameState.isPlayerTurn = true; // It's now the player's turn
+        renderBattleGrid(); // Re-render to show active buttons
     }
 }
 async function checkPlayerDeath() {
