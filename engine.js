@@ -889,11 +889,11 @@ class Enemy extends Entity {
                 target.takeDamage(lightningDamage, true, this);
                 addToLog(`Lightning arcs from the attack, dealing an extra <span class="font-bold text-blue-400">${lightningDamage}</span> damage!`);
             }
-            if ((this.element === 'dark' || this.element === 'void') && Math.random() < procChance) {
+            if (this.element === 'void' && Math.random() < procChance) {
                 const lifestealAmount = Math.floor(damageDealt * procChance);
                  if (lifestealAmount > 0) {
                     this.hp = Math.min(this.maxHp, this.hp + lifestealAmount);
-                    addToLog(`${this.name} drains <span class="font-bold text-purple-400">${lifestealAmount}</span> HP with dark energy.`, 'text-purple-300');
+                    addToLog(`${this.name} drains <span class="font-bold text-purple-400">${lifestealAmount}</span> HP with void energy.`, 'text-purple-300');
                 }
             }
         }
@@ -932,10 +932,10 @@ class Enemy extends Entity {
         if (effects.isMagic && effects.spell_penetration) {
             effectiveDefense *= (1 - effects.spell_penetration);
         }
-        if (effects.element === 'void' || effects.element === 'dark') {
+        if (effects.element === 'void') {
             const pierceAmount = Math.min(1, 0.5 + ((effects.tier || 0) * 0.1)); // Default tier to 0 if not provided
             effectiveDefense *= (1 - pierceAmount);
-            addToLog(`Your dark attack bypasses a significant portion of the enemy's defense!`, 'text-purple-400');
+            addToLog(`Your void attack bypasses a significant portion of the enemy's defense!`, 'text-purple-400');
         }
 
         const finalDamage = Math.max(0, Math.floor(damageTaken - effectiveDefense));
@@ -1919,5 +1919,4 @@ function cancelQuest() {
     updateStatsView();
     renderQuestBoard();
 }
-
 

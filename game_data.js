@@ -72,7 +72,7 @@ const CLASSES = {
         bonusStats: { Luck: 5, Intelligence: 3, Stamina: -2 },
         startingEquipment: { weapon: 'dagger', armor: 'leather_armor', catalyst: 'wooden_stick' },
         startingItems: { 'health_potion': 1, 'mana_potion': 2 },
-        startingSpells: { 'dark_support': 1 },
+        startingSpells: { 'void_support': 1 },
         randomLures: { count: 2, types: ['humanoid', 'undead'] }
     },
     'magus': {
@@ -90,7 +90,7 @@ const CLASSES = {
         bonusStats: { Intelligence: 5, Luck: 3, Focus: -2 },
         startingEquipment: { catalyst: 'wooden_wand', armor: 'leather_armor' },
         startingItems: { 'mana_potion': 2 },
-        startingSpells: { 'none_st': 1, 'water_support': 1, 'dark_st': 1 }
+        startingSpells: { 'none_st': 1, 'water_support': 1, 'void_st': 1 }
     }
 };
 
@@ -338,7 +338,6 @@ const ELEMENTS = {
     'lightning': { name: 'Lightning', adjective: 'Thundering', weakness: ['earth'], strength: ['water', 'wind'] },
     'nature': { name: 'Nature', adjective: 'Blossoming', weakness: ['fire', 'wind'], strength: ['water', 'earth'] },
     'light': { name: 'Light', adjective: 'Shining', weakness: ['void'], strength: [] },
-    'dark': { name: 'Dark', adjective: 'Shrouding', weakness: ['light'], strength: [] }, // Added Dark element
     'void': { name: 'Void', adjective: 'Abyssal', weakness: ['light'], strength: [] },
     'healing': { name: 'Healing', adjective: 'Restorative', weakness: [], strength: [] }
 };
@@ -725,25 +724,25 @@ const SPELLS = {
             { name: 'Divine Blessings', cost: 40, effect: { type: 'buff_divine', multiplier: 2.0, duration: 3, cleanse: true }, description: "Increase magical defense by 100% for 3 turns and cleanse all debuffs." }
         ]
     },
-    // Dark
-    'dark_st': {
-        element: 'dark', type: 'st', learnCost: 250,
+    // Void
+    'void_st': {
+        element: 'void', type: 'st', learnCost: 250,
         tiers: [
             { name: 'Shadow Sneak', cost: 10, damage: [2, 8], cap: 4, upgradeCost: 750, upgradeEssences: { 'void_essence': 10 }, description: "Launch a bolt of living shadow at an enemy." },
             { name: 'Hex Strike', cost: 25, damage: [4, 8], cap: 7, upgradeCost: 3000, upgradeEssences: { 'void_essence':210 }, description: "Strike a foe with a debilitating hex that wracks their body with dark energy." },
             { name: 'Gate of the Underworld', cost: 50, damage: [6, 8], cap: 10, description: "Tear open a momentary rift to the underworld beneath a foe, pulling them toward oblivion." }
         ]
     },
-    'dark_aoe': {
-        element: 'dark', type: 'aoe', learnCost: 250,
+    'void_aoe': {
+        element: 'void', type: 'aoe', learnCost: 250,
         tiers: [
             { name: 'Shadow Bolt', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'void_essence': 10 }, description: "Hurl a bolt of shadow that explodes on impact, damaging nearby enemies." },
             { name: 'Void Engulf', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'void_essence': 20 }, description: "Engulf an area in a sphere of pure void, draining the life from those within." },
             { name: 'Black Hole', cost: 60, damage: [6, 6], cap: 10, description: "Conjure a miniature black hole that pulls in and crushes all enemies in its vicinity." }
         ]
     },
-    'dark_support': {
-        element: 'dark', type: 'support', learnCost: 250,
+    'void_support': {
+        element: 'void', type: 'support', learnCost: 250,
         tiers: [
             { name: 'Shadow Shroud', cost: 25, effect: { type: 'buff_shroud', duration: 3 }, description: "Increase dodge and critical chance by 50% for 3 turns.", upgradeCost: 2500, upgradeEssences: { 'void_essence': 15 } },
             { name: 'Blessing of Voidwalker', cost: 50, effect: { type: 'buff_voidwalker', duration: 3 }, description: "Grants Shadow Shroud, +50% critical damage, and guaranteed fleeing." }
