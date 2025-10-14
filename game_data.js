@@ -940,6 +940,16 @@ const WITCH_COVEN_SERVICES = {
 
 const CHANGELOG_DATA = [
     {
+        version: "v5.4 - The Welcome Home Update",
+        date: "2025-10-14",
+        changes: [
+            "Added a tutorial. Now you have no excuse for losing to a rabbit.",
+            "The Library is open. Go read about monster weaknesses for a change.",
+            "Players can now own a house. Stop paying that greedy innkeeper.",
+            "Added difficulty sliders. Choose whether to breeze through or suffer."
+        ]
+    },
+    {
         version: "v0.5.3 - The Smartass Patch",
         date: "2025-10-12",
         changes: [
