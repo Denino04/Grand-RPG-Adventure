@@ -1,9 +1,15 @@
 // --- UTILITY & DOM FUNCTIONS ---
 const $ = (selector) => document.querySelector(selector);
-const logElement = $('#game-log');
-const mainView = $('#main-view');
+// MODIFICATION: Delay initialization of these variables
+let logElement;
+let mainView;
 let characterSheetOriginalStats = null;
 
+// MODIFICATION: New function to initialize DOM elements after page load
+function initUIElements() {
+    logElement = $('#game-log');
+    mainView = $('#main-view');
+}
 
 function capitalize(str) {
     if (!str) return '';
@@ -22,7 +28,20 @@ function rollDice(numDice, sides, purpose = 'Generic Roll') {
     }
     return total; 
 }
-function addToLog(message, colorClass = '') { const p = document.createElement('p'); p.innerHTML = message; p.className = `mb-1 ${colorClass}`; logElement.appendChild(p); logElement.scrollTop = logElement.scrollHeight; }
+
+function addToLog(message, colorClass = '') {
+    // MODIFICATION: Add a guard clause to prevent errors if logElement is not ready
+    if (!logElement) {
+        console.error("Log element not initialized, cannot add log:", message);
+        return;
+    }
+    const p = document.createElement('p');
+    p.innerHTML = message;
+    p.className = `mb-1 ${colorClass}`;
+    logElement.appendChild(p);
+    logElement.scrollTop = logElement.scrollHeight;
+}
+
 function getItemDetails(itemKey) { if (itemKey in ITEMS) return ITEMS[itemKey]; if (itemKey in WEAPONS) return WEAPONS[itemKey]; if (itemKey in CATALYSTS) return CATALYSTS[itemKey]; if (itemKey in ARMOR) return ARMOR[itemKey]; if (itemKey in SHIELDS) return SHIELDS[itemKey]; if (itemKey in LURES) return LURES[itemKey]; return null; }
 
 /**
@@ -886,3 +905,4 @@ function hideEnemyInfo() {
     $('#tooltip').style.display = 'none';
     activeTooltipItem = null;
 }
+

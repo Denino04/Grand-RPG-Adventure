@@ -611,6 +611,8 @@ async function updateLoadGameButtonVisibility() {
 
 // --- EVENT LISTENERS ---
 window.addEventListener('load', async () => { 
+    // MODIFICATION: Initialize UI elements only after the page is fully loaded.
+    initUIElements();
     await initFirebase();
     
     if (!realTimeInterval) {

@@ -1,4 +1,10 @@
 let statAllocationAmount = 1;
+let storageSortOrder = 'category';
+
+function setStorageSortOrder(order) {
+    storageSortOrder = order;
+    renderHouseStorage();
+}
 
 function getWeaponStatsString(weapon) {
     if (!weapon || !weapon.name) return 'None';
@@ -813,7 +819,6 @@ function renderHouse() {
             <div class="flex flex-col md:flex-row justify-center items-center gap-4">
                 <button onclick="restAtHouse()" class="btn btn-primary w-full md:w-auto">Rest</button>
                 <button onclick="renderHouseStorage()" class="btn btn-primary w-full md:w-auto">Storage</button>
-                <button onclick="renderHouseGarden()" class="btn btn-primary w-full md:w-auto">Garden</button>
             </div>
              <div class="mt-8">
                 <button onclick="renderTownSquare()" class="btn btn-action">Leave House</button>
@@ -826,107 +831,143 @@ function renderHouse() {
 
 function renderHouseStorage() {
     gameState.currentView = 'house_storage';
-    
-    const renderInventoryList = () => {
-        let html = '';
-        const categories = ['items', 'weapons', 'armor', 'shields', 'catalysts', 'lures'];
+
+    const renderItemList = (source, type, moveAction, sortOrder) => {
+        let allItems = [];
+        const categories = ['items', 'lures', 'weapons', 'catalysts', 'armor', 'shields'];
+        let hasContent = false;
+
+        // 1. Flatten all items into one array
         categories.forEach(category => {
-            let itemsInCategory;
+            const itemsInCategory = source[category] || (category === 'items' || category === 'lures' ? {} : []);
+
             if (category === 'items' || category === 'lures') {
-                itemsInCategory = Object.keys(player.inventory[category] || {});
+                Object.keys(itemsInCategory).forEach(key => {
+                    const count = itemsInCategory[key];
+                    const details = getItemDetails(key);
+                    if (count > 0 && details && details.type !== 'key') {
+                        allItems.push({ key, count, category, details });
+                    }
+                });
             } else {
-                itemsInCategory = [...new Set(player.inventory[category] || [])];
-            }
-            
-            if (itemsInCategory.length > 0) {
-                html += `<h4 class="font-bold text-yellow-300 mt-3 mb-1 text-sm">${capitalize(category)}</h4>`;
-                itemsInCategory.forEach(key => {
+                // For non-stackable, we need to handle duplicates by counting them
+                const itemCounts = {};
+                itemsInCategory.forEach(key => itemCounts[key] = (itemCounts[key] || 0) + 1);
+
+                Object.keys(itemCounts).forEach(key => {
                     const details = getItemDetails(key);
                     if (!details || details.rarity === 'Broken') return;
-                     const isEquipped = (player.equippedWeapon === details || player.equippedArmor === details || player.equippedShield === details || player.equippedCatalyst === details || player.equippedLure === key);
+
+                    let isEquipped = false;
+                    if (type === 'inventory') {
+                        isEquipped = (player.equippedWeapon.name === details.name && category === 'weapons') ||
+                                     (player.equippedArmor.name === details.name && category === 'armor') ||
+                                     (player.equippedShield.name === details.name && category === 'shields') ||
+                                     (player.equippedCatalyst.name === details.name && category === 'catalysts');
+                    }
                     if (!isEquipped) {
-                        html += `<div class="flex justify-between items-center p-1 bg-slate-900/50 rounded text-xs">
-                            <span onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">${details.name}</span>
-                            <button onclick="moveToStorage('${category}', '${key}')" class="btn btn-primary text-xs py-0 px-2 leading-none">></button>
-                        </div>`;
+                        allItems.push({ key, count: itemCounts[key], category, details });
                     }
                 });
             }
         });
-        return html;
-    };
-
-    const renderStorageList = () => {
-        let html = '';
-        if (player.house.storage.length === 0) {
-            return '<p class="text-xs text-gray-500 text-center mt-4">Storage is empty.</p>';
+        
+        hasContent = allItems.length > 0;
+        if (!hasContent) {
+            const message = type === 'inventory' ? 'Your inventory is empty of unequipped items.' : 'Your storage is empty.';
+            return `<p class="text-sm text-gray-500 text-center mt-4 col-span-full">${message}</p>`;
         }
-        player.house.storage.forEach((key, index) => {
-            const details = getItemDetails(key);
-            html += `<div class="flex justify-between items-center p-1 bg-slate-900/50 rounded text-xs">
-                <button onclick="moveFromStorage('${key}', ${index})" class="btn btn-primary text-xs py-0 px-2 leading-none"><</button>
-                <span onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">${details.name}</span>
+
+        // 2. Sort the array
+        if (sortOrder === 'name') {
+            allItems.sort((a, b) => a.details.name.localeCompare(b.details.name));
+        } else if (sortOrder === 'cost') {
+            allItems.sort((a, b) => (b.details.price || 0) - (a.details.price || 0));
+        } else { // 'category' sort (default)
+            allItems.sort((a, b) => {
+                if (a.category !== b.category) {
+                    return categories.indexOf(a.category) - categories.indexOf(b.category);
+                }
+                return a.details.name.localeCompare(b.details.name);
+            });
+        }
+        
+        // 3. Render the sorted list
+        let html = '';
+        let currentCategory = '';
+        allItems.forEach(item => {
+            if (sortOrder === 'category' && item.category !== currentCategory) {
+                currentCategory = item.category;
+                // Add a full-width header for the category
+                html += `<h4 class="font-bold text-yellow-300 mt-4 mb-2 text-sm uppercase tracking-wider col-span-full">${capitalize(currentCategory)}</h4>`;
+            }
+            
+            const arrow = type === 'inventory' ? '↓' : '↑';
+            const countText = item.count > 1 ? ` (x${item.count})` : (item.category === 'lures' ? ` (x${item.count} uses)`: '');
+            
+            html += `<div class="flex justify-between items-center p-2 bg-slate-900/50 rounded text-sm">
+                <span onmouseover="showTooltip('${item.key}', event)" onmouseout="hideTooltip()">${item.details.name}${countText}</span>
+                <button onclick="${moveAction}('${item.category}', '${item.key}')" class="btn btn-primary text-lg py-0 px-3 leading-none">${arrow}</button>
             </div>`;
         });
-        return html;
+        
+        return `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">${html}</div>`;
     };
 
     let html = `
-        <div class="w-full">
+        <div class="w-full max-w-4xl mx-auto flex flex-col h-full">
             <h2 class="font-medieval text-3xl mb-4 text-center">Storage Chest</h2>
-            <div class="grid grid-cols-2 gap-4 h-80">
-                <div class="bg-slate-800 p-2 rounded-lg">
-                    <h3 class="font-bold text-lg text-center mb-2">Your Inventory</h3>
-                    <div class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-1 pb-8">
-                        ${renderInventoryList()}
+            
+            <div class="flex-grow flex flex-col bg-slate-800 rounded-lg overflow-hidden">
+                <!-- Inventory Section -->
+                <div class="p-4 flex-1 overflow-y-auto inventory-scrollbar">
+                    <div class="flex justify-between items-center mb-2 sticky top-0 bg-slate-800/80 backdrop-blur-sm py-2 z-10">
+                         <h3 class="font-bold text-xl text-yellow-300">Your Inventory</h3>
+                         <button onclick="placeAllInStorage()" class="btn btn-primary text-sm py-1 px-3">Place All ↓</button>
+                    </div>
+                    <div>
+                        ${renderItemList(player.inventory, 'inventory', 'moveToStorage', 'category')}
                     </div>
                 </div>
-                <div class="bg-slate-800 p-2 rounded-lg">
-                    <h3 class="font-bold text-lg text-center mb-2">Chest</h3>
-                    <div class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-1 pb-8">
-                        ${renderStorageList()}
+
+                <!-- Separator -->
+                <hr class="border-slate-600">
+
+                <!-- Storage Section -->
+                <div class="p-4 flex-1 overflow-y-auto inventory-scrollbar">
+                     <div class="flex flex-wrap justify-between items-center mb-2 sticky top-0 bg-slate-800/80 backdrop-blur-sm py-2 z-10 gap-2">
+                         <div class="flex items-center gap-4">
+                            <h3 class="font-bold text-xl text-yellow-300">Chest Storage</h3>
+                            <button onclick="takeAllFromStorage()" class="btn btn-primary text-sm py-1 px-3">Take All ↑</button>
+                         </div>
+                         <div class="flex items-center gap-2">
+                            <span class="text-sm text-gray-400">Sort by:</span>
+                            <button onclick="setStorageSortOrder('category')" class="btn ${storageSortOrder === 'category' ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2">Category</button>
+                            <button onclick="setStorageSortOrder('name')" class="btn ${storageSortOrder === 'name' ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2">Name</button>
+                            <button onclick="setStorageSortOrder('cost')" class="btn ${storageSortOrder === 'cost' ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2">Cost</button>
+                         </div>
+                    </div>
+                     <div>
+                        ${renderItemList(player.house.storage, 'storage', 'moveFromStorage', storageSortOrder)}
                     </div>
                 </div>
             </div>
-            <div class="text-center mt-4">
+
+            <!-- Back Button - outside the scrollable area -->
+            <div class="text-center mt-4 flex-shrink-0">
                 <button onclick="renderHouse()" class="btn btn-primary">Back</button>
             </div>
         </div>`;
 
     const container = document.createElement('div');
+    container.className = 'w-full h-full';
     container.innerHTML = html;
+    
     render(container);
-}
-
-function renderHouseGarden() {
-    gameState.currentView = 'house_garden';
-
-    let html = `<div class="w-full text-center">
-        <h2 class="font-medieval text-3xl mb-4">Your Garden</h2>
-        <p class="text-gray-400 mb-6">A small patch of fertile ground. You'll need to find some seeds to plant anything.</p>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-lg mx-auto">`;
-
-    for (let i = 0; i < player.house.gardenPlots; i++) {
-        const plot = player.house.garden[i];
-        html += `<div class="aspect-square bg-yellow-900/50 border-2 border-yellow-700 rounded-lg flex flex-col items-center justify-center p-2">`;
-        if (plot && plot.seed) {
-            // Future logic for planted seeds
-            html += `<span class="text-2xl">🌱</span><p class="text-xs mt-1">${getItemDetails(plot.seed).name}</p>`;
-        } else {
-            html += `<span class="text-2xl">흙</span><p class="text-xs text-gray-500 mt-1">Empty Plot</p>`;
-        }
-        html += `</div>`;
-    }
-
-    html += `</div>
-        <div class="text-center mt-8">
-            <button onclick="renderHouse()" class="btn btn-primary">Back</button>
-        </div>
-    </div>`;
-
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    render(container);
+    
+    // Custom adjustments for this full-screen-like view
+    mainView.classList.remove('items-center', 'p-6');
+    mainView.classList.add('p-2');
 }
 
 
@@ -1754,7 +1795,7 @@ function renderSageTowerTrain() {
         spellsByElement[spell.element].push(spellKey);
     }
     
-    const elementOrder = ['none', 'fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'dark', 'healing'];
+    const elementOrder = ['none', 'fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'void', 'healing'];
     
     let html = `<div class="w-full">
         <h2 class="font-medieval text-3xl mb-4 text-center">Train Spells</h2>
@@ -2132,6 +2173,10 @@ function renderBattle(subView = 'main', actionData = null) {
      } else if (subView === 'magic') {
         let spellsHtml = Object.keys(player.spells).map(key => {
             const spellTree = SPELLS[key];
+            if (!spellTree) {
+                console.warn(`Invalid spell key "${key}" found in player's spellbook. Skipping.`);
+                return ''; // Skip rendering this invalid spell
+            }
             const spell = spellTree.tiers[player.spells[key].tier - 1];
             const canCast = player.mp >= spell.cost;
             return `<button onclick="battleAction('magic_select', {spellKey: '${key}'})" class="btn btn-magic w-full text-left" ${!canCast ? 'disabled' : ''} onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
@@ -2478,5 +2523,4 @@ function renderBettyQuestProposal() {
     container.innerHTML = dialogueHtml;
     render(container);
 }
-
 

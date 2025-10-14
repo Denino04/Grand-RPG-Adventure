@@ -276,7 +276,7 @@ class Player extends Entity {
         this.background = '';
         this.backgroundKey = '';
         this.difficulty = 'hardcore';
-        this.house = { owned: false, storage: { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} }, gardenSize: 2, garden: {} };
+        this.house = { owned: false, storage: { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} } };
         this.dialogueFlags = {};
         this.bettyQuestState = 'not_started'; // not_started, declined, accepted
 
@@ -493,7 +493,7 @@ class Player extends Entity {
                          (itemKey in LURES ? 'lures' : 'items'))));
 
         if (category === 'lures') {
-             this.inventory.lures[itemKey] = (this.inventory.lures[itemKey] || 0) + details.uses;
+             this.inventory.lures[itemKey] = (this.inventory.lures[itemKey] || 0) + quantity;
         } else if (category === 'items') { 
             this.inventory.items[itemKey] = (this.inventory.items[itemKey] || 0) + quantity; 
         } else {
@@ -577,7 +577,7 @@ class Player extends Entity {
         // MODIFICATION: Added check for weapon parry.
         if (this.equippedWeapon.effect?.parry) totalParryChance += this.equippedWeapon.effect.parry;
 
-        if (totalParryChance > 0 && Math.random() < totalParryChance && attacker && attacker.isAlive()) {
+        if (attacker && totalParryChance > 0 && Math.random() < totalParryChance && attacker.isAlive()) {
             attacker.attackParried = true;
             addToLog(`You parried ${attacker.name}'s attack!`, 'text-yellow-300 font-bold');
             setTimeout(() => {
@@ -595,7 +595,7 @@ class Player extends Entity {
         }
         
         // --- Dodge logic (Stops attack entirely) ---
-        if (dodgeChance > 0 && Math.random() < dodgeChance) {
+        if (attacker && dodgeChance > 0 && Math.random() < dodgeChance) {
             attacker.attackParried = true;
             addToLog(`You dodged ${attacker.name}'s attack!`, 'text-teal-300 font-bold');
             updateStatsView();
@@ -1944,8 +1944,6 @@ function buildHouse() {
     
     // Ensure full house structure exists, especially for older saves
     if (!player.house.storage) player.house.storage = { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} };
-    if (!player.house.gardenSize) player.house.gardenSize = 2;
-    if (!player.house.garden) player.house.garden = {};
 
 
     addToLog("You hand over the gold and the deed is yours! Your new house is ready.", "text-green-400 font-bold");
@@ -1963,13 +1961,118 @@ function restAtHouse() {
     renderHouse();
 }
 
+function placeAllInStorage() {
+    const categories = ['items', 'weapons', 'armor', 'shields', 'catalysts', 'lures'];
+    let itemsMovedCount = 0;
+
+    categories.forEach(category => {
+        // Ensure destination category exists in storage
+        if (!player.house.storage[category]) {
+            if (category === 'items' || category === 'lures') {
+                player.house.storage[category] = {};
+            } else {
+                player.house.storage[category] = [];
+            }
+        }
+
+        if (category === 'items' || category === 'lures') {
+            const source = player.inventory[category];
+            const destination = player.house.storage[category];
+            for (const itemKey in source) {
+                const details = getItemDetails(itemKey);
+                // Don't move key items
+                if (details && details.rarity !== 'Broken' && details.type !== 'key') {
+                    destination[itemKey] = (destination[itemKey] || 0) + source[itemKey];
+                    itemsMovedCount += source[itemKey]; // Add the whole stack to the count
+                    delete source[itemKey];
+                }
+            }
+        } else { // Equipment
+            const source = player.inventory[category];
+            const destination = player.house.storage[category];
+            // Iterate backwards when splicing from an array you're looping over
+            for (let i = source.length - 1; i >= 0; i--) {
+                const itemKey = source[i];
+                const details = getItemDetails(itemKey);
+                if (!details || details.rarity === 'Broken') continue;
+
+                const isEquipped = (player.equippedWeapon.name === details.name && category === 'weapons') ||
+                                 (player.equippedArmor.name === details.name && category === 'armor') ||
+                                 (player.equippedShield.name === details.name && category === 'shields') ||
+                                 (player.equippedCatalyst.name === details.name && category === 'catalysts');
+
+                if (!isEquipped) {
+                    destination.push(itemKey);
+                    source.splice(i, 1);
+                    itemsMovedCount++;
+                }
+            }
+        }
+    });
+
+    if (itemsMovedCount > 0) {
+        addToLog(`Moved all unequipped items to storage.`);
+    } else {
+        addToLog(`No unequipped items to move.`);
+    }
+    
+    renderHouseStorage();
+}
+
+function takeAllFromStorage() {
+    if (!player.house.storage) {
+        player.house.storage = { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} };
+    }
+    const categories = ['items', 'weapons', 'armor', 'shields', 'catalysts', 'lures'];
+    let itemsMovedCount = 0;
+
+    categories.forEach(category => {
+        if (!player.house.storage[category]) return; // Skip if storage category doesn't exist
+
+        if (category === 'items' || category === 'lures') {
+            const source = player.house.storage[category];
+            const destination = player.inventory[category];
+            for (const itemKey in source) {
+                const count = source[itemKey];
+                if (count > 0) {
+                    destination[itemKey] = (destination[itemKey] || 0) + count;
+                    itemsMovedCount += count;
+                }
+            }
+            // Clear the source object
+            player.house.storage[category] = {};
+        } else { // Equipment
+            const source = player.house.storage[category];
+            const destination = player.inventory[category];
+            if (source.length > 0) {
+                itemsMovedCount += source.length;
+                // Extend the destination array with all items from source
+                destination.push(...source);
+                // Clear the source array
+                player.house.storage[category] = [];
+            }
+        }
+    });
+
+    if (itemsMovedCount > 0) {
+        addToLog(`Moved all items from storage to your inventory.`);
+    } else {
+        addToLog(`Storage is already empty.`);
+    }
+    
+    renderHouseStorage();
+}
+
 // MODIFICATION: Rewriting storage functions for new object-based storage
 function moveToStorage(category, itemKey, index = -1) {
+    if (!player.house.storage) {
+        player.house.storage = { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} };
+    }
     const details = getItemDetails(itemKey);
     if (!details) return;
 
-    // Handle stackable items (items)
-    if (category === 'items') {
+    // Handle stackable items (items & lures)
+    if (category === 'items' || category === 'lures') {
         const source = player.inventory[category];
         const destination = player.house.storage[category];
         
@@ -1999,19 +2102,24 @@ function moveToStorage(category, itemKey, index = -1) {
 }
 
 function moveFromStorage(category, itemKey, index = -1) {
+    if (!player.house.storage) {
+        player.house.storage = { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} };
+    }
     const details = getItemDetails(itemKey);
     if (!details) return;
 
-    // Handle stackable items (items)
-    if (category === 'items') {
+    // Handle stackable items (items & lures)
+    if (category === 'items' || category === 'lures') {
         const source = player.house.storage[category];
+        const destination = player.inventory[category];
         if (source[itemKey] && source[itemKey] > 0) {
             source[itemKey]--;
             if (source[itemKey] <= 0) delete source[itemKey];
-            player.addToInventory(itemKey, 1, false);
+            destination[itemKey] = (destination[itemKey] || 0) + 1;
         }
     } else { // Handle equipment
         const source = player.house.storage[category];
+        const destination = player.inventory[category];
         let itemIndex = -1;
         if (index > -1 && source[index] === itemKey) {
             itemIndex = index;
@@ -2021,31 +2129,9 @@ function moveFromStorage(category, itemKey, index = -1) {
         
         if (itemIndex > -1) {
             source.splice(itemIndex, 1);
-            player.addToInventory(itemKey, 1, false);
+            destination[itemKey] = (destination[itemKey] || 0) + 1;
         }
     }
     renderHouseStorage();
-}
-
-
-function expandGarden() {
-    const currentSize = player.house.gardenSize;
-    if (currentSize >= 5) {
-        addToLog("Your garden is already at its maximum size.", "text-yellow-400");
-        return;
-    }
-
-    const nextSize = currentSize + 1;
-    const cost = GARDEN_EXPANSION_COSTS[nextSize];
-    if (player.gold < cost) {
-        addToLog(`You need ${cost} G to expand your garden to ${nextSize}x${nextSize}.`, "text-red-400");
-        return;
-    }
-
-    player.gold -= cost;
-    player.house.gardenSize++;
-    addToLog(`You've expanded your garden to ${player.house.gardenSize}x${player.house.gardenSize}!`, "text-green-400");
-    saveGame();
-    renderHouseGarden();
 }
 
