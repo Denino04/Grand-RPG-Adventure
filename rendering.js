@@ -43,6 +43,7 @@ function updateStatsView() {
     if (player.race) detailsText.push(player.race);
     if (player.class) detailsText.push(player.class);
     if (player.background) detailsText.push(player.background);
+    if (player.difficulty) detailsText.push(capitalize(player.difficulty));
     elements.details.textContent = detailsText.join(' | ');
 
     elements.level.textContent = player.level; 
@@ -106,62 +107,30 @@ function updateStatsView() {
 
 function renderCharacterCreation() {
     $('#start-screen').classList.add('hidden');
-    $('#character-creation-screen').classList.remove('hidden');
-    $('#creation-step-1').classList.remove('hidden');
-    $('#creation-step-2').classList.add('hidden');
-    $('#creation-step-3').classList.add('hidden');
+    const creationScreen = $('#character-creation-screen');
+    creationScreen.classList.remove('hidden');
+
+    for (let i = 0; i <= 3; i++) {
+        const step = $(`#creation-step-${i}`);
+        if(step) step.classList.add('hidden');
+    }
+    $('#creation-step-0').classList.remove('hidden');
     $('#new-char-name').focus();
 
-    let creationState = {
-        name: '',
-        gender: null,
-        race: null,
-        class: null,
-        background: null
-    };
-    
-    // --- Step 1: Race Selection ---
-    const raceListContainer = $('#race-selection-list');
-    raceListContainer.innerHTML = '';
-    Object.keys(RACES).forEach(raceKey => {
-        const button = document.createElement('button');
-        button.className = 'btn btn-primary w-full text-left';
-        button.dataset.race = raceKey;
-        button.textContent = raceKey;
-        button.onmouseenter = () => {
-            const raceData = RACES[raceKey];
-            $('#race-details-name').textContent = raceKey;
-            $('#race-details-description').textContent = raceData.description;
-            const statsContainer = $('#race-details-stats');
-            statsContainer.innerHTML = Object.entries(raceData)
-                .filter(([key]) => key !== 'description')
-                .map(([stat, value]) => `<div class="grid grid-cols-2"><span>${stat}</span><span class="font-bold text-yellow-300 text-right">${value}</span></div>`)
-                .join('');
-        };
-        button.addEventListener('click', () => {
-            document.querySelectorAll('#race-selection-list button').forEach(btn => {
-                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
-                btn.classList.add('btn-primary');
-            });
-            button.classList.add('bg-yellow-600', 'border-yellow-800');
-            button.classList.remove('btn-primary');
-            creationState.race = raceKey;
-        });
-        raceListContainer.appendChild(button);
-    });
+    if (isTutorialEnabled) {
+        startTutorialSequence('character_creation');
+    }
 
-    const genderButtons = document.querySelectorAll('#gender-selection button');
-    genderButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            genderButtons.forEach(btn => {
-                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
-                btn.classList.add('btn-primary');
-            });
-            button.classList.add('bg-yellow-600', 'border-yellow-800');
-            button.classList.remove('btn-primary');
-            creationState.gender = button.dataset.gender;
-        });
-    });
+    let creationState = { name: '', gender: null, race: null, class: null, background: null, difficulty: 'hardcore' };
+
+    const switchStep = (from, to) => {
+        $(`#creation-step-${from}`).classList.add('hidden');
+        $(`#creation-step-${to}`).classList.remove('hidden');
+    };
+
+    // --- Event Listeners for Navigation ---
+    $('#creation-back-to-start-btn').onclick = () => { window.location.hash = 'menu' };
+    $('#back-to-step-0-btn').onclick = () => switchStep(1, 0);
 
     $('#to-step-2-btn').onclick = () => {
         const nameInput = $('#new-char-name');
@@ -185,12 +154,84 @@ function renderCharacterCreation() {
         }
 
         if (!hasError) {
-            $('#creation-step-1').classList.add('hidden');
-            $('#creation-step-2').classList.remove('hidden');
+            if (tutorialState.isActive) advanceTutorial();
+            switchStep(1, 2);
         }
     };
+
+    $('#back-to-step-1-btn').onclick = () => switchStep(2, 1);
     
-    // --- Step 2: Class Selection ---
+    $('#to-step-3-btn').onclick = () => {
+        if (!creationState.class) {
+             $('#class-label').classList.add('animate-pulse', 'text-red-400');
+            setTimeout(() =>  $('#class-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
+            return;
+        }
+        if (tutorialState.isActive) advanceTutorial();
+        switchStep(2, 3);
+    };
+    
+    $('#back-to-step-2-btn').onclick = () => switchStep(3, 2);
+
+    $('#finalize-creation-btn').onclick = () => {
+        if (!creationState.background) {
+            $('#background-label').classList.add('animate-pulse', 'text-red-400');
+            setTimeout(() => $('#background-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
+            return;
+        }
+        if (tutorialState.isActive) advanceTutorial(creationState.name);
+        
+        setTimeout(() => {
+            initGame(creationState.name, creationState.gender, creationState.race, creationState.class, creationState.background, creationState.difficulty);
+        }, tutorialState.isActive ? 2500 : 0);
+    };
+
+    $('#difficulty-easy').onclick = () => { creationState.difficulty = 'easy'; switchStep(0, 1); };
+    $('#difficulty-medium').onclick = () => { creationState.difficulty = 'medium'; switchStep(0, 1); };
+    $('#difficulty-hardcore').onclick = () => { creationState.difficulty = 'hardcore'; switchStep(0, 1); };
+
+    const genderButtons = document.querySelectorAll('#gender-selection button');
+    genderButtons.forEach(button => {
+        button.onclick = () => {
+            genderButtons.forEach(btn => {
+                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
+                btn.classList.add('btn-primary');
+            });
+            button.classList.add('bg-yellow-600', 'border-yellow-800');
+            button.classList.remove('btn-primary');
+            creationState.gender = button.dataset.gender;
+        };
+    });
+
+    const raceListContainer = $('#race-selection-list');
+    raceListContainer.innerHTML = '';
+    Object.keys(RACES).forEach(raceKey => {
+        const button = document.createElement('button');
+        button.className = 'btn btn-primary w-full text-left';
+        button.dataset.race = raceKey;
+        button.textContent = raceKey;
+        button.onmouseenter = () => {
+            const raceData = RACES[raceKey];
+            $('#race-details-name').textContent = raceKey;
+            $('#race-details-description').textContent = raceData.description;
+            const statsContainer = $('#race-details-stats');
+            statsContainer.innerHTML = Object.entries(raceData)
+                .filter(([key]) => key !== 'description')
+                .map(([stat, value]) => `<div class="grid grid-cols-2"><span>${stat}</span><span class="font-bold text-yellow-300 text-right">${value}</span></div>`)
+                .join('');
+        };
+        button.onclick = () => {
+            document.querySelectorAll('#race-selection-list button').forEach(btn => {
+                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
+                btn.classList.add('btn-primary');
+            });
+            button.classList.add('bg-yellow-600', 'border-yellow-800');
+            button.classList.remove('btn-primary');
+            creationState.race = raceKey;
+        };
+        raceListContainer.appendChild(button);
+    });
+
     const classListContainer = $('#class-selection-list');
     classListContainer.innerHTML = '';
     Object.keys(CLASSES).forEach(classKey => {
@@ -217,7 +258,7 @@ function renderCharacterCreation() {
 
             $('#class-details-stats').innerHTML = detailsHtml;
         };
-        button.addEventListener('click', () => {
+        button.onclick = () => {
              document.querySelectorAll('#class-selection-list button').forEach(btn => {
                 btn.classList.remove('bg-yellow-600', 'border-yellow-800');
                 btn.classList.add('btn-primary');
@@ -225,21 +266,10 @@ function renderCharacterCreation() {
             button.classList.add('bg-yellow-600', 'border-yellow-800');
             button.classList.remove('btn-primary');
             creationState.class = classKey;
-        });
+        };
         classListContainer.appendChild(button);
     });
     
-    $('#to-step-3-btn').onclick = () => {
-        if (!creationState.class) {
-             $('#class-label').classList.add('animate-pulse', 'text-red-400');
-            setTimeout(() =>  $('#class-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
-            return;
-        }
-        $('#creation-step-2').classList.add('hidden');
-        $('#creation-step-3').classList.remove('hidden');
-    };
-
-    // --- Step 3: Background Selection ---
     const backgroundListContainer = $('#background-selection-list');
     backgroundListContainer.innerHTML = '';
     Object.keys(BACKGROUNDS).forEach(bgKey => {
@@ -256,7 +286,7 @@ function renderCharacterCreation() {
             detailsHtml += `<p class="text-xs">${favoredStats}</p>`;
             $('#background-details-stats').innerHTML = detailsHtml;
         };
-        button.addEventListener('click', () => {
+        button.onclick = () => {
              document.querySelectorAll('#background-selection-list button').forEach(btn => {
                 btn.classList.remove('bg-yellow-600', 'border-yellow-800');
                 btn.classList.add('btn-primary');
@@ -264,32 +294,14 @@ function renderCharacterCreation() {
             button.classList.add('bg-yellow-600', 'border-yellow-800');
             button.classList.remove('btn-primary');
             creationState.background = bgKey;
-        });
+        };
         backgroundListContainer.appendChild(button);
     });
-
-    $('#finalize-creation-btn').onclick = () => {
-        if (!creationState.background) {
-            $('#background-label').classList.add('animate-pulse', 'text-red-400');
-            setTimeout(() => $('#background-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
-            return;
-        }
-        initGame(creationState.name, creationState.gender, creationState.race, creationState.class, creationState.background);
-    };
-
-    $('#back-to-step-1-btn').onclick = () => {
-        $('#creation-step-2').classList.add('hidden');
-        $('#creation-step-1').classList.remove('hidden');
-    };
-    $('#back-to-step-2-btn').onclick = () => {
-        $('#creation-step-3').classList.add('hidden');
-        $('#creation-step-2').classList.remove('hidden');
-    };
-    $('#back-to-start-btn').onclick = showStartScreen;
 }
 
+
 function renderRaceSelectionForOldSave(savedData, saveKey, isImport) {
-    showStartScreen(); // Reset all screens
+    showStartScreen(); 
     $('#start-screen').classList.add('hidden');
     $('#old-save-race-selection-screen').classList.remove('hidden');
 
@@ -339,7 +351,7 @@ function renderRaceSelectionForOldSave(savedData, saveKey, isImport) {
 }
 
 function renderClassBackgroundSelectionForOldSave(savedData, saveKey, isImport) {
-    showStartScreen(); // Reset all screens
+    showStartScreen(); 
     $('#start-screen').classList.add('hidden');
     $('#old-save-class-background-screen').classList.remove('hidden');
 
@@ -422,12 +434,10 @@ function renderClassBackgroundSelectionForOldSave(savedData, saveKey, isImport) 
 
     confirmBtn.onclick = () => {
         if (selectedClass && selectedBackground) {
-            // Update save data object
             savedData.class = CLASSES[selectedClass].name;
             savedData.background = BACKGROUNDS[selectedBackground].name;
             savedData.backgroundKey = selectedBackground;
 
-            // Retroactively apply class bonuses and starting items
             const classData = CLASSES[selectedClass];
             for (const stat in classData.bonusStats) {
                 if (savedData.hasOwnProperty(stat.toLowerCase())) {
@@ -590,7 +600,6 @@ window.deallocatePoint = function(stat, amount) {
 function resetStatAllocation() {
     if (!characterSheetOriginalStats) return;
 
-    // Restore main stats from the backup
     player.vigor = characterSheetOriginalStats.vigor;
     player.focus = characterSheetOriginalStats.focus;
     player.stamina = characterSheetOriginalStats.stamina;
@@ -598,7 +607,6 @@ function resetStatAllocation() {
     player.intelligence = characterSheetOriginalStats.intelligence;
     player.luck = characterSheetOriginalStats.luck;
 
-    // Restore bonus points from the backup
     player.bonusVigor = characterSheetOriginalStats.bonusVigor;
     player.bonusFocus = characterSheetOriginalStats.bonusFocus;
     player.bonusStamina = characterSheetOriginalStats.bonusStamina;
@@ -606,7 +614,6 @@ function resetStatAllocation() {
     player.bonusIntelligence = characterSheetOriginalStats.bonusIntelligence;
     player.bonusLuck = characterSheetOriginalStats.bonusLuck;
     
-    // Restore stat points
     player.statPoints = characterSheetOriginalStats.statPoints;
     
     player.recalculateGrowthBonuses();
@@ -620,7 +627,7 @@ function resetStatAllocation() {
 
 function confirmStatAllocation() {
     if (!player) return;
-    characterSheetOriginalStats = null; // Lock in the new stats
+    characterSheetOriginalStats = null; 
     addToLog("Your attributes have been confirmed.", "text-green-400");
     saveGame();
     
@@ -664,16 +671,12 @@ function exitGame() {
     addToLog('Saving your progress...');
     saveGame();
     setTimeout(() => {
-        $('#game-container').classList.add('hidden');
-        $('#start-screen').classList.remove('hidden');
-        logElement.innerHTML = '';
-        updateLoadGameButtonVisibility();
-        applyTheme('default');
+        window.location.hash = 'menu';
     }, 1000);
 }
 
 function renderWildernessMenu() {
-    applyTheme('default');
+    updateRealTimePalette();
     lastViewBeforeInventory = 'wilderness';
     gameState.currentView = 'wilderness';
     let html = `<div class="w-full">
@@ -716,16 +719,7 @@ function renderTown() {
 }
 
 function renderTownSquare() {
-    const defaultPalettes = ['noon', 'sunset', 'midnight'];
-    const allPalettes = Object.keys(PALETTES);
-    const palettesToUse = useFullPaletteRotation ? allPalettes : defaultPalettes;
-
-    if (timeOfDayIndex >= palettesToUse.length) {
-        timeOfDayIndex = 0;
-    }
-    const theme = palettesToUse[timeOfDayIndex];
-    applyTheme(theme);
-    timeOfDayIndex = (timeOfDayIndex + 1) % palettesToUse.length;
+    updateRealTimePalette();
 
     lastViewBeforeInventory = 'town';
     gameState.currentView = 'town';
@@ -765,28 +759,228 @@ function renderTownSquare() {
         { name: 'Arcane Quarter', action: "renderArcaneQuarter()", class: 'btn-primary' },
         { name: 'Residential Area', action: "renderResidentialDistrict()", class: 'btn-primary' },
     ];
+    
+    // MODIFICATION: Dynamic House Button
+    if (player.house.owned) {
+        buttons.push({ name: 'Your House', action: "renderHouse()", class: 'btn-primary' });
+    } else if (player.level >= 4) {
+        buttons.push({ name: 'Build House (1000 G)', action: "buildHouse()", class: 'btn-primary' });
+    } else {
+        buttons.push({ name: 'Your House (Lvl 4)', action: "", class: 'btn-primary', disabled: true });
+    }
+
      if (player.bettyQuestState === 'accepted') {
         buttons.push({ name: 'Betty\'s Corner', action: "startBettyDialogue()", class: 'btn-primary' });
     }
     buttons.push({ name: 'Save Game', action: "saveGame(true)", class: 'btn-primary' });
     buttons.push({ name: 'Export Save', action: "exportSave()", class: 'btn-primary' });
 
-
     let html = `
-        <button onclick="exitGame()" class="absolute top-2 right-2 btn btn-action !p-2 !rounded-full w-10 h-10 text-xl leading-none" title="Leave Game">
-            &times;
-        </button>
+        <div class="absolute top-4 right-4 flex gap-2 z-10">
+            <button onclick="renderSettingsMenu()" class="btn btn-primary !p-2 !rounded-full w-10 h-10 flex items-center justify-center" title="Settings">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+            </button>
+            <button onclick="exitGame()" class="btn btn-action !p-2 !rounded-full w-10 h-10 text-xl leading-none flex items-center justify-center" title="Leave Game">
+                &times;
+            </button>
+        </div>
         <h2 class="font-medieval text-3xl mb-8 text-center">Town Square</h2>
         <div class="grid grid-cols-1 gap-4 w-full max-w-xs">
-            ${buttons.map(btn => `<button onclick="${btn.action}" class="btn ${btn.class}">${btn.name}</button>`).join('')}
+            ${buttons.map(btn => `<button onclick="${btn.action}" class="btn ${btn.class}" ${btn.disabled ? 'disabled' : ''}>${btn.name}</button>`).join('')}
         </div>`;
     
+    container.innerHTML = html;
+    render(container);
+
+    if (tutorialState.isActive) {
+        const currentStep = tutorialState.sequence[tutorialState.currentIndex];
+        if (currentStep && (currentStep.trigger?.setFlag || currentStep.type === 'checkpoint')) {
+            advanceTutorial();
+        }
+    }
+}
+
+// MODIFICATION: New Housing functions
+function renderHouse() {
+    updateRealTimePalette();
+    lastViewBeforeInventory = 'town'; // Go back to town square from house
+    gameState.currentView = 'house';
+
+    let html = `
+        <div class="w-full text-center">
+            <h2 class="font-medieval text-3xl mb-4 text-center">Your House</h2>
+            <p class="mb-6 text-gray-400">A cozy, personal space to rest and prepare for your adventures.</p>
+            <div class="flex flex-col md:flex-row justify-center items-center gap-4">
+                <button onclick="restAtHouse()" class="btn btn-primary w-full md:w-auto">Rest</button>
+                <button onclick="renderHouseStorage()" class="btn btn-primary w-full md:w-auto">Storage</button>
+                <button onclick="renderHouseGarden()" class="btn btn-primary w-full md:w-auto">Garden</button>
+            </div>
+             <div class="mt-8">
+                <button onclick="renderTownSquare()" class="btn btn-action">Leave House</button>
+            </div>
+        </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+function renderHouseStorage() {
+    gameState.currentView = 'house_storage';
+    
+    const renderInventoryList = () => {
+        let html = '';
+        const categories = ['items', 'weapons', 'armor', 'shields', 'catalysts', 'lures'];
+        categories.forEach(category => {
+            let itemsInCategory;
+            if (category === 'items' || category === 'lures') {
+                itemsInCategory = Object.keys(player.inventory[category] || {});
+            } else {
+                itemsInCategory = [...new Set(player.inventory[category] || [])];
+            }
+            
+            if (itemsInCategory.length > 0) {
+                html += `<h4 class="font-bold text-yellow-300 mt-3 mb-1 text-sm">${capitalize(category)}</h4>`;
+                itemsInCategory.forEach(key => {
+                    const details = getItemDetails(key);
+                    if (!details || details.rarity === 'Broken') return;
+                     const isEquipped = (player.equippedWeapon === details || player.equippedArmor === details || player.equippedShield === details || player.equippedCatalyst === details || player.equippedLure === key);
+                    if (!isEquipped) {
+                        html += `<div class="flex justify-between items-center p-1 bg-slate-900/50 rounded text-xs">
+                            <span onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">${details.name}</span>
+                            <button onclick="moveToStorage('${category}', '${key}')" class="btn btn-primary text-xs py-0 px-2 leading-none">></button>
+                        </div>`;
+                    }
+                });
+            }
+        });
+        return html;
+    };
+
+    const renderStorageList = () => {
+        let html = '';
+        if (player.house.storage.length === 0) {
+            return '<p class="text-xs text-gray-500 text-center mt-4">Storage is empty.</p>';
+        }
+        player.house.storage.forEach((key, index) => {
+            const details = getItemDetails(key);
+            html += `<div class="flex justify-between items-center p-1 bg-slate-900/50 rounded text-xs">
+                <button onclick="moveFromStorage('${key}', ${index})" class="btn btn-primary text-xs py-0 px-2 leading-none"><</button>
+                <span onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">${details.name}</span>
+            </div>`;
+        });
+        return html;
+    };
+
+    let html = `
+        <div class="w-full">
+            <h2 class="font-medieval text-3xl mb-4 text-center">Storage Chest</h2>
+            <div class="grid grid-cols-2 gap-4 h-80">
+                <div class="bg-slate-800 p-2 rounded-lg">
+                    <h3 class="font-bold text-lg text-center mb-2">Your Inventory</h3>
+                    <div class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-1 pb-8">
+                        ${renderInventoryList()}
+                    </div>
+                </div>
+                <div class="bg-slate-800 p-2 rounded-lg">
+                    <h3 class="font-bold text-lg text-center mb-2">Chest</h3>
+                    <div class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-1 pb-8">
+                        ${renderStorageList()}
+                    </div>
+                </div>
+            </div>
+            <div class="text-center mt-4">
+                <button onclick="renderHouse()" class="btn btn-primary">Back</button>
+            </div>
+        </div>`;
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+function renderHouseGarden() {
+    gameState.currentView = 'house_garden';
+
+    let html = `<div class="w-full text-center">
+        <h2 class="font-medieval text-3xl mb-4">Your Garden</h2>
+        <p class="text-gray-400 mb-6">A small patch of fertile ground. You'll need to find some seeds to plant anything.</p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-lg mx-auto">`;
+
+    for (let i = 0; i < player.house.gardenPlots; i++) {
+        const plot = player.house.garden[i];
+        html += `<div class="aspect-square bg-yellow-900/50 border-2 border-yellow-700 rounded-lg flex flex-col items-center justify-center p-2">`;
+        if (plot && plot.seed) {
+            // Future logic for planted seeds
+            html += `<span class="text-2xl">🌱</span><p class="text-xs mt-1">${getItemDetails(plot.seed).name}</p>`;
+        } else {
+            html += `<span class="text-2xl">흙</span><p class="text-xs text-gray-500 mt-1">Empty Plot</p>`;
+        }
+        html += `</div>`;
+    }
+
+    html += `</div>
+        <div class="text-center mt-8">
+            <button onclick="renderHouse()" class="btn btn-primary">Back</button>
+        </div>
+    </div>`;
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+
+function renderSettingsMenu() {
+    lastViewBeforeInventory = 'town';
+    gameState.currentView = 'settings';
+    updateRealTimePalette();
+
+    const difficulties = {
+        easy: {
+            name: "Child's Play",
+            color: "text-green-400",
+            desc: "When you die, you simply pass out and wake up at the inn, fully restored. A new day begins, and no progress is lost."
+        },
+        medium: {
+            name: "Medium is Premium",
+            color: "text-yellow-400",
+            desc: "When you die, you wake up at the inn, but at a cost. You lose half your gold and a random half of your items and equipment."
+        },
+        hardcore: {
+            name: "Hardcore Savages",
+            color: "text-red-400",
+            desc: "Death is permanent. Your save file will be deleted, and your character's name will be added to the Graveyard for all to remember."
+        }
+    };
+
+    let html = `<div class="w-full max-w-2xl text-center">
+        <h2 class="font-medieval text-3xl mb-4">Settings</h2>
+        <h3 class="text-xl font-bold mb-4 text-center">Change Difficulty</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">`;
+
+    for (const key in difficulties) {
+        const diff = difficulties[key];
+        const isSelected = player.difficulty === key;
+        const colorClass = diff.color.replace('text-', '');
+        html += `<div onclick="setDifficulty('${key}')" class="p-4 bg-slate-800 rounded-lg border-2 ${isSelected ? `border-${colorClass}` : 'border-transparent'} hover:border-${colorClass} cursor-pointer">
+            <h4 class="font-bold text-2xl ${diff.color}">${diff.name}</h4>
+            <p class="text-sm text-gray-400 mt-2">${diff.desc}</p>
+        </div>`;
+    }
+
+    html += `</div>
+        <div class="mt-8">
+            <button onclick="renderTownSquare()" class="btn btn-primary">Back to Town</button>
+        </div>
+    </div>`;
+    
+    const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
 }
 
 function renderResidentialDistrict() {
-    applyTheme('town');
+    updateRealTimePalette(); 
     lastViewBeforeInventory = 'residential_district';
     gameState.currentView = 'residential_district';
 
@@ -796,7 +990,7 @@ function renderResidentialDistrict() {
     const locations = [
         { name: 'The Inn', action: "renderInn()" },
         { name: 'Quest Board', action: "renderQuestBoard()" },
-        { name: 'Your House', action: "addToLog('Sorry, the housing market has yet to crash.', 'text-yellow-400')" },
+        { name: 'Library', action: "renderLibrary()" },
     ];
 
     let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Residential District</h2>
@@ -815,8 +1009,75 @@ function renderResidentialDistrict() {
     render(container);
 }
 
+function renderLibrary() {
+    updateRealTimePalette();
+    lastViewBeforeInventory = 'library';
+    gameState.currentView = 'library';
+    
+    let html = `<div class="w-full h-full flex flex-col text-left">
+        <h2 class="font-medieval text-3xl mb-4 text-center">The Library</h2>
+        <div class="flex-grow flex gap-6 overflow-hidden">
+            <div class="w-1/3 flex flex-col gap-2">
+                <h3 class="font-bold text-lg text-yellow-300">Available Tomes</h3>
+                <div id="book-list" class="flex flex-col gap-2">`;
+
+    Object.keys(LIBRARY_BOOKS).forEach(bookKey => {
+        const book = LIBRARY_BOOKS[bookKey];
+        html += `<button onclick="renderBook('${bookKey}')" class="btn btn-primary text-left">${book.title}</button>`;
+    });
+
+    html += `   </div>
+            </div>
+            <div id="library-content-view" class="w-2/3 bg-slate-800 p-4 rounded-lg overflow-y-auto inventory-scrollbar">
+                <p class="text-gray-400">Select a book to read.</p>
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            <button onclick="renderResidentialDistrict()" class="btn btn-primary">Back to Residential Area</button>
+        </div>
+    </div>`;
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+function renderBook(bookKey, chapterIndex = 0) {
+    const book = LIBRARY_BOOKS[bookKey];
+    if (!book) return;
+
+    const contentArea = $('#library-content-view');
+    let html = `<div class="text-left">
+        <h3 class="font-bold text-xl text-yellow-300 mb-1">${book.title}</h3>
+        <p class="text-xs text-gray-400 mb-4">By ${book.author}</p>
+        
+        <div class="mb-4 flex flex-wrap gap-2 border-b border-gray-600 pb-2">`;
+    
+    book.chapters.forEach((chap, index) => {
+        const isActive = index === chapterIndex;
+        html += `<button onclick="renderBook('${bookKey}', ${index})" class="text-sm px-3 py-1 rounded ${isActive ? 'bg-yellow-600 text-slate-900 font-bold' : 'bg-slate-700 hover:bg-slate-600'}">${chap.title}</button>`;
+    });
+
+    html += `</div>
+        <div class="prose prose-invert max-w-none text-gray-300">${book.chapters[chapterIndex].content}</div>
+    </div>`;
+
+    contentArea.innerHTML = html;
+
+    document.querySelectorAll('#book-list button').forEach(btn => {
+        btn.classList.remove('bg-yellow-600', 'border-yellow-800');
+        btn.classList.add('btn-primary');
+    });
+    const activeBtn = document.querySelector(`#book-list button[onclick*="'${bookKey}'"]`);
+    if(activeBtn) {
+        activeBtn.classList.add('bg-yellow-600', 'border-yellow-800');
+        activeBtn.classList.remove('btn-primary');
+    }
+}
+
+
 function renderCommercialDistrict() {
-    applyTheme('town');
+    updateRealTimePalette();
     lastViewBeforeInventory = 'commercial_district';
     gameState.currentView = 'commercial_district';
 
@@ -939,7 +1200,6 @@ function renderWitchsCoven(subView = 'main') {
         html += `<h3 class="font-bold text-xl text-yellow-300 mb-4">Rebirth</h3>
                  <p class="mb-6">The witch can reshape your very being, but it will be costly.</p>
                  <div class="space-y-4 max-w-lg mx-auto text-left">`;
-        // Change Race
         const raceCost = WITCH_COVEN_SERVICES.changeRace;
         html += `<div class="p-3 bg-slate-800 rounded-lg">
             <p class="font-bold">Change Race (Cost: ${raceCost.gold} G, ${raceCost.hearts} Hearts)</p>
@@ -948,7 +1208,6 @@ function renderWitchsCoven(subView = 'main') {
                 <button onclick="changeCharacterAspect('race', document.getElementById('race-change-select').value)" class="btn btn-primary">Change</button>
             </div>
         </div>`;
-        // Change Class
         const classCost = WITCH_COVEN_SERVICES.changeClass;
         html += `<div class="p-3 bg-slate-800 rounded-lg">
             <p class="font-bold">Change Class (Cost: ${classCost.gold} G, ${classCost.hearts} Hearts)</p>
@@ -957,7 +1216,6 @@ function renderWitchsCoven(subView = 'main') {
                 <button onclick="changeCharacterAspect('class', document.getElementById('class-change-select').value)" class="btn btn-primary">Change</button>
             </div>
         </div>`;
-        // Change Background
         const bgCost = WITCH_COVEN_SERVICES.changeBackground;
         html += `<div class="p-3 bg-slate-800 rounded-lg">
             <p class="font-bold">Change Background (Cost: ${bgCost.gold} G, ${bgCost.hearts} Hearts)</p>
@@ -1014,7 +1272,6 @@ function renderEnchanter(selectedElement = null) {
     let html = `<h2 class="font-medieval text-3xl mb-2 text-center">The Enchanter's Table</h2>
                 <p class="text-center text-gray-400 mb-6">Imbue your equipment with elemental power.</p>`;
 
-    // --- Element Selection ---
     html += `<div class="mb-6 p-4 bg-slate-900/50 rounded-lg">
                 <h3 class="font-bold text-lg text-yellow-300 mb-3 text-center">1. Select an Element</h3>
                 <div class="flex flex-wrap justify-center gap-2">`;
@@ -1025,7 +1282,6 @@ function renderEnchanter(selectedElement = null) {
     });
     html += `</div></div>`;
 
-    // --- Equipment & Enchanting ---
     if (selectedElement) {
         const essenceKey = `${selectedElement}_essence`;
         const essenceDetails = getItemDetails(essenceKey);
@@ -1075,7 +1331,7 @@ function renderEnchanter(selectedElement = null) {
 }
 
 function renderQuestBoard() {
-    applyTheme('town');
+    updateRealTimePalette();
     const scrollable = mainView.querySelector('.inventory-scrollbar');
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
 
@@ -1094,7 +1350,7 @@ function renderQuestBoard() {
             if (itemDetails) {
                  if (quest.target in ITEMS) {
                      progress = player.inventory.items[quest.target] || 0;
-                } else { // Equipment
+                } else { 
                     let category;
                     if (quest.target in WEAPONS) category = 'weapons';
                     else if (quest.target in ARMOR) category = 'armor';
@@ -1121,17 +1377,12 @@ function renderQuestBoard() {
     } else {
         html += `<p class="text-center mb-4">Choose a quest to undertake.</p>`;
 
-        // Determine number of quests to show based on player tier
         const numQuestsToShow = 2 + player.playerTier;
 
-        // Gather and filter available quests
         let availableQuests = [];
-        // Iterate through the flat QUESTS object
         for (const questKey in QUESTS) {
             const quest = QUESTS[questKey];
-            // Check if the quest tier is appropriate for the player
             if (quest.tier <= player.playerTier) {
-                // Determine the quest category/type. Default to 'extermination' if not specified.
                 const category = quest.type || 'extermination';
                 availableQuests.push({ ...quest, category: category, key: questKey });
             }
@@ -1139,7 +1390,7 @@ function renderQuestBoard() {
         
         availableQuests = availableQuests.filter(quest => !player.questsTakenToday.includes(quest.key));
 
-        const rng = seededRandom(player.seed); // Use the player's seed for consistent quest offerings
+        const rng = seededRandom(player.seed); 
         const offeredQuests = shuffleArray(availableQuests, rng).slice(0, numQuestsToShow);
         
         html += `<div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`
@@ -1167,7 +1418,7 @@ function renderQuestBoard() {
 }
 
 function renderInn() { 
-    applyTheme('town');
+    updateRealTimePalette();
     lastViewBeforeInventory = 'inn';
     gameState.currentView = 'inn'; 
     const cost = 10 + 5 * player.level; 
@@ -1179,7 +1430,7 @@ function renderInn() {
 
 function renderShop(type) {
     if (type === 'store') {
-        applyTheme('town');
+        updateRealTimePalette();
     } else if (type === 'black_market') {
         applyTheme('void');
     }
@@ -1210,7 +1461,6 @@ function renderShop(type) {
         itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
         itemsHtml += '<div class="space-y-2">';
         
-        // Refactored to use createItemList
         itemsHtml += createItemList({
             items: inventory[category],
             detailsFn: getItemDetails,
@@ -1267,7 +1517,6 @@ function renderBlacksmithBuy() {
         itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
         itemsHtml += '<div class="space-y-2">';
         
-        // Refactored to use createItemList
         itemsHtml += createItemList({
             items: BLACKSMITH_INVENTORY[category],
             detailsFn: getItemDetails,
@@ -1311,7 +1560,7 @@ function renderBlacksmithCraft() {
 
             if(ITEMS[ingredientKey]) {
                 playerAmount = player.inventory.items[ingredientKey] || 0;
-            } else if (ARMOR[ingredientKey]) { // Special case for crafting with armor
+            } else if (ARMOR[ingredientKey]) { 
                 playerAmount = player.inventory.armor.filter(i => i === ingredientKey).length;
             }
 
@@ -1418,7 +1667,7 @@ function renderAlchemist() {
 }
 
 function renderSell() {
-    applyTheme('town');
+    updateRealTimePalette();
     const scrollable = mainView.querySelector('.inventory-scrollbar');
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
 
@@ -1441,7 +1690,7 @@ function renderSell() {
             let categoryHtml = '';
             itemsInCategory.forEach(key => {
                 const details = getItemDetails(key);
-                if (details && details.price > 0) { // Can't sell items with no price
+                if (details && details.price > 0) { 
                     const sellPrice = Math.floor(details.price / 4);
                     let count = 0;
                      if (category === 'items') {
@@ -1496,7 +1745,6 @@ function renderSageTowerTrain() {
     lastViewBeforeInventory = 'sage_tower_train';
     gameState.currentView = 'sage_tower_train';
 
-    // Group spells by element
     const spellsByElement = {};
     for (const spellKey in SPELLS) {
         const spell = SPELLS[spellKey];
@@ -1506,7 +1754,6 @@ function renderSageTowerTrain() {
         spellsByElement[spell.element].push(spellKey);
     }
     
-    // Define the order of elements
     const elementOrder = ['none', 'fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'dark', 'healing'];
     
     let html = `<div class="w-full">
@@ -1526,14 +1773,14 @@ function renderSageTowerTrain() {
                 
                 html += `<div class="p-3 bg-slate-800 rounded-lg text-left">`;
 
-                if (currentTier === 0) { // Spell not learned
+                if (currentTier === 0) { 
                     const canAfford = player.gold >= spellTree.learnCost;
                     html += `<div class="flex justify-between items-center">
                                 <h3 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name}</h3>
                                 <button onclick="upgradeSpell('${spellKey}')" class="btn btn-primary" ${!canAfford ? 'disabled' : ''}>Learn</button>
                             </div>
                             <p class="text-sm text-gray-400">Cost: ${spellTree.learnCost} G</p>`;
-                } else if (currentTier < spellTree.tiers.length) { // Can be upgraded
+                } else if (currentTier < spellTree.tiers.length) { 
                     const upgradeData = spellTree.tiers[currentTier - 1];
                     const canAffordGold = player.gold >= upgradeData.upgradeCost;
                     const hasEssences = Object.entries(upgradeData.upgradeEssences || {}).every(([key, val]) => (player.inventory.items[key] || 0) >= val);
@@ -1546,7 +1793,7 @@ function renderSageTowerTrain() {
                             </div>
                              <p class="text-sm text-gray-400">Next: ${spellTree.tiers[currentTier].name}</p>
                              <p class="text-sm text-gray-400">Cost: ${upgradeData.upgradeCost} G, ${essenceList}</p>`;
-                } else { // Max tier
+                } else { 
                      html += `<div class="flex justify-between items-center">
                                 <h3 class="font-bold text-lg text-cyan-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name} (Max Tier)</h3>
                                 <span class="text-gray-500">Mastered</span>
@@ -1587,7 +1834,6 @@ function renderSageTowerBuy() {
         itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
         itemsHtml += '<div class="space-y-2">';
         
-        // Refactored to use createItemList
         itemsHtml += createItemList({
             items: MAGIC_SHOP_INVENTORY[category],
             detailsFn: getItemDetails,
@@ -1748,7 +1994,7 @@ function renderInventory() {
             if (!details) return '';
 
             if (category === 'items' && details.type === 'key') {
-                return ''; // Exclude key items from the regular item list
+                return ''; 
             }
 
             let countStr = '';
@@ -1864,7 +2110,7 @@ function renderInventory() {
 
 function renderBattle(subView = 'main', actionData = null) {
      if (gameState.battleEnded) return;
-     if (currentEnemies.length === 0 && subView !== 'item') return; // Allow item menu after battle
+     if (currentEnemies.length === 0 && subView !== 'item') return;
 
      if (subView === 'main') {
         renderBattleGrid();
@@ -1874,7 +2120,7 @@ function renderBattle(subView = 'main', actionData = null) {
             if (enemy.isAlive()) {
                  if (subView === 'attack') {
                     html += `<button onclick="performAttack(${index})" class="btn btn-action">${enemy.name}</button>`;
-                } else { // magic_target
+                } else { 
                     html += `<button onclick="castSpell('${actionData.spellKey}', ${index})" class="btn btn-magic">${enemy.name}</button>`;
                 }
             }
@@ -1913,9 +2159,9 @@ function renderBattle(subView = 'main', actionData = null) {
             .map(key => {
                 const item = ITEMS[key];
                 const count = player.inventory.items[key];
-                let action = `useItem('${key}', true)`; // Default action for potions etc.
+                let action = `useItem('${key}', true)`; 
                 if (item.type === 'enchant') {
-                    action = `battleAction('item_select', {itemKey: '${key}'})`; // Action for essences that need targeting
+                    action = `battleAction('item_select', {itemKey: '${key}'})`; 
                 }
                 return `<button onclick="${action}" class="btn btn-item w-full text-left" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"><div class="flex justify-between"><span>${item.name}</span><span>x${count}</span></div></button>`;
             }).join('');
@@ -1932,7 +2178,7 @@ function renderBattle(subView = 'main', actionData = null) {
         const container = document.createElement('div');
         container.innerHTML = html;
         render(container);
-     } else if (subView === 'item_target') { // New sub-view for item targeting
+     } else if (subView === 'item_target') { 
         let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Use ${ITEMS[actionData.itemKey].name} on...</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
         currentEnemies.forEach((enemy, index) => {
             if (enemy.isAlive()) {
@@ -1950,8 +2196,17 @@ function renderPostBattleMenu() {
     player.clearEncounterBuffs();
     gameState.currentView = 'post_battle';
     lastViewBeforeInventory = 'post_battle';
+    
+    if (tutorialState.isActive) {
+        const currentStep = tutorialState.sequence[tutorialState.currentIndex];
+        if (currentStep && currentStep.trigger && currentStep.trigger.type === 'enemy_death') {
+            advanceTutorial();
+            return;
+        }
+    }
+
     const biomeKey = gameState.currentBiome;
-    if (!biomeKey) { // Safety check
+    if (!biomeKey) { 
         renderTownSquare();
         return;
     }
@@ -1995,7 +2250,7 @@ function renderGraveyard() {
     </div>`;
 
     $('#start-screen').classList.add('hidden');
-    const screenContainer = $('#changelog-screen'); // Re-use this container
+    const screenContainer = $('#changelog-screen'); 
     screenContainer.innerHTML = html;
     screenContainer.classList.remove('hidden');
 }
@@ -2072,7 +2327,7 @@ window.castHealingSpellOutsideCombat = function(spellKey) {
     addToLog(`You cast ${spell.name} and recover <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-green-300');
     
     updateStatsView();
-    renderInventory(); // Re-render the inventory to update the button states
+    renderInventory(); 
 }
 
 function renderBestiaryMenu(origin = 'inventory') {
@@ -2104,10 +2359,9 @@ function renderBestiaryMenu(origin = 'inventory') {
 // --- BETTY DIALOGUE FUNCTIONS ---
 
 function startBettyDialogue() {
-    gameState.currentView = 'dialogue'; // Prevent other actions
-    $('#betty-encounter-popup').classList.add('hidden'); // Hide popup once dialogue starts
+    gameState.currentView = 'dialogue'; 
+    $('#betty-encounter-popup').classList.add('hidden'); 
 
-    // This is the first time the player is interacting with her in any capacity.
     if (!player.dialogueFlags.bettyMet) {
         player.dialogueFlags.bettyMet = true;
     }
@@ -2150,7 +2404,7 @@ function renderBettyDialogue(sceneKey) {
     dialogueHtml += `</div></div></div>`;
     
     const container = document.createElement('div');
-    container.innerHTML = dialogueHtml;
+    container.innerHTML = html;
     render(container);
 }
 
@@ -2158,7 +2412,6 @@ function handleBettyResponse(sceneKey, optionKey) {
     const scene = BETTY_DIALOGUE[sceneKey];
     const option = scene.options[optionKey];
 
-    // Display Betty's immediate response
     let responseHtml = `<div class="w-full h-full flex flex-col items-center justify-center p-4">
         <div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
             <p class="mb-6 italic text-gray-300">"${option.response}"</p>
@@ -2168,14 +2421,13 @@ function handleBettyResponse(sceneKey, optionKey) {
     container.innerHTML = responseHtml;
     render(container);
 
-    // After a delay, move to the next part of the conversation
     setTimeout(() => {
         if (sceneKey === 'first_encounter') {
             renderBettyQuestProposal();
         } else if (sceneKey === 'quest_proposal') {
             let nextHtml = '';
             switch(optionKey) {
-                case 'A': // Accept
+                case 'A': 
                     player.bettyQuestState = 'accepted';
                     player.addToInventory('bestiary_notebook');
                     nextHtml = `<div class="w-full h-full flex flex-col items-center justify-center p-4"><div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
@@ -2185,11 +2437,11 @@ function handleBettyResponse(sceneKey, optionKey) {
                     container.innerHTML = nextHtml;
                     render(container);
                     break;
-                case 'B': // Decline
+                case 'B': 
                     player.bettyQuestState = 'declined';
-                    setTimeout(renderTown, 2000); // Go back to town after a short delay
+                    setTimeout(renderTown, 2000); 
                     break;
-                case 'C': // Silent Accept
+                case 'C': 
                     player.bettyQuestState = 'accepted';
                     player.addToInventory('bestiary_notebook');
                     nextHtml = `<div class="w-full h-full flex flex-col items-center justify-center p-4"><div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
@@ -2201,7 +2453,7 @@ function handleBettyResponse(sceneKey, optionKey) {
                     break;
             }
         }
-    }, 2500); // 2.5 second delay
+    }, 2500); 
 }
 
 function renderBettyQuestProposal() {

@@ -11,152 +11,172 @@ function startBattle(biomeKey) {
     gameState.comboTarget = null;
     gameState.comboCount = 0;
     gameState.lastSpellElement = 'none';
-
-    // --- GRID SELECTION ---
-    const gridKeys = Object.keys(BATTLE_GRIDS);
-    const randomGridKey = gridKeys[Math.floor(Math.random() * gridKeys.length)];
-    const gridData = BATTLE_GRIDS[randomGridKey];
-    gameState.gridWidth = gridData.width;
-    gameState.gridHeight = gridData.height;
-    gameState.gridLayout = gridData.layout;
     gameState.gridObjects = []; // Obstacles and terrain
 
+    const isTutorialBattle = tutorialState.isActive && tutorialState.sequence[tutorialState.currentIndex]?.id === 'wilderness_select';
 
-    // --- ENTITY AND OBJECT PLACEMENT ---
-    const occupiedCells = new Set();
-    const validCells = [];
-    for (let y = 0; y < gameState.gridHeight; y++) {
-        for (let x = 0; x < gameState.gridWidth; x++) {
-            if (gameState.gridLayout[y * gameState.gridWidth + x] === 1) {
-                validCells.push({x, y});
+    if (isTutorialBattle) {
+        // --- TUTORIAL BATTLE SETUP ---
+        const gridData = BATTLE_GRIDS['square_5x5'];
+        gameState.gridWidth = gridData.width;
+        gameState.gridHeight = gridData.height;
+        gameState.gridLayout = gridData.layout;
+        
+        const enemy = new Enemy(MONSTER_SPECIES['goblin'], MONSTER_RARITY['common'], player.level);
+        
+        // Place player and enemy at random valid spots
+        const occupiedCells = new Set();
+        const validCells = [];
+        for (let y = 0; y < gameState.gridHeight; y++) {
+            for (let x = 0; x < gameState.gridWidth; x++) {
+                if (gameState.gridLayout[y * gameState.gridWidth + x] === 1) {
+                    validCells.push({x, y});
+                }
             }
         }
-    }
-
-    // Function to get a random unoccupied valid cell
-    const getUnoccupiedCell = (cellList) => {
-        let availableCells = cellList.filter(c => !occupiedCells.has(`${c.x},${c.y}`));
-        if (availableCells.length === 0) return null; // No space left
-        return availableCells[Math.floor(Math.random() * availableCells.length)];
-    };
-
-    // Position player in the bottom half
-    const playerSpawnArea = validCells.filter(c => c.y >= Math.floor(gameState.gridHeight / 2));
-    const playerCell = getUnoccupiedCell(playerSpawnArea);
-    if (playerCell) {
+        
+        let playerCellIndex = Math.floor(Math.random() * validCells.length);
+        let playerCell = validCells.splice(playerCellIndex, 1)[0];
         player.x = playerCell.x;
         player.y = playerCell.y;
-        occupiedCells.add(`${player.x},${player.y}`);
+
+        let enemyCellIndex = Math.floor(Math.random() * validCells.length);
+        let enemyCell = validCells.splice(enemyCellIndex, 1)[0];
+        enemy.x = enemyCell.x;
+        enemy.y = enemyCell.y;
+        
+        currentEnemies.push(enemy);
+
     } else {
-        const fallbackCell = getUnoccupiedCell(validCells);
-        if(fallbackCell) {
-            player.x = fallbackCell.x;
-            player.y = fallbackCell.y;
-            occupiedCells.add(`${player.x},${player.y}`);
-        } else {
-            console.error("No valid cell to spawn player!");
-            addToLog("Error: Could not find a valid spot to start the battle. Returning to menu.", "text-red-500");
-            setTimeout(showStartScreen, 2000);
-            return;
-        }
-    }
-
-
-    // Position enemies in the top half
-    const enemySpawnArea = validCells.filter(c => c.y < Math.floor(gameState.gridHeight / 2));
-    let numEnemies = 1;
-    if (player.level >= 50) {
-        const rand = Math.random();
-        if (rand > 0.9) numEnemies = 5;
-        else if (rand > 0.7) numEnemies = 4;
-        else if (rand > 0.4) numEnemies = 3;
-        else if (rand > 0.1) numEnemies = 2;
-    } else if (player.level >= 6) {
-        const rand = Math.random();
-        if (rand > 0.8) { numEnemies = 3; } 
-        else if (rand > 0.5) { numEnemies = 2; }
-    }
-    for (let i = 0; i < numEnemies; i++) {
-        const enemy = generateEnemy(biomeKey);
-        const enemyCell = getUnoccupiedCell(enemySpawnArea);
-        if (enemyCell) {
-            enemy.x = enemyCell.x;
-            enemy.y = enemyCell.y;
-            occupiedCells.add(`${enemy.x},${enemy.y}`);
-            currentEnemies.push(enemy);
-        }
-    }
-
-    // --- PATH GUARANTEE & OBSTACLE PLACEMENT ---
-
-    // 1. Find a critical path to guarantee connectivity before placing obstacles.
-    let criticalPath = [];
-    if (currentEnemies.length > 0) {
-        // Find a path to the first enemy. This path will be kept clear.
-        criticalPath = findPath({ x: player.x, y: player.y }, { x: currentEnemies[0].x, y: currentEnemies[0].y }, false) || [];
-    }
-    const criticalPathCells = new Set(criticalPath.map(cell => `${cell.x},${cell.y}`));
-
-    // 2. Create a pool of cells available for obstacles (i.e., not on the critical path or occupied).
-    const obstacleSafeCells = validCells.filter(cell => !criticalPathCells.has(`${cell.x},${cell.y}`));
-
-
-    // Position Obstacles
-    const numObstacles = 1 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < numObstacles; i++) {
-        const obstacleCell = getUnoccupiedCell(obstacleSafeCells);
-        if (obstacleCell) {
-            const obstacleType = BIOMES[biomeKey].obstacle || { char: '🪨', name: 'Rock' };
-            gameState.gridObjects.push({ 
-                x: obstacleCell.x, 
-                y: obstacleCell.y, 
-                type: 'obstacle', 
-                hp: 1, 
-                emoji: obstacleType.char,
-                name: obstacleType.name
-            });
-            occupiedCells.add(`${obstacleCell.x},${obstacleCell.y}`);
-        }
-    }
-
-    // Generate connected terrain
-    const numTerrain = 1 + Math.floor(Math.random() * 3);
-    if (numTerrain > 0) {
-        const startCell = getUnoccupiedCell(obstacleSafeCells);
-        if (startCell) {
-            const terrainGroup = [startCell];
-            occupiedCells.add(`${startCell.x},${startCell.y}`);
-
-            for (let i = 1; i < numTerrain; i++) {
-                const frontier = [];
-                for (const tile of terrainGroup) {
-                    const neighbors = [
-                        {x: tile.x + 1, y: tile.y}, {x: tile.x - 1, y: tile.y},
-                        {x: tile.x, y: tile.y + 1}, {x: tile.x, y: tile.y - 1}
-                    ];
-                    for (const neighbor of neighbors) {
-                        const isOccupied = occupiedCells.has(`${neighbor.x},${neighbor.y}`);
-                        const isValid = validCells.some(c => c.x === neighbor.x && c.y === neighbor.y);
-                        if(isValid && !isOccupied && !terrainGroup.some(t => t.x === neighbor.x && t.y === neighbor.y)) {
-                            frontier.push(neighbor);
-                        }
-                    }
-                }
-                
-                if (frontier.length > 0) {
-                    const nextCell = frontier[Math.floor(Math.random() * frontier.length)];
-                    terrainGroup.push(nextCell);
-                    occupiedCells.add(`${nextCell.x},${nextCell.y}`);
-                } else {
-                    break; 
+        // --- STANDARD BATTLE SETUP ---
+        const gridKeys = Object.keys(BATTLE_GRIDS);
+        const randomGridKey = gridKeys[Math.floor(Math.random() * gridKeys.length)];
+        const gridData = BATTLE_GRIDS[randomGridKey];
+        gameState.gridWidth = gridData.width;
+        gameState.gridHeight = gridData.height;
+        gameState.gridLayout = gridData.layout;
+        
+        const occupiedCells = new Set();
+        const validCells = [];
+        for (let y = 0; y < gameState.gridHeight; y++) {
+            for (let x = 0; x < gameState.gridWidth; x++) {
+                if (gameState.gridLayout[y * gameState.gridWidth + x] === 1) {
+                    validCells.push({x, y});
                 }
             }
-             terrainGroup.forEach(cell => {
-                gameState.gridObjects.push({ x: cell.x, y: cell.y, type: 'terrain' });
-            });
+        }
+
+        const getUnoccupiedCell = (cellList) => {
+            let availableCells = cellList.filter(c => !occupiedCells.has(`${c.x},${c.y}`));
+            if (availableCells.length === 0) return null;
+            return availableCells[Math.floor(Math.random() * availableCells.length)];
+        };
+
+        const playerSpawnArea = validCells.filter(c => c.y >= Math.floor(gameState.gridHeight / 2));
+        const playerCell = getUnoccupiedCell(playerSpawnArea);
+        if (playerCell) {
+            player.x = playerCell.x;
+            player.y = playerCell.y;
+            occupiedCells.add(`${player.x},${player.y}`);
+        } else {
+            const fallbackCell = getUnoccupiedCell(validCells);
+            if(fallbackCell) {
+                player.x = fallbackCell.x;
+                player.y = fallbackCell.y;
+                occupiedCells.add(`${player.x},${player.y}`);
+            } else {
+                console.error("No valid cell to spawn player!");
+                addToLog("Error: Could not find a valid spot to start the battle. Returning to menu.", "text-red-500");
+                setTimeout(showStartScreen, 2000);
+                return;
+            }
+        }
+
+        const enemySpawnArea = validCells.filter(c => c.y < Math.floor(gameState.gridHeight / 2));
+        let numEnemies = 1;
+        if (player.level >= 50) {
+            const rand = Math.random();
+            if (rand > 0.9) numEnemies = 5;
+            else if (rand > 0.7) numEnemies = 4;
+            else if (rand > 0.4) numEnemies = 3;
+            else if (rand > 0.1) numEnemies = 2;
+        } else if (player.level >= 6) {
+            const rand = Math.random();
+            if (rand > 0.8) { numEnemies = 3; } 
+            else if (rand > 0.5) { numEnemies = 2; }
+        }
+        for (let i = 0; i < numEnemies; i++) {
+            const enemy = generateEnemy(biomeKey);
+            const enemyCell = getUnoccupiedCell(enemySpawnArea);
+            if (enemyCell) {
+                enemy.x = enemyCell.x;
+                enemy.y = enemyCell.y;
+                occupiedCells.add(`${enemy.x},${enemy.y}`);
+                currentEnemies.push(enemy);
+            }
+        }
+
+        let criticalPath = [];
+        if (currentEnemies.length > 0) {
+            criticalPath = findPath({ x: player.x, y: player.y }, { x: currentEnemies[0].x, y: currentEnemies[0].y }, false) || [];
+        }
+        const criticalPathCells = new Set(criticalPath.map(cell => `${cell.x},${cell.y}`));
+        const obstacleSafeCells = validCells.filter(cell => !criticalPathCells.has(`${cell.x},${cell.y}`));
+
+        const numObstacles = 1 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < numObstacles; i++) {
+            const obstacleCell = getUnoccupiedCell(obstacleSafeCells);
+            if (obstacleCell) {
+                const obstacleType = BIOMES[biomeKey].obstacle || { char: '🪨', name: 'Rock' };
+                gameState.gridObjects.push({ 
+                    x: obstacleCell.x, 
+                    y: obstacleCell.y, 
+                    type: 'obstacle', 
+                    hp: 1, 
+                    emoji: obstacleType.char,
+                    name: obstacleType.name
+                });
+                occupiedCells.add(`${obstacleCell.x},${obstacleCell.y}`);
+            }
+        }
+
+        const numTerrain = 1 + Math.floor(Math.random() * 3);
+        if (numTerrain > 0) {
+            const startCell = getUnoccupiedCell(obstacleSafeCells);
+            if (startCell) {
+                const terrainGroup = [startCell];
+                occupiedCells.add(`${startCell.x},${startCell.y}`);
+
+                for (let i = 1; i < numTerrain; i++) {
+                    const frontier = [];
+                    for (const tile of terrainGroup) {
+                        const neighbors = [
+                            {x: tile.x + 1, y: tile.y}, {x: tile.x - 1, y: tile.y},
+                            {x: tile.x, y: tile.y + 1}, {x: tile.x, y: tile.y - 1}
+                        ];
+                        for (const neighbor of neighbors) {
+                            const isOccupied = occupiedCells.has(`${neighbor.x},${neighbor.y}`);
+                            const isValid = validCells.some(c => c.x === neighbor.x && c.y === neighbor.y);
+                            if(isValid && !isOccupied && !terrainGroup.some(t => t.x === neighbor.x && t.y === neighbor.y)) {
+                                frontier.push(neighbor);
+                            }
+                        }
+                    }
+                    
+                    if (frontier.length > 0) {
+                        const nextCell = frontier[Math.floor(Math.random() * frontier.length)];
+                        terrainGroup.push(nextCell);
+                        occupiedCells.add(`${nextCell.x},${nextCell.y}`);
+                    } else {
+                        break; 
+                    }
+                }
+                 terrainGroup.forEach(cell => {
+                    gameState.gridObjects.push({ x: cell.x, y: cell.y, type: 'terrain' });
+                });
+            }
         }
     }
-
 
     const biome = BIOMES[biomeKey];
     if (biome && biome.theme) {
@@ -168,6 +188,10 @@ function startBattle(biomeKey) {
     const enemyNames = currentEnemies.map(e => `<span class="font-bold text-red-400">${e.name}</span>`).join(', ');
     addToLog(`You encounter: ${enemyNames} in the ${BIOMES[biomeKey].name}!`); 
     renderBattleGrid(); 
+
+    if (isTutorialBattle) {
+        advanceTutorial();
+    }
 }
 
 function renderBattleGrid() {
@@ -1140,6 +1164,12 @@ function checkBattleStatus(isReaction = false) {
     if (allDefeated) {
         gameState.battleEnded = true;
         addToLog(`VICTORY! All enemies have been defeated.`, 'text-yellow-200 font-bold text-lg');
+
+        if (tutorialState.isActive && tutorialState.sequence[tutorialState.currentIndex]?.trigger?.type === 'enemy_death') {
+            setTimeout(advanceTutorial, 1000); // Give a moment to read the victory message
+            return;
+        }
+        
         setTimeout(renderPostBattleMenu, 1500);
     } else if (!gameState.isPlayerTurn && !isReaction) {
         setTimeout(enemyTurn, 400);
@@ -1400,35 +1430,93 @@ function beginPlayerTurn() {
         renderBattleGrid(); // Re-render to show active buttons
     }
 }
+// MODIFICATION: Major overhaul of the death logic based on difficulty.
 async function checkPlayerDeath() {
-    // MODIFICATION: Moved revive check to the TOP of the function.
-    if (!player.isAlive() && !gameState.playerIsDying) {
-        
-        // Void Greatsword Revive
-        if(player.equippedWeapon.effect?.revive && !player.specialWeaponStates.void_greatsword_revive_used) {
-            player.hp = Math.floor(player.maxHp * 0.5);
-            player.specialWeaponStates.void_greatsword_revive_used = true;
-            addToLog('The Void Greatsword flashes with dark energy, pulling your soul back from the brink!', 'text-purple-400 font-bold');
-            updateStatsView();
-            gameState.playerIsDying = false; 
-            return;
-        }
+    if (player.isAlive() || gameState.playerIsDying) return;
 
-        gameState.playerIsDying = true; // Set dying state AFTER checking for revive.
+    // First, check for any revive effects
+    if(player.equippedWeapon.effect?.revive && !player.specialWeaponStates.void_greatsword_revive_used) {
+        player.hp = Math.floor(player.maxHp * 0.5);
+        player.specialWeaponStates.void_greatsword_revive_used = true;
+        addToLog('The Void Greatsword flashes with dark energy, pulling your soul back from the brink!', 'text-purple-400 font-bold');
+        updateStatsView();
+        return; // Player is revived, death is averted
+    }
+
+    gameState.playerIsDying = true;
+    const killer = currentEnemies.length > 0 ? currentEnemies[0].name : 'the wilderness';
+    const template = document.getElementById('template-death');
+    render(template.content.cloneNode(true));
+    addToLog(`You were defeated by ${killer}...`, 'text-red-600 font-bold');
+
+    switch (player.difficulty) {
+        case 'easy':
+            addToLog('You pass out from your injuries...', 'text-gray-400');
+            setTimeout(() => {
+                addToLog('You awaken in a bed at the inn, fully restored.', 'text-green-400');
+                restAtInn(0); // Respawn by resting for free
+                gameState.playerIsDying = false;
+            }, 3000);
+            break;
         
-        const template = document.getElementById('template-death');
-        render(template.content.cloneNode(true));
-        const killer = currentEnemies.length > 0 ? currentEnemies[0].name : 'the wilderness';
-        addToLog(`You were defeated by ${killer}...`, 'text-red-600 font-bold'); 
-        
-        await addToGraveyard(player, killer);
-        
-        await deleteSave(player.firestoreId);
-        addToLog('Your save file has been deleted from the cloud.', 'text-gray-500');
-        
-        setTimeout(() => { 
-            signOutUser();
-        }, 3000);
+        case 'medium':
+            addToLog('You collapse, your belongings scattering...', 'text-orange-400');
+            
+            // Lose half gold
+            const goldLost = Math.floor(player.gold / 2);
+            player.gold -= goldLost;
+            addToLog(`You lost <span class="font-bold">${goldLost}</span> G.`, 'text-red-500');
+
+            // Lose half items and equipment
+            let itemsDropped = 0;
+            for (const itemKey in player.inventory.items) {
+                const amount = player.inventory.items[itemKey];
+                const amountToDrop = Math.floor(amount / 2);
+                if (amountToDrop > 0) {
+                    player.inventory.items[itemKey] -= amountToDrop;
+                    if (player.inventory.items[itemKey] <= 0) {
+                        delete player.inventory.items[itemKey];
+                    }
+                    itemsDropped++;
+                }
+            }
+
+            ['weapons', 'armor', 'shields', 'catalysts'].forEach(category => {
+                const items = player.inventory[category];
+                const amountToDrop = Math.floor(items.length / 2);
+                for (let i = 0; i < amountToDrop; i++) {
+                    const randomIndex = Math.floor(Math.random() * items.length);
+                    // Ensure we don't drop the default "None" items
+                    const itemDetails = getItemDetails(items[randomIndex]);
+                    if (itemDetails && itemDetails.rarity !== 'Broken') {
+                        items.splice(randomIndex, 1);
+                        itemsDropped++;
+                    }
+                }
+            });
+
+            if (itemsDropped > 0) {
+                addToLog('You lost some of your items and equipment in the fall.', 'text-red-500');
+            }
+
+            setTimeout(() => {
+                addToLog('You awaken at the inn, sore but alive.', 'text-yellow-300');
+                restAtInn(0); // Respawn by resting for free
+                gameState.playerIsDying = false;
+            }, 3000);
+            break;
+
+        case 'hardcore':
+        default:
+            addToLog('Your journey ends here.', 'text-gray-500');
+            await addToGraveyard(player, killer);
+            await deleteSave(player.firestoreId || 'local');
+            addToLog('Your legacy has been recorded in the Graveyard. Your save file has been deleted.', 'text-gray-500');
+            
+            setTimeout(() => { 
+                signOutUser();
+            }, 4000);
+            break;
     }
 }
 

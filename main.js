@@ -4,13 +4,14 @@ let currentEnemies = [];
 let gameState = { currentView: 'main_menu', isPlayerTurn: true, currentBiome: null, playerIsDying: false };
 let lastViewBeforeInventory = 'main_menu';
 let isDebugVisible = false;
-let timeOfDayIndex = 0;
-let useFullPaletteRotation = false;
+let realTimeInterval = null; 
+let isTutorialEnabled = true;
 
 // Firebase variables
 let db, auth, userId, app;
 let firebaseInitialized = false;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+let initialAuthCheckCompleted = false; 
 
 // --- INITIALIZATION ---
 const fallbackFirebaseConfig = {
@@ -73,6 +74,11 @@ async function initFirebase() {
                 $('#user-display').textContent = '';
                 await updateLoadGameButtonVisibility();
             }
+
+            if (!initialAuthCheckCompleted) {
+                initialAuthCheckCompleted = true;
+                handleRouteChange();
+            }
         });
 
     } catch (error) {
@@ -107,23 +113,38 @@ async function signOutUser() {
     if (!auth) return;
     try {
         await auth.signOut();
-        showStartScreen(); 
+        window.location.hash = 'menu';
     } catch (error) {
         console.error("Sign out failed:", error);
     }
 }
 
+async function handleRouteChange() {
+    const route = window.location.hash || '#menu';
+    const activeSaveKey = sessionStorage.getItem('activeSaveKey');
 
-async function initGame(playerName, gender, raceKey, classKey, backgroundKey) { 
-    $('#character-creation-screen').classList.add('hidden');
-    $('#start-screen').classList.add('hidden'); 
-    $('#game-container').classList.remove('hidden'); 
-    
+    if (route === '#game') {
+        if (activeSaveKey) {
+            if (player && document.body.classList.contains('in-game')) {
+                return; 
+            }
+            await loadGameFromKey(activeSaveKey);
+        } else {
+            window.location.hash = 'menu';
+        }
+    } else { 
+        showStartScreen();
+    }
+}
+
+
+async function initGame(playerName, gender, raceKey, classKey, backgroundKey, difficulty) { 
     player = new Player(playerName, raceKey); 
     player.gender = gender;
     player.class = CLASSES[classKey].name;
     player.background = BACKGROUNDS[backgroundKey].name;
     player.backgroundKey = backgroundKey;
+    player.difficulty = difficulty; 
     player.totalXp = 0; 
 
     const classData = CLASSES[classKey];
@@ -198,11 +219,12 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey) {
     generateRandomizedBiomeOrder();
     generateBlackMarketStock();
     updatePlayerTier();
-    addToLog(`Welcome, ${playerName} the ${player.class}! Your adventure begins.`); 
-    applyTheme('default'); 
-    updateStatsView(); 
-    await saveGame();
-    renderTownSquare(); 
+    
+    await saveGame(); 
+
+    const saveKey = player.firestoreId || 'local';
+    sessionStorage.setItem('activeSaveKey', saveKey);
+    window.location.hash = 'game';
 }
 
 function generateRandomizedBiomeOrder() {
@@ -251,6 +273,34 @@ function updatePlayerTier() {
         }
     });
     player.playerTier = maxTier || 1;
+}
+
+function updateRealTimePalette() {
+    if (document.body.classList.contains('in-game')) {
+        if (gameState.currentView === 'battle') {
+            return;
+        }
+        const hour = new Date().getHours();
+        let theme = 'noon';
+        if (hour >= 18 || hour < 5) {
+            theme = 'midnight';
+        } else if (hour >= 16) {
+            theme = 'sunset';
+        }
+        applyTheme(theme);
+    } else {
+        applyTheme('default');
+    }
+}
+
+function setDifficulty(newDifficulty) {
+    if (!player || player.difficulty === newDifficulty) return;
+
+    player.difficulty = newDifficulty;
+    addToLog(`Difficulty changed to <span class="font-bold">${capitalize(newDifficulty)}</span>.`, 'text-yellow-400');
+    saveGame();
+    updateStatsView();
+    renderSettingsMenu();
 }
 
 
@@ -313,7 +363,7 @@ async function renderLoadMenu() {
                         <p class="text-sm text-gray-400">Level ${charData.level} ${charData.race || ''} ${charData.class || ''}</p>
                     </div>
                     <div>
-                        <button onclick="loadGameFromKey('local')" class="btn btn-primary text-sm py-1 px-3">Load</button>
+                        <button onclick="sessionStorage.setItem('activeSaveKey', 'local'); window.location.hash = 'game';" class="btn btn-primary text-sm py-1 px-3">Load</button>
                         <button onclick="deleteSave('local')" class="btn btn-action text-sm py-1 px-3 ml-2">Delete</button>
                     </div>
                 </div>`;
@@ -338,7 +388,7 @@ async function renderLoadMenu() {
                                 <p class="text-sm text-gray-400">Level ${charData.level} ${charData.race || ''} ${charData.class || ''}</p>
                             </div>
                             <div>
-                                <button onclick="loadGameFromKey('${doc.id}')" class="btn btn-primary text-sm py-1 px-3">Load</button>
+                                <button onclick="sessionStorage.setItem('activeSaveKey', '${doc.id}'); window.location.hash = 'game';" class="btn btn-primary text-sm py-1 px-3">Load</button>
                                 <button onclick="deleteSave('${doc.id}')" class="btn btn-action text-sm py-1 px-3 ml-2">Delete</button>
                             </div>
                         </div>`;
@@ -395,12 +445,12 @@ async function loadGameFromKey(docId, isImport = false) {
                 parsedData = JSON.parse(localSaveDataString);
             } catch (e) {
                 alert("Local save file is corrupted!");
-                showStartScreen();
+                window.location.hash = 'menu';
                 return;
             }
         } else {
             alert("Local save file not found!");
-            showStartScreen();
+            window.location.hash = 'menu';
             return;
         }
     } 
@@ -413,7 +463,7 @@ async function loadGameFromKey(docId, isImport = false) {
                 parsedData = docSnap.data();
             } else {
                 alert("Save file not found in the cloud!");
-                showStartScreen();
+                window.location.hash = 'menu';
                 return;
             }
         } catch (error) {
@@ -427,6 +477,10 @@ async function loadGameFromKey(docId, isImport = false) {
         Object.assign(player, parsedData);
         if(docId !== 'local') {
             player.firestoreId = docId;
+        }
+        
+        if (!player.difficulty) {
+            player.difficulty = 'hardcore';
         }
 
         if (!player.race) {
@@ -458,12 +512,10 @@ async function loadGameFromKey(docId, isImport = false) {
         const shieldKey = findKeyByName(parsedData.equippedShield?.name, SHIELDS) || 'no_shield';
         player.equippedShield = SHIELDS[shieldKey];
 
-        $('#start-screen').classList.add('hidden');
-        $('#changelog-screen').classList.add('hidden');
-        $('#game-container').classList.remove('hidden');
+        document.body.classList.add('in-game');
 
         addToLog(`Welcome back, ${player.name}!`);
-        applyTheme('default');
+        updateRealTimePalette();
         updateStatsView();
         if (player.statPoints > 0) {
             setTimeout(() => renderCharacterSheet(true), 1500);
@@ -503,7 +555,9 @@ async function importSave(saveString) {
         await saveGame();
         
         addToLog(`Successfully imported character: ${player.name}!`, "text-green-400");
-        await loadGameFromKey(player.firestoreId, true);
+        const saveKey = player.firestoreId || 'local';
+        sessionStorage.setItem('activeSaveKey', saveKey);
+        window.location.hash = 'game';
 
     } catch (error) {
         console.error("Could not import save:", error);
@@ -514,21 +568,27 @@ async function importSave(saveString) {
 
 // --- START SCREEN & UI HELPERS ---
 function showStartScreen() {
-    $('#game-container').classList.add('hidden');
+    document.body.classList.remove('in-game');
     $('#changelog-screen').classList.add('hidden');
     $('#character-creation-screen').classList.add('hidden');
     $('#old-save-race-selection-screen').classList.add('hidden');
+    $('#old-save-class-background-screen').classList.add('hidden'); 
     $('#start-screen').classList.remove('hidden');
+    
     logElement.innerHTML = '';
     player = null;
+    sessionStorage.removeItem('activeSaveKey');
     updateLoadGameButtonVisibility();
+    if(realTimeInterval) clearInterval(realTimeInterval);
+    realTimeInterval = null;
+    applyTheme('default');
 }
 
 async function updateLoadGameButtonVisibility() {
     const localSaveExists = !!localStorage.getItem('rpgSaveData_local');
     const loadGameBtn = $('#load-game-btn');
     const graveyardBtn = $('#graveyard-btn');
-    graveyardBtn.classList.toggle('hidden', true); // Hide by default
+    graveyardBtn.classList.toggle('hidden', true); 
 
     if (!db || !userId) {
         loadGameBtn.classList.toggle('hidden', !localSaveExists);
@@ -542,7 +602,7 @@ async function updateLoadGameButtonVisibility() {
 
         const graveyardSnapshot = await db.collection(`artifacts/${appId}/public/data/graveyard`).limit(1).get();
         if(!graveyardSnapshot.empty) graveyardBtn.classList.toggle('hidden', false);
-    } catch (error) {
+    } catch (error) { // MODIFICATION: Corrected the nested try block
         console.error("Could not check for saved games:", error);
         loadGameBtn.classList.toggle('hidden', !localSaveExists);
     }
@@ -553,9 +613,15 @@ async function updateLoadGameButtonVisibility() {
 window.addEventListener('load', async () => { 
     await initFirebase();
     
+    if (!realTimeInterval) {
+        realTimeInterval = setInterval(updateRealTimePalette, 60000); 
+    }
+    
+    window.addEventListener('hashchange', handleRouteChange);
+
     $('#start-game-btn').addEventListener('click', renderCharacterCreation);
     $('#google-signin-btn').addEventListener('click', signInWithGoogle);
-     $('#anonymous-signin-btn').addEventListener('click', signInAnonymously);
+    $('#anonymous-signin-btn').addEventListener('click', signInAnonymously);
     $('#sign-out-btn').addEventListener('click', signOutUser);
 
     $('#import-save-btn').addEventListener('click', () => {
@@ -569,19 +635,16 @@ window.addEventListener('load', async () => {
     $('#graveyard-btn').addEventListener('click', renderGraveyard); 
     $('#changelog-btn').addEventListener('click', renderChangelog);
 
-    // Palette Toggle Logic
-    const paletteToggle = $('#palette-toggle');
-    const savedPalettePref = localStorage.getItem('rpgFullPaletteRotation');
-    if (savedPalettePref === 'true') {
-        paletteToggle.checked = true;
-        useFullPaletteRotation = true;
+    const tutorialToggle = $('#tutorial-toggle');
+    const savedTutorialPref = localStorage.getItem('rpgTutorialEnabled');
+    if (savedTutorialPref !== null) {
+        isTutorialEnabled = savedTutorialPref === 'true';
+        tutorialToggle.checked = isTutorialEnabled;
     }
-
-    paletteToggle.addEventListener('change', () => {
-        useFullPaletteRotation = paletteToggle.checked;
-        localStorage.setItem('rpgFullPaletteRotation', useFullPaletteRotation);
+    tutorialToggle.addEventListener('change', () => {
+        isTutorialEnabled = tutorialToggle.checked;
+        localStorage.setItem('rpgTutorialEnabled', isTutorialEnabled);
     });
-
 
     const keysPressed = new Set();
     document.addEventListener('keydown', (e) => {

@@ -275,6 +275,8 @@ class Player extends Entity {
         this.class = '';
         this.background = '';
         this.backgroundKey = '';
+        this.difficulty = 'hardcore';
+        this.house = { owned: false, storage: { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} }, gardenSize: 2, garden: {} };
         this.dialogueFlags = {};
         this.bettyQuestState = 'not_started'; // not_started, declined, accepted
 
@@ -498,7 +500,9 @@ class Player extends Entity {
             if (!this.inventory[category]) {
                 this.inventory[category] = [];
             }
-            this.inventory[category].push(itemKey);
+            for (let i = 0; i < quantity; i++) {
+                this.inventory[category].push(itemKey);
+            }
         }
     }
     gainXp(amount) { 
@@ -1207,9 +1211,14 @@ function enchantItem(gearType, elementKey) {
 }
 
 function restAtInn(cost) { 
+    if(cost > 0 && player.gold < cost) {
+        addToLog("You can't afford a room.", "text-red-400");
+        return;
+    }
     player.gold -= cost; 
-    addToLog(`You pay <span class="font-bold">${cost} G</span> for a room.`, 'text-yellow-400'); 
-    if (Math.random() < 0.1) { 
+    if(cost > 0) addToLog(`You pay <span class="font-bold">${cost} G</span> for a room.`, 'text-yellow-400'); 
+    
+    if (Math.random() < 0.1 && cost > 0) { 
         addToLog(`You are ambushed in your sleep!`, 'text-red-500 font-bold'); 
         setTimeout(() => startBattle(gameState.currentBiome || player.biomeOrder[0]), 2000); 
     } else { 
@@ -1898,7 +1907,7 @@ function cancelQuest() {
     const quest = getQuestDetails(player.activeQuest);
     if (!quest) return;
 
-    const penalty = (quest.tier || 1) * 25; // Tier-based penalty
+    const penalty = (quest.tier || 1) * 25; 
 
     if (player.gold < penalty) {
         addToLog(`You cannot afford the ${penalty} G fee to cancel the quest.`, 'text-red-400');
@@ -1918,5 +1927,125 @@ function cancelQuest() {
     
     updateStatsView();
     renderQuestBoard();
+}
+
+// MODIFICATION: New functions for player housing
+function buildHouse() {
+    if (player.level < 4) {
+        addToLog("You must be at least level 4 to build a house.", "text-red-400");
+        return;
+    }
+    if (player.gold < 1000) {
+        addToLog("You need 1000 Gold to build your house.", "text-red-400");
+        return;
+    }
+    player.gold -= 1000;
+    player.house.owned = true;
+    
+    // Ensure full house structure exists, especially for older saves
+    if (!player.house.storage) player.house.storage = { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} };
+    if (!player.house.gardenSize) player.house.gardenSize = 2;
+    if (!player.house.garden) player.house.garden = {};
+
+
+    addToLog("You hand over the gold and the deed is yours! Your new house is ready.", "text-green-400 font-bold");
+    saveGame();
+    updateStatsView();
+    renderHouse();
+}
+
+function restAtHouse() {
+    player.hp = player.maxHp;
+    player.mp = player.maxMp;
+    addToLog("You rest in the comfort of your own bed and feel fully restored.", "text-green-400");
+    updateStatsView();
+    saveGame();
+    renderHouse();
+}
+
+// MODIFICATION: Rewriting storage functions for new object-based storage
+function moveToStorage(category, itemKey, index = -1) {
+    const details = getItemDetails(itemKey);
+    if (!details) return;
+
+    // Handle stackable items (items)
+    if (category === 'items') {
+        const source = player.inventory[category];
+        const destination = player.house.storage[category];
+        
+        if (source[itemKey] && source[itemKey] > 0) {
+            source[itemKey]--;
+            if (source[itemKey] <= 0) delete source[itemKey];
+            destination[itemKey] = (destination[itemKey] || 0) + 1;
+        }
+    } else { // Handle equipment (weapons, armor, etc.)
+        const source = player.inventory[category];
+        const destination = player.house.storage[category];
+
+        let itemIndex = -1;
+        // If a specific index is provided (from a list of multiple identical items), use it
+        if (index > -1 && source[index] === itemKey) {
+            itemIndex = index;
+        } else { // Otherwise, just find the first one
+            itemIndex = source.indexOf(itemKey);
+        }
+
+        if (itemIndex > -1) {
+            source.splice(itemIndex, 1);
+            destination.push(itemKey);
+        }
+    }
+    renderHouseStorage();
+}
+
+function moveFromStorage(category, itemKey, index = -1) {
+    const details = getItemDetails(itemKey);
+    if (!details) return;
+
+    // Handle stackable items (items)
+    if (category === 'items') {
+        const source = player.house.storage[category];
+        if (source[itemKey] && source[itemKey] > 0) {
+            source[itemKey]--;
+            if (source[itemKey] <= 0) delete source[itemKey];
+            player.addToInventory(itemKey, 1, false);
+        }
+    } else { // Handle equipment
+        const source = player.house.storage[category];
+        let itemIndex = -1;
+        if (index > -1 && source[index] === itemKey) {
+            itemIndex = index;
+        } else {
+            itemIndex = source.indexOf(itemKey);
+        }
+        
+        if (itemIndex > -1) {
+            source.splice(itemIndex, 1);
+            player.addToInventory(itemKey, 1, false);
+        }
+    }
+    renderHouseStorage();
+}
+
+
+function expandGarden() {
+    const currentSize = player.house.gardenSize;
+    if (currentSize >= 5) {
+        addToLog("Your garden is already at its maximum size.", "text-yellow-400");
+        return;
+    }
+
+    const nextSize = currentSize + 1;
+    const cost = GARDEN_EXPANSION_COSTS[nextSize];
+    if (player.gold < cost) {
+        addToLog(`You need ${cost} G to expand your garden to ${nextSize}x${nextSize}.`, "text-red-400");
+        return;
+    }
+
+    player.gold -= cost;
+    player.house.gardenSize++;
+    addToLog(`You've expanded your garden to ${player.house.gardenSize}x${player.house.gardenSize}!`, "text-green-400");
+    saveGame();
+    renderHouseGarden();
 }
 

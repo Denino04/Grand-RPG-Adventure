@@ -87,6 +87,266 @@ function calculateElementalModifier(attackerElement, defenderElement) {
     return 1;
 }
 
+// --- TUTORIAL FUNCTIONS ---
+let tutorialState = {
+    isActive: false,
+    sequence: [],
+    currentIndex: -1,
+    currentTriggerController: null,
+    flags: new Set()
+};
+
+function startTutorialSequence(sequenceKey) {
+    if (!isTutorialEnabled) return;
+    
+    if(sequenceKey === 'main_game_screen') {
+        const skipBtn = $('#skip-tutorial-btn');
+        skipBtn.classList.remove('hidden');
+        skipBtn.onclick = endTutorial;
+    }
+
+    const sequence = TUTORIAL_SEQUENCES[sequenceKey];
+    if (sequence) {
+        tutorialState.isActive = true;
+        tutorialState.sequence = [...sequence];
+        tutorialState.currentIndex = -1;
+        tutorialState.flags.clear();
+        advanceTutorial();
+    }
+}
+
+function advanceTutorial(param = '') {
+    if (tutorialState.currentTriggerController) {
+        tutorialState.currentTriggerController.abort();
+        tutorialState.currentTriggerController = null;
+    }
+    
+    const currentStep = tutorialState.sequence[tutorialState.currentIndex];
+
+    if (param && currentStep?.type === 'choice') {
+        const choiceBranchKey = currentStep.choices[param];
+        const branchSequence = TUTORIAL_SEQUENCES[choiceBranchKey] || [];
+        const continuationSequence = TUTORIAL_SEQUENCES['continue_main_tutorial'] || [];
+        // Splice in the chosen branch, followed by the main continuation.
+        tutorialState.sequence.splice(tutorialState.currentIndex + 1, 0, ...branchSequence, ...continuationSequence);
+    }
+
+    tutorialState.currentIndex++;
+    if (tutorialState.currentIndex >= tutorialState.sequence.length) {
+        endTutorial();
+        return;
+    }
+
+    let step = tutorialState.sequence[tutorialState.currentIndex];
+
+    // Handle checkpoint logic
+    if (step.type === 'checkpoint') {
+        const requiredFlags = step.requiredFlags || [];
+        const hasAllFlags = requiredFlags.every(flag => tutorialState.flags.has(flag));
+        
+        if (hasAllFlags) {
+            // All flags met, proceed to the next step.
+            advanceTutorial();
+            return;
+        } else {
+            // Not all flags met, show the checkpoint message and set up triggers for the remaining districts.
+            let checkpointContent = "Time to check out the town. Visit the ";
+            const remaining = [];
+            if (!tutorialState.flags.has('commercial_visited')) {
+                 setupTutorialTrigger({ type: 'click', targetId: 'button[onclick*="renderCommercialDistrict"]', nextSequence: 'commercial_district_tour' });
+                 remaining.push('Commercial District');
+            }
+            if (!tutorialState.flags.has('arcane_visited')) {
+                 setupTutorialTrigger({ type: 'click', targetId: 'button[onclick*="renderArcaneQuarter"]', nextSequence: 'arcane_district_tour' });
+                 remaining.push('Arcane Quarter');
+            }
+            if (!tutorialState.flags.has('residential_visited')) {
+                 setupTutorialTrigger({ type: 'click', targetId: 'button[onclick*="renderResidentialDistrict"]', nextSequence: 'residential_district_tour' });
+                 remaining.push('Residential Area');
+            }
+            checkpointContent += remaining.join(', ') + ".";
+            showTutorialStep(step, checkpointContent);
+            return; // Halt further advancement until a trigger is met.
+        }
+    }
+    
+    let content = step.content;
+    const charName = player ? player.name : param; 
+    if (charName && content.includes('<Charname>')) {
+        content = content.replace(/<Charname>/g, charName);
+    }
+    
+    // Execute pre-action if it exists
+    if (step.preAction === 'enableWilderness') {
+        const wildernessBtn = document.querySelector('button[onclick*="renderWildernessMenu"]');
+        if(wildernessBtn) wildernessBtn.disabled = false;
+    }
+
+    showTutorialStep(step, content);
+}
+
+
+function showTutorialStep(step, content) {
+    const box = $('#tutorial-box');
+    const text = $('#tutorial-text');
+    const nextBtn = $('#tutorial-next-btn');
+    const choiceContainer = $('#tutorial-choice-buttons');
+    
+    text.innerHTML = content;
+    box.classList.remove('hidden');
+    choiceContainer.innerHTML = '';
+    nextBtn.style.display = 'none';
+
+    box.className = box.className.replace(/arrow-\w+/g, '').trim();
+
+    if (step.type === 'modal' || step.type === 'choice') {
+        box.style.position = 'fixed';
+        box.style.top = '50%';
+        box.style.left = '50%';
+        box.style.transform = 'translate(-50%, -50%)';
+        box.style.opacity = '1';
+
+        if (step.type === 'choice') {
+            Object.keys(step.choices).forEach(choiceText => {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-primary';
+                btn.textContent = choiceText;
+                btn.onclick = () => advanceTutorial(choiceText);
+                choiceContainer.appendChild(btn);
+            });
+        } else {
+             nextBtn.style.display = 'block';
+             nextBtn.onclick = advanceTutorial;
+        }
+
+    } else {
+        const targetElement = document.querySelector(step.targetId);
+        if (!targetElement) {
+            console.warn(`Tutorial target element ${step.targetId} not found.`);
+            advanceTutorial();
+            return;
+        }
+
+        void box.offsetHeight; // Force reflow
+
+        const targetRect = targetElement.getBoundingClientRect();
+        const boxRect = box.getBoundingClientRect();
+        const arrowOffset = 20;
+
+        let top, left;
+        const position = step.position || 'right';
+        
+        box.style.position = 'fixed';
+
+        switch (position) {
+            case 'left':
+                left = targetRect.left - boxRect.width - arrowOffset;
+                top = targetRect.top + (targetRect.height / 2) - (boxRect.height / 2);
+                box.classList.add('arrow-right');
+                break;
+            case 'top':
+                left = targetRect.left + (targetRect.width / 2) - (boxRect.width / 2);
+                top = targetRect.top - boxRect.height - arrowOffset;
+                box.classList.add('arrow-bottom');
+                break;
+             case 'bottom':
+                left = targetRect.left + (targetRect.width / 2) - (boxRect.width / 2);
+                top = targetRect.top + targetRect.height + arrowOffset;
+                box.classList.add('arrow-top');
+                break;
+             case 'right':
+            default:
+                left = targetRect.left + targetRect.width + arrowOffset;
+                top = targetRect.top + (targetRect.height / 2) - (boxRect.height / 2);
+                box.classList.add('arrow-left');
+                break;
+        }
+        
+        left = Math.max(10, Math.min(left, window.innerWidth - boxRect.width - 10));
+        top = Math.max(10, Math.min(top, window.innerHeight - boxRect.height - 10));
+        
+        box.style.left = `${left}px`;
+        box.style.top = `${top}px`;
+        box.style.transform = '';
+        box.style.opacity = '1';
+
+        setupTutorialTrigger(step.trigger);
+    }
+}
+
+
+function setupTutorialTrigger(trigger) {
+    const nextBtn = $('#tutorial-next-btn');
+    if(!trigger) {
+        nextBtn.style.display = 'block';
+        nextBtn.onclick = advanceTutorial;
+    } else {
+        nextBtn.style.display = 'none';
+    }
+
+    if (tutorialState.currentTriggerController) {
+        tutorialState.currentTriggerController.abort();
+    }
+    tutorialState.currentTriggerController = new AbortController();
+    const { signal } = tutorialState.currentTriggerController;
+
+    if (!trigger) return;
+
+    switch (trigger.type) {
+        case 'next_button':
+            // Handled by specific UI buttons calling advanceTutorial()
+            break;
+        case 'input':
+            const inputEl = $(`#${trigger.targetId}`);
+            if (inputEl) {
+                const triggerAdvance = () => advanceTutorial();
+                inputEl.addEventListener('input', triggerAdvance, { once: true, signal });
+            }
+            break;
+        case 'click':
+            const clickEls = document.querySelectorAll(trigger.targetId);
+            if (clickEls.length > 0) {
+                clickEls.forEach(el => {
+                    const handler = () => {
+                        if (trigger.setFlag) {
+                            tutorialState.flags.add(trigger.setFlag);
+                        }
+                         // If it's a district tour, jump to that sequence
+                        if (trigger.nextSequence) {
+                            const nextSeq = TUTORIAL_SEQUENCES[trigger.nextSequence] || [];
+                            tutorialState.sequence.splice(tutorialState.currentIndex + 1, 0, ...nextSeq);
+                        }
+                        advanceTutorial();
+                    };
+                    el.addEventListener('click', handler, { once: true, signal });
+                });
+            }
+            break;
+         case 'enemy_death':
+            // Custom trigger handled in game logic
+            break;
+    }
+}
+
+
+function endTutorial() {
+    $('#tutorial-box').classList.add('hidden');
+    $('#skip-tutorial-btn').classList.add('hidden');
+    tutorialState.isActive = false;
+    tutorialState.sequence = [];
+    tutorialState.currentIndex = -1;
+    if (tutorialState.currentTriggerController) {
+        tutorialState.currentTriggerController.abort();
+    }
+    const wildernessBtn = document.querySelector('button[onclick*="renderWildernessMenu"]');
+    if(wildernessBtn) wildernessBtn.disabled = false;
+    
+    if (gameState.currentView !== 'town' && player) {
+        renderTownSquare();
+    }
+}
+
+
 // --- UI BUILDER FUNCTIONS ---
 
 /**
@@ -626,4 +886,3 @@ function hideEnemyInfo() {
     $('#tooltip').style.display = 'none';
     activeTooltipItem = null;
 }
-

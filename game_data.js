@@ -343,7 +343,7 @@ const ELEMENTS = {
 
 const WEAPONS = {
     // --- Fists ---
-    'fists': { name: 'Fists', class: 'Hand-to-Hand', damage: [2, 2], price: 0, rarity: 'Broken', description: "Just your bare hands." },
+    'fists': { name: 'Fists', class: 'Longsword', damage: [2, 2], price: 0, rarity: 'Broken', description: "Just your bare hands." },
     'caestus': { name: 'Caestus', class: 'Hand-to-Hand', damage: [2, 2], price: 50, rarity: 'Common', description: "A simple caestus made for brawling. Made from hardened leather and soft cotton, designed to protect the hand of a fighter while they tenderize someone's face." },
     'iron_ball': { name: 'Iron Ball', class: 'Hand-to-Hand', damage: [1, 6], price: 200, rarity: 'Uncommon', description: "Two iron balls fashioned in the shape of a boxing glove. Heavy, hefty, and they hit like... well, two iron balls." },
     'assassins_claw': { name: 'Assassin’s Claw', class: 'Hand-to-Hand', damage: [2, 4], price: 1000, rarity: 'Rare', description: "Claws resembling those of a feline, used by a gang of underworld assassins on their jobs. Its sharp designs are meant to strike at weak points.", effect: { critChance: 0.1, critMultiplier: 2.0 } },
@@ -505,8 +505,8 @@ const ITEMS = {
     'dragon_heart_item': { name: 'Dragon Heart', type: 'alchemy', price: 2000, description: 'The still-warm heart of a slain dragon.'},
     'void_heart': { name: 'Void Heart', type: 'alchemy', price: 2000, description: 'A pulsating shard of darkness from a Dullahan.'},
     'undying_heart': { name: 'Undying Heart', type: 'special', price: 1000, description: 'A pulsating heart that refuses to stop beating. Can be equipped to grant a single revival per day.' },
-    'strength_potion': { name: 'Strength Potion', type: 'buff', price: 150, effect: { type: 'strength', multiplier: 1.5, duration: 3 }, description: 'Temporarily increases physical damage.' },
-    'stonehide_potion': { name: 'Stonehide Potion', type: 'buff', price: 200, effect: { type: 'stonehide', multiplier: 2, duration: 3 }, description: 'Temporarily increases defense.' },
+    'strength_potion': { name: 'Strength Potion', type: 'buff', price: 150, effect: { type: 'strength', multiplier: 1.5, duration: 4 }, description: 'Temporarily increases physical damage.' },
+    'stonehide_potion': { name: 'Stonehide Potion', type: 'buff', price: 200, effect: { type: 'stonehide', multiplier: 2, duration: 4 }, description: 'Temporarily increases defense.' },
     'cleansing_potion': { name: 'Cleansing Potion', type: 'cleanse', price: 250, description: 'Removes all negative status effects.' },
     'fire_essence': { name: 'Fire Essence', type: 'enchant', price: 100, description: 'The pure, searing essence of fire.' },
     'water_essence': { name: 'Water Essence', type: 'enchant', price: 100, description: 'The pure, flowing essence of water.' },
@@ -516,12 +516,12 @@ const ITEMS = {
     'nature_essence': { name: 'Nature Essence', type: 'enchant', price: 100, description: 'The pure, vibrant essence of nature.' },
     'light_essence': { name: 'Light Essence', type: 'enchant', price: 100, description: 'The pure, radiant essence of light.' },
     'void_essence': { name: 'Void Essence', type: 'enchant', price: 100, description: 'The pure, silent essence of the void.' },
-    'potion_of_giant_strength': { name: 'Potion of Giant Strength', type: 'buff', encounterDuration: 3, price: 500, effect: { type: 'temp_strength', multiplier: 1.25, duration: 3 }, description: 'Temporarily increases Physical Damage by 25% for 3 encounters.' },
-    'potion_of_fortitude': { name: 'Potion of Fortitude', type: 'buff', encounterDuration: 3, price: 500, effect: { type: 'temp_vigor', multiplier: 1.25, duration: 3 }, description: 'Temporarily increases Max HP by 25% for 3 encounters.' },
     'potion_of_brilliance': { name: 'Potion of Brilliance', type: 'buff', encounterDuration: 3, price: 500, effect: { type: 'temp_intelligence', multiplier: 1.25, duration: 3 }, description: 'Temporarily increases Magical Damage by 25% for 3 encounters.' },
     'potion_of_clarity': { name: 'Potion of Clarity', type: 'buff', encounterDuration: 3, price: 500, effect: { type: 'temp_focus', multiplier: 1.25, duration: 3 }, description: 'Temporarily increases Max MP by 25% for 3 encounters.' },
-    'bestiary_notebook': {name: 'Bestiary Notebook', type: 'key', price: 0, description: "A leather-bound book from a nervous researcher named Betty. Used to catalogue monster observations."}
-
+    'bestiary_notebook': {name: 'Bestiary Notebook', type: 'key', price: 0, description: "A leather-bound book from a nervous researcher named Betty. Used to catalogue monster observations."},
+    // MODIFICATION: Added seeds for the garden
+    'sunpetal_seed': {name: 'Sunpetal Seed', type: 'seed', price: 50, description: "A seed that seems to glow with a faint, warm light."},
+    'moonbloom_seed': {name: 'Moonbloom Seed', type: 'seed', price: 50, description: "A dark, smooth seed that feels cool to the touch."}
 };
 const LURES = {
     'no_lure': { name: 'None', price: 0, description: 'No lure equipped.' },
@@ -575,8 +575,8 @@ const SPELLS = {
     'fire_support': {
         element: 'fire', type: 'support', learnCost: 250,
         tiers: [
-            { name: 'Flame, Grant me Strength', cost: 20, effect: { type: 'buff_strength', multiplier: 1.5, duration: 3 }, description: "Increase strength by 50% for 3 turns.", upgradeCost: 2000, upgradeEssences: { 'fire_essence': 15 } },
-            { name: 'Chaos, Boil my Blood', cost: 40, effect: { type: 'buff_chaos_strength', strMultiplier: 2.0, defMultiplier: 0.5, duration: 3 }, description: "Increase strength by 100% but decrease all defense by 50% for 3 turns." }
+            { name: 'Flame, Grant me Strength', cost: 20, effect: { type: 'buff_strength', multiplier: 1.5, duration: 4 }, description: "Increase strength by 50% for 3 turns.", upgradeCost: 2000, upgradeEssences: { 'fire_essence': 15 } },
+            { name: 'Chaos, Boil my Blood', cost: 40, effect: { type: 'buff_chaos_strength', strMultiplier: 2.0, defMultiplier: 0.5, duration: 4 }, description: "Increase strength by 100% but decrease all defense by 50% for 3 turns." }
         ]
     },
     // Water
@@ -599,8 +599,8 @@ const SPELLS = {
     'water_support': {
         element: 'water', type: 'support', learnCost: 250,
         tiers: [
-            { name: 'Water Sport', cost: 20, effect: { type: 'debuff_strength', multiplier: 0.75, duration: 3 }, description: "Decrease enemies' strength by 25% for 3 turns.", upgradeCost: 2000, upgradeEssences: { 'water_essence': 15 } },
-            { name: 'Deep Sea Protection', cost: 40, effect: { type: 'debuff_strength', multiplier: 0.5, duration: 3 }, description: "Decrease enemies' strength by 50% for 3 turns." }
+            { name: 'Water Sport', cost: 20, effect: { type: 'debuff_strength', multiplier: 0.75, duration: 4 }, description: "Decrease enemies' strength by 25% for 3 turns.", upgradeCost: 2000, upgradeEssences: { 'water_essence': 15 } },
+            { name: 'Deep Sea Protection', cost: 40, effect: { type: 'debuff_strength', multiplier: 0.5, duration: 4 }, description: "Decrease enemies' strength by 50% for 3 turns." }
         ]
     },
     // Earth
@@ -647,8 +647,8 @@ const SPELLS = {
     'wind_support': {
         element: 'wind', type: 'support', learnCost: 250,
         tiers: [
-            { name: 'Haste', cost: 25, effect: { type: 'buff_haste', duration: 3 }, description: "Grants an additional attack per turn for 3 turns.", upgradeCost: 2500, upgradeEssences: { 'wind_essence': 15 } },
-            { name: 'Hermes\' Trickery', cost: 50, effect: { type: 'buff_hermes', duration: 3 }, description: "Grants Haste and doubles dodge/block chance for 3 turns." }
+            { name: 'Haste', cost: 25, effect: { type: 'buff_haste', duration: 4 }, description: "Grants an additional attack per turn for 3 turns.", upgradeCost: 2500, upgradeEssences: { 'wind_essence': 15 } },
+            { name: 'Hermes\' Trickery', cost: 50, effect: { type: 'buff_hermes', duration: 4 }, description: "Grants Haste and doubles dodge/block chance for 3 turns." }
         ]
     },
     // Lightning
@@ -671,8 +671,8 @@ const SPELLS = {
     'lightning_support': {
         element: 'lightning', type: 'support', learnCost: 250,
         tiers: [
-            { name: 'Unstable Ion', cost: 20, effect: { type: 'buff_ion_self', duration: 3 }, description: "Weapon attacks may chain to another target (including you) for 50% damage.", upgradeCost: 2000, upgradeEssences: { 'lightning_essence': 15 } },
-            { name: 'Thunderbolt Blessings', cost: 40, effect: { type: 'buff_ion_other', duration: 3 }, description: "Weapon attacks may chain to other enemies. Reflect 25% of damage taken." }
+            { name: 'Unstable Ion', cost: 20, effect: { type: 'buff_ion_self', duration: 4 }, description: "Weapon attacks may chain to another target (including you) for 50% damage.", upgradeCost: 2000, upgradeEssences: { 'lightning_essence': 15 } },
+            { name: 'Thunderbolt Blessings', cost: 40, effect: { type: 'buff_ion_other', duration: 4 }, description: "Weapon attacks may chain to other enemies. Reflect 25% of damage taken." }
         ]
     },
     // Nature
@@ -719,8 +719,8 @@ const SPELLS = {
     'light_support': {
         element: 'light', type: 'support', learnCost: 250,
         tiers: [
-            { name: 'Shield of Faith', cost: 20, effect: { type: 'buff_magic_defense', multiplier: 1.5, duration: 3 }, description: "Increase magical defense by 50% for 3 turns.", upgradeCost: 2000, upgradeEssences: { 'light_essence': 15 } },
-            { name: 'Divine Blessings', cost: 40, effect: { type: 'buff_divine', multiplier: 2.0, duration: 3, cleanse: true }, description: "Increase magical defense by 100% for 3 turns and cleanse all debuffs." }
+            { name: 'Shield of Faith', cost: 20, effect: { type: 'buff_magic_defense', multiplier: 1.5, duration: 4 }, description: "Increase magical defense by 50% for 3 turns.", upgradeCost: 2000, upgradeEssences: { 'light_essence': 15 } },
+            { name: 'Divine Blessings', cost: 40, effect: { type: 'buff_divine', multiplier: 2.0, duration: 4, cleanse: true }, description: "Increase magical defense by 100% for 3 turns and cleanse all debuffs." }
         ]
     },
     // Void
@@ -728,7 +728,7 @@ const SPELLS = {
         element: 'void', type: 'st', learnCost: 250,
         tiers: [
             { name: 'Shadow Sneak', cost: 10, damage: [2, 8], cap: 4, upgradeCost: 750, upgradeEssences: { 'void_essence': 10 }, description: "Launch a bolt of living shadow at an enemy." },
-            { name: 'Hex Strike', cost: 25, damage: [4, 8], cap: 7, upgradeCost: 3000, upgradeEssences: { 'void_essence':210 }, description: "Strike a foe with a debilitating hex that wracks their body with dark energy." },
+            { name: 'Hex Strike', cost: 25, damage: [4, 8], cap: 7, upgradeCost: 3000, upgradeEssences: { 'void_essence': 20 }, description: "Strike a foe with a debilitating hex that wracks their body with dark energy." },
             { name: 'Gate of the Underworld', cost: 50, damage: [6, 8], cap: 10, description: "Tear open a momentary rift to the underworld beneath a foe, pulling them toward oblivion." }
         ]
     },
@@ -743,8 +743,8 @@ const SPELLS = {
     'void_support': {
         element: 'void', type: 'support', learnCost: 250,
         tiers: [
-            { name: 'Shadow Shroud', cost: 25, effect: { type: 'buff_shroud', duration: 3 }, description: "Increase dodge and critical chance by 50% for 3 turns.", upgradeCost: 2500, upgradeEssences: { 'void_essence': 15 } },
-            { name: 'Blessing of Voidwalker', cost: 50, effect: { type: 'buff_voidwalker', duration: 3 }, description: "Grants Shadow Shroud, +50% critical damage, and guaranteed fleeing." }
+            { name: 'Shadow Shroud', cost: 25, effect: { type: 'buff_shroud', duration: 4 }, description: "Increase dodge and critical chance by 50% for 3 turns.", upgradeCost: 2500, upgradeEssences: { 'void_essence': 15 } },
+            { name: 'Blessing of Voidwalker', cost: 50, effect: { type: 'buff_voidwalker', duration: 4 }, description: "Grants Shadow Shroud, +50% critical damage, and guaranteed fleeing." }
         ]
     },
     // Healing
@@ -879,16 +879,7 @@ const BLACK_MARKET_INVENTORY = {
 };
 
 const ALCHEMY_RECIPES = {
-    'potion_giant_strength': { output: 'potion_of_giant_strength', ingredients: { 'orc_liver': 5 }, cost: 250, hearts: 1 },
-    'potion_fortitude': { output: 'potion_of_fortitude', ingredients: { 'cockatrice_venom_gland': 5 }, cost: 250, hearts: 1 },
-    'potion_brilliance': { output: 'potion_of_brilliance', ingredients: { 'spider_venom': 5 }, cost: 250, hearts: 1 },
-    'potion_clarity': { output: 'potion_of_clarity', ingredients: { 'unicorn_horn_fragment': 2 }, cost: 250, hearts: 1 },
-    'brew_health': { output: 'health_potion', ingredients: { 'slime_glob': 2 }, cost: 10 },
-    'brew_mana': { output: 'mana_potion', ingredients: { 'slime_glob': 2 }, cost: 15 },
-    'brew_condensed_health': { output: 'condensed_health_potion', ingredients: { 'slime_glob': 10 }, cost: 50 },
-    'brew_condensed_mana': { output: 'condensed_mana_potion', ingredients: { 'slime_glob': 10 }, cost: 60 },
-    'brew_super_health': { output: 'superior_health_potion', ingredients: { 'slime_glob': 20, 'orc_liver' : 2 }, cost: 100 },
-    'brew_super_mana': { output: 'superior_mana_potion', ingredients: { 'slime_glob': 20, 'cockatrice_venom_gland': 2 }, cost: 120 },
+
 };
 
 const BLACKSMITH_RECIPES = {
