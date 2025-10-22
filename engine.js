@@ -1,14 +1,4 @@
 /**
- * Calculates the damage modifier based on elemental strengths and weaknesses.
- * @param {string} attackElement The element of the incoming attack.
- * @param {string} defenseElement The element of the defending entity/gear.
- * @returns {number} 2 for strong, 0.5 for weak, 1 for neutral.
- */
-// MODIFICATION: This entire function has been removed to eliminate redundancy.
-// The same function in ui_helpers.js will be used globally.
-
-
-/**
  * Calculates dynamic rarity weights based on player level and monster class.
  * @param {number} playerLevel The player's current level.
  * @param {string} monsterClass The class of the monster being generated.
@@ -49,7 +39,7 @@ function getDynamicRarityWeights(playerLevel, monsterClass) {
         weights.epic += Math.floor(transferPoints * 0.2);     // 20% of points
         // The base legendary chance is preserved for that "oh shit" factor at all levels.
     }
-    
+
     // Normalize weights to ensure they sum to 100.
     const finalWeights = Object.values(weights);
     const currentTotal = finalWeights.reduce((a, b) => a + b, 0);
@@ -87,30 +77,30 @@ function seededRandom(seed) {
  * @param {function(): number} [rng=Math.random] Optional random number generator.
  * @returns {Array} The shuffled array.
  */
-function shuffleArray(array, rng) { 
+function shuffleArray(array, rng) {
     const randomFunc = rng || Math.random;
-    for (let i = array.length - 1; i > 0; i--) { 
-        const j = Math.floor(randomFunc() * (i + 1)); 
-        [array[i], array[j]] = [array[j], array[i]]; 
-    } 
-    return array; 
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(randomFunc() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
 }
 
 /**
- * Selects a random element from a population based on weights.
+ * Selects a random element from a population based on on weights.
  * @param {Array} population The array of items to choose from.
  * @param {Array<number>} weights The corresponding weights for each item.
  * @param {function(): number} [rng=Math.random] Optional random number generator.
  * @returns {*} The chosen item.
  */
-function choices(population, weights, rng) { 
+function choices(population, weights, rng) {
     const randomFunc = rng || Math.random;
-    let totalWeight = weights.reduce((acc, w) => acc + w, 0); 
-    let randomNum = randomFunc() * totalWeight; 
-    for (let i = 0; i < population.length; i++) { 
-        if (randomNum < weights[i]) return population[i]; 
-        randomNum -= weights[i]; 
-    } 
+    let totalWeight = weights.reduce((acc, w) => acc + w, 0);
+    let randomNum = randomFunc() * totalWeight;
+    for (let i = 0; i < population.length; i++) {
+        if (randomNum < weights[i]) return population[i];
+        randomNum -= weights[i];
+    }
 }
 
 /**
@@ -142,7 +132,7 @@ function getPlayerEmoji() {
  * @returns {object|null} The details object for the item, or null if not found.
  */
 function getItemDetails(itemKey) {
-    return WEAPONS[itemKey] || ARMOR[itemKey] || SHIELDS[itemKey] || CATALYSTS[itemKey] || ITEMS[itemKey] || LURES[itemKey] || SPELLS[itemKey] || null;
+    return WEAPONS[itemKey] || ARMOR[itemKey] || SHIELDS[itemKey] || CATALYSTS[itemKey] || ITEMS[itemKey] || LURES[itemKey] || SPELLS[itemKey] || COOKING_RECIPES[itemKey] || null;
 }
 
 
@@ -185,7 +175,7 @@ function findPath(start, end, isFlying = false) {
         for (const neighbor of neighbors) {
             if (neighbor.x < 0 || neighbor.x >= gameState.gridWidth || neighbor.y < 0 || neighbor.y >= gameState.gridHeight) continue;
             if (gameState.gridLayout[neighbor.y * gameState.gridWidth + neighbor.x] !== 1) continue;
-            
+
             // Check for blocking entities (player or other enemies)
             const isOccupiedByEntity = (currentEnemies.some(e => e.x === neighbor.x && e.y === neighbor.y) || (player.x === neighbor.x && player.y === neighbor.y));
             if (isOccupiedByEntity && !(neighbor.x === end.x && neighbor.y === end.y)) continue;
@@ -237,7 +227,7 @@ function findReachableCells(start, maxDistance) {
                     neighbor.y >= 0 && neighbor.y < gameState.gridHeight &&
                     gameState.gridLayout[neighbor.y * gameState.gridWidth + neighbor.x] === 1 &&
                     !isCellBlocked(neighbor.x, neighbor.y)) {
-                    
+
                     visited.add(key);
                     queue.push({ x: neighbor.x, y: neighbor.y, dist: current.dist + 1 });
                 }
@@ -250,9 +240,9 @@ function findReachableCells(start, maxDistance) {
 
 // --- CLASSES ---
 class Entity {
-    constructor(name) { 
-        this.name = name; 
-        this.statusEffects = {}; 
+    constructor(name) {
+        this.name = name;
+        this.statusEffects = {};
     }
     isAlive() { return this.hp > 0; }
 }
@@ -265,8 +255,8 @@ class Player extends Entity {
         // Core Attributes
         this.level = 1;
         this.xp = 0;
-        // this.totalXp is intentionally left undefined here. It will be initialized for new games in initGame()
-        // and calculated for old saves in loadGameFromKey().
+        this.xpMultiplier = 1;
+        this.totalXp = 0;
         this.xpToNextLevel = this.calculateXpToNextLevel();
         this.gold = 100;
         this.statPoints = 0;
@@ -276,9 +266,21 @@ class Player extends Entity {
         this.background = '';
         this.backgroundKey = '';
         this.difficulty = 'hardcore';
-        this.house = { owned: false, storage: { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} } };
+        this.house = {
+            owned: false,
+            storage: { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} },
+            storageTier: 0,
+            gardenTier: 0,
+            kitchenTier: 0,
+            alchemyTier: 0,
+            trainingTier: 0,
+            garden: [],
+            treePlots: []
+        };
         this.dialogueFlags = {};
         this.bettyQuestState = 'not_started'; // not_started, declined, accepted
+        this.knownCookingRecipes = [];
+        this.knownAlchemyRecipes = [];
 
         // Main Stats from Race
         const raceStats = RACES[this.race] || RACES['Human'];
@@ -306,20 +308,19 @@ class Player extends Entity {
         this.bonusMagicalDamage = 0;
         this.bonusEvasion = 0;
         this.bonusCritChance = 0;
-        
+
         // Initial HP/MP set from base stats
         this.hp = this.maxHp;
         this.mp = this.maxMp;
 
         // Game State & Equipment
-                            this.usedReviveToday = false;
-                            this.temporaryBuffs = {};
+        this.foodBuffs = {};
         this.firestoreId = null;
         this.seed = null;
         this.playerTier = 1;
         this.specialWeaponStates = {};
         this.blackMarketStock = { seasonal: [] };
-        
+
         this.equippedWeapon = WEAPONS['fists'];
         this.equippedCatalyst = CATALYSTS['no_catalyst'];
         this.equippedArmor = ARMOR['travelers_garb'];
@@ -331,13 +332,13 @@ class Player extends Entity {
         this.shieldElement = 'none';
 
         this.equipmentOrder = [];
-        this.inventory = { 
-            items: { 'health_potion': 3, 'mana_potion': 1 }, 
+        this.inventory = {
+            items: { 'health_potion': 3, 'mana_potion': 1 },
             weapons: ['fists'],
             catalysts: ['no_catalyst'],
-            armor: ['travelers_garb'], 
-            shields: ['no_shield'], 
-            lures: { } 
+            armor: ['travelers_garb'],
+            shields: ['no_shield'],
+            lures: { }
         };
         this.spells = {};
         this.activeQuest = null; this.questProgress = 0;
@@ -348,8 +349,20 @@ class Player extends Entity {
     }
 
     // Derived Stats using Getters
-    get maxHp() { return (this.vigor * 5) + this.bonusHp; }
-    get maxMp() { return (this.focus * 5) + this.bonusMp; }
+    get maxHp() { 
+        let finalHp = (this.vigor * 5) + this.bonusHp;
+        if (this.foodBuffs?.max_hp) {
+            finalHp *= this.foodBuffs.max_hp.value;
+        }
+        return Math.floor(finalHp);
+    }
+    get maxMp() { 
+        let finalMp = (this.focus * 5) + this.bonusMp;
+        if (this.foodBuffs?.max_mp) {
+            finalMp *= this.foodBuffs.max_mp.value;
+        }
+        return Math.floor(finalMp);
+    }
     get physicalDefense() { return Math.floor((this.stamina + this.vigor) / 2) + this.bonusPhysicalDefense; }
     get magicalDefense() { return Math.floor((this.stamina + this.focus) / 2) + this.bonusMagicalDefense; }
     get physicalDamageBonus() { return this.strength + this.bonusPhysicalDamage; }
@@ -358,22 +371,11 @@ class Player extends Entity {
     get critChance() { return Math.min(0.3, ((this.luck * 0.5) / 100) + this.bonusCritChance); } 
     get evasionChance() { return Math.min(0.2, ((this.luck * 0.5) / 100) + this.bonusEvasion); }
     
-    /**
-     * Calculates the experience required to level up using the NEW formula.
-     * @param {number} [level] - Optional level to calculate for, otherwise uses current level.
-     * @returns {number} The total XP needed for the next level.
-     */
     calculateXpToNextLevel(level) {
         const lvl = level || this.level;
-        // New, easier formula: 100 * level^1.15
         return Math.floor(100 * Math.pow(lvl, 1.15));
     }
 
-    /**
-     * Recalculates the player's level, current XP, and stat points from their totalXP.
-     * This is the core function for migrating old saves to the new EXP curve.
-     * @returns {number} The number of levels gained or lost.
-     */
     recalculateLevelFromTotalXp() {
         const oldLevel = this.level;
         let newLevel = 1;
@@ -388,13 +390,12 @@ class Player extends Entity {
 
         this.level = newLevel;
         this.xp = xpPool;
-        this.xpToNextLevel = this.calculateXpToNextLevel(this.level); // Update for current level
+        this.xpToNextLevel = this.calculateXpToNextLevel(this.level);
 
-        // Recalculate stat points based on the new level, preserving spent points.
         const totalSpentPoints = this.bonusVigor + this.bonusFocus + this.bonusStamina + this.bonusStrength + this.bonusIntelligence + this.bonusLuck;
         const totalPointsFromLevels = (this.level - 1) * 5;
         this.statPoints = totalPointsFromLevels - totalSpentPoints;
-        
+
         return newLevel - oldLevel;
     }
 
@@ -413,22 +414,20 @@ class Player extends Entity {
         if (!this.backgroundKey || !BACKGROUNDS[this.backgroundKey]) return;
 
         const backgroundData = BACKGROUNDS[this.backgroundKey];
-        const rng = seededRandom(this.seed || 1); // Use a seeded RNG for deterministic random choices
+        const rng = seededRandom(this.seed || 1);
 
-        // Wretch Background Logic
         if (backgroundData.growthBonus.wretch) {
             const totalPointsSpent = this.bonusVigor + this.bonusFocus + this.bonusStamina + this.bonusStrength + this.bonusIntelligence + this.bonusLuck;
             const procs = Math.floor(totalPointsSpent / 2);
             const possibleBonuses = ['vigor', 'focus', 'stamina', 'strength', 'intelligence', 'luck'];
-            
+
             for (let i = 0; i < procs; i++) {
                 const randomStat = possibleBonuses[Math.floor(rng() * possibleBonuses.length)];
-                this.applyBonusForStat(randomStat, 1, rng, true); // Force apply for Wretch
+                this.applyBonusForStat(randomStat, 1, rng, true);
             }
-            return; // Wretch logic is exclusive
+            return;
         }
 
-        // Standard Background Logic
         this.applyBonusForStat('vigor', this.bonusVigor, rng);
         this.applyBonusForStat('focus', this.bonusFocus, rng);
         this.applyBonusForStat('stamina', this.bonusStamina, rng);
@@ -439,11 +438,11 @@ class Player extends Entity {
 
     applyBonusForStat(stat, points, rng, isWretch = false) {
         if (!this.backgroundKey || !BACKGROUNDS[this.backgroundKey] || points === 0) return;
-        
+
         const background = BACKGROUNDS[this.backgroundKey];
         const favoredStats = background.favoredStats.map(s => s.toLowerCase());
 
-        if (!isWretch && !favoredStats.includes(stat)) return; // Only apply bonus if it's a favored stat (or Wretch)
+        if (!isWretch && !favoredStats.includes(stat)) return;
 
         switch(stat) {
             case 'vigor': this.bonusHp += 5 * points; break;
@@ -458,24 +457,33 @@ class Player extends Entity {
             case 'intelligence': this.bonusMagicalDamage += 1 * points; break;
             case 'luck':
                 for (let i = 0; i < points; i++) {
-                    if (rng() < 0.5) this.bonusEvasion += 0.005; // 0.5%
-                    else this.bonusCritChance += 0.005; // 0.5%
+                    if (rng() < 0.5) this.bonusEvasion += 0.005;
+                    else this.bonusCritChance += 0.005;
                 }
                 break;
         }
     }
 
+    clearFoodBuffs() {
+        if (Object.keys(this.foodBuffs).length > 0) {
+            this.foodBuffs = {};
+            addToLog("The effects of your last meal have worn off.", "text-gray-400");
+            this.hp = Math.min(this.hp, this.maxHp);
+            this.mp = Math.min(this.mp, this.maxMp);
+        }
+    }
+
     clearEncounterBuffs() {
         let buffsCleared = false;
-        for (const key in this.temporaryBuffs) {
-            this.temporaryBuffs[key]--;
-            if (this.temporaryBuffs[key] <= 0) {
-                delete this.temporaryBuffs[key];
+        for (const key in this.foodBuffs) {
+            this.foodBuffs[key].duration--;
+            if (this.foodBuffs[key].duration <= 0) {
+                delete this.foodBuffs[key];
                 buffsCleared = true;
             }
         }
-        if(buffsCleared) {
-            addToLog("The effects of a concoction wear off.", "text-purple-400");
+        if (buffsCleared) {
+            addToLog("The lingering effects of your meal begin to fade...", "text-purple-400");
             this.hp = Math.min(this.hp, this.maxHp);
             this.mp = Math.min(this.mp, this.maxMp);
             updateStatsView();
@@ -484,18 +492,26 @@ class Player extends Entity {
 
     addToInventory(itemKey, quantity = 1, verbose = true) {
         const details = getItemDetails(itemKey); if (!details) return;
+
+        if(details.type === 'recipe') {
+            for(let i = 0; i < quantity; i++) {
+                this.learnRecipe(itemKey, verbose);
+            }
+            return;
+        }
+
         if (verbose) addToLog(`You received: <span class="font-bold" style="color: var(--text-accent);">${details.name}</span>!`, 'text-green-400');
-        
+
         const category = itemKey in WEAPONS ? 'weapons' :
                          (itemKey in CATALYSTS ? 'catalysts' :
-                         (itemKey in ARMOR ? 'armor' : 
-                         (itemKey in SHIELDS ? 'shields' : 
+                         (itemKey in ARMOR ? 'armor' :
+                         (itemKey in SHIELDS ? 'shields' :
                          (itemKey in LURES ? 'lures' : 'items'))));
 
         if (category === 'lures') {
-             this.inventory.lures[itemKey] = (this.inventory.lures[itemKey] || 0) + quantity;
-        } else if (category === 'items') { 
-            this.inventory.items[itemKey] = (this.inventory.items[itemKey] || 0) + quantity; 
+             this.inventory.lures[itemKey] = (this.inventory.lures[itemKey] || 0) + details.uses;
+        } else if (category === 'items') {
+            this.inventory.items[itemKey] = (this.inventory.items[itemKey] || 0) + quantity;
         } else {
             if (!this.inventory[category]) {
                 this.inventory[category] = [];
@@ -505,27 +521,57 @@ class Player extends Entity {
             }
         }
     }
-    gainXp(amount) { 
-        this.xp += amount; 
-        if (this.totalXp === undefined) this.totalXp = 0; // safety check
-        this.totalXp += amount; // Add to total XP as well
-        addToLog(`You gained <span class="font-bold">${amount}</span> XP!`, 'text-yellow-400'); 
-        while (this.xp >= this.xpToNextLevel) { // Use while loop for multiple level ups
-            this.levelUp();
-        } 
-        updateStatsView(); 
+
+    learnRecipe(itemKey, verbose = true) {
+        const details = ITEMS[itemKey];
+        if(!details) return;
+
+        const actualRecipeKey = details.recipeKey;
+        let recipeList;
+        let messageType = '';
+
+        if(details.recipeType === 'cooking') {
+            recipeList = this.knownCookingRecipes;
+            messageType = 'cooking';
+        } else if (details.recipeType === 'alchemy') {
+            recipeList = this.knownAlchemyRecipes;
+            messageType = 'alchemy';
+        }
+
+        if(recipeList && !recipeList.includes(actualRecipeKey)) {
+            recipeList.push(actualRecipeKey);
+            if (verbose) addToLog(`You learned a new ${messageType} recipe: <span class="font-bold text-yellow-300">${details.name.replace('Recipe: ', '')}</span>!`, 'text-green-400');
+        } else {
+            if (verbose) addToLog(`You already know this recipe. You sell the spare for a small profit.`);
+            this.gold += Math.floor(details.price / 4);
+        }
     }
-    levelUp() { 
-        this.xp -= this.xpToNextLevel; 
-        this.level++; // NOTE: This is only called when leveling up, not during recalculation
-        this.xpToNextLevel = this.calculateXpToNextLevel(); 
+
+
+    gainXp(amount) {
+        let modifiedAmount = Math.floor(amount * (this.xpMultiplier || 1));
+        if(this.foodBuffs.xp_gain) modifiedAmount = Math.floor(modifiedAmount * this.foodBuffs.xp_gain.value);
+
+        this.xp += modifiedAmount;
+        if (this.totalXp === undefined) this.totalXp = 0;
+        this.totalXp += modifiedAmount;
+        addToLog(`You gained <span class="font-bold">${modifiedAmount}</span> XP!`, 'text-yellow-400');
+        while (this.xp >= this.xpToNextLevel) {
+            this.levelUp();
+        }
+        updateStatsView();
+    }
+    levelUp() {
+        this.xp -= this.xpToNextLevel;
+        this.level++;
+        this.xpToNextLevel = this.calculateXpToNextLevel();
         this.statPoints += 5;
-        this.hp = this.maxHp; 
-        this.mp = this.maxMp; 
-        addToLog(`*** LEVEL UP! You are now level ${this.level}! ***`, 'text-yellow-200 font-bold text-lg'); 
+        this.hp = this.maxHp;
+        this.mp = this.maxMp;
+        addToLog(`*** LEVEL UP! You are now level ${this.level}! ***`, 'text-yellow-200 font-bold text-lg');
         addToLog(`You have <span class="font-bold text-green-400">5</span> stat points to allocate!`, 'text-green-300');
         updatePlayerTier();
-        characterSheetOriginalStats = null; // Reset the baseline for the character sheet
+        characterSheetOriginalStats = null;
         if (gameState.currentView !== 'battle' && gameState.currentView !== 'character_sheet_levelup') {
             setTimeout(() => renderCharacterSheet(true), 1000);
         }
@@ -537,7 +583,7 @@ class Player extends Entity {
             'buff_haste', 'buff_hermes', 'buff_ion_self', 'buff_ion_other',
             'buff_magic_defense', 'buff_divine'
         ];
-        
+
         let cleared = false;
         for (const buffKey of buffsToClear) {
             if (this.statusEffects[buffKey]) {
@@ -545,22 +591,20 @@ class Player extends Entity {
                 cleared = true;
             }
         }
-        
+
         if (cleared) {
             addToLog("The temporary magical effects of the battle wear off.", "text-gray-400");
         }
     }
-    takeDamage(damage, ignoresDefense = false, attacker = null, attackOptions = { isMagic: false }) { 
+    takeDamage(damage, ignoresDefense = false, attacker = null, attackOptions = { isMagic: false }) {
         const shield = this.equippedShield;
         const armor = this.equippedArmor;
-        let dodgeChance = this.evasionChance; // Base evasion from Luck
+        let dodgeChance = this.evasionChance;
 
-        // --- WEAPON CLASS DRAWBACKS ---
         if (this.equippedWeapon.class === 'Axe' || this.equippedWeapon.class === 'Hammer') {
             dodgeChance *= 0.5;
         }
 
-        // --- Calculate Dodge Chance ---
         if (armor && armor.effect?.type === 'dodge') {
             dodgeChance += armor.effect.chance;
         }
@@ -568,13 +612,13 @@ class Player extends Entity {
             dodgeChance *= 1.5;
         }
         if (this.statusEffects.buff_hermes) {
-            dodgeChance *= 2; // Double total dodge
+            dodgeChance *= 2;
         }
+        if(this.statusEffects.bonus_speed) dodgeChance += this.statusEffects.bonus_speed.dodge;
+        if(this.statusEffects.slowed) dodgeChance += this.statusEffects.slowed.dodge;
 
-        // --- Parry logic (Stops attack entirely) ---
         let totalParryChance = 0;
         if (shield && shield.effect?.type === 'parry') totalParryChance += shield.effect.chance;
-        // MODIFICATION: Added check for weapon parry.
         if (this.equippedWeapon.effect?.parry) totalParryChance += this.equippedWeapon.effect.parry;
 
         if (attacker && totalParryChance > 0 && Math.random() < totalParryChance && attacker.isAlive()) {
@@ -593,8 +637,7 @@ class Player extends Entity {
             updateStatsView();
             return 0;
         }
-        
-        // --- Dodge logic (Stops attack entirely) ---
+
         if (attacker && dodgeChance > 0 && Math.random() < dodgeChance) {
             attacker.attackParried = true;
             addToLog(`You dodged ${attacker.name}'s attack!`, 'text-teal-300 font-bold');
@@ -602,7 +645,6 @@ class Player extends Entity {
             return 0;
         }
 
-        // --- Block logic (Stops attack entirely) ---
         const totalBlockChance = (shield?.blockChance || 0) + (armor?.blockChance || 0);
         if (!ignoresDefense && totalBlockChance > 0 && Math.random() < totalBlockChance) {
             addToLog(`You blocked the attack!`, 'text-cyan-400 font-bold');
@@ -610,7 +652,20 @@ class Player extends Entity {
             return 0;
         }
 
-        // --- Defense Calculation with Elemental Modifiers ---
+        if (this.statusEffects.alchemical_barrier && this.statusEffects.alchemical_barrier.hp > 0) {
+            const barrierHP = this.statusEffects.alchemical_barrier.hp;
+            if (damage >= barrierHP) {
+                damage -= barrierHP;
+                delete this.statusEffects.alchemical_barrier;
+                addToLog(`Your alchemical barrier shatters, absorbing <span class="font-bold text-cyan-300">${barrierHP}</span> damage!`, 'text-cyan-400');
+            } else {
+                this.statusEffects.alchemical_barrier.hp -= damage;
+                addToLog(`Your alchemical barrier absorbs <span class="font-bold text-cyan-300">${damage}</span> damage!`, 'text-cyan-400');
+                updateStatsView();
+                return 0;
+            }
+        }
+
         let isMagicAttack = (attacker?.element && attacker.element !== 'none') || ignoresDefense || attackOptions.isMagic;
         let armorDefense = ignoresDefense ? 0 : (isMagicAttack ? this.magicalDefense : this.physicalDefense);
         let shieldDefense = ignoresDefense ? 0 : (shield?.defense || 0);
@@ -635,9 +690,13 @@ class Player extends Entity {
             }
         }
 
+        if(this.statusEffects.elemental_vuln && attacker?.element === this.statusEffects.elemental_vuln.element){
+            damage = Math.floor(damage * 1.25);
+            addToLog(`You are vulnerable to ${attacker.element} and take extra damage!`, 'text-red-600');
+        }
+
         let totalDefense = armorDefense + shieldDefense;
-        
-        // --- Apply status effect defense modifiers ---
+
         if(this.statusEffects.stonehide) {
             totalDefense = Math.floor(totalDefense * this.statusEffects.stonehide.multiplier);
             addToLog(`Your stone-like skin absorbs the blow!`, `text-gray-400`);
@@ -653,12 +712,11 @@ class Player extends Entity {
             totalDefense = Math.floor(totalDefense * this.statusEffects.buff_chaos_strength.defMultiplier);
              addToLog(`Your reckless abandon lowers your defense!`, `text-red-400`);
         }
-        
+
         if (ignoresDefense) {
              addToLog(`The attack ignores your defense!`, 'text-yellow-500 font-bold');
         }
 
-        // --- Final Damage Calculation ---
         let effectiveDefense = totalDefense;
         if (attacker?.element === 'void') {
             effectiveDefense *= 0.5;
@@ -666,16 +724,15 @@ class Player extends Entity {
         }
         const finalDamage = Math.max(0, Math.floor(damage - effectiveDefense));
         this.hp -= finalDamage;
-        
+
         let damageType = '';
         if (attacker && attacker.element && attacker.element !== 'none') {
             damageType = ` ${ELEMENTS[attacker.element].name}`;
         } else if (isMagicAttack) {
             damageType = ' magical';
         }
-        addToLog(`You take <span class="font-bold text-red-400">${finalDamage}</span>${damageType} damage.`); 
+        addToLog(`You take <span class="font-bold text-red-400">${finalDamage}</span>${damageType} damage.`);
 
-        // --- Post-Damage Effects (Reflect) ---
         if (armor?.effect?.reflect_damage && attacker && attacker.isAlive()) {
              const reflectedDamage = Math.floor(damage * armor.effect.reflect_damage);
              if (reflectedDamage > 0) {
@@ -704,7 +761,7 @@ class Enemy extends Entity {
         const finalHp = Math.floor((speciesData.base_hp + (playerLevel * 1.5)) * statMultiplier);
         const finalStrength = Math.floor((speciesData.base_strength + Math.floor(playerLevel / 2)) * statMultiplier);
         const finalDefense = Math.floor(((speciesData.base_defense || 0) + Math.floor(playerLevel / 3)) * statMultiplier);
-        
+
         const name = elementData.key !== 'none'
             ? `${rarityData.name} ${elementData.adjective} ${speciesData.name}`
             : `${rarityData.name} ${speciesData.name}`;
@@ -715,27 +772,27 @@ class Enemy extends Entity {
         this.hp = finalHp;
         this.maxHp = finalHp;
         this.strength = finalStrength;
-        
+
         const classDamage = MONSTER_CLASS_DAMAGE[speciesData.class];
         const tier = speciesData.tier;
         const rarityIndex = rarityData.rarityIndex;
 
         let diceCount = (rarityIndex + tier + classDamage.baseDice) - 2;
         this.damage = [Math.max(1, diceCount), classDamage.dieSides];
-        
+
         this.defense = finalDefense;
         this.ability = speciesData.ability;
         this.element = elementData.key;
         this.range = speciesData.range || 1;
         this.movement = speciesData.movement || { speed: 2, type: 'ground' };
-        this.xpReward = Math.floor(speciesData.base_xp * rewardMultiplier * (speciesData.class === 'Monstrosity' ? 1.2 : 1)); 
+        this.xpReward = Math.floor(speciesData.base_xp * rewardMultiplier * (speciesData.class === 'Monstrosity' ? 1.2 : 1));
         this.goldReward = Math.floor(speciesData.base_gold * rewardMultiplier * (speciesData.class === 'Monstrosity' ? 1.2 : 1));
         this.lootTable = {...speciesData.loot_table};
         this.lootChanceMod = (speciesData.class === 'Beast' ? 1.5 : 1);
         this.potionDropChanceMod = (speciesData.class === 'Humanoid' ? 1.5 : 1);
         this.speciesData = speciesData;
         this.rarityData = rarityData;
-        
+
         if (this.element !== 'none') {
             const essenceKey = `${this.element}_essence`;
             if (ITEMS[essenceKey]) {
@@ -807,7 +864,7 @@ class Enemy extends Entity {
             diceCount++;
             calcLog.steps.push({ description: "Enrage Buff", value: "+1 Dice", result: `(Now ${diceCount}d${this.damage[1]})` });
         }
-        let totalDamage = rollDice(diceCount, this.damage[1], `${this.name} Attack`); 
+        let totalDamage = rollDice(diceCount, this.damage[1], `${this.name} Attack`);
         calcLog.baseDamage = totalDamage;
 
         const statBonus = this.strength;
@@ -820,7 +877,7 @@ class Enemy extends Entity {
         const strengthFlatBonus = Math.floor(this.strength / 5);
         totalDamage += strengthFlatBonus;
         calcLog.steps.push({ description: "Strength Flat Bonus (Str/5)", value: `+${strengthFlatBonus}`, result: totalDamage });
-        
+
         if (this.statusEffects.drenched) {
             const multiplier = this.statusEffects.drenched.multiplier;
             totalDamage = Math.floor(totalDamage * multiplier);
@@ -833,13 +890,13 @@ class Enemy extends Entity {
             totalDamage = Math.floor(totalDamage * fireMultiplier);
             calcLog.steps.push({ description: "Fire Element Bonus", value: `x${fireMultiplier.toFixed(2)}`, result: totalDamage });
         }
-        
+
         if (target.statusEffects.swallowed && target.statusEffects.swallower === this) {
             totalDamage *= 2;
             addToLog(`${this.name}'s attack is amplified from within!`, 'text-red-600');
             calcLog.steps.push({ description: "Swallowed Target Bonus", value: `x2`, result: totalDamage });
         }
-        
+
         let attackOptions = { isMagic: false };
         const damageType = this.speciesData.damage_type;
 
@@ -855,8 +912,14 @@ class Enemy extends Entity {
             }
         }
 
+        // Concoction effect
+        if(player.statusEffects.inaccurate && Math.random() < 0.2) {
+             addToLog(`${this.name}'s attack misses due to your blurred vision!`, 'text-gray-400');
+             return;
+        }
+
         damageDealt = target.takeDamage(totalDamage, !!this.statusEffects.ultra_focus, this, attackOptions);
-        
+
         calcLog.finalDamage = damageDealt;
         logDamageCalculation(calcLog);
 
@@ -909,7 +972,7 @@ class Enemy extends Entity {
             }
         }
     }
-    takeDamage(damage, effects = {}) { 
+    takeDamage(damage, effects = {}) {
         let currentDefense = this.defense;
         if (this.statusEffects.living_shield) {
             currentDefense *= 2;
@@ -951,41 +1014,19 @@ class Enemy extends Entity {
         return finalDamage;
     }
     async moveTowards(target) {
-        const path = findPath({x: this.x, y: this.y}, {x: target.x, y: target.y}, true);
-        
-        if (path && path.length > 1) {
-            addToLog(`${this.name} moves closer!`);
-             for (let i = 1; i < path.length; i++) {
-                // Stop if adjacent to the player
-                const dx = Math.abs(path[i].x - target.x);
-                const dy = Math.abs(path[i].y - target.y);
-                if (dx + dy <= this.range) {
-                     break;
-                }
-
-                await new Promise(resolve => setTimeout(resolve, 200));
-                this.x = path[i].x;
-                this.y = path[i].y;
-                renderBattleGrid();
-            }
-        } else {
-            addToLog(`${this.name} is blocked and cannot move!`);
-        }
-    }
-    async moveTowards(target) {
         const isFlying = this.movement.type === 'flying';
         const path = findPath({x: this.x, y: this.y}, {x: target.x, y: target.y}, isFlying);
-        
+
         if (path && path.length > 1) {
             addToLog(`${this.name} moves closer!`);
             const stepsToTake = Math.min(path.length - 1, this.movement.speed);
 
             for (let i = 1; i <= stepsToTake; i++) {
                 const nextStep = path[i];
-                
+
                 // Check if moving into this cell would put it in range
                 const distanceAfterMove = Math.abs(nextStep.x - target.x) + Math.abs(nextStep.y - target.y);
-                
+
                 this.x = nextStep.x;
                 this.y = nextStep.y;
                 renderBattleGrid();
@@ -1031,8 +1072,34 @@ function getQuestDetails(questIdentifier) {
     if (!questIdentifier || !questIdentifier.category || !questIdentifier.key) {
         return null;
     }
+
+    // A unified way to check quest progress
+    if (player.activeQuest && player.activeQuest.key === questIdentifier.key) {
+        const quest = QUESTS[questIdentifier.key];
+        if (!quest) return null;
+
+        if (quest.type === 'collection') {
+            player.questProgress = 0;
+            const itemDetails = getItemDetails(quest.target);
+            if (itemDetails) {
+                if (quest.target in ITEMS) {
+                    player.questProgress = player.inventory.items[quest.target] || 0;
+                } else {
+                    let category;
+                    if (quest.target in WEAPONS) category = 'weapons';
+                    else if (quest.target in ARMOR) category = 'armor';
+                    else if (quest.target in SHIELDS) category = 'shields';
+                    if (category) {
+                        player.questProgress = player.inventory[category].filter(item => item === quest.target).length;
+                    }
+                }
+            }
+        }
+    }
+    
     return QUESTS[questIdentifier.key] || null;
 }
+
 
 function applyStatusEffect(target, effectType, effectData, sourceName) {
     if (target instanceof Player) {
@@ -1044,15 +1111,15 @@ function applyStatusEffect(target, effectType, effectData, sourceName) {
         if (shield && shield.effect?.type === 'debuff_resist') {
             finalResist += (1 - finalResist) * shield.effect.chance;
         }
-        
+
         if (Math.random() < finalResist) {
             addToLog(`You resisted the ${effectType} effect from ${sourceName}!`, 'text-cyan-300 font-bold');
             return;
         }
     }
-    
+
     target.statusEffects[effectType] = effectData;
-    
+
     let message = '';
     let color = 'text-red-400';
     switch(effectType) {
@@ -1086,15 +1153,10 @@ function generateEnemy(biomeKey) {
     if (player.equippedLure !== 'no_lure' && lureDetails && monsterPool[lureDetails.lureTarget] && Math.random() < 0.75) {
         speciesKey = lureDetails.lureTarget;
         addToLog(`Your ${lureDetails.name} attracts a monster!`, 'text-yellow-300');
-        // MODIFICATION: Consume one use of the lure.
         player.inventory.lures[player.equippedLure]--;
         if (player.inventory.lures[player.equippedLure] <= 0) {
             addToLog(`Your ${lureDetails.name} has been fully used.`, 'text-gray-400');
             delete player.inventory.lures[player.equippedLure];
-            if (player.equippedLure === lureDetails.lureTarget) { // This seems wrong, should be the key
-                 player.equippedLure = 'no_lure';
-            }
-             // Let's find the key of the lure and unequip if it matches
             const lureKey = Object.keys(LURES).find(k => LURES[k].name === lureDetails.name);
             if(player.equippedLure === lureKey) {
                 player.equippedLure = 'no_lure';
@@ -1108,13 +1170,11 @@ function generateEnemy(biomeKey) {
 
     const speciesData = MONSTER_SPECIES[speciesKey];
 
-    // Determine Rarity dynamically based on player level and monster class
     const rarityKeys = Object.keys(MONSTER_RARITY);
     const rarityWeights = getDynamicRarityWeights(player.level, speciesData.class);
     const chosenRarityKey = choices(rarityKeys, rarityWeights);
     const rarityData = MONSTER_RARITY[chosenRarityKey];
 
-    // Determine Element
     const elementPopulation = ['none', 'fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'void'];
     const elementWeights = [40, 9, 9, 9, 9, 9, 9, 3, 3];
     const chosenElementKey = choices(elementPopulation, elementWeights);
@@ -1143,16 +1203,21 @@ function generateBlackMarketStock() {
     Object.keys(SHIELDS).forEach(key => { if (SHIELDS[key].price > 50) potentialStock.push(key); });
     Object.keys(ITEMS).forEach(key => {
         const item = ITEMS[key];
-        if (item.price > 0 && item.type !== 'junk' && item.type !== 'alchemy') {
+        if (item.price > 0 && (item.type === 'seed' || item.type === 'sapling')) {
             potentialStock.push(key);
         }
     });
 
     const filteredStock = potentialStock.filter(itemKey => !restrictedItems.includes(itemKey));
-    
+
     const shuffled = shuffleArray(filteredStock, rng);
     const stockCount = 3 + Math.floor(rng() * 3);
     player.blackMarketStock.seasonal = shuffled.slice(0, stockCount);
+}
+
+// MODIFICATION: This function is now redundant as logic has been moved.
+function initializeShopInventories() {
+    // This function is kept for compatibility but the logic is now in renderShop.
 }
 
 
@@ -1168,7 +1233,7 @@ function enchantItem(gearType, elementKey) {
         case 'shield': gear = player.equippedShield; currentElementProp = 'shieldElement'; break;
         default: return;
     }
-    
+
     if (!gear || gear.rarity === 'Broken' || !gear.rarity) {
         addToLog(`You cannot enchant this item.`, 'text-red-400');
         return;
@@ -1205,38 +1270,38 @@ function enchantItem(gearType, elementKey) {
 
     player[currentElementProp] = elementKey;
 
-    addToLog(`You successfully enchanted your ${gear.name} with the power of ${elementKey}!`, 'text-green-400 font-bold');
+        addToLog(`You successfully enchanted your ${gear.name} with the power of ${elementKey}!`, 'text-green-400 font-bold');
     updateStatsView();
     renderEnchanter(elementKey);
 }
 
-function restAtInn(cost) { 
+function restAtInn(cost) {
     if(cost > 0 && player.gold < cost) {
         addToLog("You can't afford a room.", "text-red-400");
         return;
     }
-    player.gold -= cost; 
-    if(cost > 0) addToLog(`You pay <span class="font-bold">${cost} G</span> for a room.`, 'text-yellow-400'); 
-    
-    if (Math.random() < 0.1 && cost > 0) { 
-        addToLog(`You are ambushed in your sleep!`, 'text-red-500 font-bold'); 
-        setTimeout(() => startBattle(gameState.currentBiome || player.biomeOrder[0]), 2000); 
-    } else { 
-        player.hp = player.maxHp; 
-        player.mp = player.maxMp; 
+    player.gold -= cost;
+    if(cost > 0) addToLog(`You pay <span class="font-bold">${cost} G</span> for a room.`, 'text-yellow-400');
+
+    if (Math.random() < 0.1 && cost > 0) {
+        addToLog(`You are ambushed in your sleep!`, 'text-red-500 font-bold');
+        setTimeout(() => startBattle(gameState.currentBiome || player.biomeOrder[0]), 2000);
+    } else {
+        player.hp = player.maxHp;
+        player.mp = player.maxMp;
         player.questsTakenToday = [];
         player.seed = Math.floor(Math.random() * 1000000);
         generateBlackMarketStock();
         addToLog(`You wake up feeling refreshed. The quest board and black market have new offerings.`, 'text-green-400 font-bold');
-        updateStatsView(); 
-        setTimeout(renderTown, 2000); 
-    } 
+        updateStatsView();
+        setTimeout(renderTown, 2000);
+    }
 }
 
 function upgradeSpell(spellKey) {
     const spellData = SPELLS[spellKey];
     const playerSpell = player.spells[spellKey];
-    
+
     if (!playerSpell) {
         const learnCost = spellData.learnCost || 0;
         if (player.gold >= learnCost) {
@@ -1250,18 +1315,18 @@ function upgradeSpell(spellKey) {
         renderSageTowerTrain();
         return;
     }
-    
+
     const currentTierIndex = playerSpell.tier - 1;
     const currentTierData = spellData.tiers[currentTierIndex];
-    
+
     if (currentTierIndex >= spellData.tiers.length - 1) {
         addToLog("This spell is already at its maximum tier.", 'text-yellow-400');
         return;
     }
-    
+
     const upgradeCost = currentTierData.upgradeCost;
     const requiredEssences = currentTierData.upgradeEssences || {};
-    
+
     if (player.gold < upgradeCost) {
         addToLog(`You need ${upgradeCost} G to upgrade this spell.`, 'text-red-400');
         return;
@@ -1290,14 +1355,13 @@ function upgradeSpell(spellKey) {
     renderSageTowerTrain();
 }
 
-function buyItem(itemKey, shopType, priceOverride = null) { 
-    const details = getItemDetails(itemKey); 
+function buyItem(itemKey, shopType, priceOverride = null) {
+    const details = getItemDetails(itemKey);
     const finalPrice = priceOverride !== null ? priceOverride : details.price;
-    if (player.gold >= finalPrice) { 
-        player.gold -= finalPrice; 
-        player.addToInventory(itemKey, 1, false); 
-        addToLog(`You bought a ${details.name} for ${finalPrice} G.`, 'text-yellow-400'); 
-        updateStatsView(); 
+    if (player.gold >= finalPrice) {
+        player.gold -= finalPrice;
+        player.addToInventory(itemKey, 1, true); // Set verbose to true
+        updateStatsView();
         if (shopType === 'blacksmith') {
             renderBlacksmithBuy();
         } else if (shopType === 'magic') {
@@ -1305,7 +1369,7 @@ function buyItem(itemKey, shopType, priceOverride = null) {
         } else {
             renderShop(shopType);
         }
-    } 
+    }
 }
 
 function sellItem(category, itemKey, price) {
@@ -1360,7 +1424,41 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
         return false;
     }
     const details = ITEMS[itemKey];
-    
+
+    // Consume the item
+    player.inventory.items[itemKey]--;
+    if (player.inventory.items[itemKey] <= 0) {
+        delete player.inventory.items[itemKey];
+    }
+
+    addToLog(`You used a <span class="font-bold text-green-300">${details.name}</span>.`);
+
+    if (inBattle) gameState.isPlayerTurn = false;
+
+    if (details.type === 'experimental') {
+        const tier = details.tier;
+        const numEffects = tier;
+        addToLog("The concoction bubbles violently as you drink it...", "text-purple-400");
+
+        setTimeout(() => {
+            for (let i = 0; i < numEffects; i++) {
+                const isGood = Math.random() < 0.33; // 1/3 chance for a good effect
+                const effectPool = isGood ? MYSTERIOUS_CONCOCTION_EFFECTS.good : MYSTERIOUS_CONCOCTION_EFFECTS.bad;
+                const randomEffect = effectPool[Math.floor(Math.random() * effectPool.length)];
+
+                addToLog(randomEffect.message, isGood ? 'text-green-300' : 'text-red-400');
+                randomEffect.apply(player);
+                updateStatsView();
+            }
+            if (inBattle) {
+                 setTimeout(checkBattleStatus, 200);
+            } else {
+                renderInventory();
+            }
+        }, 1000);
+        return true;
+    }
+
     if (inBattle && details.type === 'enchant') {
         const target = currentEnemies[targetIndex];
         if (targetIndex === null || !target || !target.isAlive()) {
@@ -1368,8 +1466,7 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
             renderBattle('item');
             return false;
         }
-        
-        gameState.isPlayerTurn = false;
+
         const element = itemKey.replace('_essence', '');
         const damage = rollDice(1, 8, 'Essence Attack') + player.magicalDamageBonus;
 
@@ -1378,15 +1475,18 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
         addToLog(`It hits ${target.name} for <span class="font-bold text-purple-400">${finalDamage}</span> ${element} damage.`);
 
     } else {
-        if (inBattle) gameState.isPlayerTurn = false;
-
         if (details.type === 'healing') {
             player.hp = Math.min(player.maxHp, player.hp + details.amount);
         } else if (details.type === 'mana_restore') {
             player.mp = Math.min(player.maxMp, player.mp + details.amount);
         } else if (details.type === 'buff') {
-            player.statusEffects[details.effect.type] = { ...details.effect };
-            addToLog(`You drink the ${details.name} and feel a surge of power!`, 'text-yellow-300');
+            // This is for standard buffs, not experimental ones
+            if (details.effect.type.startsWith('resist_')) {
+                player.statusEffects[details.effect.type] = { ...details.effect };
+            } else {
+                player.temporaryBuffs[details.effect.type] = (player.temporaryBuffs[details.effect.type] || 0) + details.effect.duration;
+            }
+             addToLog(`You drink the ${details.name} and feel its effects.`, 'text-yellow-300');
         } else if (details.type === 'cleanse') {
             const badEffects = ['poison', 'petrified', 'paralyzed', 'swallowed'];
             for (const effect of badEffects) {
@@ -1396,13 +1496,8 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
             }
             addToLog(`You drink the ${details.name} and feel purified.`, 'text-cyan-300');
         }
-        addToLog(`You used a <span class="font-bold text-green-300">${details.name}</span>.`);
     }
 
-    player.inventory.items[itemKey]--;
-    if (player.inventory.items[itemKey] <= 0) {
-        delete player.inventory.items[itemKey];
-    }
     updateStatsView();
 
     if (!inBattle) {
@@ -1412,6 +1507,7 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
     }
     return true;
 }
+
 
 function equipItem(itemKey) {
     const details = getItemDetails(itemKey);
@@ -1430,9 +1526,9 @@ function equipItem(itemKey) {
     } else if (itemType === 'lure') {
         if (player.equippedLure === itemKey) return;
         player.equippedLure = itemKey;
-    } 
+    }
     else if (itemType) {
-        const isCurrentlyEquipped = 
+        const isCurrentlyEquipped =
             (itemType === 'weapon' && player.equippedWeapon === details) ||
             (itemType === 'catalyst' && player.equippedCatalyst === details) ||
             (itemType === 'shield' && player.equippedShield === details);
@@ -1453,7 +1549,7 @@ function equipItem(itemKey) {
                 }
             }
         }
-        
+
         if ((itemType === 'shield' || itemType === 'catalyst') && (player.equippedWeapon.class === 'Hand-to-Hand' || player.equippedWeapon.effect?.dualWield)) {
             addToLog(`You cannot use a ${itemType} while using a two-handed weapon.`, 'text-red-400');
             return;
@@ -1481,7 +1577,7 @@ function equipItem(itemKey) {
         }
 
         player.equipmentOrder.push(itemType);
-        
+
         if (itemType === 'weapon') player.equippedWeapon = details;
         else if (itemType === 'catalyst') player.equippedCatalyst = details;
         else if (itemType === 'shield') player.equippedShield = details;
@@ -1551,15 +1647,16 @@ function brewWitchPotion(recipeKey) {
     const recipe = WITCH_COVEN_RECIPES[recipeKey];
     if (!recipe) return;
 
-    if(player.gold < recipe.cost) {
+    if (player.gold < recipe.cost) {
         addToLog(`You need ${recipe.cost} Gold.`, 'text-red-400');
         return;
     }
-    if ((player.inventory.items['undying_heart'] || 0) < recipe.hearts) {
-         addToLog(`You need ${recipe.hearts} Undying Hearts.`, 'text-red-400');
+    const hearts = player.inventory.items['undying_heart'] || 0;
+    if (hearts < (recipe.hearts || 0)) {
+        addToLog(`You need ${recipe.hearts || 0} Undying Hearts.`, 'text-red-400');
         return;
     }
-     for (const ingredientKey in recipe.ingredients) {
+    for (const ingredientKey in recipe.ingredients) {
         if ((player.inventory.items[ingredientKey] || 0) < recipe.ingredients[ingredientKey]) {
             addToLog(`You lack the required ingredients.`, 'text-red-400');
             return;
@@ -1567,15 +1664,25 @@ function brewWitchPotion(recipeKey) {
     }
 
     player.gold -= recipe.cost;
-    player.inventory.items['undying_heart'] -= recipe.hearts;
-    if (player.inventory.items['undying_heart'] <= 0) delete player.inventory.items['undying_heart'];
+    if (recipe.hearts) {
+        player.inventory.items['undying_heart'] -= recipe.hearts;
+        if (player.inventory.items['undying_heart'] <= 0) delete player.inventory.items['undying_heart'];
+    }
 
     for (const ingredientKey in recipe.ingredients) {
         player.inventory.items[ingredientKey] -= recipe.ingredients[ingredientKey];
         if (player.inventory.items[ingredientKey] <= 0) delete player.inventory.items[ingredientKey];
     }
-    
-    player.addToInventory(recipe.output, 1);
+
+    player.addToInventory(recipe.output, 1, false);
+    const productDetails = getItemDetails(recipe.output);
+    addToLog(`You successfully brewed a <span class="font-bold text-green-300">${productDetails.name}</span>!`);
+
+    if (player.activeQuest && player.activeQuest.category === 'creation' && player.activeQuest.target === recipe.output) {
+        player.questProgress++;
+        addToLog(`Quest progress: ${player.questProgress}/${getQuestDetails(player.activeQuest).required}`, 'text-amber-300');
+    }
+
     updateStatsView();
     renderWitchsCoven('brew');
 }
@@ -1594,7 +1701,7 @@ function transmuteWitchItem(recipeKey) {
             return;
         }
     }
-    
+
     player.gold -= recipe.cost;
     for (const ingredientKey in recipe.ingredients) {
         player.inventory.items[ingredientKey] -= recipe.ingredients[ingredientKey];
@@ -1612,14 +1719,14 @@ function resetStatsCoven() {
         addToLog("You lack the required payment to reset your fate.", 'text-red-400');
         return;
     }
-    
+
     player.gold -= cost.gold;
     player.inventory.items['undying_heart'] -= cost.hearts;
     if(player.inventory.items['undying_heart'] <= 0) delete player.inventory.items['undying_heart'];
 
     const pointsToRefund = player.bonusVigor + player.bonusFocus + player.bonusStamina + player.bonusStrength + player.bonusIntelligence + player.bonusLuck;
     player.statPoints += pointsToRefund;
-    
+
     // Subtract the bonus points from the main stats before resetting the bonus points
     player.vigor -= player.bonusVigor;
     player.focus -= player.bonusFocus;
@@ -1627,7 +1734,7 @@ function resetStatsCoven() {
     player.strength -= player.bonusStrength;
     player.intelligence -= player.bonusIntelligence;
     player.luck -= player.bonusLuck;
-    
+
     // Now reset the bonus points
     player.bonusVigor = 0;
     player.bonusFocus = 0;
@@ -1639,7 +1746,7 @@ function resetStatsCoven() {
     player.recalculateGrowthBonuses();
     player.hp = player.maxHp;
     player.mp = player.maxMp;
-    
+
     addToLog("The witch chants, and you feel your body's potential restored. Your stats have been reset.", 'text-purple-300');
     updateStatsView();
     saveGame();
@@ -1658,7 +1765,7 @@ function changeCharacterAspect(aspectType, newKey) {
         addToLog("You lack the required payment for such a powerful ritual.", 'text-red-400');
         return;
     }
-    
+
     player.gold -= cost.gold;
     player.inventory.items['undying_heart'] -= cost.hearts;
     if(player.inventory.items['undying_heart'] <= 0) delete player.inventory.items['undying_heart'];
@@ -1682,7 +1789,7 @@ function changeCharacterAspect(aspectType, newKey) {
             player.luck -= oldRaceData.Luck;
         }
     }
-    
+
     // Apply new bonuses
     if (aspectType === 'class') {
         const newClassData = CLASSES[newKey];
@@ -1714,69 +1821,118 @@ function changeCharacterAspect(aspectType, newKey) {
     renderWitchsCoven('rebirth');
 }
 
-function brewPotion(recipeKey) {
-    const recipe = ALCHEMY_RECIPES[recipeKey];
-    if (!recipe) return;
+function determineBrewingOutcome(ingredients) {
+    const alchemyTier = player.house.alchemyTier || 1;
+    const ingredientCounts = {};
+    ingredients.forEach(key => {
+        ingredientCounts[key] = (ingredientCounts[key] || 0) + 1;
+    });
 
-    let hasIngredients = true;
-    for (const ingredientKey in recipe.ingredients) {
-        const requiredAmount = recipe.ingredients[ingredientKey];
-        
-        let playerAmount = 0;
-        if (ITEMS[ingredientKey]) {
-            playerAmount = player.inventory.items[ingredientKey] || 0;
-        } else if (ARMOR[ingredientKey]) {
-            playerAmount = player.inventory.armor.filter(i => i === ingredientKey).length;
-        }
+    // Check for exact recipe match
+    for (const recipeKey in ALCHEMY_RECIPES) {
+        const recipe = ALCHEMY_RECIPES[recipeKey];
+        if (recipe.tier !== alchemyTier) continue;
 
-        if (playerAmount < requiredAmount) {
-            hasIngredients = false;
-            break;
-        }
-    }
-
-    if (!hasIngredients) {
-        addToLog("You don't have the required ingredients.", 'text-red-400');
-        return;
-    }
-    if (player.gold < recipe.cost) {
-        addToLog("You don't have enough gold.", 'text-red-400');
-        return;
-    }
-
-    for (const ingredientKey in recipe.ingredients) {
-        const requiredAmount = recipe.ingredients[ingredientKey];
-        if (ITEMS[ingredientKey]) {
-            player.inventory.items[ingredientKey] -= requiredAmount;
-            if (player.inventory.items[ingredientKey] <= 0) {
-                delete player.inventory.items[ingredientKey];
-            }
-        } else if (ARMOR[ingredientKey]) {
-            for(let i = 0; i < requiredAmount; i++) {
-                const index = player.inventory.armor.indexOf(ingredientKey);
-                if (index > -1) {
-                    player.inventory.armor.splice(index, 1);
+        const recipeIngredients = recipe.ingredients;
+        let isMatch = true;
+        if (Object.keys(recipeIngredients).length !== Object.keys(ingredientCounts).length) {
+            isMatch = false;
+        } else {
+            for (const itemKey in recipeIngredients) {
+                if (ingredientCounts[itemKey] !== recipeIngredients[itemKey]) {
+                    isMatch = false;
+                    break;
                 }
             }
         }
-    }
-    player.gold -= recipe.cost;
-
-    player.addToInventory(recipe.output);
-    const productDetails = getItemDetails(recipe.output);
-    addToLog(`You successfully crafted a <span class="font-bold text-green-300">${productDetails.name}</span>!`);
-
-    if (player.activeQuest && player.activeQuest.category === 'creation') {
-        const quest = getQuestDetails(player.activeQuest);
-        if (quest && quest.target === recipe.output) {
-            player.questProgress++;
-            addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300');
+        if (isMatch) {
+            return { success: true, potion: recipe.output, message: `You successfully brewed a ${getItemDetails(recipe.output).name}!` };
         }
     }
 
-    updateStatsView();
-    renderAlchemist();
+    // Experimental Brewing
+    const ingredientTypes = {};
+    let totalIngredients = 0;
+    Object.keys(ingredientCounts).forEach(key => {
+        const details = getItemDetails(key);
+        if (details && details.alchemyType) {
+            const type = details.alchemyType;
+            ingredientTypes[type] = (ingredientTypes[type] || 0) + ingredientCounts[key];
+            totalIngredients += ingredientCounts[key];
+        }
+    });
+
+    const primaryReagents = Object.keys(ingredientTypes).filter(t => t.startsWith('primary_'));
+
+    let outcome;
+    const rand = Math.random();
+
+    if (primaryReagents.length === 1) { // Majority points to one type
+        const majorityType = primaryReagents[0];
+        const associatedPotion = Object.values(ALCHEMY_RECIPES).find(r => r.tier === alchemyTier && r.ingredients[Object.keys(r.ingredients).find(k => getItemDetails(k)?.alchemyType === majorityType)]);
+
+        if (rand < 0.5) { // 50% success
+            outcome = { success: true, potion: associatedPotion.output, message: "Against the odds, you managed to create a proper potion!" };
+        } else if (rand < 0.7) { // 20% random
+             const allPotionsOfTier = Object.values(ALCHEMY_RECIPES).filter(r => r.tier === alchemyTier).map(r => r.output);
+             const randomPotion = allPotionsOfTier[Math.floor(Math.random() * allPotionsOfTier.length)];
+             outcome = { success: true, potion: randomPotion, message: "A happy accident! You've created a useful potion." };
+        } else { // 30% failure
+            outcome = { success: false, potion: `mysterious_concoction_t${alchemyTier}`, message: "The mixture bubbles violently and settles into a strange, unpredictable brew..." };
+        }
+    } else { // No majority
+        let cumulativeChance = 0;
+        let foundPotion = false;
+        for (const type of primaryReagents) {
+             if (rand < cumulativeChance + 0.10) { // 10% for each potential type
+                const associatedPotion = Object.values(ALCHEMY_RECIPES).find(r => r.tier === alchemyTier && r.ingredients[Object.keys(r.ingredients).find(k => getItemDetails(k)?.alchemyType === type)]);
+                if (associatedPotion) {
+                    outcome = { success: true, potion: associatedPotion.output, message: "A happy accident! You've created a useful potion." };
+                    foundPotion = true;
+                    break;
+                }
+            }
+            cumulativeChance += 0.10;
+        }
+
+        if (!foundPotion) {
+            if (rand < cumulativeChance + 0.20) { // 20% random
+                 const allPotionsOfTier = Object.values(ALCHEMY_RECIPES).filter(r => r.tier === alchemyTier).map(r => r.output);
+                 const randomPotion = allPotionsOfTier[Math.floor(Math.random() * allPotionsOfTier.length)];
+                 outcome = { success: true, potion: randomPotion, message: "What's this? You've brewed something unexpected..." };
+            } else { // 50% or more failure
+                outcome = { success: false, potion: `mysterious_concoction_t${alchemyTier}`, message: "The mixture bubbles violently and settles into a strange, unpredictable brew..." };
+            }
+        }
+    }
+    return outcome;
 }
+
+function brewHomePotion(ingredients, outcome) {
+    const ingredientCounts = {};
+    ingredients.forEach(key => {
+        ingredientCounts[key] = (ingredientCounts[key] || 0) + 1;
+    });
+
+    for(const key in ingredientCounts) {
+        player.inventory.items[key] -= ingredientCounts[key];
+        if(player.inventory.items[key] <= 0) {
+            delete player.inventory.items[key];
+        }
+    }
+
+    addToLog(outcome.message, outcome.success ? 'text-green-400' : 'text-purple-400');
+    player.addToInventory(outcome.potion, 1, false);
+
+    // MODIFICATION: Add quest progress check for home brewing
+    if (player.activeQuest && player.activeQuest.category === 'creation' && player.activeQuest.target === outcome.potion) {
+        player.questProgress++;
+        addToLog(`Quest progress: ${player.questProgress}/${getQuestDetails(player.activeQuest).required}`, 'text-amber-300');
+    }
+
+    return true;
+}
+
 
 function craftGear(recipeKey, sourceShop) {
     const recipe = (sourceShop === 'magic' ? MAGIC_SHOP_RECIPES[recipeKey] : BLACKSMITH_RECIPES[recipeKey]);
@@ -1785,7 +1941,7 @@ function craftGear(recipeKey, sourceShop) {
     let hasIngredients = true;
     for (const ingredientKey in recipe.ingredients) {
         const requiredAmount = recipe.ingredients[ingredientKey];
-        
+
         let playerAmount = 0;
         if (ITEMS[ingredientKey]) {
             playerAmount = player.inventory.items[ingredientKey] || 0;
@@ -1827,16 +1983,13 @@ function craftGear(recipeKey, sourceShop) {
     }
     player.gold -= recipe.cost;
 
-    player.addToInventory(recipe.output);
+    player.addToInventory(recipe.output, 1, false); // changed to false to avoid double logging
     const craftedItemDetails = getItemDetails(recipe.output);
     addToLog(`You successfully created a <span class="font-bold text-green-300">${craftedItemDetails.name}</span>!`);
 
-    if (player.activeQuest && player.activeQuest.category === 'creation') {
-        const quest = getQuestDetails(player.activeQuest);
-        if (quest && quest.target === recipe.output) {
-            player.questProgress++;
-            addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300');
-        }
+    if (player.activeQuest && player.activeQuest.category === 'creation' && player.activeQuest.target === recipe.output) {
+        player.questProgress++;
+        addToLog(`Quest progress: ${player.questProgress}/${getQuestDetails(player.activeQuest).required}`, 'text-amber-300');
     }
 
     updateStatsView();
@@ -1849,18 +2002,18 @@ function craftGear(recipeKey, sourceShop) {
 
 
 // --- QUESTS ---
-function acceptQuest(category, questKey) { 
-    if (!player.activeQuest) { 
-        player.activeQuest = { category, key: questKey }; 
-        player.questProgress = 0; 
+function acceptQuest(category, questKey) {
+    if (!player.activeQuest) {
+        player.activeQuest = { category, key: questKey };
+        player.questProgress = 0;
         player.questsTakenToday.push(questKey);
         const quest = getQuestDetails(player.activeQuest);
-        addToLog(`New quest accepted: <span class="font-bold" style="color: var(--text-accent);">${quest.title}</span>!`); 
-        updateStatsView(); 
-        renderQuestBoard(); 
-    } else { 
-        addToLog(`You already have an active quest!`); 
-    } 
+        addToLog(`New quest accepted: <span class="font-bold" style="color: var(--text-accent);">${quest.title}</span>!`);
+        updateStatsView();
+        renderQuestBoard();
+    } else {
+        addToLog(`You already have an active quest!`);
+    }
 }
 function completeQuest() {
     if (!player.activeQuest) return;
@@ -1893,12 +2046,12 @@ function completeQuest() {
         }
     }
     addToLog(`Quest Complete: <span class="font-bold text-green-400">${quest.title}</span>!`);
-    player.gainXp(quest.reward.xp); 
-    player.gold += quest.reward.gold; 
+    player.gainXp(quest.reward.xp);
+    player.gold += quest.reward.gold;
     addToLog(`You received ${quest.reward.gold} G.`, 'text-yellow-400');
-    player.activeQuest = null; 
-    player.questProgress = 0; 
-    updateStatsView(); 
+    player.activeQuest = null;
+    player.questProgress = 0;
+    updateStatsView();
     renderQuestBoard();
 }
 
@@ -1907,7 +2060,7 @@ function cancelQuest() {
     const quest = getQuestDetails(player.activeQuest);
     if (!quest) return;
 
-    const penalty = (quest.tier || 1) * 25; 
+    const penalty = (quest.tier || 1) * 25;
 
     if (player.gold < penalty) {
         addToLog(`You cannot afford the ${penalty} G fee to cancel the quest.`, 'text-red-400');
@@ -1916,15 +2069,15 @@ function cancelQuest() {
 
     player.gold -= penalty;
     addToLog(`You paid a ${penalty} G fee and abandoned the quest: <span class="font-bold text-yellow-300">${quest.title}</span>.`, 'text-red-400');
-    
+
     const questIndex = player.questsTakenToday.indexOf(player.activeQuest.key);
     if (questIndex > -1) {
         player.questsTakenToday.splice(questIndex, 1);
     }
-    
+
     player.activeQuest = null;
     player.questProgress = 0;
-    
+
     updateStatsView();
     renderQuestBoard();
 }
@@ -1941,9 +2094,15 @@ function buildHouse() {
     }
     player.gold -= 1000;
     player.house.owned = true;
-    
-    // Ensure full house structure exists, especially for older saves
+
     if (!player.house.storage) player.house.storage = { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} };
+    if (player.house.storageTier === undefined) player.house.storageTier = 0;
+    if (player.house.gardenTier === undefined) player.house.gardenTier = 0;
+    if (player.house.kitchenTier === undefined) player.house.kitchenTier = 0;
+    if (player.house.alchemyTier === undefined) player.house.alchemyTier = 0;
+    if (player.house.trainingTier === undefined) player.house.trainingTier = 0;
+    if (!player.house.garden || !Array.isArray(player.house.garden)) player.house.garden = [];
+    if (!player.house.treePlots || !Array.isArray(player.house.treePlots)) player.house.treePlots = [];
 
 
     addToLog("You hand over the gold and the deed is yours! Your new house is ready.", "text-green-400 font-bold");
@@ -1962,35 +2121,61 @@ function restAtHouse() {
 }
 
 function placeAllInStorage() {
-    const categories = ['items', 'weapons', 'armor', 'shields', 'catalysts', 'lures'];
-    let itemsMovedCount = 0;
+    const storage = player.house.storage;
+    const inventory = player.inventory;
+    const storageTier = player.house.storageTier || 0;
+    const baseLimits = { unique: 10, stack: 10 };
+    const limits = HOME_IMPROVEMENTS.storage.upgrades[storageTier - 1]?.limits || baseLimits;
 
-    categories.forEach(category => {
-        // Ensure destination category exists in storage
-        if (!player.house.storage[category]) {
-            if (category === 'items' || category === 'lures') {
-                player.house.storage[category] = {};
-            } else {
-                player.house.storage[category] = [];
-            }
-        }
+    const allStorageItemsSet = new Set([
+        ...Object.keys(storage.items), ...Object.keys(storage.lures),
+        ...storage.weapons, ...storage.armor, ...storage.shields, ...storage.catalysts
+    ]);
+    let uniqueItemCount = allStorageItemsSet.size;
+
+    let itemsMovedCount = 0;
+    let storageFull = false;
+
+    const categories = ['items', 'lures', 'weapons', 'armor', 'shields', 'catalysts'];
+
+    for (const category of categories) {
+        if (!inventory[category]) continue;
 
         if (category === 'items' || category === 'lures') {
-            const source = player.inventory[category];
-            const destination = player.house.storage[category];
-            for (const itemKey in source) {
+            const source = inventory[category];
+            const destination = storage[category];
+            const itemKeys = Object.keys(source);
+
+            for (const itemKey of itemKeys) {
                 const details = getItemDetails(itemKey);
-                // Don't move key items
-                if (details && details.rarity !== 'Broken' && details.type !== 'key') {
-                    destination[itemKey] = (destination[itemKey] || 0) + source[itemKey];
-                    itemsMovedCount += source[itemKey]; // Add the whole stack to the count
-                    delete source[itemKey];
+                if (!details || details.type === 'key' || details.rarity === 'Broken') continue;
+
+                let spaceInStack = limits.stack - (destination[itemKey] || 0);
+                if (spaceInStack <= 0) continue;
+
+                let isNewItem = !allStorageItemsSet.has(itemKey);
+                if (isNewItem && uniqueItemCount >= limits.unique) {
+                    storageFull = true;
+                    continue;
+                }
+
+                const amountToMove = Math.min(source[itemKey], spaceInStack);
+
+                if (amountToMove > 0) {
+                    if (isNewItem) {
+                        allStorageItemsSet.add(itemKey);
+                        uniqueItemCount++;
+                    }
+                    destination[itemKey] = (destination[itemKey] || 0) + amountToMove;
+                    source[itemKey] -= amountToMove;
+                    if (source[itemKey] <= 0) delete source[itemKey];
+                    itemsMovedCount += amountToMove;
                 }
             }
         } else { // Equipment
-            const source = player.inventory[category];
-            const destination = player.house.storage[category];
-            // Iterate backwards when splicing from an array you're looping over
+            const source = inventory[category];
+            const destination = storage[category];
+
             for (let i = source.length - 1; i >= 0; i--) {
                 const itemKey = source[i];
                 const details = getItemDetails(itemKey);
@@ -2000,22 +2185,35 @@ function placeAllInStorage() {
                                  (player.equippedArmor.name === details.name && category === 'armor') ||
                                  (player.equippedShield.name === details.name && category === 'shields') ||
                                  (player.equippedCatalyst.name === details.name && category === 'catalysts');
+                if (isEquipped) continue;
 
-                if (!isEquipped) {
-                    destination.push(itemKey);
-                    source.splice(i, 1);
-                    itemsMovedCount++;
+                let isNewItem = !allStorageItemsSet.has(itemKey);
+                if (isNewItem && uniqueItemCount >= limits.unique) {
+                    storageFull = true;
+                    continue;
                 }
+
+                if (isNewItem) {
+                    allStorageItemsSet.add(itemKey);
+                    uniqueItemCount++;
+                }
+
+                destination.push(itemKey);
+                source.splice(i, 1);
+                itemsMovedCount++;
             }
         }
-    });
+    }
 
     if (itemsMovedCount > 0) {
-        addToLog(`Moved all unequipped items to storage.`);
+        addToLog(`Moved ${itemsMovedCount} item(s) to storage.`);
     } else {
         addToLog(`No unequipped items to move.`);
     }
-    
+    if (storageFull) {
+        addToLog(`Could not move all items because the storage limit was reached.`, 'text-yellow-400');
+    }
+
     renderHouseStorage();
 }
 
@@ -2027,7 +2225,7 @@ function takeAllFromStorage() {
     let itemsMovedCount = 0;
 
     categories.forEach(category => {
-        if (!player.house.storage[category]) return; // Skip if storage category doesn't exist
+        if (!player.house.storage[category]) return;
 
         if (category === 'items' || category === 'lures') {
             const source = player.house.storage[category];
@@ -2039,16 +2237,13 @@ function takeAllFromStorage() {
                     itemsMovedCount += count;
                 }
             }
-            // Clear the source object
             player.house.storage[category] = {};
-        } else { // Equipment
+        } else {
             const source = player.house.storage[category];
             const destination = player.inventory[category];
             if (source.length > 0) {
                 itemsMovedCount += source.length;
-                // Extend the destination array with all items from source
                 destination.push(...source);
-                // Clear the source array
                 player.house.storage[category] = [];
             }
         }
@@ -2059,11 +2254,10 @@ function takeAllFromStorage() {
     } else {
         addToLog(`Storage is already empty.`);
     }
-    
+
     renderHouseStorage();
 }
 
-// MODIFICATION: Rewriting storage functions for new object-based storage
 function moveToStorage(category, itemKey, index = -1) {
     if (!player.house.storage) {
         player.house.storage = { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} };
@@ -2071,25 +2265,50 @@ function moveToStorage(category, itemKey, index = -1) {
     const details = getItemDetails(itemKey);
     if (!details) return;
 
-    // Handle stackable items (items & lures)
+    const storageTier = player.house.storageTier || 0;
+    const baseLimits = { unique: 10, stack: 10 };
+    const limits = HOME_IMPROVEMENTS.storage.upgrades[storageTier - 1]?.limits || baseLimits;
+
+    const allStorageItems = [
+        ...Object.keys(player.house.storage.items),
+        ...Object.keys(player.house.storage.lures),
+        ...player.house.storage.weapons,
+        ...player.house.storage.armor,
+        ...player.house.storage.shields,
+        ...player.house.storage.catalysts
+    ];
+    const uniqueItemCount = new Set(allStorageItems).size;
+
+    const isNewUniqueItem = !allStorageItems.includes(itemKey);
+
+    if (isNewUniqueItem && uniqueItemCount >= limits.unique) {
+        addToLog('Your storage chest is full! You cannot add any more types of items.', 'text-red-400');
+        return;
+    }
+
+
     if (category === 'items' || category === 'lures') {
         const source = player.inventory[category];
         const destination = player.house.storage[category];
-        
+
+        if ((destination[itemKey] || 0) >= limits.stack) {
+            addToLog(`You cannot store any more ${details.name}. The stack is full.`, 'text-red-400');
+            return;
+        }
+
         if (source[itemKey] && source[itemKey] > 0) {
             source[itemKey]--;
             if (source[itemKey] <= 0) delete source[itemKey];
             destination[itemKey] = (destination[itemKey] || 0) + 1;
         }
-    } else { // Handle equipment (weapons, armor, etc.)
+    } else {
         const source = player.inventory[category];
         const destination = player.house.storage[category];
 
         let itemIndex = -1;
-        // If a specific index is provided (from a list of multiple identical items), use it
         if (index > -1 && source[index] === itemKey) {
             itemIndex = index;
-        } else { // Otherwise, just find the first one
+        } else {
             itemIndex = source.indexOf(itemKey);
         }
 
@@ -2108,7 +2327,6 @@ function moveFromStorage(category, itemKey, index = -1) {
     const details = getItemDetails(itemKey);
     if (!details) return;
 
-    // Handle stackable items (items & lures)
     if (category === 'items' || category === 'lures') {
         const source = player.house.storage[category];
         const destination = player.inventory[category];
@@ -2117,7 +2335,7 @@ function moveFromStorage(category, itemKey, index = -1) {
             if (source[itemKey] <= 0) delete source[itemKey];
             destination[itemKey] = (destination[itemKey] || 0) + 1;
         }
-    } else { // Handle equipment
+    } else {
         const source = player.house.storage[category];
         const destination = player.inventory[category];
         let itemIndex = -1;
@@ -2126,12 +2344,254 @@ function moveFromStorage(category, itemKey, index = -1) {
         } else {
             itemIndex = source.indexOf(itemKey);
         }
-        
+
         if (itemIndex > -1) {
             source.splice(itemIndex, 1);
-            destination[itemKey] = (destination[itemKey] || 0) + 1;
+            destination.push(itemKey);
         }
     }
     renderHouseStorage();
+}
+
+function purchaseHouseUpgrade(categoryKey) {
+    const category = HOME_IMPROVEMENTS[categoryKey];
+    if (!category) return;
+
+    const currentTier = player.house[`${categoryKey}Tier`] || 0;
+    if (currentTier >= category.upgrades.length) {
+        addToLog("You've already fully upgraded this feature.", 'text-yellow-400');
+        return;
+    }
+
+    const upgrade = category.upgrades[currentTier];
+    if (player.gold < upgrade.cost) {
+        addToLog(`You need ${upgrade.cost} G for the ${upgrade.name}.`, 'text-red-400');
+        return;
+    }
+
+    player.gold -= upgrade.cost;
+    player.house[`${categoryKey}Tier`]++;
+
+    addToLog(`Upgrade purchased: ${upgrade.name}!`, 'text-green-400 font-bold');
+
+    if (categoryKey === 'storage') {
+        player.house.storageLimits = upgrade.limits;
+    } else if (categoryKey === 'garden') {
+        const newSize = upgrade.size.width * upgrade.size.height;
+        if (!player.house.garden || player.house.garden.length < newSize) {
+             const newGarden = Array(newSize).fill(null).map(() => ({ seed: null, plantedAt: 0, growthStage: 0 }));
+             if(player.house.garden) {
+                 for(let i=0; i < player.house.garden.length; i++) {
+                     newGarden[i] = player.house.garden[i];
+                 }
+             }
+             player.house.garden = newGarden;
+        }
+
+        if(upgrade.treeSize) {
+            const treePlotSize = upgrade.treeSize.width * upgrade.treeSize.height;
+             if (!player.house.treePlots || player.house.treePlots.length < treePlotSize) {
+                const newTreePlots = Array(treePlotSize).fill(null).map(() => ({ seed: null, plantedAt: 0, growthStage: 0 }));
+                if(player.house.treePlots) {
+                    for(let i=0; i < player.house.treePlots.length; i++) {
+                        newTreePlots[i] = player.house.treePlots[i];
+                    }
+                }
+                player.house.treePlots = newTreePlots;
+            }
+        }
+    }
+
+    saveGame();
+    updateStatsView();
+    renderHomeImprovements(categoryKey);
+}
+
+// --- GARDEN FUNCTIONS ---
+
+function updateGarden() {
+    if (!player || !player.house.owned || player.house.gardenTier === 0) return;
+    if (!Array.isArray(player.house.garden)) {
+        console.error("Garden data was not an array! Resetting to prevent crash.");
+        player.house.garden = [];
+    }
+     if (!Array.isArray(player.house.treePlots)) {
+        player.house.treePlots = [];
+    }
+
+
+    const now = Date.now();
+    let needsRender = false;
+
+    const checkPlots = (plots) => {
+        if (!Array.isArray(plots)) return;
+        plots.forEach(plot => {
+            if (plot && plot.seed && plot.plantedAt > 0) {
+                const seedInfo = SEEDS[plot.seed];
+                if (!seedInfo) return;
+
+                const timePassed = now - plot.plantedAt;
+                const currentStage = plot.growthStage;
+                let newStage = 0;
+                if (timePassed >= seedInfo.growthTime) {
+                    newStage = 3; // Fully grown
+                } else if (timePassed >= seedInfo.growthTime * 0.66) {
+                    newStage = 2; // Sprout
+                } else if (timePassed >= seedInfo.growthTime * 0.33) {
+                    newStage = 1; // Seedling
+                }
+
+                if (newStage !== currentStage) {
+                    plot.growthStage = newStage;
+                    needsRender = true;
+                }
+            }
+        });
+    };
+
+    checkPlots(player.house.garden);
+    checkPlots(player.house.treePlots);
+
+
+    if (needsRender && gameState.currentView === 'garden') {
+        renderGarden();
+    }
+}
+
+function plantSeed(plotIndex, seedKey, isTreePlot) {
+    if ((player.inventory.items[seedKey] || 0) < 1) {
+        addToLog(`You don't have any ${getItemDetails(seedKey).name}.`, 'text-red-400');
+        return;
+    }
+
+    player.inventory.items[seedKey]--;
+    if (player.inventory.items[seedKey] <= 0) {
+        delete player.inventory.items[seedKey];
+    }
+
+    const plotData = {
+        seed: seedKey,
+        plantedAt: Date.now(),
+        growthStage: 0
+    };
+
+    if (isTreePlot) {
+        player.house.treePlots[plotIndex] = plotData;
+    } else {
+        player.house.garden[plotIndex] = plotData;
+    }
+
+    addToLog(`You planted a ${getItemDetails(seedKey).name}.`, 'text-green-400');
+    renderGarden();
+}
+
+function harvestPlant(plotIndex, isTreePlot) {
+    const plot = isTreePlot ? player.house.treePlots[plotIndex] : player.house.garden[plotIndex];
+    if (!plot || plot.growthStage < 3) return;
+
+    const seedInfo = SEEDS[plot.seed];
+    if (!seedInfo) return;
+
+    player.addToInventory(seedInfo.growsInto, 1);
+
+    if (isTreePlot) {
+        player.house.treePlots[plotIndex] = { seed: null, plantedAt: 0, growthStage: 0 };
+    } else {
+        player.house.garden[plotIndex] = { seed: null, plantedAt: 0, growthStage: 0 };
+    }
+
+    renderGarden();
+}
+
+// --- COOKING FUNCTIONS ---
+function cookRecipe(recipeKey) {
+    const recipeData = COOKING_RECIPES[recipeKey];
+    if (!recipeData) {
+        addToLog("Invalid recipe.", "text-red-400");
+        return;
+    }
+
+    // --- Check ingredients ---
+    const required = recipeData.ingredients;
+    const availableIngredients = {
+        meat: [],
+        veggie: [],
+        seasoning: []
+    };
+
+    // Populate available ingredients, sorted by price (cheapest first)
+    Object.keys(player.inventory.items).forEach(itemKey => {
+        const details = getItemDetails(itemKey);
+        if (details && details.cookingType) {
+            for (let i = 0; i < player.inventory.items[itemKey]; i++) {
+                availableIngredients[details.cookingType].push({ key: itemKey, price: details.price });
+            }
+        }
+    });
+        
+    for(const type in availableIngredients) {
+        availableIngredients[type].sort((a,b) => a.price - b.price);
+    }
+
+    // Check if player has enough
+    const ingredientsToConsume = {};
+    let canCook = true;
+    for (const reqKey in required) {
+        const requiredAmount = required[reqKey];
+        const isGeneric = ['meat', 'veggie', 'seasoning'].includes(reqKey);
+
+        if (isGeneric) {
+            if (availableIngredients[reqKey].length < requiredAmount) {
+                canCook = false;
+                break;
+            }
+            // Mark the cheapest ones for consumption
+            for(let i = 0; i < requiredAmount; i++) {
+                const itemToUse = availableIngredients[reqKey][i].key;
+                ingredientsToConsume[itemToUse] = (ingredientsToConsume[itemToUse] || 0) + 1;
+            }
+        } else { // Specific ingredient
+            if ((player.inventory.items[reqKey] || 0) < requiredAmount) {
+                canCook = false;
+                break;
+            }
+            ingredientsToConsume[reqKey] = (ingredientsToConsume[reqKey] || 0) + requiredAmount;
+        }
+    }
+
+    if (!canCook) {
+        addToLog("You don't have the required ingredients.", "text-red-400");
+        return;
+    }
+
+    // --- Consume Ingredients & Apply Effects ---
+    for (const itemKey in ingredientsToConsume) {
+        player.inventory.items[itemKey] -= ingredientsToConsume[itemKey];
+        if (player.inventory.items[itemKey] <= 0) {
+            delete player.inventory.items[itemKey];
+        }
+    }
+
+    player.clearFoodBuffs(); // Clear old buffs before applying new ones
+
+    const effect = recipeData.effect;
+
+    if (effect.type === 'full_restore') {
+        player.hp = player.maxHp;
+        player.mp = player.maxMp;
+    } else if (effect.type === 'heal_percent') {
+        player.hp = Math.min(player.maxHp, player.hp + Math.floor(player.maxHp * effect.heal_percent));
+    } else if (effect.type === 'mana_percent') {
+        player.mp = Math.min(player.maxMp, player.mp + Math.floor(player.maxMp * effect.mana_percent));
+    } else if (effect.type === 'buff') {
+        effect.buffs.forEach(buff => {
+            player.foodBuffs[buff.stat] = { value: buff.value, duration: buff.duration };
+        });
+    }
+
+    addToLog(`You cooked and ate ${recipeData.name}. You feel its effects!`, "text-green-400 font-bold");
+
+    updateStatsView();
+    renderKitchen(); // Re-render to update button states
 }
 

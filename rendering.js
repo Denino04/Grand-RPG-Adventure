@@ -8,8 +8,17 @@ function setStorageSortOrder(order) {
 
 function getWeaponStatsString(weapon) {
     if (!weapon || !weapon.name) return 'None';
+
+    let stats = [];
+    stats.push(`${weapon.damage[0]}d${weapon.damage[1]}`);
+    
+    // Add specific weapon effect stats
+    if(weapon.effect?.critChance) stats.push(`Crit: ${weapon.effect.critChance*100}%`);
+    if(weapon.effect?.armorPierce) stats.push(`Pierce: ${weapon.effect.armorPierce*100}%`);
+
+
     const elementText = player.weaponElement !== 'none' ? ` <span class="font-bold text-cyan-300">[${capitalize(player.weaponElement)}]</span>` : '';
-    return `${weapon.name} (${weapon.damage[0]}d${weapon.damage[1]})${elementText}`;
+    return `${weapon.name} (${stats.join(', ')})${elementText}`;
 }
 
 function getCatalystStatsString(catalyst) {
@@ -20,13 +29,13 @@ function getCatalystStatsString(catalyst) {
     if (catalyst.effect?.hp_regen) stats.push(`+${catalyst.effect.hp_regen}HP/t`);
     if (catalyst.effect?.mana_regen) stats.push(`+${catalyst.effect.mana_regen}MP/t`);
     if (catalyst.effect?.spell_crit_chance) stats.push(`${catalyst.effect.spell_crit_chance * 100}% Crit`);
-    if (catalyst.effect?.spell_vamp) stats.push(`Spell Vamp`);
-    if (catalyst.effect?.spell_penetration) stats.push(`Penetration`);
+    if (catalyst.effect?.spell_vamp) stats.push(`Vamp`);
+    if (catalyst.effect?.spell_penetration) stats.push(`Pen`);
     if (catalyst.effect?.spell_sniper) stats.push(`Sniper`);
     if (catalyst.effect?.overdrive) stats.push(`Overdrive`);
     if (catalyst.effect?.battlestaff) stats.push(`Battlestaff`);
-    if (catalyst.effect?.spell_weaver) stats.push(`Spellweaver`);
-    if (catalyst.effect?.ranged_chance) stats.push(`Ranged Evasion`);
+    if (catalyst.effect?.spell_weaver) stats.push(`Weaver`);
+    if (catalyst.effect?.ranged_chance) stats.push(`Ranged Eva`);
     return `${catalyst.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
 }
 
@@ -124,7 +133,7 @@ function renderCharacterCreation() {
     $('#new-char-name').focus();
 
     if (isTutorialEnabled) {
-        startTutorialSequence('character_creation');
+        startTutorialSequence('creation_welcome');
     }
 
     let creationState = { name: '', gender: null, race: null, class: null, background: null, difficulty: 'hardcore' };
@@ -132,10 +141,16 @@ function renderCharacterCreation() {
     const switchStep = (from, to) => {
         $(`#creation-step-${from}`).classList.add('hidden');
         $(`#creation-step-${to}`).classList.remove('hidden');
+
+        if (isTutorialEnabled) {
+            if (to === 1) startTutorialSequence('creation_step1');
+            else if (to === 2) startTutorialSequence('creation_step2');
+            else if (to === 3) startTutorialSequence('creation_step3');
+        }
     };
 
     // --- Event Listeners for Navigation ---
-    $('#creation-back-to-start-btn').onclick = () => { window.location.hash = 'menu' };
+    $('#creation-back-to-start-btn').onclick = showStartScreen;
     $('#back-to-step-0-btn').onclick = () => switchStep(1, 0);
 
     $('#to-step-2-btn').onclick = () => {
@@ -160,7 +175,6 @@ function renderCharacterCreation() {
         }
 
         if (!hasError) {
-            if (tutorialState.isActive) advanceTutorial();
             switchStep(1, 2);
         }
     };
@@ -173,7 +187,6 @@ function renderCharacterCreation() {
             setTimeout(() =>  $('#class-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
             return;
         }
-        if (tutorialState.isActive) advanceTutorial();
         switchStep(2, 3);
     };
     
@@ -185,11 +198,15 @@ function renderCharacterCreation() {
             setTimeout(() => $('#background-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
             return;
         }
-        if (tutorialState.isActive) advanceTutorial(creationState.name);
+        
+        if (isTutorialEnabled) {
+            startTutorialSequence('creation_finalize');
+            advanceTutorial(creationState.name); // Pass name to final message
+        }
         
         setTimeout(() => {
             initGame(creationState.name, creationState.gender, creationState.race, creationState.class, creationState.background, creationState.difficulty);
-        }, tutorialState.isActive ? 2500 : 0);
+        }, isTutorialEnabled ? 2500 : 0);
     };
 
     $('#difficulty-easy').onclick = () => { creationState.difficulty = 'easy'; switchStep(0, 1); };
@@ -550,6 +567,23 @@ function renderCharacterSheet(isLevelUp = false) {
     });
 
     html += `</div></div></div>
+
+        <h3 class="font-bold text-lg text-yellow-300 mt-3 mb-1 text-center">Active Food Buffs</h3>
+        <div id="food-buff-tracker" class="space-y-0.5 text-xs bg-slate-800 p-2 rounded-lg h-24 overflow-y-auto inventory-scrollbar">`;
+
+    let hasBuffs = false;
+    for (const buffKey in player.foodBuffs) {
+        hasBuffs = true;
+        const buff = player.foodBuffs[buffKey];
+        const statName = buffKey.replace(/_/g, ' ');
+        html += `<div class="flex justify-between"><span>${capitalize(statName)}:</span><span class="font-semibold text-green-400">+${((buff.value - 1) * 100).toFixed(0)}% (${buff.duration} encounters)</span></div>`;
+    }
+
+    if (!hasBuffs) {
+        html += `<p class="text-center text-gray-500">None</p>`;
+    }
+
+    html += `</div>
         <div class="text-center mt-2 flex justify-center gap-4">
             <button onclick="resetStatAllocation()" class="btn btn-action" ${!hasChanges ? 'disabled' : ''}>Reset</button>
             <button onclick="confirmStatAllocation()" class="btn btn-primary">Done</button>
@@ -663,12 +697,12 @@ function returnFromInventory() {
         case 'blacksmith_buy': renderBlacksmithBuy(); break;
         case 'blacksmith_craft': renderBlacksmithCraft(); break;
         case 'black_market': renderShop('black_market'); break;
-        case 'alchemist': renderAlchemist(); break;
         case 'witchs_coven': renderWitchsCoven(); break;
         case 'sell': renderSell(); break;
         case 'battle': renderBattleGrid(); break;
         case 'post_battle': renderPostBattleMenu(); break;
         case 'wilderness': renderWildernessMenu(); break;
+        case 'settings': renderTownSquare(); break;
         default: renderTownSquare();
     }
 }
@@ -759,14 +793,13 @@ function renderTownSquare() {
     const container = document.createElement('div');
     container.className = 'relative flex flex-col items-center justify-center w-full h-full';
 
-    let buttons = [
+    const buttons = [
         { name: 'Explore Wilderness', action: "renderWildernessMenu()", class: 'btn-action' },
         { name: 'Commercial District', action: "renderCommercialDistrict()", class: 'btn-primary' },
         { name: 'Arcane Quarter', action: "renderArcaneQuarter()", class: 'btn-primary' },
         { name: 'Residential Area', action: "renderResidentialDistrict()", class: 'btn-primary' },
     ];
     
-    // MODIFICATION: Dynamic House Button
     if (player.house.owned) {
         buttons.push({ name: 'Your House', action: "renderHouse()", class: 'btn-primary' });
     } else if (player.level >= 4) {
@@ -778,20 +811,10 @@ function renderTownSquare() {
      if (player.bettyQuestState === 'accepted') {
         buttons.push({ name: 'Betty\'s Corner', action: "startBettyDialogue()", class: 'btn-primary' });
     }
-    buttons.push({ name: 'Save Game', action: "saveGame(true)", class: 'btn-primary' });
-    buttons.push({ name: 'Export Save', action: "exportSave()", class: 'btn-primary' });
 
     let html = `
-        <div class="absolute top-4 right-4 flex gap-2 z-10">
-            <button onclick="renderSettingsMenu()" class="btn btn-primary !p-2 !rounded-full w-10 h-10 flex items-center justify-center" title="Settings">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
-            </button>
-            <button onclick="exitGame()" class="btn btn-action !p-2 !rounded-full w-10 h-10 text-xl leading-none flex items-center justify-center" title="Leave Game">
-                &times;
-            </button>
-        </div>
         <h2 class="font-medieval text-3xl mb-8 text-center">Town Square</h2>
-        <div class="grid grid-cols-1 gap-4 w-full max-w-xs">
+        <div class="grid grid-cols-2 gap-4 w-full max-w-md">
             ${buttons.map(btn => `<button onclick="${btn.action}" class="btn ${btn.class}" ${btn.disabled ? 'disabled' : ''}>${btn.name}</button>`).join('')}
         </div>`;
     
@@ -801,7 +824,7 @@ function renderTownSquare() {
     if (tutorialState.isActive) {
         const currentStep = tutorialState.sequence[tutorialState.currentIndex];
         if (currentStep && (currentStep.trigger?.setFlag || currentStep.type === 'checkpoint')) {
-            advanceTutorial();
+            setTimeout(() => advanceTutorial(), 100);
         }
     }
 }
@@ -812,13 +835,30 @@ function renderHouse() {
     lastViewBeforeInventory = 'town'; // Go back to town square from house
     gameState.currentView = 'house';
 
+    let buttonsHtml = `
+        <button onclick="restAtHouse()" class="btn btn-primary w-full md:w-auto">Rest</button>
+        <button onclick="renderHouseStorage()" class="btn btn-primary w-full md:w-auto">Storage</button>
+    `;
+
+    if (player.house.gardenTier > 0) {
+        buttonsHtml += `<button onclick="renderGarden()" class="btn btn-primary w-full md:w-auto">Garden</button>`;
+    }
+    if (player.house.kitchenTier > 0) {
+        buttonsHtml += `<button onclick="renderKitchen()" class="btn btn-primary w-full md:w-auto">Kitchen</button>`;
+    }
+    if (player.house.alchemyTier > 0) {
+        buttonsHtml += `<button onclick="renderAlchemyLab()" class="btn btn-primary w-full md:w-auto">Alchemy Lab</button>`;
+    }
+    if (player.house.trainingTier > 0) {
+        buttonsHtml += `<button onclick="renderTrainingGrounds()" class="btn btn-primary w-full md:w-auto">Training Grounds</button>`;
+    }
+
     let html = `
         <div class="w-full text-center">
             <h2 class="font-medieval text-3xl mb-4 text-center">Your House</h2>
             <p class="mb-6 text-gray-400">A cozy, personal space to rest and prepare for your adventures.</p>
-            <div class="flex flex-col md:flex-row justify-center items-center gap-4">
-                <button onclick="restAtHouse()" class="btn btn-primary w-full md:w-auto">Rest</button>
-                <button onclick="renderHouseStorage()" class="btn btn-primary w-full md:w-auto">Storage</button>
+            <div class="grid grid-cols-2 gap-4 w-full max-w-md mx-auto">
+                ${buttonsHtml}
             </div>
              <div class="mt-8">
                 <button onclick="renderTownSquare()" class="btn btn-action">Leave House</button>
@@ -914,9 +954,36 @@ function renderHouseStorage() {
         return `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">${html}</div>`;
     };
 
+    // Ensure storage object and its properties exist to prevent errors with old saves
+    if (!player.house.storage) {
+        player.house.storage = { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} };
+    }
+    const storage = player.house.storage;
+    if (!storage.items) storage.items = {};
+    if (!storage.lures) storage.lures = {};
+    if (!storage.weapons) storage.weapons = [];
+    if (!storage.armor) storage.armor = [];
+    if (!storage.shields) storage.shields = [];
+    if (!storage.catalysts) storage.catalysts = [];
+
+    const storageTier = player.house.storageTier || 0;
+    const baseLimits = { unique: 10, stack: 10 };
+    const limits = HOME_IMPROVEMENTS.storage.upgrades[storageTier - 1]?.limits || baseLimits;
+    
+    const allStorageItems = [
+        ...Object.keys(storage.items),
+        ...Object.keys(storage.lures),
+        ...storage.weapons,
+        ...storage.armor,
+        ...storage.shields,
+        ...storage.catalysts
+    ];
+    const uniqueItemCount = new Set(allStorageItems).size;
+
     let html = `
         <div class="w-full max-w-4xl mx-auto flex flex-col h-full">
-            <h2 class="font-medieval text-3xl mb-4 text-center">Storage Chest</h2>
+            <h2 class="font-medieval text-3xl mb-2 text-center">Storage Chest</h2>
+            <p class="text-center text-sm text-gray-400 mb-4">Capacity: ${uniqueItemCount} / ${limits.unique} Unique Items | Max Stack: ${limits.stack}</p>
             
             <div class="flex-grow flex flex-col bg-slate-800 rounded-lg overflow-hidden">
                 <!-- Inventory Section -->
@@ -971,8 +1038,8 @@ function renderHouseStorage() {
 }
 
 
-function renderSettingsMenu() {
-    lastViewBeforeInventory = 'town';
+function renderSettingsMenu(originView = 'town') {
+    lastViewBeforeInventory = originView;
     gameState.currentView = 'settings';
     updateRealTimePalette();
 
@@ -996,6 +1063,12 @@ function renderSettingsMenu() {
 
     let html = `<div class="w-full max-w-2xl text-center">
         <h2 class="font-medieval text-3xl mb-4">Settings</h2>
+
+        <div class="mb-6 space-y-2">
+            <button onclick="saveGame(true)" class="btn btn-primary">Save Game</button>
+            <button onclick="exportSave()" class="btn btn-primary">Export Save</button>
+        </div>
+
         <h3 class="text-xl font-bold mb-4 text-center">Change Difficulty</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">`;
 
@@ -1011,7 +1084,7 @@ function renderSettingsMenu() {
 
     html += `</div>
         <div class="mt-8">
-            <button onclick="renderTownSquare()" class="btn btn-primary">Back to Town</button>
+            <button onclick="returnFromInventory()" class="btn btn-primary">Back</button>
         </div>
     </div>`;
     
@@ -1021,7 +1094,7 @@ function renderSettingsMenu() {
 }
 
 function renderResidentialDistrict() {
-    updateRealTimePalette(); 
+    updateRealTimePalette();
     lastViewBeforeInventory = 'residential_district';
     gameState.currentView = 'residential_district';
 
@@ -1064,7 +1137,15 @@ function renderLibrary() {
 
     Object.keys(LIBRARY_BOOKS).forEach(bookKey => {
         const book = LIBRARY_BOOKS[bookKey];
-        html += `<button onclick="renderBook('${bookKey}')" class="btn btn-primary text-left">${book.title}</button>`;
+        if (book.isDynamic) {
+            const hasContent = (book.recipeType === 'cooking' && player.knownCookingRecipes.length > 0) ||
+                               (book.recipeType === 'alchemy' && player.knownAlchemyRecipes.some(r => ALCHEMY_RECIPES[r].tier === book.tier));
+            if (hasContent) {
+                html += `<button onclick="renderBook('${bookKey}')" class="btn btn-primary text-left">${book.title}</button>`;
+            }
+        } else {
+             html += `<button onclick="renderBook('${bookKey}')" class="btn btn-primary text-left">${book.title}</button>`;
+        }
     });
 
     html += `   </div>
@@ -1084,8 +1165,54 @@ function renderLibrary() {
 }
 
 function renderBook(bookKey, chapterIndex = 0) {
-    const book = LIBRARY_BOOKS[bookKey];
-    if (!book) return;
+    const bookData = LIBRARY_BOOKS[bookKey];
+    if (!bookData) return;
+
+    let book = { ...bookData }; // Create a mutable copy
+
+    if (bookData.isDynamic) {
+        book.chapters = [...bookData.chapters]; // Copy static chapters like 'Introduction'
+
+        if (book.recipeType === 'cooking') {
+            player.knownCookingRecipes.sort((a,b) => COOKING_RECIPES[a].name.localeCompare(COOKING_RECIPES[b].name)).forEach(recipeKey => {
+                const recipe = COOKING_RECIPES[recipeKey];
+                const chapterContent = recipe.library_description; // Correctly pull from the recipe object
+                if (chapterContent) {
+                    book.chapters.push({
+                        title: recipe.name,
+                        content: chapterContent
+                    });
+                } else {
+                    // Fallback for any recipes that might not have a detailed entry
+                    const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => {
+                        const details = getItemDetails(key);
+                        return `${val}x ${details ? details.name : capitalize(key)}`;
+                    }).join(', ');
+                    book.chapters.push({
+                        title: recipe.name,
+                        content: `<p class="italic mb-2">${recipe.description}</p><p><strong>Requires:</strong> ${ingredients}</p>`
+                    });
+                }
+            });
+        } else if (book.recipeType === 'alchemy') {
+            player.knownAlchemyRecipes.filter(r => ALCHEMY_RECIPES[r].tier === book.tier).sort((a,b) => getItemDetails(ALCHEMY_RECIPES[a].output).name.localeCompare(getItemDetails(ALCHEMY_RECIPES[b].output).name)).forEach(recipeKey => {
+                const recipe = ALCHEMY_RECIPES[recipeKey];
+                const chapterContent = recipe.library_description;
+                if (chapterContent) {
+                    book.chapters.push({
+                        title: getItemDetails(recipe.output).name,
+                        content: chapterContent
+                    });
+                } else {
+                    const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => `${val}x ${getItemDetails(key).name}`).join(', ');
+                    book.chapters.push({
+                        title: getItemDetails(recipe.output).name,
+                        content: `<p><strong>Requires:</strong> ${ingredients}</p>`
+                    });
+                }
+            });
+        }
+    }
 
     const contentArea = $('#library-content-view');
     let html = `<div class="text-left">
@@ -1099,9 +1226,16 @@ function renderBook(bookKey, chapterIndex = 0) {
         html += `<button onclick="renderBook('${bookKey}', ${index})" class="text-sm px-3 py-1 rounded ${isActive ? 'bg-yellow-600 text-slate-900 font-bold' : 'bg-slate-700 hover:bg-slate-600'}">${chap.title}</button>`;
     });
 
-    html += `</div>
-        <div class="prose prose-invert max-w-none text-gray-300">${book.chapters[chapterIndex].content}</div>
-    </div>`;
+    html += `</div>`;
+    
+    if (book.chapters[chapterIndex]) {
+        html += `<div class="prose prose-invert max-w-none text-gray-300">${book.chapters[chapterIndex].content}</div>`;
+    } else if (book.chapters.length > 0) {
+        // Automatically select the first chapter if the provided index is invalid
+        html += `<div class="prose prose-invert max-w-none text-gray-300">${book.chapters[0].content}</div>`;
+    }
+
+    html += `</div>`;
 
     contentArea.innerHTML = html;
 
@@ -1130,6 +1264,10 @@ function renderCommercialDistrict() {
         { name: 'Blacksmith', action: "renderBlacksmithMenu()" }, 
         { name: 'Black Market', action: "renderShop('black_market')" }
     ];
+
+    if (player.house.owned) {
+        locations.push({ name: "Foundation & Fortune", action: "renderHomeImprovements()" });
+    }
 
     let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Commercial District</h2>
                 <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
@@ -1177,6 +1315,98 @@ function renderArcaneQuarter() {
     render(container);
 }
 
+function renderHomeImprovements(activeCategoryKey = 'storage') {
+    updateRealTimePalette();
+    lastViewBeforeInventory = 'commercial_district';
+    gameState.currentView = 'home_improvements';
+    
+    let html = `<div class="w-full h-full flex flex-col text-left">
+        <h2 class="font-medieval text-3xl mb-1 text-center">Foundation & Fortune</h2>
+        <p class="text-sm text-gray-400 text-center mb-4">"Gizmo at your service! More space? Bigger booms? Pointy-er practice dummies? You want it, I got it... for a price!"</p>
+        
+        <div class="flex-grow flex flex-col md:flex-row gap-6 overflow-hidden">
+            <div class="w-full md:w-1/3 flex flex-col gap-2">
+                <h3 class="font-bold text-lg text-yellow-300">Upgrade Categories</h3>
+                <div id="upgrade-category-list" class="flex flex-col gap-2">`;
+
+    Object.keys(HOME_IMPROVEMENTS).forEach(key => {
+        const category = HOME_IMPROVEMENTS[key];
+        const isActive = key === activeCategoryKey;
+        html += `<button onclick="renderHomeImprovements('${key}')" class="btn ${isActive ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-left">${category.name}</button>`;
+    });
+
+    html += `   </div>
+            </div>
+            <div id="upgrade-content-view" class="w-full md:w-2/3 bg-slate-800 p-4 rounded-lg overflow-y-auto inventory-scrollbar">
+                <!-- Upgrade details will be injected here by renderUpgradeCategory -->
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            <button onclick="renderCommercialDistrict()" class="btn btn-primary">Back to Market</button>
+        </div>
+    </div>`;
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+    
+    // Now call the function to render the details for the active category
+    renderUpgradeCategory(activeCategoryKey);
+}
+
+function renderUpgradeCategory(categoryKey) {
+    const contentArea = $('#upgrade-content-view');
+    if (!contentArea) return;
+
+    const category = HOME_IMPROVEMENTS[categoryKey];
+    const currentTier = player.house[`${categoryKey}Tier`] || 0;
+
+    let html = `<h3 class="font-bold text-xl text-yellow-300 mb-4">${category.name}</h3>`;
+
+    if (currentTier >= category.upgrades.length) {
+        html += `<p class="text-green-400">You have fully upgraded this feature. Gizmo thanks you for your patronage!</p>`;
+    } else {
+        const upgrade = category.upgrades[currentTier];
+        const canAfford = player.gold >= upgrade.cost;
+        html += `
+            <div class="p-4 bg-slate-900/50 rounded-lg">
+                <h4 class="font-bold text-lg text-cyan-300">Next Upgrade: ${upgrade.name}</h4>
+                <p class="text-sm text-gray-400 my-2">${upgrade.description}</p>
+                <div class="flex justify-between items-center mt-4">
+                    <p class="text-yellow-400 font-bold">Cost: ${upgrade.cost} G</p>
+                    <button onclick="purchaseHouseUpgrade('${categoryKey}')" class="btn btn-primary" ${!canAfford ? 'disabled' : ''}>Purchase</button>
+                </div>
+            </div>
+        `;
+    }
+
+    html += `<hr class="border-slate-600 my-4">
+             <h4 class="font-bold text-md text-gray-300 mb-2">Current Status</h4>
+             <p class="text-sm text-gray-400">Current Tier: ${currentTier}</p>`;
+    
+    if (currentTier > 0) {
+        const currentUpgrade = category.upgrades[currentTier - 1];
+        if(categoryKey === 'storage') {
+            html += `<p class="text-sm text-gray-400">Capacity: ${currentUpgrade.limits.unique} unique items, stacks of ${currentUpgrade.limits.stack}.</p>`;
+        }
+        if(categoryKey === 'garden') {
+            html += `<p class="text-sm text-gray-400">Size: ${currentUpgrade.size.width}x${currentUpgrade.size.height} plot.</p>`;
+            if(currentUpgrade.treeSize) {
+                 html += `<p class="text-sm text-gray-400">Tree Plot Size: ${currentUpgrade.treeSize.width}x${currentUpgrade.treeSize.height}.</p>`;
+            }
+        }
+    } else {
+        if(categoryKey === 'storage') {
+            html += `<p class="text-sm text-gray-400">Capacity: 10 unique items, stacks of 10.</p>`;
+        } else {
+            html += `<p class="text-sm text-gray-400">Not yet purchased.</p>`;
+        }
+    }
+
+
+    contentArea.innerHTML = html;
+}
+
 function renderWitchsCoven(subView = 'main') {
     applyTheme('necropolis'); 
     lastViewBeforeInventory = 'witchs_coven';
@@ -1191,6 +1421,7 @@ function renderWitchsCoven(subView = 'main') {
         html += `<p class="mb-6">The air is thick with incense and unspoken power. The witch offers her services... for a price.</p>
             <div class="flex flex-col md:flex-row justify-center items-center gap-4">
                 <button onclick="renderWitchsCoven('transmute')" class="btn btn-magic w-full md:w-auto">Transmute Items</button>
+                <button onclick="renderWitchsCoven('brew')" class="btn btn-magic w-full md:w-auto">Brew Potions</button>
                 <button onclick="renderWitchsCoven('reset')" class="btn btn-magic w-full md:w-auto">Reset Fate</button>
                 <button onclick="renderWitchsCoven('rebirth')" class="btn btn-magic w-full md:w-auto">Rebirth</button>
             </div>`;
@@ -1479,10 +1710,32 @@ function renderShop(type) {
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
 
     let inventory, title;
-
+    
+    // Create a mutable copy of the base inventory
+    let shopInventory = JSON.parse(JSON.stringify(SHOP_INVENTORY));
+    
     switch (type) {
         case 'store':
-            inventory = SHOP_INVENTORY;
+            // --- DYNAMIC RECIPE LOGIC FOR GENERAL STORE ---
+            const rng = seededRandom(player.seed);
+            let availableRecipes = [];
+            
+            // Determine which recipes to potentially show based on house upgrades
+            if (player.house.kitchenTier > 0) {
+                 const cookingRecipes = shopInventory['Recipes'].filter(key => ITEMS[key] && ITEMS[key].recipeType === 'cooking');
+                 const shuffled = shuffleArray([...cookingRecipes], rng);
+                 availableRecipes.push(...shuffled.slice(0, 2));
+            }
+            if (player.house.alchemyTier > 0) {
+                 const alchemyRecipes = shopInventory['Recipes'].filter(key => ITEMS[key] && ITEMS[key].recipeType === 'alchemy');
+                 const shuffled = shuffleArray([...alchemyRecipes], rng);
+                 availableRecipes.push(...shuffled.slice(0, 3));
+            }
+            
+            // Assign the dynamically selected recipes to the shop's inventory for this render
+            shopInventory['Recipes'] = availableRecipes;
+            
+            inventory = shopInventory;
             title = 'General Store';
             lastViewBeforeInventory = 'shop';
             gameState.currentView = 'shop';
@@ -1498,6 +1751,11 @@ function renderShop(type) {
 
     let itemsHtml = '';
     for (const category in inventory) {
+        // Hide Recipes category if there are none to show
+        if (category === 'Recipes' && (!inventory[category] || inventory[category].length === 0)) {
+            continue;
+        }
+
         if (inventory[category].length === 0) continue;
         itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
         itemsHtml += '<div class="space-y-2">';
@@ -1524,6 +1782,7 @@ function renderShop(type) {
     const newScrollable = mainView.querySelector('.inventory-scrollbar');
     if (newScrollable) newScrollable.scrollTop = scrollPos;
 }
+
 
 function renderBlacksmithMenu() {
     applyTheme('volcano');
@@ -1639,64 +1898,6 @@ function renderBlacksmithCraft() {
             <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">${recipesHtml}</div>
             <div class="text-center mt-4">
                 <button onclick="renderBlacksmithMenu()" class="btn btn-primary">Back</button>
-            </div>
-        </div>`;
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    render(container);
-
-    const newScrollable = mainView.querySelector('.inventory-scrollbar');
-    if (newScrollable) newScrollable.scrollTop = scrollPos;
-}
-
-function renderAlchemist() {
-    applyTheme('swamp');
-    const scrollable = mainView.querySelector('.inventory-scrollbar');
-    const scrollPos = scrollable ? scrollable.scrollTop : 0;
-
-    lastViewBeforeInventory = 'alchemist';
-    gameState.currentView = 'alchemist';
-
-    let recipesHtml = '';
-    for (const recipeKey in ALCHEMY_RECIPES) {
-        const recipe = ALCHEMY_RECIPES[recipeKey];
-        const productDetails = getItemDetails(recipe.output);
-        
-        let hasIngredients = true;
-        let ingredientsList = [];
-        for (const ingredientKey in recipe.ingredients) {
-            const requiredAmount = recipe.ingredients[ingredientKey];
-            const playerAmount = player.inventory.items[ingredientKey] || 0;
-            if (playerAmount < requiredAmount) {
-                hasIngredients = false;
-            }
-            const ingredientDetails = getItemDetails(ingredientKey);
-            ingredientsList.push(`<span onmouseover="showTooltip('${ingredientKey}', event)" onmouseout="hideTooltip()">${requiredAmount}x ${ingredientDetails.name}</span>`);
-        }
-
-        const canAfford = player.gold >= recipe.cost;
-        const canBrew = hasIngredients && canAfford;
-
-        recipesHtml += `
-            <div class="p-3 bg-slate-800 rounded-lg">
-                <div class="flex justify-between items-center">
-                    <h3 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${recipe.output}', event)" onmouseout="hideTooltip()">${productDetails.name}</h3>
-                    <button onclick="brewPotion('${recipeKey}')" class="btn btn-primary text-sm py-1 px-3" ${!canBrew ? 'disabled' : ''}>Brew</button>
-                </div>
-                <div class="text-sm text-gray-400 mt-1">
-                    <p>Requires: ${ingredientsList.join(', ')}</p>
-                    <p>Cost: <span class="text-yellow-400">${recipe.cost} G</span></p>
-                </div>
-            </div>`;
-    }
-
-    let html = `
-        <div class="w-full">
-            <h2 class="font-medieval text-3xl mb-4 text-center">Alchemist's Workshop</h2>
-            <p class="text-center text-gray-400 mb-4">Brew powerful potions from monster parts.</p>
-            <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">${recipesHtml}</div>
-            <div class="text-center mt-4">
-                <button onclick="renderCommercialDistrict()" class="btn btn-primary">Back</button>
             </div>
         </div>`;
     const container = document.createElement('div');
@@ -2034,7 +2235,7 @@ function renderInventory() {
             const details = getItemDetails(key); 
             if (!details) return '';
 
-            if (category === 'items' && details.type === 'key') {
+            if (category === 'items' && (details.type === 'key' || details.type === 'seed' || details.type === 'sapling')) {
                 return ''; 
             }
 
@@ -2058,7 +2259,7 @@ function renderInventory() {
                              (category === 'lures' && key === player.equippedLure); 
             const equippedText = isEquipped ? '<span class="text-green-400 font-bold ml-2">[Equipped]</span>' : ''; 
             let buttonHtml = ''; 
-            if (category === 'items' && details.type !== 'junk' && details.type !== 'alchemy' && details.type !== 'key') { 
+            if (category === 'items' && details.type !== 'junk' && details.type !== 'alchemy' && details.type !== 'key' && !details.cookingType && !details.type.startsWith('recipe')) { 
                 buttonHtml = `<button onclick="useItem('${key}')" class="btn btn-item text-sm py-1 px-3">Use</button>`; 
             } else if (isEquipped) {
                 let itemType = category.slice(0, -1);
@@ -2178,9 +2379,14 @@ function renderBattle(subView = 'main', actionData = null) {
                 return ''; // Skip rendering this invalid spell
             }
             const spell = spellTree.tiers[player.spells[key].tier - 1];
-            const canCast = player.mp >= spell.cost;
+            
+            // Check concoction debuff
+            let finalCost = spell.cost;
+            if(player.statusEffects.magic_dampen) finalCost = spell.cost; // Show original cost, but check will fail on cast
+            const canCast = player.mp >= finalCost;
+
             return `<button onclick="battleAction('magic_select', {spellKey: '${key}'})" class="btn btn-magic w-full text-left" ${!canCast ? 'disabled' : ''} onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
-                        <div class="flex justify-between"><span>${spell.name}</span><span>${spell.cost} MP</span></div>
+                        <div class="flex justify-between"><span>${spell.name}</span><span>${finalCost} MP</span></div>
                     </button>`;
         }).join('');
         
@@ -2199,7 +2405,7 @@ function renderBattle(subView = 'main', actionData = null) {
         let itemsHtml = Object.keys(player.inventory.items)
             .filter(key => {
                 const item = ITEMS[key];
-                return item && item.type !== 'junk' && item.type !== 'alchemy' && item.type !== 'key';
+                return item && item.type !== 'junk' && item.type !== 'alchemy' && item.type !== 'key' && !item.cookingType;
             })
             .map(key => {
                 const item = ITEMS[key];
@@ -2239,16 +2445,22 @@ function renderPostBattleMenu() {
     $('#inventory-btn').disabled = false;
     $('#character-sheet-btn').disabled = false;
     player.clearEncounterBuffs();
+    
+    // If it was a training battle, restore state and go back to training grounds
+    if (preTrainingState !== null) {
+        addToLog("Training session ended. Restoring your resources.", "text-cyan-300");
+        player.hp = preTrainingState.hp;
+        player.mp = preTrainingState.mp;
+        preTrainingState = null;
+        updateStatsView();
+        setTimeout(renderTrainingGrounds, 1500);
+        return;
+    }
+
     gameState.currentView = 'post_battle';
     lastViewBeforeInventory = 'post_battle';
     
-    if (tutorialState.isActive) {
-        const currentStep = tutorialState.sequence[tutorialState.currentIndex];
-        if (currentStep && currentStep.trigger && currentStep.trigger.type === 'enemy_death') {
-            advanceTutorial();
-            return;
-        }
-    }
+    // DO NOT ADVANCE TUTORIAL HERE. It's handled after the "outro" modal.
 
     const biomeKey = gameState.currentBiome;
     if (!biomeKey) { 
@@ -2355,7 +2567,7 @@ window.castHealingSpellOutsideCombat = function(spellKey) {
     }
 
     if (player.mp < finalSpellCost) {
-        addToLog(`Not enough MP to cast ${spell.name}.`, "text-red-400");
+        addToLog(`Not enough MP to cast ${spell.name}.`, 'text-red-400');
         return;
     }
 
@@ -2449,7 +2661,7 @@ function renderBettyDialogue(sceneKey) {
     dialogueHtml += `</div></div></div>`;
     
     const container = document.createElement('div');
-    container.innerHTML = html;
+    container.innerHTML = dialogueHtml;
     render(container);
 }
 
@@ -2523,4 +2735,593 @@ function renderBettyQuestProposal() {
     container.innerHTML = dialogueHtml;
     render(container);
 }
+
+function formatTime(ms) {
+    if (ms <= 0) return "Ready!";
+    let seconds = Math.floor(ms / 1000);
+    let minutes = Math.floor(seconds / 60);
+    let hours = Math.floor(minutes / 60);
+
+    seconds = seconds % 60;
+    minutes = minutes % 60;
+
+    const pad = (num) => num.toString().padStart(2, '0');
+
+    if (hours > 0) {
+        return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
+    return `${pad(minutes)}:${pad(seconds)}`;
+}
+
+function renderGarden() {
+    gameState.currentView = 'garden';
+    lastViewBeforeInventory = 'house';
+
+    // Defensive check to prevent crashes if player or house object is missing.
+    if (!player || !player.house) {
+        console.error("Critical Error: Player or house data is missing when trying to render garden.");
+        render(document.createTextNode("Error: Could not load player data for the garden."));
+        return;
+    }
+
+    const gardenTier = player.house.gardenTier || 0;
+    if (gardenTier === 0) {
+        render(document.createTextNode("Error: Garden not purchased. Please report this bug."));
+        return;
+    }
+
+    const upgrade = HOME_IMPROVEMENTS.garden.upgrades[gardenTier - 1];
+    if (!upgrade) {
+        console.error(`Invalid garden tier or upgrade data for tier ${gardenTier}`);
+        render(document.createTextNode("Error: Could not load garden data."));
+        return;
+    }
+
+    const { width, height } = upgrade.size;
+    const totalPlots = width * height;
+    const treePlotSize = upgrade.treeSize ? upgrade.treeSize.width * upgrade.treeSize.height : 0;
+
+    // Critical Fix: Ensure the garden arrays are valid and match the expected size for the tier.
+    if (!player.house.garden || !Array.isArray(player.house.garden) || player.house.garden.length < totalPlots) {
+        const newGarden = Array(totalPlots).fill(null).map(() => ({ seed: null, plantedAt: 0, growthStage: 0 }));
+        if(player.house.garden && Array.isArray(player.house.garden)) {
+            for(let i = 0; i < player.house.garden.length; i++) {
+                if (i < newGarden.length) newGarden[i] = player.house.garden[i];
+            }
+        }
+        player.house.garden = newGarden;
+    }
+    if (treePlotSize > 0 && (!player.house.treePlots || !Array.isArray(player.house.treePlots) || player.house.treePlots.length < treePlotSize)) {
+         const newTreePlots = Array(treePlotSize).fill(null).map(() => ({ seed: null, plantedAt: 0, growthStage: 0 }));
+         if(player.house.treePlots && Array.isArray(player.house.treePlots)) {
+             for(let i = 0; i < player.house.treePlots.length; i++) {
+                 if (i < newTreePlots.length) newTreePlots[i] = player.house.treePlots[i];
+             }
+         }
+         player.house.treePlots = newTreePlots;
+    }
+
+    let html = `<div class="w-full text-center">
+        <h2 class="font-medieval text-3xl mb-2">Your Garden</h2>
+        <p class="text-gray-400 mb-4">Click an empty plot to plant a seed, or a grown plant to harvest.</p>
+        
+        <div class="flex flex-col md:flex-row justify-center items-center md:items-start gap-4 w-full">
+            <div class="inline-grid gap-2 p-4 bg-slate-900/50 rounded-lg" style="grid-template-columns: repeat(${width}, 1fr);">`;
+
+    for (let i = 0; i < totalPlots; i++) {
+        const plot = player.house.garden[i];
+        html += renderPlot(plot, i, false);
+    }
+    html += `</div>`;
+
+    if (upgrade.treeSize) {
+        const treeWidth = upgrade.treeSize.width;
+        const treeHeight = upgrade.treeSize.height;
+        html += `<div class="p-4 bg-slate-900/50 rounded-lg">
+                    <h3 class="font-bold text-yellow-300 mb-2">Tree Plot</h3>
+                    <div class="inline-grid gap-1" style="grid-template-columns: repeat(${treeWidth}, 1fr);">`;
+        for(let i=0; i < treeWidth * treeHeight; i++) {
+            const plot = player.house.treePlots[i];
+            html += renderPlot(plot, i, true);
+        }
+        html += `</div></div>`;
+    }
+
+    html += `</div>`;
+
+    html += `<div id="seed-selection-box" class="hidden mt-4 p-4 bg-slate-800 rounded-lg max-w-md mx-auto">
+            <h3 id="seed-selection-title" class="font-bold text-lg mb-2 text-yellow-300">Select a Seed</h3>
+            <div id="seed-list" class="flex flex-wrap justify-center gap-2"></div>
+             <button onclick="hideSeedSelection()" class="btn btn-action mt-3 text-sm">Cancel</button>
+        </div>`;
+
+    html += `<div class="mt-6">
+                <button onclick="renderHouse()" class="btn btn-primary">Back to House</button>
+            </div>
+    </div>`;
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+
+function renderPlot(plot, index, isTreePlot) {
+    let content = '';
+    let plotClass = 'garden-plot-dirt';
+    let action = `showSeedSelection(${index}, ${isTreePlot})`;
+    let title = isTreePlot ? 'Empty Tree Plot' : 'Empty Plot';
+    let timerHtml = '';
+
+    if (plot && plot.seed) {
+        const seedInfo = SEEDS[plot.seed];
+        action = ''; 
+        title = `Planted: ${getItemDetails(plot.seed).name}`;
+        const timeRemaining = (plot.plantedAt + seedInfo.growthTime) - Date.now();
+
+        switch(plot.growthStage) {
+            case 0: content = '🌱'; title += ' (Seedling)'; break;
+            case 1: content = isTreePlot ? '🌳' : '🌿'; title += ' (Sprout)'; break;
+            case 2: content = isTreePlot ? '🌳' : '🌿'; plotClass='garden-plot-growing'; title += ' (Growing)'; break;
+            case 3: 
+                content = isTreePlot ? '🌲' : '🌻'; 
+                plotClass='garden-plot-ready';
+                action = `harvestPlant(${index}, ${isTreePlot})`;
+                title = 'Ready to Harvest!';
+                break;
+        }
+
+        if (plot.growthStage < 3 && timeRemaining > 0) {
+            timerHtml = `<div class="garden-timer">${formatTime(timeRemaining)}</div>`;
+            title += ` - ${formatTime(timeRemaining)} remaining`;
+        }
+    }
+    
+    return `<div onclick="${action}" class="garden-plot ${isTreePlot ? 'tree-plot' : ''} ${plotClass}" title="${title}">${content}${timerHtml}</div>`;
+}
+
+
+function showSeedSelection(plotIndex, isTreePlot) {
+    hideSeedSelection();
+
+    const seedBox = document.getElementById('seed-selection-box');
+    const seedList = document.getElementById('seed-list');
+    const seedTitle = document.getElementById('seed-selection-title');
+    if (!seedBox || !seedList || !seedTitle) return;
+
+    const seedType = isTreePlot ? 'sapling' : 'seed';
+    seedTitle.textContent = isTreePlot ? "Select a Sapling to Plant" : "Select a Seed to Plant";
+    
+    let availableSeeds = Object.keys(player.inventory.items).filter(key => {
+        const item = ITEMS[key];
+        return item && (item.type === seedType) && player.inventory.items[key] > 0;
+    });
+    
+    if (availableSeeds.length === 0) {
+        addToLog(`You have no ${seedType}s to plant.`, "text-yellow-400");
+        return;
+    }
+
+    seedList.innerHTML = '';
+    availableSeeds.forEach(seedKey => {
+        const details = getItemDetails(seedKey);
+        const count = player.inventory.items[seedKey];
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-primary text-sm';
+        btn.innerHTML = `${details.name} (x${count})`;
+        btn.onclick = () => plantSeed(plotIndex, seedKey, isTreePlot);
+        seedList.appendChild(btn);
+    });
+
+    seedBox.classList.remove('hidden');
+}
+
+function hideSeedSelection() {
+     const seedBox = document.getElementById('seed-selection-box');
+     if (seedBox) seedBox.classList.add('hidden');
+}
+
+function renderKitchen() {
+    gameState.currentView = 'kitchen';
+    lastViewBeforeInventory = 'house';
+    applyTheme('town');
+
+    let html = `<div class="w-full text-center">
+        <h2 class="font-medieval text-3xl mb-2">Kitchen</h2>
+        <p class="text-gray-400 mb-6">Combine ingredients to cook hearty meals. Note: Food buffs do not stack.</p>
+        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3 max-w-lg mx-auto text-left">`;
+    
+    if (player.knownCookingRecipes.length === 0) {
+        html += `<p class="text-center text-gray-500">You don't know any recipes. Find or buy some to get started!</p>`;
+    } else {
+        const availableIngredients = {
+            meat: [],
+            veggie: [],
+            seasoning: []
+        };
+        Object.keys(player.inventory.items).forEach(itemKey => {
+            const details = getItemDetails(itemKey);
+            if (details && details.cookingType) {
+                for (let i = 0; i < player.inventory.items[itemKey]; i++) {
+                    availableIngredients[details.cookingType].push({ key: itemKey, price: details.price });
+                }
+            }
+        });
+            
+        player.knownCookingRecipes.forEach(recipeKey => {
+            const recipe = COOKING_RECIPES[recipeKey];
+            if (!recipe) return;
+
+            let ingredientsHtml = [];
+            let canCook = true;
+
+            for (const reqKey in recipe.ingredients) {
+                const requiredAmount = recipe.ingredients[reqKey];
+                let currentAmount = 0;
+                let ingredientName = '';
+                const isGeneric = ['meat', 'veggie', 'seasoning'].includes(reqKey);
+
+                if (isGeneric) {
+                    currentAmount = availableIngredients[reqKey].length;
+                    ingredientName = capitalize(reqKey);
+                } else { // Specific ingredient
+                    currentAmount = player.inventory.items[reqKey] || 0;
+                    const details = getItemDetails(reqKey);
+                    ingredientName = details ? details.name : reqKey;
+                }
+                
+                if (currentAmount < requiredAmount) {
+                    canCook = false;
+                    ingredientsHtml.push(`<span class="text-red-400">${ingredientName} (${currentAmount}/${requiredAmount})</span>`);
+                } else {
+                     ingredientsHtml.push(`<span class="text-gray-400">${ingredientName} (${currentAmount}/${requiredAmount})</span>`);
+                }
+            }
+            
+            html += `<div class="p-3 bg-slate-800 rounded-lg ${!canCook ? 'opacity-60' : ''}">
+                <div class="flex justify-between items-center">
+                    <h4 class="font-bold text-lg ${!canCook ? 'text-gray-500' : 'text-yellow-300'}" onmouseover="showTooltip('${recipeKey}', event)" onmouseout="hideTooltip()">${recipe.name}</h4>
+                    <button onclick="cookRecipe('${recipeKey}')" class="btn btn-primary" ${!canCook ? 'disabled' : ''}>Cook</button>
+                </div>
+                <p class="text-sm">Requires: ${ingredientsHtml.join(', ')}</p>
+            </div>`;
+        });
+    }
+
+
+    html += `</div>
+        <div class="mt-6">
+            <button onclick="renderHouse()" class="btn btn-primary">Back to House</button>
+        </div>
+    </div>`;
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+let alchemyState = {
+    slots: [],
+    outputKey: null
+};
+
+function renderAlchemyLab() {
+    applyTheme('swamp');
+    lastViewBeforeInventory = 'house';
+    gameState.currentView = 'alchemy_lab';
+
+    const alchemyTier = player.house.alchemyTier || 0;
+    if (alchemyTier === 0) {
+        render(document.createTextNode("Error: Alchemy Lab not purchased."));
+        return;
+    }
+
+    const slotCounts = { 1: 3, 2: 4, 3: 4 };
+    const numSlots = slotCounts[alchemyTier] || 3;
+    const slotClass = numSlots === 3 ? 'slot-tier-1' : 'slot-tier-2';
+
+    // Ensure alchemyState.slots has the correct number of array entries
+    while (alchemyState.slots.length < numSlots) {
+        alchemyState.slots.push([]);
+    }
+    if (alchemyState.slots.length > numSlots) {
+        alchemyState.slots = alchemyState.slots.slice(0, numSlots);
+    }
+
+    let slotsHtml = alchemyState.slots.map((slotContents, index) => {
+        const hasItems = slotContents.length > 0;
+        const details = hasItems ? getItemDetails(slotContents[0]) : null;
+        const displayName = hasItems ? `${details.name} (x${slotContents.length})` : `Ingredient ${index + 1}`;
+        const leftClickAction = `openIngredientPicker(${index})`;
+        const rightClickAction = hasItems ? `removeLastIngredient(${index}); event.preventDefault()` : '';
+        
+        return `
+            <div class="alchemy-slot ${slotClass} ${details ? 'filled' : ''}" 
+                 onclick="${leftClickAction}" 
+                 oncontextmenu="${rightClickAction}"
+                 onmouseover="showTooltip('${hasItems ? slotContents[0] : ''}', event)" 
+                 onmouseout="hideTooltip()">
+                ${displayName}
+                <div class="alchemy-connector"></div>
+            </div>`;
+    }).join('');
+
+    const outputDetails = alchemyState.outputKey ? getItemDetails(alchemyState.outputKey) : null;
+    const allSlotsFilled = alchemyState.slots.every(s => s.length > 0);
+
+    let html = `
+        <div class="w-full text-left">
+            <h2 class="font-medieval text-3xl mb-2 text-center">Home Alchemy Lab</h2>
+            <p class="text-center text-gray-400 mb-6">Tier ${alchemyTier} Station. Left-click a slot to add ingredients. Right-click to remove.</p>
+            
+            <div class="alchemy-station">
+                ${slotsHtml}
+                <div class="alchemy-slot alchemy-output ${outputDetails ? 'filled' : ''}" onmouseover="showTooltip('${alchemyState.outputKey || ''}', event)" onmouseout="hideTooltip()">
+                    ${outputDetails ? `Brewed:<br>${outputDetails.name}` : 'Output'}
+                </div>
+            </div>
+
+            <div id="ingredient-picker-container" class="mt-6"></div>
+
+            <div class="text-center mt-6 flex justify-center gap-4">
+                <button onclick="brewFromStation()" class="btn btn-primary" ${!allSlotsFilled || outputDetails ? 'disabled' : ''}>Brew Potion</button>
+                <button onclick="resetAlchemyStation()" class="btn btn-action">Reset</button>
+            </div>
+             <div class="text-center mt-4">
+                <button onclick="renderHouse()" class="btn btn-primary">Back to House</button>
+            </div>
+        </div>`;
+    
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+function openIngredientPicker(slotIndex) {
+    const pickerContainer = $('#ingredient-picker-container');
+    if (!pickerContainer) return;
+
+    const slotContents = alchemyState.slots[slotIndex] || [];
+    
+    // An empty slot can accept any alchemy ingredient.
+    // A non-empty slot can only accept more of the same ingredient.
+    const currentItemInSlot = slotContents.length > 0 ? slotContents[0] : null;
+
+    // Count all ingredients currently in ANY slot to check against total inventory
+    const usedCounts = {};
+    alchemyState.slots.flat().forEach(key => {
+        if (key) usedCounts[key] = (usedCounts[key] || 0) + 1;
+    });
+
+    let availableItems = Object.keys(player.inventory.items).filter(key => {
+        const details = ITEMS[key];
+        const canAddToSlot = !currentItemInSlot || currentItemInSlot === key;
+        return details && details.alchemyType && (player.inventory.items[key] > (usedCounts[key] || 0)) && canAddToSlot;
+    });
+    
+    if (availableItems.length === 0) {
+        const message = currentItemInSlot 
+            ? `You have no more ${getItemDetails(currentItemInSlot).name} to add.`
+            : 'You have no more alchemy ingredients to add.';
+        addToLog(message, 'text-yellow-400');
+        closeIngredientPicker();
+        return;
+    }
+
+    let itemsHtml = availableItems.map(key => {
+        const details = getItemDetails(key);
+        const availableCount = player.inventory.items[key] - (usedCounts[key] || 0);
+        return `<button class="btn btn-primary ingredient-item" onclick="selectIngredient(${slotIndex}, '${key}')">${details.name} (x${availableCount})</button>`;
+    }).join('');
+
+    pickerContainer.innerHTML = `
+        <div class="ingredient-picker">
+            <h3 class="font-bold text-lg mb-2 text-yellow-300">Add Ingredient to Slot ${slotIndex + 1}</h3>
+            <div class="ingredient-picker-grid">${itemsHtml}</div>
+            <div class="text-center mt-3">
+                <button onclick="closeIngredientPicker()" class="btn btn-action text-sm">Cancel</button>
+            </div>
+        </div>`;
+}
+
+function closeIngredientPicker() {
+    const pickerContainer = $('#ingredient-picker-container');
+    if (pickerContainer) pickerContainer.innerHTML = '';
+}
+
+function selectIngredient(slotIndex, itemKey) {
+    if (!alchemyState.slots[slotIndex]) {
+        alchemyState.slots[slotIndex] = [];
+    }
+    alchemyState.slots[slotIndex].push(itemKey);
+    // If we just added the last available item, close the picker. Otherwise, reopen it to add more.
+    const usedCount = alchemyState.slots.flat().filter(k => k === itemKey).length;
+    if (usedCount >= player.inventory.items[itemKey]) {
+        closeIngredientPicker();
+    } else {
+        openIngredientPicker(slotIndex); // Refresh the picker
+    }
+    renderAlchemyLab();
+}
+
+function removeLastIngredient(slotIndex) {
+    if (alchemyState.slots[slotIndex] && alchemyState.slots[slotIndex].length > 0) {
+        alchemyState.slots[slotIndex].pop();
+        closeIngredientPicker(); // Close picker in case it was open for this slot
+        renderAlchemyLab();
+    }
+}
+
+function brewFromStation() {
+    const ingredients = alchemyState.slots.flat().filter(s => s);
+    if (ingredients.length === 0) return;
+
+    const outcome = determineBrewingOutcome(ingredients);
+    
+    if (brewHomePotion(ingredients, outcome)) {
+        if (outcome.success) {
+            alchemyState.outputKey = outcome.potion;
+        } else {
+            alchemyState.outputKey = outcome.potion; // This will be the mysterious concoction
+        }
+        renderAlchemyLab();
+        setTimeout(resetAlchemyStation, 2000);
+    }
+}
+
+function resetAlchemyStation() {
+    const numSlots = alchemyState.slots.length;
+    alchemyState = { slots: Array(numSlots).fill(null).map(() => []), outputKey: null };
+    renderAlchemyLab();
+}
+
+function renderTrainingGrounds() {
+    gameState.currentView = 'training_grounds';
+    lastViewBeforeInventory = 'house';
+    applyTheme('town');
+
+    const trainingTier = player.house.trainingTier || 0;
+    const defeatedEnemies = Object.keys(player.legacyQuestProgress || {});
+    let html = `<div class="w-full text-center">
+        <h2 class="font-medieval text-3xl mb-2">Training Grounds</h2>`;
+
+    // --- Tier 2: Arena of Champions (Replaces Tier 1) ---
+    if (trainingTier >= 2) {
+        html += `<div class="max-w-2xl mx-auto text-left space-y-4 p-4 border border-yellow-600 rounded-lg mt-6">
+            <h3 class="font-bold text-xl text-yellow-300 text-center">Arena of Champions (Tier 2)</h3>
+            <p class="text-gray-400 text-center text-sm mb-4">Design your own custom encounter.</p>
+            
+            <div>
+                <label for="t2-enemy-count" class="block font-bold text-lg mb-2">Number of Enemies (1-5)</label>
+                <input type="number" id="t2-enemy-count" value="1" min="1" max="5" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">
+            </div>
+
+            <div id="t2-enemy-configs" class="space-y-3"></div>
+
+            <div>
+                <label for="t2-grid-size-select" class="block font-bold text-lg mb-2">Arena Size</label>
+                <select id="t2-grid-size-select" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">
+                    <option value="5">5x5</option>
+                    <option value="6" selected>6x6</option>
+                </select>
+            </div>
+             <div class="text-center">
+                <button onclick="startTrainingBattle(2)" class="btn btn-primary" ${defeatedEnemies.length === 0 ? 'disabled' : ''}>Start Tier 2 Training</button>
+            </div>
+        </div>`;
+    }
+    // --- Tier 1: Sparring Circle ---
+    else if (trainingTier >= 1) {
+        html += `<div class="max-w-lg mx-auto text-left space-y-4 p-4 border border-gray-700 rounded-lg">
+            <h3 class="font-bold text-xl text-yellow-300 text-center">Sparring Circle (Tier 1)</h3>
+            <p class="text-gray-400 text-center text-sm mb-4">Practice against a single foe to test your might.</p>
+            <div>
+                <label for="t1-enemy-select" class="block font-bold text-lg mb-2">Enemy Dummy</label>
+                <select id="t1-enemy-select" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">`;
+        
+        if (defeatedEnemies.length > 0) {
+            defeatedEnemies.forEach(enemyKey => {
+                const enemy = MONSTER_SPECIES[enemyKey];
+                if (enemy) html += `<option value="${enemyKey}">${enemy.name}</option>`;
+            });
+        } else {
+            html += `<option value="" disabled>Defeat an enemy first</option>`;
+        }
+        html += `   </select>
+            </div>
+            
+            <div>
+                <label for="t1-grid-size-select" class="block font-bold text-lg mb-2">Arena Size</label>
+                <select id="t1-grid-size-select" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">
+                    <option value="3">3x3</option>
+                    <option value="4">4x4</option>
+                    <option value="5" selected>5x5</option>
+                    <option value="6">6x6</option>
+                </select>
+            </div>
+            <div class="text-center">
+                <button onclick="startTrainingBattle(1)" class="btn btn-primary" ${defeatedEnemies.length === 0 ? 'disabled' : ''}>Start Tier 1 Training</button>
+            </div>
+        </div>`;
+    }
+
+    html += `<div class="mt-8">
+        <button onclick="renderHouse()" class="btn btn-action">Back to House</button>
+    </div></div>`;
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+
+    // Add event listener for Tier 2 enemy count change
+    if (trainingTier >= 2) {
+        const enemyCountInput = document.getElementById('t2-enemy-count');
+        enemyCountInput.addEventListener('change', () => {
+            const count = Math.max(1, Math.min(5, parseInt(enemyCountInput.value) || 1));
+            enemyCountInput.value = count;
+            generateEnemyConfigRows(count);
+        });
+        generateEnemyConfigRows(1); // Initial row
+    }
+}
+
+function generateEnemyConfigRows(count) {
+    const container = document.getElementById('t2-enemy-configs');
+    if (!container) return;
+    
+    const defeatedEnemies = Object.keys(player.legacyQuestProgress || {});
+    const enemyOptions = defeatedEnemies.map(key => `<option value="${key}">${MONSTER_SPECIES[key].name}</option>`).join('');
+    const rarityOptions = Object.keys(MONSTER_RARITY).map(key => `<option value="${key}">${MONSTER_RARITY[key].name}</option>`).join('');
+
+    let html = '';
+    for (let i = 0; i < count; i++) {
+        html += `<div class="p-2 border border-gray-700 rounded-md">
+            <p class="font-semibold mb-2">Enemy ${i + 1}</p>
+            <div class="grid grid-cols-2 gap-2">
+                <select id="t2-enemy-type-${i}" class="w-full bg-gray-700 text-white border border-gray-600 rounded px-2 py-1">${enemyOptions}</select>
+                <select id="t2-enemy-rarity-${i}" class="w-full bg-gray-700 text-white border border-gray-600 rounded px-2 py-1">${rarityOptions}</select>
+            </div>
+        </div>`;
+    }
+    container.innerHTML = html;
+}
+
+window.startTrainingBattle = function(tier) {
+    let trainingConfig = {};
+
+    if (tier === 1) {
+        const enemyKey = document.getElementById('t1-enemy-select').value;
+        const gridSize = parseInt(document.getElementById('t1-grid-size-select').value);
+        if (!enemyKey) {
+            addToLog("You must select an enemy to train against.", "text-red-400");
+            return;
+        }
+        trainingConfig = {
+            gridSize: gridSize,
+            enemies: [{ key: enemyKey, rarity: 'common' }]
+        };
+    } else if (tier === 2) {
+        const enemyCount = parseInt(document.getElementById('t2-enemy-count').value);
+        const gridSize = parseInt(document.getElementById('t2-grid-size-select').value);
+        const enemies = [];
+        for (let i = 0; i < enemyCount; i++) {
+            const key = document.getElementById(`t2-enemy-type-${i}`).value;
+            const rarity = document.getElementById(`t2-enemy-rarity-${i}`).value;
+            if (key) {
+                enemies.push({ key, rarity });
+            }
+        }
+        if (enemies.length === 0) {
+            addToLog("You must select at least one enemy to train against.", "text-red-400");
+            return;
+        }
+        trainingConfig = {
+            gridSize: gridSize,
+            enemies: enemies
+        };
+    }
+
+    startBattle(null, trainingConfig);
+}
+
 

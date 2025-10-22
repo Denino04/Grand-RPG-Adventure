@@ -36,33 +36,38 @@ const BETTY_DIALOGUE = {
 };
 
 const TUTORIAL_SEQUENCES = {
-    character_creation: [
+    creation_welcome: [
         {
             id: 'welcome',
             type: 'modal',
             content: "Welcome to the Chronicles of Cocytus. You are one of the first adventurers to set foot in this foreign land, where a new life awaits. Here, you are free to become whoever you wish. So, tell us… who are you?"
-        },
-        {
+        }
+    ],
+    creation_step1: [
+         {
             id: 'step1_guide',
             content: "First, choose your Name, Gender, and Race. When you're done, hit Next.",
             targetId: '#creation-step-1',
-            position: 'bottom',
-            trigger: { type: 'next_button', targetId: '#to-step-2-btn' }
-        },
+            position: 'bottom'
+        }
+    ],
+    creation_step2: [
         {
             id: 'class',
             content: "Your class grants bonus stats and starting equipment. What is your chosen profession?",
             targetId: '#class-selection-list',
-            position: 'left',
-            trigger: { type: 'next_button', targetId: '#to-step-3-btn' }
-        },
+            position: 'left'
+        }
+    ],
+    creation_step3: [
         {
             id: 'background',
             content: "Finally, your background provides unique stat bonuses. What life did you lead before coming to this frigid land?",
             targetId: '#background-selection-list',
-            position: 'left',
-            trigger: { type: 'next_button', targetId: '#finalize-creation-btn' }
-        },
+            position: 'left'
+        }
+    ],
+    creation_finalize: [
         {
             id: 'finalize',
             type: 'modal',
@@ -89,17 +94,24 @@ const TUTORIAL_SEQUENCES = {
     continue_main_tutorial: [
         { id: 'close_sheet_prompt', targetId: '#main-view', position: 'top', content: "Alright, that's enough reading. Close the sheet by clicking 'Done' so we can continue.", trigger: { type: 'click', targetId: 'button[onclick*="confirmStatAllocation"]'} },
         { id: 'town_nav_checkpoint', type: 'checkpoint', requiredFlags: ['commercial_visited', 'arcane_visited', 'residential_visited'], targetId: '#main-view', position: 'top' },
-        { id: 'final_ui_save', targetId: 'button[onclick*="saveGame"]', position: 'top', content: "See these two icons? The book is to Save your game. The scroll is to Export your save file. Don't be an idiot, save often." },
-        { id: 'log', targetId: '#game-log-container', position: 'top', content: "Last thing. This box here is your Log. It keeps track of everything you do. Check it if your memory's as bad as your face." },
+        { id: 'log', targetId: '#game-log-container', position: 'top', content: "This box here is your Log. It keeps track of everything you do. Check it if your memory's as bad as your face." },
+        { id: 'settings', targetId: 'button[onclick*="renderSettingsMenu"]', position: 'left', content: "The gear icon opens the settings menu. In there, you can change the difficulty, save your game, or export the save file. Don't be an idiot, save often." },
         { id: 'to_wilderness', preAction: 'enableWilderness', targetId: 'button[onclick*="renderWildernessMenu"]', position: 'bottom', content: "Alright, lecture's over. Looks like you're ready for a real fight. Let's head to the Wilderness.", trigger: { type: 'click', targetId: 'button[onclick*="renderWildernessMenu"]' } },
         { id: 'wilderness_select', targetId: '#main-view', position: 'top', content: "These are the surveyed areas. Most are too tough for a whelp like you. We'll start with the closest one.", trigger: { type: 'click', targetId: 'button[onclick*="startBattle"]' } },
+        {
+            id: 'battle_buffer',
+            type: 'modal',
+            content: "Now let's see how you fight, chump!"
+        },
         { 
             id: 'battle_intro', 
-            type: 'modal',
-            content: "Welcome to the battlefield. You're the blue one, the enemy's the red one. Don't mix 'em up. Down here are your actions:<br><b>Move:</b> To walk around the grid.<br><b>Attack:</b> To hit whatever's in your weapon's range.<br><b>Magic:</b> To cast a spell, if you have one.<br><b>Item:</b> To use something from your bag.<br><b>Flee:</b> To run away like a coward. Now, go smash that goblin!"
+            targetId: '#battle-grid',
+            position: 'top',
+            content: "These are your actions: Move, Attack, Magic, Item, and Flee. The grid is the battlefield. You're blue, they're red. Simple. Now, go smash that goblin!"
         },
         {
             id: 'wait_for_goblin_death',
+            type: 'trigger_only', // Make the step's purpose explicit
             trigger: { type: 'enemy_death' }
         },
         { 
@@ -107,6 +119,11 @@ const TUTORIAL_SEQUENCES = {
             type: 'modal', 
             content: "Heh, you won. Not bad... for a rookie. That's everything I can teach ya. If you need a refresher on any of this, go read a book at the library. Now get out of my sight. Good luck out there, and try not to die." 
         },
+         {
+            id: 'show_post_battle',
+            type: 'trigger_only',
+            preAction: 'renderPostBattleMenu'
+        }
     ],
     commercial_district_tour: [
         { id: 'commercial_explained', targetId: '#main-view', position: 'top', content: "Right, the market. That's the General Store, the Blacksmith's forge, and that shady alley... that's the Black Market. Go back to the Town Square when you're done looking.", trigger: { type: 'click', targetId: 'button[onclick*="renderTownSquare"]', setFlag: 'commercial_visited' } }
@@ -123,6 +140,7 @@ const LIBRARY_BOOKS = {
     'cocytus_guidebook': {
         title: "A New Adventurer's Guide to Cocytus",
         author: "Captain Org",
+        isDynamic: false,
         chapters: [
             { 
                 title: "On Your Stats", 
@@ -178,6 +196,57 @@ const LIBRARY_BOOKS = {
                         <li><strong>Flee:</strong> To run away like a coward.</li>
                     </ul>
                 `
+            }
+        ]
+    },
+    'nathalies_cookbook': {
+        isDynamic: true,
+        recipeType: 'cooking',
+        title: "Nathalie's Home Cook Guide",
+        author: "Nathalie Mahesvara",
+        chapters: [
+            {
+                title: "Introduction",
+                content: `<p>A collection of recipes gathered from across the land. The pages are filled with notes and stains, a testament to many meals cooked and enjoyed.</p>`
+            }
+        ]
+    },
+    'alchemy_beginner': {
+        isDynamic: true,
+        recipeType: 'alchemy',
+        tier: 1,
+        title: "Foundational Formulations, Vol. I",
+        author: "Kiky Dionysson",
+        chapters: [
+            {
+                title: "Foreword",
+                content: `<p>A comprehensive treatise on the fundamental principles of alchemical synthesis for novice practitioners. Authored by Kiky Dionysson, this volume details precise methodologies for the creation of various Tier 1 concoctions. Adherence to procedure is paramount for reproducible results.</p>`
+            }
+        ]
+    },
+    'alchemy_intermediate': {
+        isDynamic: true,
+        recipeType: 'alchemy',
+        tier: 2,
+        title: "Foundational Formulations, Vol. II",
+        author: "Kiky Dionysson",
+        chapters: [
+             {
+                title: "Foreword",
+                content: `<p>More complex concoctions for the aspiring alchemist. These require rarer reagents and a steady hand.</p>`
+            }
+        ]
+    },
+    'alchemy_advanced': {
+        isDynamic: true,
+        recipeType: 'alchemy',
+        tier: 3,
+        title: "Foundational Formulations, Vol. III",
+        author: "Kiky Dionysson",
+        chapters: [
+             {
+                title: "Foreword",
+                content: `<p>Masterwork formulas for powerful and volatile potions. Do not attempt without significant experience.</p>`
             }
         ]
     }

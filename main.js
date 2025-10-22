@@ -5,6 +5,7 @@ let gameState = { currentView: 'main_menu', isPlayerTurn: true, currentBiome: nu
 let lastViewBeforeInventory = 'main_menu';
 let isDebugVisible = false;
 let realTimeInterval = null; 
+let gardenInterval = null;
 let isTutorialEnabled = true;
 
 // Firebase variables
@@ -14,6 +15,7 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 let initialAuthCheckCompleted = false; 
 
 // --- INITIALIZATION ---
+// Fallback config for local development if not provided by the environment
 const fallbackFirebaseConfig = {
     apiKey: "AIzaSyD4exnjoWEpKGkrGeiRe4A8dvX74-tjdyk",
     authDomain: "epic-rpg-adventure.firebaseapp.com",
@@ -28,20 +30,12 @@ async function initFirebase() {
     if (firebaseInitialized) return;
 
     try {
-        let firebaseConfig;
-        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-            firebaseConfig = JSON.parse(__firebase_config);
-        } else {
-            console.warn("Using fallback Firebase config. This is intended for local development.");
-            firebaseConfig = fallbackFirebaseConfig;
-        }
+        const firebaseConfig = (typeof __firebase_config !== 'undefined' && __firebase_config)
+            ? JSON.parse(__firebase_config)
+            : fallbackFirebaseConfig;
         
-        if (!firebase.apps.length) {
-            app = firebase.initializeApp(firebaseConfig);
-        } else {
-            app = firebase.app();
-        }
-
+        // Updated to modern Firebase v9+ syntax
+        app = firebase.initializeApp(firebaseConfig);
         auth = firebase.auth();
         db = firebase.firestore();
         firebaseInitialized = true;
@@ -50,30 +44,15 @@ async function initFirebase() {
         document.body.classList.add('logged-out'); 
 
         auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                userId = user.uid;
-                console.log("User is signed in with UID:", userId);
-                
-                document.body.classList.remove('logged-out');
-                document.body.classList.add('logged-in');
+            userId = user ? user.uid : null;
+            console.log(user ? `User is signed in with UID: ${userId}` : "User is signed out.");
+            
+            document.body.classList.toggle('logged-in', !!user);
+            document.body.classList.toggle('logged-out', !user);
 
-                if (!user.isAnonymous) {
-                    $('#user-display').textContent = `Welcome, ${user.displayName}!`;
-                } else {
-                     $('#user-display').textContent = `Playing as Guest`;
-                }
-
-                await updateLoadGameButtonVisibility();
-            } else {
-                userId = null;
-                console.log("User is signed out.");
-                
-                document.body.classList.remove('logged-in');
-                document.body.classList.add('logged-out');
-                
-                $('#user-display').textContent = '';
-                await updateLoadGameButtonVisibility();
-            }
+            $('#user-display').textContent = user ? (user.isAnonymous ? 'Playing as Guest' : `Welcome, ${user.displayName}!`) : '';
+            
+            await updateLoadGameButtonVisibility();
 
             if (!initialAuthCheckCompleted) {
                 initialAuthCheckCompleted = true;
@@ -87,18 +66,19 @@ async function initFirebase() {
     }
 }
 
-async function signInWithGoogle() {
+
+async function signInWithProvider(provider) {
     if (!auth) return;
-    const provider = new firebase.auth.GoogleAuthProvider();
     try {
         await auth.signInWithPopup(provider);
     } catch (error) {
-        console.error("Google Sign-In failed:", error);
-        addToLog("Google Sign-In failed. Please try again.", "text-red-400");
+        console.error(`${provider.providerId} Sign-In failed:`, error);
+        addToLog("Sign-In failed. Please try again.", "text-red-400");
     }
 }
 
-async function signInAnonymously() {
+const signInWithGoogle = () => signInWithProvider(new firebase.auth.GoogleAuthProvider());
+const signInAnonymously = async () => {
     if (!auth) return;
     try {
         await auth.signInAnonymously();
@@ -106,8 +86,7 @@ async function signInAnonymously() {
         console.error("Anonymous Sign-In failed:", error);
         addToLog("Could not start a guest session.", "text-red-400");
     }
-}
-
+};
 
 async function signOutUser() {
     if (!auth) return;
@@ -119,67 +98,55 @@ async function signOutUser() {
     }
 }
 
-async function handleRouteChange() {
+function handleRouteChange() {
     const route = window.location.hash || '#menu';
     const activeSaveKey = sessionStorage.getItem('activeSaveKey');
 
-    if (route === '#game') {
-        if (activeSaveKey) {
-            if (player && document.body.classList.contains('in-game')) {
-                return; 
-            }
-            await loadGameFromKey(activeSaveKey);
-        } else {
-            window.location.hash = 'menu';
+    if (route === '#game' && activeSaveKey) {
+        if (!player || !document.body.classList.contains('in-game')) {
+            loadGameFromKey(activeSaveKey);
         }
-    } else { 
+    } else {
         showStartScreen();
     }
 }
 
-
 async function initGame(playerName, gender, raceKey, classKey, backgroundKey, difficulty) { 
-    player = new Player(playerName, raceKey); 
-    player.gender = gender;
-    player.class = CLASSES[classKey].name;
-    player.background = BACKGROUNDS[backgroundKey].name;
-    player.backgroundKey = backgroundKey;
-    player.difficulty = difficulty; 
-    player.totalXp = 0; 
+    player = new Player(playerName, raceKey);
+    Object.assign(player, {
+        gender,
+        class: CLASSES[classKey].name,
+        background: BACKGROUNDS[backgroundKey].name,
+        backgroundKey,
+        difficulty,
+        totalXp: 0,
+        inventory: { items: {}, weapons: [], catalysts: [], armor: [], shields: [], lures: {} },
+        spells: {},
+        dialogueFlags: {},
+        knownCookingRecipes: [],
+        knownAlchemyRecipes: [],
+        seed: Math.floor(Math.random() * 1000000)
+    });
 
     const classData = CLASSES[classKey];
-    
     for (const stat in classData.bonusStats) {
-        let statLower = stat.toLowerCase();
+        const statLower = stat.toLowerCase();
         if (player.hasOwnProperty(statLower)) {
             player[statLower] += classData.bonusStats[stat];
         }
     }
     
-    player.inventory = { items: {}, weapons: [], catalysts: [], armor: [], shields: [], lures: {} }; 
-    
     for (const itemKey in classData.startingItems) {
         player.addToInventory(itemKey, classData.startingItems[itemKey], false);
     }
     
-    if (classData.startingEquipment.weapon) {
-        player.addToInventory(classData.startingEquipment.weapon, 1, false);
-        equipItem(classData.startingEquipment.weapon);
-    }
-    if (classData.startingEquipment.catalyst) {
-        player.addToInventory(classData.startingEquipment.catalyst, 1, false);
-        equipItem(classData.startingEquipment.catalyst);
-    }
-    if (classData.startingEquipment.armor) {
-        player.addToInventory(classData.startingEquipment.armor, 1, false);
-        equipItem(classData.startingEquipment.armor);
-    }
-    if (classData.startingEquipment.shield) {
-        player.addToInventory(classData.startingEquipment.shield, 1, false);
-        equipItem(classData.startingEquipment.shield);
-    }
+    Object.values(classData.startingEquipment).forEach(itemKey => {
+        if(itemKey) {
+            player.addToInventory(itemKey, 1, false);
+            equipItem(itemKey);
+        }
+    });
 
-    player.spells = {}; 
     for (const spellKey in classData.startingSpells) {
         player.spells[spellKey] = { tier: classData.startingSpells[spellKey] };
     }
@@ -210,16 +177,13 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey, di
 
     player.hp = player.maxHp;
     player.mp = player.maxMp;
-    player.baseStats = { Vigor: player.vigor, Focus: player.focus, Stamina: player.stamina, Strength: player.strength, Intelligence: player.intelligence, Luck: player.luck };
-    player.dialogueFlags = {};
-
-
-    player.seed = Math.floor(Math.random() * 1000000);
+    
     gameState.playerIsDying = false; 
     generateRandomizedBiomeOrder();
     generateBlackMarketStock();
     updatePlayerTier();
     
+    sessionStorage.setItem('isNewGame', 'true');
     await saveGame(); 
 
     const saveKey = player.firestoreId || 'local';
@@ -233,33 +197,22 @@ function generateRandomizedBiomeOrder() {
     const biomesByTier = {};
     for (const biomeKey in BIOMES) {
         const biome = BIOMES[biomeKey];
-        if (!biomesByTier[biome.tier]) {
-            biomesByTier[biome.tier] = [];
-        }
-        biomesByTier[biome.tier].push(biomeKey);
+        (biomesByTier[biome.tier] = biomesByTier[biome.tier] || []).push(biomeKey);
     }
 
     player.biomeOrder = [];
-    const sortedTiers = Object.keys(biomesByTier).sort((a, b) => a - b);
-    for (const tier of sortedTiers) {
-        const shuffledBiomesInTier = shuffleArray(biomesByTier[tier], rng);
-        player.biomeOrder.push(...shuffledBiomesInTier);
-    }
-
+    Object.keys(biomesByTier).sort((a, b) => a - b).forEach(tier => {
+        player.biomeOrder.push(...shuffleArray(biomesByTier[tier], rng));
+    });
+    
     player.biomeUnlockLevels = {};
-    let currentLvl = 1;
-    let increment = 3;
-    let step = 0;
+    let currentLvl = 1, increment = 3, step = 0;
     player.biomeOrder.forEach(biomeKey => {
         player.biomeUnlockLevels[biomeKey] = currentLvl;
         currentLvl += increment;
         step++;
-        if (step === 2) {
-            increment = 4;
-        } else if (step === 3) {
-            increment = 3;
-            step = 0;
-        }
+        if (step === 2) increment = 4;
+        else if (step === 3) { increment = 3; step = 0; }
     });
 }
 
@@ -267,35 +220,25 @@ function updatePlayerTier() {
     if (!player) return;
     let maxTier = 0;
     player.biomeOrder.forEach(biomeKey => {
-        const biome = BIOMES[biomeKey];
         if (player.level >= player.biomeUnlockLevels[biomeKey]) {
-            maxTier = Math.max(maxTier, biome.tier);
+            maxTier = Math.max(maxTier, BIOMES[biomeKey].tier);
         }
     });
     player.playerTier = maxTier || 1;
 }
 
 function updateRealTimePalette() {
-    if (document.body.classList.contains('in-game')) {
-        if (gameState.currentView === 'battle') {
-            return;
-        }
-        const hour = new Date().getHours();
-        let theme = 'noon';
-        if (hour >= 18 || hour < 5) {
-            theme = 'midnight';
-        } else if (hour >= 16) {
-            theme = 'sunset';
-        }
-        applyTheme(theme);
-    } else {
+    if (!document.body.classList.contains('in-game') || gameState.currentView === 'battle') {
         applyTheme('default');
+        return;
     }
+    const hour = new Date().getHours();
+    let theme = (hour >= 18 || hour < 5) ? 'midnight' : (hour >= 16 ? 'sunset' : 'noon');
+    applyTheme(theme);
 }
 
 function setDifficulty(newDifficulty) {
     if (!player || player.difficulty === newDifficulty) return;
-
     player.difficulty = newDifficulty;
     addToLog(`Difficulty changed to <span class="font-bold">${capitalize(newDifficulty)}</span>.`, 'text-yellow-400');
     saveGame();
@@ -303,18 +246,14 @@ function setDifficulty(newDifficulty) {
     renderSettingsMenu();
 }
 
-
-// --- SAVE & LOAD ---
 async function saveGame(manual = false) { 
     if (!player) return; 
     const saveData = JSON.parse(JSON.stringify(player));
     
-    if (!auth || !auth.currentUser || auth.currentUser.isAnonymous) {
+    if (!auth?.currentUser || auth.currentUser.isAnonymous) {
         try {
             localStorage.setItem('rpgSaveData_local', JSON.stringify(saveData));
-            if (manual) {
-                addToLog('Game Saved Locally!', 'text-green-400 font-bold');
-            }
+            if (manual) addToLog('Game Saved Locally!', 'text-green-400 font-bold');
         } catch (error) {
             console.error("Could not save game to localStorage:", error); 
             addToLog('Error: Could not save game locally.', 'text-red-400');
@@ -323,21 +262,14 @@ async function saveGame(manual = false) {
     }
 
     try {
-        saveData.userEmail = auth.currentUser.email;
-        saveData.userDisplayName = auth.currentUser.displayName;
-
         const charactersCollection = db.collection(`artifacts/${appId}/users/${userId}/characters`);
-
         if (player.firestoreId) {
             await charactersCollection.doc(player.firestoreId).set(saveData, { merge: true });
         } else {
             const docRef = await charactersCollection.add(saveData);
             player.firestoreId = docRef.id;
         }
-
-        if (manual) { 
-            addToLog('Game Saved to Cloud!', 'text-green-400 font-bold'); 
-        } 
+        if (manual) addToLog('Game Saved to Cloud!', 'text-green-400 font-bold'); 
     } catch (error) { 
         console.error("Could not save game to Firestore:", error); 
         addToLog('Error: Could not save game to cloud.', 'text-red-400');
@@ -348,51 +280,34 @@ async function renderLoadMenu() {
     let html = `<div class="w-full text-center">
         <h2 class="font-medieval text-3xl mb-4 text-center">Load Character</h2>
         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`;
-
     let hasSaves = false;
+
+    const createSaveHTML = (charData, key, isGuest) => `
+        <div class="p-3 bg-slate-800 ${isGuest ? 'border-l-4 border-yellow-400' : ''} rounded-lg flex justify-between items-center">
+            <div>
+                <p class="font-bold text-yellow-300">${charData.name} ${isGuest ? '<span class="text-sm font-normal text-gray-400">(Guest)</span>' : ''}</p>
+                <p class="text-sm text-gray-400">Level ${charData.level} ${charData.race || ''} ${charData.class || ''}</p>
+            </div>
+            <div>
+                <button onclick="sessionStorage.setItem('activeSaveKey', '${key}'); window.location.hash = 'game';" class="btn btn-primary text-sm py-1 px-3">Load</button>
+                <button onclick="deleteSave('${key}')" class="btn btn-action text-sm py-1 px-3 ml-2">Delete</button>
+            </div>
+        </div>`;
 
     const localSaveDataString = localStorage.getItem('rpgSaveData_local');
     if (localSaveDataString) {
         try {
-            const charData = JSON.parse(localSaveDataString);
             hasSaves = true;
-            html += `
-                <div class="p-3 bg-slate-800 border-l-4 border-yellow-400 rounded-lg flex justify-between items-center">
-                    <div>
-                        <p class="font-bold text-yellow-300">${charData.name} <span class="text-sm font-normal text-gray-400">(Guest)</span></p>
-                        <p class="text-sm text-gray-400">Level ${charData.level} ${charData.race || ''} ${charData.class || ''}</p>
-                    </div>
-                    <div>
-                        <button onclick="sessionStorage.setItem('activeSaveKey', 'local'); window.location.hash = 'game';" class="btn btn-primary text-sm py-1 px-3">Load</button>
-                        <button onclick="deleteSave('local')" class="btn btn-action text-sm py-1 px-3 ml-2">Delete</button>
-                    </div>
-                </div>`;
-        } catch (e) {
-            console.error("Error parsing local save:", e);
-        }
+            html += createSaveHTML(JSON.parse(localSaveDataString), 'local', true);
+        } catch (e) { console.error("Error parsing local save:", e); }
     }
 
     if (db && userId) {
         try {
-            const charactersCollection = db.collection(`artifacts/${appId}/users/${userId}/characters`);
-            const querySnapshot = await charactersCollection.get();
-
+            const querySnapshot = await db.collection(`artifacts/${appId}/users/${userId}/characters`).get();
             if (!querySnapshot.empty) {
                 hasSaves = true;
-                querySnapshot.forEach(doc => {
-                    const charData = doc.data();
-                    html += `
-                        <div class="p-3 bg-slate-800 rounded-lg flex justify-between items-center">
-                            <div>
-                                <p class="font-bold text-yellow-300">${charData.name}</p>
-                                <p class="text-sm text-gray-400">Level ${charData.level} ${charData.race || ''} ${charData.class || ''}</p>
-                            </div>
-                            <div>
-                                <button onclick="sessionStorage.setItem('activeSaveKey', '${doc.id}'); window.location.hash = 'game';" class="btn btn-primary text-sm py-1 px-3">Load</button>
-                                <button onclick="deleteSave('${doc.id}')" class="btn btn-action text-sm py-1 px-3 ml-2">Delete</button>
-                            </div>
-                        </div>`;
-                });
+                querySnapshot.forEach(doc => html += createSaveHTML(doc.data(), doc.id, false));
             }
         } catch (error) {
             console.error("Error loading characters:", error);
@@ -400,15 +315,9 @@ async function renderLoadMenu() {
         }
     }
     
-    if (!hasSaves) {
-        html += `<p class="text-gray-400">No saved games found.</p>`;
-    }
+    if (!hasSaves) html += `<p class="text-gray-400">No saved games found.</p>`;
 
-    html += `</div>
-        <div class="text-center mt-4">
-            <button onclick="showStartScreen()" class="btn btn-primary">Back</button>
-        </div>
-    </div>`;
+    html += `</div><div class="text-center mt-4"><button onclick="showStartScreen()" class="btn btn-primary">Back</button></div></div>`;
     
     $('#start-screen').classList.add('hidden');
     const screenContainer = $('#changelog-screen');
@@ -420,69 +329,52 @@ async function deleteSave(docId) {
      if (docId === 'local') {
          localStorage.removeItem('rpgSaveData_local');
          addToLog("Guest save file deleted.", "text-yellow-400");
-         await renderLoadMenu();
-         await updateLoadGameButtonVisibility();
-         return;
+     } else if (db && userId) {
+         try {
+             await db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId).delete();
+             addToLog("Cloud save file deleted.", "text-yellow-400");
+     } catch (error) { console.error("Error deleting save:", error); }
      }
-     if (!db || !userId) return;
-     try {
-         await db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId).delete();
-         addToLog("Cloud save file deleted.", "text-yellow-400");
-         await renderLoadMenu();
-         await updateLoadGameButtonVisibility();
-     } catch (error) {
-         console.error("Error deleting save:", error);
-     }
+     await renderLoadMenu();
+     await updateLoadGameButtonVisibility();
 }
 
 async function loadGameFromKey(docId, isImport = false) {
     let parsedData;
-
-    if (docId === 'local') {
-        const localSaveDataString = localStorage.getItem('rpgSaveData_local');
-        if (localSaveDataString) {
-            try {
-                parsedData = JSON.parse(localSaveDataString);
-            } catch (e) {
-                alert("Local save file is corrupted!");
-                window.location.hash = 'menu';
-                return;
-            }
+    try {
+        if (docId === 'local') {
+            const localSave = localStorage.getItem('rpgSaveData_local');
+            if (!localSave) throw new Error("Local save file not found!");
+            parsedData = JSON.parse(localSave);
         } else {
-            alert("Local save file not found!");
-            window.location.hash = 'menu';
-            return;
+            if (!db || !userId) return;
+            const docSnap = await db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId).get();
+            if (!docSnap.exists) throw new Error("Save file not found in the cloud!");
+            parsedData = docSnap.data();
         }
-    } 
-    else {
-        if (!db || !userId) return;
-        const docRef = db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId);
-        try {
-            const docSnap = await docRef.get();
-            if (docSnap.exists) {
-                parsedData = docSnap.data();
-            } else {
-                alert("Save file not found in the cloud!");
-                window.location.hash = 'menu';
-                return;
-            }
-        } catch (error) {
-            console.error("Could not load game from cloud:", error);
-            return;
-        }
+    } catch (e) {
+        alert(e.message);
+        window.location.hash = 'menu';
+        return;
     }
     
-    if(parsedData) {
+    if (parsedData) {
         player = new Player("Loading...", "Human");
         Object.assign(player, parsedData);
-        if(docId !== 'local') {
-            player.firestoreId = docId;
-        }
+        if(docId !== 'local') player.firestoreId = docId;
         
-        if (!player.difficulty) {
-            player.difficulty = 'hardcore';
-        }
+        // --- DATA MIGRATION & DEFAULTS ---
+        if (!player.house) player.house = { owned: false, storage: {}, garden: [] };
+        ['storageTier', 'gardenTier', 'kitchenTier', 'alchemyTier', 'trainingTier'].forEach(tier => {
+            if (player.house[tier] === undefined) player.house[tier] = 0;
+        });
+        if (!Array.isArray(player.house.garden)) player.house.garden = [];
+        if (!player.difficulty) player.difficulty = 'hardcore';
+        if (!player.knownCookingRecipes) player.knownCookingRecipes = [];
+        if (!player.knownAlchemyRecipes) player.knownAlchemyRecipes = [];
+        if (!player.seed) player.seed = Math.floor(Math.random() * 1000000);
 
+        // --- CHARACTER COMPLETION CHECKS ---
         if (!player.race) {
             renderRaceSelectionForOldSave(player, player.firestoreId || 'local', isImport);
             return;
@@ -491,37 +383,46 @@ async function loadGameFromKey(docId, isImport = false) {
             renderClassBackgroundSelectionForOldSave(player, player.firestoreId || 'local', isImport);
             return;
         }
+
+        // --- STAT RECALCULATION ---
         if (player.totalXp === undefined) {
             let estimatedTotalXp = 0;
-            for (let i = 1; i < player.level; i++) {
-                estimatedTotalXp += Math.floor(100 * Math.pow(i, 1.5));
-            }
-            estimatedTotalXp += player.xp;
-            player.totalXp = estimatedTotalXp;
+            for (let i = 1; i < player.level; i++) estimatedTotalXp += Math.floor(100 * Math.pow(i, 1.5));
+            player.totalXp = estimatedTotalXp + player.xp;
         }
         player.recalculateLevelFromTotalXp();
         player.recalculateGrowthBonuses();
         player.hp = Math.min(parsedData.hp, player.maxHp);
         player.mp = Math.min(parsedData.mp, player.maxMp);
-        const weaponKey = findKeyByName(parsedData.equippedWeapon?.name, WEAPONS) || 'fists';
-        player.equippedWeapon = WEAPONS[weaponKey];
-        const catalystKey = findKeyByName(parsedData.equippedCatalyst?.name, CATALYSTS) || 'no_catalyst';
-        player.equippedCatalyst = CATALYSTS[catalystKey];
-        const armorKey = findKeyByName(parsedData.equippedArmor?.name, ARMOR) || 'travelers_garb';
-        player.equippedArmor = ARMOR[armorKey];
-        const shieldKey = findKeyByName(parsedData.equippedShield?.name, SHIELDS) || 'no_shield';
-        player.equippedShield = SHIELDS[shieldKey];
+
+        // --- EQUIPMENT RE-ASSIGNMENT ---
+        player.equippedWeapon = WEAPONS[findKeyByName(parsedData.equippedWeapon?.name, WEAPONS)] || WEAPONS['fists'];
+        player.equippedCatalyst = CATALYSTS[findKeyByName(parsedData.equippedCatalyst?.name, CATALYSTS)] || CATALYSTS['no_catalyst'];
+        player.equippedArmor = ARMOR[findKeyByName(parsedData.equippedArmor?.name, ARMOR)] || ARMOR['travelers_garb'];
+        player.equippedShield = SHIELDS[findKeyByName(parsedData.equippedShield?.name, SHIELDS)] || SHIELDS['no_shield'];
 
         document.body.classList.add('in-game');
-
-        addToLog(`Welcome back, ${player.name}!`);
-        updateRealTimePalette();
-        updateStatsView();
-        if (player.statPoints > 0) {
-            setTimeout(() => renderCharacterSheet(true), 1500);
+        
+        const isNewGame = sessionStorage.getItem('isNewGame') === 'true';
+        if (isNewGame) {
+            addToLog(`Welcome to Cocytus, ${player.name}!`);
+            sessionStorage.removeItem('isNewGame'); // Clear the flag
         } else {
-            renderTownSquare();
+            addToLog(`Welcome back, ${player.name}!`);
         }
+        
+        requestAnimationFrame(() => {
+            updateRealTimePalette();
+            updateStatsView();
+
+            if (isNewGame && isTutorialEnabled) {
+                setTimeout(() => startTutorialSequence('main_game_screen'), 500);
+            } else if (player.statPoints > 0) {
+                setTimeout(() => renderCharacterSheet(true), 1500);
+            } else {
+                renderTownSquare();
+            }
+        });
     }
 }
 
@@ -529,7 +430,7 @@ async function exportSave() {
     if (!player) return;
     try {
         const saveDataString = JSON.stringify(player);
-        const base64Save = btoa(saveDataString);
+        const base64Save = btoa(unescape(encodeURIComponent(saveDataString)));
         await navigator.clipboard.writeText(base64Save);
         addToLog('Save data copied to clipboard!', 'text-green-400');
     } catch (error) {
@@ -540,16 +441,12 @@ async function exportSave() {
 
 async function importSave(saveString) {
     try {
-        const jsonString = atob(saveString);
+        const jsonString = decodeURIComponent(escape(atob(saveString)));
         const parsedData = JSON.parse(jsonString);
-
-        if (!parsedData || !parsedData.name) {
-            throw new Error("Invalid save data format.");
-        }
+        if (!parsedData?.name) throw new Error("Invalid save data format.");
         
         delete parsedData.firestoreId;
-        
-        player = new Player(parsedData.name || "Imported Hero", parsedData.race || "Human");
+        player = new Player(parsedData.name, parsedData.race || "Human");
         Object.assign(player, parsedData);
 
         await saveGame();
@@ -558,21 +455,15 @@ async function importSave(saveString) {
         const saveKey = player.firestoreId || 'local';
         sessionStorage.setItem('activeSaveKey', saveKey);
         window.location.hash = 'game';
-
     } catch (error) {
         console.error("Could not import save:", error);
         alert("Failed to import save. The key might be invalid or corrupted.");
     }
 }
 
-
-// --- START SCREEN & UI HELPERS ---
 function showStartScreen() {
     document.body.classList.remove('in-game');
-    $('#changelog-screen').classList.add('hidden');
-    $('#character-creation-screen').classList.add('hidden');
-    $('#old-save-race-selection-screen').classList.add('hidden');
-    $('#old-save-class-background-screen').classList.add('hidden'); 
+    ['#changelog-screen', '#character-creation-screen', '#old-save-race-selection-screen', '#old-save-class-background-screen'].forEach(s => $(s).classList.add('hidden'));
     $('#start-screen').classList.remove('hidden');
     
     logElement.innerHTML = '';
@@ -580,7 +471,8 @@ function showStartScreen() {
     sessionStorage.removeItem('activeSaveKey');
     updateLoadGameButtonVisibility();
     if(realTimeInterval) clearInterval(realTimeInterval);
-    realTimeInterval = null;
+    if(gardenInterval) clearInterval(gardenInterval);
+    realTimeInterval = gardenInterval = null;
     applyTheme('default');
 }
 
@@ -588,7 +480,7 @@ async function updateLoadGameButtonVisibility() {
     const localSaveExists = !!localStorage.getItem('rpgSaveData_local');
     const loadGameBtn = $('#load-game-btn');
     const graveyardBtn = $('#graveyard-btn');
-    graveyardBtn.classList.toggle('hidden', true); 
+    graveyardBtn.classList.add('hidden'); 
 
     if (!db || !userId) {
         loadGameBtn.classList.toggle('hidden', !localSaveExists);
@@ -597,82 +489,97 @@ async function updateLoadGameButtonVisibility() {
     
     try {
         const charactersSnapshot = await db.collection(`artifacts/${appId}/users/${userId}/characters`).limit(1).get();
-        const showLoadBtn = !charactersSnapshot.empty || localSaveExists;
-        loadGameBtn.classList.toggle('hidden', !showLoadBtn);
+        loadGameBtn.classList.toggle('hidden', charactersSnapshot.empty && !localSaveExists);
 
         const graveyardSnapshot = await db.collection(`artifacts/${appId}/public/data/graveyard`).limit(1).get();
-        if(!graveyardSnapshot.empty) graveyardBtn.classList.toggle('hidden', false);
-    } catch (error) { // MODIFICATION: Corrected the nested try block
+        graveyardBtn.classList.toggle('hidden', graveyardSnapshot.empty);
+    } catch (error) {
         console.error("Could not check for saved games:", error);
         loadGameBtn.classList.toggle('hidden', !localSaveExists);
     }
 }
 
+// Event delegation for the start screen
+function handleStartScreenClicks(event) {
+    const target = event.target.closest('button');
+    if (!target) return;
 
-// --- EVENT LISTENERS ---
-window.addEventListener('load', async () => { 
-    // MODIFICATION: Initialize UI elements only after the page is fully loaded.
-    initUIElements();
-    await initFirebase();
-    
-    if (!realTimeInterval) {
-        realTimeInterval = setInterval(updateRealTimePalette, 60000); 
-    }
-    
-    window.addEventListener('hashchange', handleRouteChange);
-
-    $('#start-game-btn').addEventListener('click', renderCharacterCreation);
-    $('#google-signin-btn').addEventListener('click', signInWithGoogle);
-    $('#anonymous-signin-btn').addEventListener('click', signInAnonymously);
-    $('#sign-out-btn').addEventListener('click', signOutUser);
-
-    $('#import-save-btn').addEventListener('click', () => {
+    const id = target.id;
+    if (id === 'google-signin-btn') signInWithGoogle();
+    else if (id === 'anonymous-signin-btn') signInAnonymously();
+    else if (id === 'start-game-btn') renderCharacterCreation();
+    else if (id === 'load-game-btn') renderLoadMenu();
+    else if (id === 'sign-out-btn') signOutUser();
+    else if (id === 'import-save-btn') {
         const saveString = $('#import-save-input').value.trim();
-        if (saveString) {
-            importSave(saveString);
-        }
-    });
-
-    $('#load-game-btn').addEventListener('click', renderLoadMenu); 
-    $('#graveyard-btn').addEventListener('click', renderGraveyard); 
-    $('#changelog-btn').addEventListener('click', renderChangelog);
-
-    const tutorialToggle = $('#tutorial-toggle');
-    const savedTutorialPref = localStorage.getItem('rpgTutorialEnabled');
-    if (savedTutorialPref !== null) {
-        isTutorialEnabled = savedTutorialPref === 'true';
-        tutorialToggle.checked = isTutorialEnabled;
+        if (saveString) importSave(saveString);
     }
+    else if (id === 'graveyard-btn') renderGraveyard();
+    else if (id === 'changelog-btn') renderChangelog();
+}
+
+
+function setupEventListeners() {
+    $('#start-screen').addEventListener('click', handleStartScreenClicks);
+    
+    const tutorialToggle = $('#tutorial-toggle');
     tutorialToggle.addEventListener('change', () => {
         isTutorialEnabled = tutorialToggle.checked;
         localStorage.setItem('rpgTutorialEnabled', isTutorialEnabled);
     });
 
-    const keysPressed = new Set();
+    // --- Konami Code & Mobile Debug ---
+    const konamiCode = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright'];
+    let keySequence = [];
     document.addEventListener('keydown', (e) => {
-        if (e.key) {
-            keysPressed.add(e.key.toLowerCase());
-        }
-        if (keysPressed.has('d') && keysPressed.has('`')) {
+        if (!e.key) return;
+        keySequence.push(e.key.toLowerCase());
+        keySequence.splice(0, keySequence.length - konamiCode.length);
+        if (keySequence.join('') === konamiCode.join('')) {
             e.preventDefault();
             toggleDebug();
+            keySequence = [];
+            addToLog("Developer access granted.", "text-purple-400");
         }
     });
-
-    document.addEventListener('keyup', (e) => {
-        if (e.key) {
-            keysPressed.delete(e.key.toLowerCase());
-        }
-    });
-
-    // Mobile debug toggle: three-finger tap
+    
+    const mobileCode = ['tl', 'tr', 'bl', 'br'];
+    let touchSequence = [];
+    const cornerSize = 100;
     document.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 3) {
-            e.preventDefault();
-            toggleDebug();
-        }
-    });
+        if (e.touches.length !== 1) { touchSequence = []; return; }
+        const { clientX: x, clientY: y } = e.touches[0];
+        const { innerWidth: w, innerHeight: h } = window;
+        let corner = '';
+        if (y < cornerSize) corner = x < cornerSize ? 'tl' : (x > w - cornerSize ? 'tr' : '');
+        else if (y > h - cornerSize) corner = x < cornerSize ? 'bl' : (x > w - cornerSize ? 'br' : '');
+        if (corner) {
+            touchSequence.push(corner);
+            touchSequence.splice(0, touchSequence.length - mobileCode.length);
+            if (touchSequence.join(',') === mobileCode.join(',')) {
+                e.preventDefault();
+                toggleDebug();
+                touchSequence = [];
+                addToLog("Developer access granted (Mobile).", "text-purple-400");
+            }
+        } else { touchSequence = []; }
+    }, { passive: false });
+}
 
-    await updateLoadGameButtonVisibility();
+
+window.addEventListener('load', async () => { 
+    initUIElements();
+    await initFirebase();
+    
+    if (!realTimeInterval) realTimeInterval = setInterval(updateRealTimePalette, 60000); 
+    if (!gardenInterval) gardenInterval = setInterval(updateGarden, 1000);
+    
+    window.addEventListener('hashchange', handleRouteChange);
+    
+    const savedTutorialPref = localStorage.getItem('rpgTutorialEnabled');
+    isTutorialEnabled = savedTutorialPref !== 'false';
+    $('#tutorial-toggle').checked = isTutorialEnabled;
+
+    setupEventListeners();
 });
 

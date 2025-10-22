@@ -8,25 +8,61 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=MedievalSharp&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     
-    <!-- Game Scripts -->
-    <script src="game_data.js" defer></script>
-    <script src="dialogue.js" defer></script>
-    <script src="engine.js" defer></script>
-    <script src="battle.js" defer></script>
-    <script src="ui_helpers.js" defer></script>
-    <!-- MODIFICATION: Moved rendering.js before main.js -->
-    <script src="rendering.js" defer></script>
-    <script src="main.js" defer></script>
+    <!-- Firebase SDKs (Updated to v9 Compat libraries for better performance) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    
+    <!-- Vercel Analytics (hosting-specific) -->
+    <script>
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script src="/_vercel/insights/script.js"></script>
+    
     <style>
+        /* --- Root Variables & Themes --- */
+        :root {
+            --bg-main: #1f2937;
+            --bg-secondary: #111827;
+            --bg-log: rgba(0, 0, 0, 0.3);
+            --bg-tooltip: #111827;
+            --border-main: #374151;
+            --text-main: #d1d5db;
+            --text-accent: #fcd34d;
+            --btn-primary-bg: #475569;
+            --btn-primary-bg-hover: #64748b;
+            --btn-primary-border: #1e293b;
+            --btn-primary-border-hover: #334155;
+            --btn-action-bg: #dc2626;
+            --btn-action-bg-hover: #ef4444;
+            --btn-action-border: #991b1b;
+            --btn-action-border-hover: #b91c1c;
+            --btn-magic-bg: #9333ea;
+            --btn-magic-bg-hover: #a855f7;
+            --btn-magic-border: #6b21a8;
+            --btn-magic-border-hover: #7e22ce;
+            --btn-item-bg: #16a34a;
+            --btn-item-bg-hover: #22c55e;
+            --btn-item-border: #15803d;
+            --btn-item-border-hover: #16a34a;
+            --btn-flee-bg: #6b7280;
+            --btn-flee-bg-hover: #4b5563;
+            --btn-flee-border: '#374151';
+            --btn-flee-border-hover: '#1f2937';
+        }
+
         html {
-            font-size: 14px; /* Slightly increase base font size for readability */
+            font-size: 14px;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-secondary);
+            color: var(--text-main);
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* IE10+/Edge */
+            user-select: none; /* Standard */
         }
         /* Allow vertical scrolling on the body for smaller screens */
         @media (max-width: 768px) {
@@ -35,10 +71,140 @@
                 padding: 1rem 0;
             }
         }
+
+        /* --- Page Wrapper Visibility --- */
+        #menu-wrapper, #game-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            width: 100%;
+        }
+        #game-wrapper { display: none; }
+        body.in-game #menu-wrapper { display: none; }
+        body.in-game #game-wrapper { display: flex; }
+        
+        /* --- Authentication Visibility Rules --- */
+        body.logged-out #post-auth-section { display: none; }
+        body.logged-in #auth-buttons { display: none; }
+        #post-auth-section { display: none; }
+        body.logged-in #post-auth-section { display: block; }
+
+        /* --- Component Styling --- */
+        .font-medieval { font-family: 'MedievalSharp', cursive; }
+        #game-container { background-color: var(--bg-main); border-color: var(--border-main); }
+        #stats-view, .bg-slate-800 { background-color: var(--bg-secondary); }
+        #main-view { background-color: color-mix(in srgb, var(--bg-secondary) 50%, transparent); }
+        #game-log { background-color: var(--bg-log); color: var(--text-main); display: flex; flex-direction: column; }
+        #tooltip { background-color: var(--bg-tooltip); border-color: var(--border-main); }
+        #player-name, .text-yellow-300 { color: var(--text-accent); }
+        .text-gray-200 { color: var(--text-main); }
+
+        /* --- Scrollbar Styling --- */
+        .inventory-scrollbar::-webkit-scrollbar { width: 10px; }
+        .inventory-scrollbar::-webkit-scrollbar-track { background: #1a202c; border-radius: 5px; }
+        .inventory-scrollbar::-webkit-scrollbar-thumb { background-color: #a0aec0; border-radius: 5px; border: 2px solid #1a202c; }
+        .inventory-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #cbd5e0; }
+
+        /* --- Button Styling --- */
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            color: white;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-bottom-width: 4px;
+        }
+        .btn:disabled {
+            background-color: #6b7280;
+            border-color: #374151;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .btn-primary { background-color: var(--btn-primary-bg); border-color: var(--btn-primary-border); }
+        .btn-primary:hover:not(:disabled) { background-color: var(--btn-primary-bg-hover); border-color: var(--btn-primary-border-hover); }
+        #start-screen .btn-primary { background-color: transparent; border-color: transparent; box-shadow: none; }
+        #start-screen .btn-primary:hover:not(:disabled) { background-color: var(--bg-secondary); border-color: transparent; }
+        #start-screen .btn-primary:disabled { background-color: transparent; border-color: transparent; opacity: 0.5; }
+        .btn-action { background-color: var(--btn-action-bg); border-color: var(--btn-action-border); }
+        .btn-action:hover:not(:disabled) { background-color: var(--btn-action-bg-hover); border-color: var(--btn-action-border-hover); }
+        .btn-magic { background-color: var(--btn-magic-bg); border-color: var(--btn-magic-border); }
+        .btn-magic:hover:not(:disabled) { background-color: var(--btn-magic-bg-hover); border-color: var(--btn-magic-border-hover); }
+        .btn-item { background-color: var(--btn-item-bg); border-color: var(--btn-item-border); }
+        .btn-item:hover:not(:disabled) { background-color: var(--btn-item-bg-hover); border-color: var(--btn-item-border-hover); }
+        .btn-flee { background-color: var(--btn-flee-bg); border-color: var(--btn-flee-border); }
+        .btn-flee:hover:not(:disabled) { background-color: var(--btn-flee-bg-hover); border-color: var(--btn-flee-border-hover); }
+
+        /* --- Tooltip & Popups --- */
+        #tooltip { position: fixed; display: none; z-index: 100; pointer-events: none; transition: opacity 0.2s; }
+        @keyframes pulse-light {
+          0%, 100% { box-shadow: 0 0 10px 0px rgba(216, 180, 254, 0.5); }
+          50% { box-shadow: 0 0 20px 8px rgba(216, 180, 254, 0.1); }
+        }
+        #betty-encounter-popup { animation: pulse-light 2.5s infinite; }
+
+        /* --- Tutorial Arrows --- */
+        #tutorial-box::after { content: ''; position: absolute; width: 0; height: 0; border-style: solid; }
+        #tutorial-box.arrow-left::after { top: 50%; right: 100%; margin-top: -10px; border-width: 10px; border-color: transparent #fcd34d transparent transparent; }
+        #tutorial-box.arrow-right::after { top: 50%; left: 100%; margin-top: -10px; border-width: 10px; border-color: transparent transparent transparent #fcd34d; }
+        #tutorial-box.arrow-top::after { bottom: 100%; left: 50%; margin-left: -10px; border-width: 10px; border-color: transparent transparent #fcd34d transparent; }
+        #tutorial-box.arrow-bottom::after { top: 100%; left: 50%; margin-left: -10px; border-width: 10px; border-color: #fcd34d transparent transparent transparent; }
+        
+        /* --- Battle Grid --- */
+        .grid-cell { border: 1px solid #4a5568; background-color: #2d3748; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; color: white; cursor: pointer; transition: background-color 0.2s; position: relative; font-size: 1.5rem; line-height: 1; }
+        .enemy-hp-bar-bg { position: absolute; bottom: 4px; left: 10%; width: 80%; height: 5px; background-color: rgba(0,0,0,0.7); border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.2); }
+        .enemy-hp-bar { height: 100%; background-color: #ef4444; border-radius: 2px; transition: width 0.3s ease-out; }
+        .grid-cell-empty { background-color: transparent; border: none; }
+        .grid-cell.player { background-color: #3b82f6; }
+        .grid-cell.enemy { background-color: #b91c1c; }
+        .grid-cell.obstacle { background-color: #78716c; font-size: 1.25rem; }
+        .grid-cell.walkable { background-color: #22c55e; opacity: 0.7; }
+        .grid-cell.attackable { background-color: #f97316; opacity: 0.7; }
+        .grid-cell.magic-attackable { background-color: #a855f7; opacity: 0.7; }
+        .grid-cell.splash-targetable { background-color: #f87171; opacity: 0.6; }
+        .grid-cell.terrain { background-color: #4a5568; opacity: 0.8; cursor: not-allowed; border: 1px solid #2d3748; }
+
+        /* --- Garden Styles --- */
+        .garden-plot { aspect-ratio: 1 / 1; width: auto; height: auto; min-width: 40px; min-height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 0.5rem; border: 2px solid; cursor: pointer; font-size: 2rem; transition: all 0.2s; position: relative; }
+        .garden-timer { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); background-color: rgba(0, 0, 0, 0.6); color: white; font-size: 0.65rem; font-weight: bold; padding: 1px 4px; border-radius: 4px; white-space: nowrap; }
+        .garden-plot-dirt { background-color: #5c4033; border-color: #8b4513; }
+        .garden-plot-dirt:hover { background-color: #7a5230; }
+        .garden-plot-growing { background-color: #22c55e; border-color: #16a34a; }
+        .garden-plot-ready { background-color: #f59e0b; border-color: #d97706; animation: pulse-light 2s infinite; }
+        .garden-plot-ready:hover { background-color: #fbbF24; }
+
+        /* --- Alchemy Lab Styles --- */
+        .alchemy-station { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: auto auto auto; gap: 1rem; align-items: center; justify-content: center; width: 100%; max-width: 600px; margin: 0 auto; position: relative; }
+        .alchemy-slot { border: 2px dashed #4a5568; border-radius: 0.5rem; height: 80px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0.5rem; font-size: 0.8rem; color: #9ca3af; cursor: pointer; transition: all 0.2s; background-color: #1f2937; position: relative; }
+        .alchemy-slot:hover { border-color: #fcd34d; color: #fcd34d; }
+        .alchemy-slot.filled { border-style: solid; border-color: #3b82f6; background-color: #2d3748; color: white; font-weight: bold; cursor: default; }
+        .slot-tier-1:nth-child(1) { grid-column: 1 / 2; grid-row: 1 / 2; }
+        .slot-tier-1:nth-child(2) { grid-column: 3 / 4; grid-row: 1 / 2; }
+        .slot-tier-1:nth-child(3) { grid-column: 5 / 6; grid-row: 1 / 2; }
+        .slot-tier-2:nth-child(1) { grid-column: 1 / 2; grid-row: 1 / 2; }
+        .slot-tier-2:nth-child(2) { grid-column: 2 / 3; grid-row: 1 / 2; }
+        .slot-tier-2:nth-child(3) { grid-column: 4 / 5; grid-row: 1 / 2; }
+        .slot-tier-2:nth-child(4) { grid-column: 5 / 6; grid-row: 1 / 2; }
+        .alchemy-output { grid-column: 3 / 4; grid-row: 3 / 4; border-color: #16a34a; cursor: default; }
+        .alchemy-output:hover { border-color: #16a34a; }
+        .alchemy-connector { position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; z-index: -1; }
+        .slot-tier-1 .alchemy-connector::after,
+        .slot-tier-2 .alchemy-connector::after { content: ''; position: absolute; background-color: #4a5568; height: 2px; }
+        .slot-tier-1:nth-child(1) .alchemy-connector::after { width: 200%; top: 150%; left: 50%; transform: rotate(26.5deg); transform-origin: left; }
+        .slot-tier-1:nth-child(2) .alchemy-connector::after { width: 100%; top: 150%; left: 0; transform: rotate(90deg); transform-origin: top; }
+        .slot-tier-1:nth-child(3) .alchemy-connector::after { width: 200%; top: 150%; right: 50%; transform: rotate(-26.5deg); transform-origin: right; }
+        .slot-tier-2:nth-child(1) .alchemy-connector::after { width: 120%; top: 150%; left: 50%; transform: rotate(45deg); transform-origin: left; }
+        .slot-tier-2:nth-child(2) .alchemy-connector::after { width: 150%; top: 150%; left: 50%; transform: rotate(65deg); transform-origin: left; }
+        .slot-tier-2:nth-child(3) .alchemy-connector::after { width: 150%; top: 150%; right: 50%; transform: rotate(-65deg); transform-origin: right; }
+        .slot-tier-2:nth-child(4) .alchemy-connector::after { width: 120%; top: 150%; right: 50%; transform: rotate(-45deg); transform-origin: right; }
+        .ingredient-picker { background-color: #111827; border: 1px solid #374151; border-radius: 0.5rem; padding: 1rem; }
+        .ingredient-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.5rem; max-height: 200px; overflow-y: auto; }
+        .ingredient-item { background-color: #1f2937; border: 1px solid #374151; color: white; }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-200">
-    <!-- MODIFICATION: This wrapper now contains all pre-game menu screens -->
+<body class="">
+    <!-- Menu Wrapper -->
     <div id="menu-wrapper">
         <div id="start-screen" class="text-center p-4">
             <h1 class="font-medieval text-6xl text-yellow-300 mb-8">Chronicles of Cocytus</h1>
@@ -89,7 +255,7 @@
         <div id="character-creation-screen" class="w-full max-w-4xl p-6 bg-slate-900 rounded-lg shadow-lg hidden">
             <h2 class="font-medieval text-4xl mb-6 text-center text-yellow-400">Create Your Hero</h2>
 
-            <!-- MODIFICATION: Added Step 0 for Difficulty -->
+            <!-- Difficulty Step -->
             <div id="creation-step-0">
                 <h3 class="text-xl font-bold mb-4 text-center">Choose Your Difficulty</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
@@ -244,18 +410,26 @@
         </div>
     </div>
     
-    <!-- MODIFICATION: This wrapper now contains the main game container -->
+    <!-- Game Wrapper -->
     <div id="game-wrapper">
-        <div id="game-container" class="w-full max-w-7xl md:h-screen md:max-h-[900px] flex flex-col md:flex-row border-2 rounded-lg shadow-2xl" style="border-color: var(--border-main); background-color: var(--bg-main);">
+        <div id="game-container" class="relative w-full max-w-7xl md:h-screen md:max-h-[900px] flex flex-col md:flex-row border-2 rounded-lg shadow-2xl">
+            <div id="persistent-buttons" class="hidden absolute top-4 right-4 flex gap-2 z-20">
+                <button onclick="renderSettingsMenu()" class="btn btn-primary !p-2 !rounded-full w-10 h-10 flex items-center justify-center" aria-label="Settings" title="Settings">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+                <button onclick="exitGame()" class="btn btn-action !p-2 !rounded-full w-10 h-10 text-xl leading-none flex items-center justify-center" aria-label="Leave Game" title="Leave Game">
+                    &times;
+                </button>
+            </div>
             <button id="skip-tutorial-btn" class="hidden absolute top-2 right-2 btn btn-action z-30">Skip Tutorial</button>
-            <div class="w-full md:w-1/3 bg-slate-800 rounded-l-lg flex flex-col">
-                <div id="stats-view" class="p-6 flex-grow overflow-y-auto inventory-scrollbar">
+            <aside class="w-full md:w-1/3 bg-slate-800 rounded-l-lg flex flex-col">
+                <section id="stats-view" class="p-6 flex-grow overflow-y-auto inventory-scrollbar">
                      <div id="stats-screen-tutorial-target">
-                        <h2 id="player-name" class="font-medieval text-2xl text-center mb-1" style="color: var(--text-accent);">Player Name</h2>
+                        <h2 id="player-name" class="font-medieval text-2xl text-center mb-1">Player Name</h2>
                         <p id="player-details" class="text-center text-sm text-gray-400 mb-4">Gender | Race</p>
                      </div>
                      
-                     <div class="grid grid-cols-3 gap-2 text-center mb-4">
+                     <div class="grid grid-cols-2 gap-2 text-center mb-4">
                          <div>
                              <p class="font-bold text-lg" id="player-level">1</p>
                              <p class="text-xs text-gray-400">Level</p>
@@ -303,13 +477,13 @@
                         </div>
                     </div>
     
-                </div>
+                </section>
                 <div id="inv-char-buttons-tutorial-target" class="px-6 pb-6 pt-4 border-t border-gray-600 flex flex-col gap-2">
                      <button id="inventory-btn" onclick="gameState.currentView !== 'inventory' ? renderInventory() : returnFromInventory()" class="btn btn-primary w-full">Inventory</button>
                      <button id="character-sheet-btn" onclick="gameState.currentView !== 'character_sheet' ? renderCharacterSheet() : returnFromInventory()" class="btn btn-primary w-full">Character</button>
                 </div>
-            </div>
-            <div class="w-full md:w-2/3 flex flex-col p-4">
+            </aside>
+            <main class="w-full md:w-2/3 flex flex-col p-4">
                 <div id="main-view" class="bg-slate-900/50 rounded-lg flex-grow flex items-center justify-center p-6 min-h-[300px] md:min-h-0 overflow-y-auto inventory-scrollbar">
                     <!-- Main game content (town, battle, etc.) -->
                 </div>
@@ -318,11 +492,11 @@
                         <!-- Game log messages will appear here -->
                     </div>
                 </div>
-            </div>
+            </main>
         </div>
     </div>
 
-    <div id="tooltip" class="hidden fixed p-3 rounded-lg text-sm shadow-xl w-64 z-50 pointer-events-none" style="background-color: var(--bg-tooltip); border: 1px solid var(--border-main);"></div>
+    <div id="tooltip" class="hidden fixed p-3 rounded-lg text-sm shadow-xl w-64 z-50 pointer-events-none"></div>
     <div id="enemy-info-display" class="hidden fixed bg-slate-800/80 p-2 rounded-lg text-sm border border-slate-600 z-10"></div>
 
     <div id="betty-encounter-popup" class="hidden fixed bottom-5 right-5 bg-slate-800 border-2 border-purple-400 p-4 rounded-lg shadow-2xl max-w-sm cursor-pointer z-20">
@@ -348,6 +522,8 @@
                             <input type="number" id="debug-gold" class="text-black rounded px-1">
                             <label for="debug-statPoints" class="text-white text-right text-xs">Stat Points:</label>
                             <input type="number" id="debug-statPoints" class="text-black rounded px-1">
+                            <label for="debug-xpMultiplier" class="text-white text-right text-xs">XP Multiplier:</label>
+                            <input type="number" id="debug-xpMultiplier" step="0.1" class="text-black rounded px-1">
                         </div>
                     </div>
     
@@ -433,14 +609,22 @@
         </div>
     </template>
     
-    <!-- Tutorial Box (moved to be a direct child of body) -->
+    <!-- Tutorial Box -->
     <div id="tutorial-box" class="hidden fixed bg-slate-800 border-2 border-yellow-400 p-4 rounded-lg shadow-2xl max-w-xs z-50 transition-all duration-300">
         <p id="tutorial-text" class="text-gray-300"></p>
         <button id="tutorial-next-btn" class="btn btn-primary mt-4 w-full">Next</button>
         <div id="tutorial-choice-buttons" class="mt-4 flex gap-2"></div>
     </div>
 
+    <!-- Game Scripts (Deferred for better performance) -->
+    <script src="game_data.js"></script>
+    <script src="recipe_data.js"></script>
+    <script src="dialogue.js"></script>
+    <script src="ui_helpers.js"></script>
+    <script src="engine.js"></script>
+    <script src="battle.js"></script>
+    <script src="rendering.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>
-
 

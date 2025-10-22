@@ -8,7 +8,8 @@ const RACES = {
     'Dragonborn': { Vigor: 12, Focus: 7, Stamina: 3, Strength: 8, Intelligence: 8, Luck: 2, description: "A proud lineage of draconic might, balancing physical and magical power. Prone to hoarding shiny things and accidentally setting the tavern curtains on fire." },
     'Aasimar': { Vigor: 10, Focus: 10, Stamina: 6, Strength: 5, Intelligence: 6, Luck: 3, description: "Celestially touched, with a harmonious balance of mind and body. You're probably the designated driver of the celestial planes." },
     'Beastkin': { Vigor: 9, Focus: 4, Stamina: 7, Strength: 9, Intelligence: 3, Luck: 8, description: "Possessing primal strength and instincts, a born survivor. You've definitely tried to solve a riddle by sniffing it." },
-    'Clankers': { Vigor: 10, Focus: 5, Stamina: 11, Strength: 5, Intelligence: 8, Luck: 1, description: "Constructed beings of metal and logic, incredibly durable but stiff. Sarcasm is not a part of your programming." }
+    'Clankers': { Vigor: 10, Focus: 5, Stamina: 11, Strength: 5, Intelligence: 8, Luck: 1, description: "Constructed beings of metal and logic, incredibly durable but stiff. Sarcasm is not a part of your programming." },
+    'Pinionfolk': { Vigor: 7, Focus: 9, Stamina: 12, Strength: 5, Intelligence: 5, Luck: 6, description: "Winged humanoids with hollow bones and sharp eyes. You're great at spotting things from afar and even better at complaining about cramped dungeons." }
 };
 
 const PLAYER_EMOJIS = {
@@ -21,10 +22,19 @@ const PLAYER_EMOJIS = {
     'Dragonborn': { 'Male': '🐲', 'Female': '🐉', 'Neutral': '🐲' },
     'Aasimar': { 'Male': '😇', 'Female': '😇', 'Neutral': '😇' },
     'Beastkin': { 'Male': '🦁', 'Female': '🐯', 'Neutral': '🐺' },
-    'Clankers': { 'Male': '🤖', 'Female': '🤖', 'Neutral': '🤖' }
+    'Clankers': { 'Male': '🤖', 'Female': '🤖', 'Neutral': '🤖' },
+    'Pinionfolk': { 'Male': '🦅', 'Female': '🦅', 'Neutral': '🦅' }
 };
 
 const CLASSES = {
+    'artificer': {
+        name: 'Artificer',
+        description: "A master of gadgets, gizmos, and things that go BOOM. You believe any problem can be solved with enough gears, gunpowder, and a blatant disregard for personal safety.",
+        bonusStats: { Stamina: 5, Intelligence: 3, Luck: -2 },
+        startingEquipment: { catalyst: 'wooden_stick', weapon: 'dagger', armor: 'travelers_garb' },
+        startingItems: { 'health_potion': 1, 'mana_potion': 2 },
+        startingSpells: { 'none_aoe': 1 }
+    },
     'barbarian': {  
         name: 'Barbarian',
         description: 'A pure brute fueled by raw strength and primal fury. Your answer to "why?" is usually "RAAAGH!"',
@@ -193,6 +203,66 @@ const BACKGROUNDS = {
     }
 };
 
+const ELEMENTS = {
+    'none': { name: 'Non-elemental', adjective: '', weakness: [], strength: [] },
+    'fire': { name: 'Fire', adjective: 'Scorching', weakness: ['water', 'earth'], strength: ['nature', 'wind'] },
+    'water': { name: 'Water', adjective: 'Surging', weakness: ['nature', 'lightning'], strength: ['fire', 'earth'] },
+    'earth': { name: 'Earth', adjective: 'Quaking', weakness: ['water', 'wind'], strength: ['fire', 'lightning'] },
+    'wind': { name: 'Wind', adjective: 'Swirling', weakness: ['fire', 'lightning'], strength: ['nature', 'earth'] },
+    'lightning': { name: 'Lightning', adjective: 'Thundering', weakness: ['earth'], strength: ['water', 'wind'] },
+    'nature': { name: 'Nature', adjective: 'Blossoming', weakness: ['fire', 'wind'], strength: ['water', 'earth'] },
+    'light': { name: 'Light', adjective: 'Shining', weakness: ['void'], strength: [] },
+    'void': { name: 'Void', adjective: 'Abyssal', weakness: ['light'], strength: [] },
+    'healing': { name: 'Healing', adjective: 'Restorative', weakness: [], strength: [] }
+};
+
+const MONSTER_SPECIES = {
+    // Tier 1
+    'goblin': { key: 'goblin', emoji: '👺', name: 'Goblin', class: 'Humanoid', tier: 1, base_hp: 20, base_strength: 3, base_defense: 0, range: 1, movement: { speed: 2, type: 'ground' }, base_xp: 25, base_gold: 15, spell_resistance: 0.05, loot_table: {'health_potion': 0.1, 'goblin_ear': 0.5, 'dagger': 0.1, 'rusty_sword': 0.15, 'wooden_shield': 0.05, 'wooden_wand': 0.02, 'wild_wine': 0.1} },
+    'rabid_rabbit': { key: 'rabid_rabbit', emoji: '🐇', name: 'Rabid Rabbit', class: 'Beast', tier: 1, base_hp: 25, base_strength: 2, base_defense: 1, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 25, base_gold: 8, spell_resistance: 0, loot_table: {'rabbit_meat': 0.6} },
+    'slime': { key: 'slime', emoji: '🦠', name: 'Slime', class: 'Monstrosity', tier: 1, base_hp: 28, base_strength: 2, base_defense: 2, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 22, base_gold: 10, spell_resistance: 0.1, loot_table: {'slime_glob': 0.5}, damage_type: 'magical' },
+    'skeleton': { key: 'skeleton', emoji: '💀', name: 'Skeleton', class: 'Undead', tier: 1, base_hp: 18, base_strength: 3, base_defense: 2, range: 1, movement: { speed: 2, type: 'ground' }, base_xp: 20, base_gold: 10, spell_resistance: 0.1, loot_table: {'rusty_sword': 0.1, 'dagger': 0.05, 'wooden_shield': 0.05, 'iron_buckler': 0.03, 'cracked_orb': 0.02, 'undying_heart': 0.02, 'grave_scythe': 0.005} },
+    
+    // Tier 2
+    'bandit': { key: 'bandit', emoji: '🤠', name: 'Bandit', class: 'Humanoid', tier: 2, base_hp: 45, base_strength: 8, base_defense: 3, range: 4, movement: { speed: 2, type: 'ground' }, base_xp: 50, base_gold: 30, spell_resistance: 0.05, loot_table: {'health_potion': 0.25, 'dagger': 0.15, 'rusty_sword': 0.1, 'steel_longsword': 0.05, 'iron_kite_shield': 0.05, 'iron_buckler': 0.05, 'padded_leather': 0.08, 'silenced_leather_armor': 0.02, 'hardwood_staff': 0.02, 'wild_wine': 0.25} },
+    'dire_wolf': { key: 'dire_wolf', emoji: '🐺', name: 'Dire Wolf', class: 'Beast', tier: 2, base_hp: 60, base_strength: 6, base_defense: 2, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 40, base_gold: 15, spell_resistance: 0, loot_table: {'health_potion': 0.15, 'wolf_pelt': 0.4, 'wolf_meat': 0.5} },
+    'giant_rat': { key: 'giant_rat', emoji: '🐀', name: 'Giant Rat', class: 'Monstrosity', tier: 2, base_hp: 40, base_strength: 5, base_defense: 1, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 35, base_gold: 10, spell_resistance: 0, loot_table: {'rat_tail': 0.6} },
+    'armored_zombie': { key: 'armored_zombie', emoji: '🧟', name: 'Armored Zombie', class: 'Undead', tier: 2, base_hp: 50, base_strength: 7, base_defense: 5, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 45, base_gold: 20, spell_resistance: 0.15, loot_table: {'dagger': 0.05, 'steel_longsword': 0.08, 'heavy_greatsword': 0.03, 'iron_kite_shield': 0.05, 'brass_shield': 0.03, 'padded_leather': 0.05, 'chainmail_armor': 0.03, 'magical_orb': 0.02, 'undying_heart': 0.05, 'grave_scythe': 0.02, 'elemental_sword': 0.01}, damage_type: 'magical' },
+    
+    // Tier 3
+    'orc_berserker': { key: 'orc_berserker', emoji: '👹', name: 'Orc Berserker', class: 'Humanoid', tier: 3, ability: 'enrage', base_hp: 70, base_strength: 12, base_defense: 4, range: 1, movement: { speed: 2, type: 'ground' }, base_xp: 80, base_gold: 40, spell_resistance: 0.1, loot_table: {'health_potion': 0.3, 'steel_longsword': 0.1, 'heavy_greatsword': 0.08, 'obsidian_axe': 0.05, 'sunderers_battleaxe': 0.02, 'orc_liver': 0.3, 'brass_shield': 0.05, 'titanium_parrying_shield': 0.02, 'chainmail_armor': 0.05, 'half_plate_armor': 0.02, 'cypresswood_staff': 0.02, 'dual_longswords': 0.02, 'bone_club': 0.1, 'wild_wine': 0.2} },
+    'cave_spider': { key: 'cave_spider', emoji: '🕷️', name: 'Cave Spider', class: 'Beast', tier: 3, ability: 'poison_web', base_hp: 90, base_strength: 9, base_defense: 3, range: 3, movement: { speed: 2, type: 'ground' }, base_xp: 75, base_gold: 30, spell_resistance: 0, loot_table: {'spider_venom': 0.5, 'eye_of_medusa': 0.01} },
+    'cockatrice': { key: 'cockatrice', emoji: '🐔', name: 'Cockatrice', class: 'Monstrosity', tier: 3, ability: 'petrification', base_hp: 80, base_strength: 10, base_defense: 5, range: 1, movement: { speed: 3, type: 'flying' }, base_xp: 90, base_gold: 50, spell_resistance: 0.2, loot_table: {'cockatrice_venom_gland': 0.3, 'eye_of_medusa': 0.02, 'arcane_focus': 0.02, 'elemental_sword': 0.02, 'chicken_meat': 0.4}, damage_type: 'magical' },
+    'necromancer': { key: 'necromancer', emoji: '🧙', name: 'Necromancer', class: 'Undead', tier: 3, ability: 'necromancy', base_hp: 60, base_strength: 8, base_defense: 2, range: 5, movement: { speed: 1, type: 'ground' }, base_xp: 100, base_gold: 60, spell_resistance: 0.3, loot_table: {'mana_potion': 0.2, 'vampiric_dagger': 0.02, 'assassin_cloak_armor': 0.02, 'staff_of_loss': 0.02, 'archmages_robes': 0.01, 'undying_heart': 0.1, 'grave_scythe': 0.03, 'headless_executioner': 0.01, 'elemental_sword': 0.02}, damage_type: 'magical' },
+    
+    // Tier 4
+    'one_eyed_troll': { key: 'one_eyed_troll', emoji: '👺', name: 'One-Eyed Troll', class: 'Humanoid', tier: 4, ability: 'ultra_focus', base_hp: 150, base_strength: 20, base_defense: 8, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 350, base_gold: 175, spell_resistance: 0.1, loot_table: {'superior_health_potion': 0.2, 'obsidian_axe': 0.08, 'sunderers_battleaxe': 0.04, 'heavy_slabshield': 0.03, 'steel_plate_armor': 0.03, 'staff_of_the_magi': 0.01, 'trollblood_shield': 0.03, 'bone_club': 0.15, 'trolls_knight_sword': 0.05, 'troll_blood': 0.5} },
+    'unicorn': { key: 'unicorn', emoji: '🦄', name: 'Unicorn', class: 'Beast', tier: 4, ability: 'healing', base_hp: 170, base_strength: 15, base_defense: 5, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 320, base_gold: 160, spell_resistance: 0.25, loot_table: {'unicorn_horn_fragment': 0.5, 'golden_greatbow': 0.05, 'obsidian_lamina': 0.02, 'purifying_crystal_shield': 0.02, 'elemental_sword': 0.03, 'horse_meat': 0.3}, damage_type: 'magical' },
+    'chimera': { key: 'chimera', emoji: '🦁', name: 'Chimera', class: 'Monstrosity', tier: 4, ability: 'true_poison', base_hp: 160, base_strength: 18, base_defense: 10, range: 3, movement: { speed: 3, type: 'flying' }, base_xp: 400, base_gold: 200, spell_resistance: 0.15, loot_table: {'golden_greatbow': 0.03, 'eye_of_medusa': 0.03, 'crystal_ball': 0.01, 'spellblade_of_echoes': 0.03, 'chimera_claw': 0.3, 'elemental_sword': 0.03, 'condensed_health_potion': 0.3}, damage_type: 'magical' },
+    'living_armor': { key: 'living_armor', emoji: '🛡️', name: 'Living Armor', class: 'Undead', tier: 4, ability: 'living_shield', base_hp: 120, base_strength: 17, base_defense: 15, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 380, base_gold: 190, spell_resistance: 0.5, loot_table: {'obsidian_axe': 0.05, 'masterwork_spear': 0.08, 'tower_greatshield': 0.05, 'exa_reflector': 0.01, 'soul_armor_shard': 0.1, 'steel_plate_armor': 0.05, 'adamantine_armor': 0.01, 'spiked_retaliator': 0.02, 'mirror_mail': 0.01, 'undying_heart': 0.2, 'the_bloodletter': 0.03, 'unending_dance': 0.005, 'headless_executioner': 0.02, 'elemental_sword': 0.03, 'superior_health_potion': 0.1}, damage_type: 'hybrid' },
+    
+    // Tier 5
+    'mountain_goliath': { key: 'mountain_goliath', emoji: '⛰️', name: 'Mountain Goliath', class: 'Humanoid', tier: 5, ability: 'earthshaker', base_hp: 300, base_strength: 28, base_defense: 12, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 1200, base_gold: 600, spell_resistance: 0.15, loot_table: {'sunderers_battleaxe': 0.05, 'earthshaker_hammer': 0.01, 'heavy_slabshield': 0.02, 'mountain_rock': 0.1, 'bone_club': 0.2, 'giant_hunter': 0.005, 'superior_health_potion': 0.5} },
+    'livyatan': { key: 'livyatan', emoji: '🐳', name: 'Livyatan', class: 'Beast', tier: 5, ability: 'swallow', base_hp: 400, base_strength: 22, base_defense: 10, range: 1, movement: { speed: 2, type: 'flying' }, base_xp: 1100, base_gold: 550, spell_resistance: 0.1, loot_table: {'vacuum_greatbow': 0.01, 'lightning_javelin': 0.05, 'vacuum_lining': 0.2, 'giant_hunter': 0.005, 'elemental_sword': 0.05, 'superior_mana_potion': 0.4, 'whale_meat': 0.2}, damage_type: 'magical' },
+    'dragon': { key: 'dragon', emoji: '🐉', name: 'Dragon', class: 'Monstrosity', tier: 5, ability: 'scorch_earth', base_hp: 350, base_strength: 25, base_defense: 18, range: 5, movement: { speed: 3, type: 'flying' }, base_xp: 1500, base_gold: 750, spell_resistance: 0.2, loot_table: {'dragon_scale': 0.5, 'dragon_scale_cragblade': 0.01, 'dragon_heart_item': 0.1, 'giant_hunter': 0.005, 'elemental_sword': 0.05, 'superior_health_potion': 0.5}, damage_type: 'hybrid' },
+    'dullahan': { key: 'dullahan', emoji: '👻', name: 'Dullahan', class: 'Undead', tier: 5, ability: 'alive_again', base_hp: 250, base_strength: 26, base_defense: 14, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 1350, base_gold: 700, spell_resistance: 0.25, loot_table: {'vampiric_dagger': 0.04, 'obsidian_lamina': 0.03, 'void_greatsword': 0.01, 'adamantine_armor': 0.02, 'void_heart': 0.1, 'undying_heart': 0.4, 'the_bloodletter': 0.04, 'headless_executioner': 0.03, 'giant_hunter': 0.005, 'elemental_sword': 0.05, 'superior_mana_potion': 0.4}, damage_type: 'hybrid' }
+};
+
+const MONSTER_RARITY = {
+    'common': {name: 'Common', multiplier: 1.0, rewardMultiplier: 1.0, rarityIndex: 1},
+    'uncommon': {name: 'Uncommon', multiplier: 1.2, rewardMultiplier: 1.3, rarityIndex: 2},
+    'rare': {name: 'Rare', multiplier: 1.5, rewardMultiplier: 1.8, rarityIndex: 3},
+    'epic': {name: 'Epic', multiplier: 2.0, rewardMultiplier: 2.5, rarityIndex: 4},
+    'legendary': {name: 'Legendary', multiplier: 2.5, rewardMultiplier: 3.5, rarityIndex: 5}
+};
+
+const MONSTER_CLASS_DAMAGE = {
+    'Humanoid': { baseDice: 1, dieSides: 8 },
+    'Beast': { baseDice: 2, dieSides: 4 },
+    'Monstrosity': { baseDice: 3, dieSides: 3 },
+    'Undead': { baseDice: 1, dieSides: 6 }
+};
+
 const BIOMES = {
     // Tier 1
     'forest': {
@@ -326,19 +396,6 @@ const BATTLE_GRIDS = {
     'rect_4x6': { width: 4, height: 6, layout: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1] },
     'rect_5x6': { width: 5, height: 6, layout: [1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1] },
     'rect_6x5': { width: 6, height: 5, layout: [1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1] },
-};
-
-const ELEMENTS = {
-    'none': { name: 'Non-elemental', adjective: '', weakness: [], strength: [] },
-    'fire': { name: 'Fire', adjective: 'Scorching', weakness: ['water', 'earth'], strength: ['nature', 'wind'] },
-    'water': { name: 'Water', adjective: 'Surging', weakness: ['nature', 'lightning'], strength: ['fire', 'earth'] },
-    'earth': { name: 'Earth', adjective: 'Quaking', weakness: ['water', 'wind'], strength: ['fire', 'lightning'] },
-    'wind': { name: 'Wind', adjective: 'Swirling', weakness: ['fire', 'lightning'], strength: ['nature', 'earth'] },
-    'lightning': { name: 'Lightning', adjective: 'Thundering', weakness: ['earth'], strength: ['water', 'wind'] },
-    'nature': { name: 'Nature', adjective: 'Blossoming', weakness: ['fire', 'wind'], strength: ['water', 'earth'] },
-    'light': { name: 'Light', adjective: 'Shining', weakness: ['void'], strength: [] },
-    'void': { name: 'Void', adjective: 'Abyssal', weakness: ['light'], strength: [] },
-    'healing': { name: 'Healing', adjective: 'Restorative', weakness: [], strength: [] }
 };
 
 const WEAPONS = {
@@ -479,50 +536,230 @@ const ARMOR = {
 };
 
 const ITEMS = {
-    'health_potion': {name: 'Health Potion', type: 'healing', amount: 20, price: 30, description: "A simple vial that restores a small amount of health."},
-    // MODIFICATION: Fixed typo "Condesed"
-    'condensed_health_potion': {name: 'Condensed Health Potion', type: 'healing', amount: 50, price: 75, description: "A heavy, concentrated mixture of refined herbs and purified mountain water. This potion is thicker and more potent than its normal counterpart, designed to provide substantial, immediate relief."},
+    // --- Recipe Scrolls ---
+    'recipe_rabbit_roast': { name: 'Recipe: Rabbit Roast', type: 'recipe', price: 100, description: 'A recipe for a simple but effective meal.', recipeType: 'cooking', recipeKey: 'rabbit_roast' },
+    'recipe_humming_medley': { name: 'Recipe: Humming Veggie Medley', type: 'recipe', price: 100, description: 'A recipe for a strange, magically-inclined dish.', recipeType: 'cooking', recipeKey: 'humming_medley' },
+    'recipe_fortifying_meat_pie': { name: 'Recipe: Fortifying Meat Pie', type: 'recipe', price: 120, description: 'A recipe for a pie that makes you feel tougher.', recipeType: 'cooking', recipeKey: 'fortifying_meat_pie' },
+    'recipe_spiced_root_stew': { name: 'Recipe: Spiced Root Stew', type: 'recipe', price: 120, description: 'A recipe for a stew that expands one\'s mana reserves.', recipeType: 'cooking', recipeKey: 'spiced_root_stew' },
+    'recipe_hunters_lunch': { name: 'Recipe: Hunter\'s Lunch', type: 'recipe', price: 150, description: 'A recipe for a meal that sharpens the eyes.', recipeType: 'cooking', recipeKey: 'hunters_lunch' },
+    'recipe_travelers_skewer': { name: 'Recipe: Traveler\'s Skewer', type: 'recipe', price: 150, description: 'A recipe for a meal that quickens the step.', recipeType: 'cooking', recipeKey: 'travelers_skewer' },
+    'recipe_sages_loaf': { name: 'Recipe: Sage\'s Loaf', type: 'recipe', price: 200, description: 'A recipe for bread that enhances learning.', recipeType: 'cooking', recipeKey: 'sages_loaf' },
+    'recipe_hearty_grain_stew': { name: 'Recipe: Hearty Grain Stew', type: 'recipe', price: 200, description: 'A recipe for a powerfully restorative stew.', recipeType: 'cooking', recipeKey: 'hearty_grain_stew' },
+    'recipe_clarifying_broth': { name: 'Recipe: Clarifying Broth', type: 'recipe', price: 200, description: 'A recipe for a broth that refills arcane energy.', recipeType: 'cooking', recipeKey: 'clarifying_broth' },
+    'recipe_spiced_wolf_steak': { name: 'Recipe: Spiced Wolf Steak', type: 'recipe', price: 300, description: 'A recipe for a steak that brings out primal power.', recipeType: 'cooking', recipeKey: 'spiced_wolf_steak' },
+    'recipe_arcane_fruit_tart': { name: 'Recipe: Arcane Fruit Tart', type: 'recipe', price: 300, description: 'A recipe for a tart that enhances magical properties.', recipeType: 'cooking', recipeKey: 'arcane_fruit_tart' },
+    'recipe_loaded_tater': { name: 'Recipe: Loaded Tater', type: 'recipe', price: 350, description: 'A recipe for a massive, durable meal.', recipeType: 'cooking', recipeKey: 'loaded_tater' },
+    'recipe_calming_tea_ceremony': { name: 'Recipe: Calming Tea Ceremony', type: 'recipe', price: 350, description: 'A recipe for a tea that expands spiritual capacity.', recipeType: 'cooking', recipeKey: 'calming_tea_ceremony' },
+    'recipe_lucky_greens_salad': { name: 'Recipe: Lucky Greens Salad', type: 'recipe', price: 400, description: 'A recipe for a salad that just feels lucky.', recipeType: 'cooking', recipeKey: 'lucky_greens_salad' },
+    'recipe_fiery_meat_platter': { name: 'Recipe: Fiery Meat Platter', type: 'recipe', price: 400, description: 'A recipe for a platter that makes you want to run.', recipeType: 'cooking', recipeKey: 'fiery_meat_platter' },
+    'recipe_focusing_stir_fry': { name: 'Recipe: Focusing Stir-fry', type: 'recipe', price: 500, description: 'A recipe for a stir-fry that sharpens the mind.', recipeType: 'cooking', recipeKey: 'focusing_stir_fry' },
+    'recipe_restorative_bird_soup': { name: 'Recipe: Restorative Bird Soup', type: 'recipe', price: 500, description: 'A recipe for the ultimate comfort food.', recipeType: 'cooking', recipeKey: 'restorative_bird_soup' },
+    'recipe_salty_seafood_stew': { name: 'Recipe: Salty Seafood Stew', type: 'recipe', price: 500, description: 'A recipe for a stew that tastes of the sea.', recipeType: 'cooking', recipeKey: 'salty_seafood_stew' },
+    'recipe_steak_of_divine_power': { name: 'Recipe: Steak of Divine Power', type: 'recipe', price: 1000, description: 'A recipe for a meal granting immense might.', recipeType: 'cooking', recipeKey: 'steak_of_divine_power' },
+    'recipe_crystalline_energy_tart': { name: 'Recipe: Crystalline Energy Tart', type: 'recipe', price: 1000, description: 'A recipe for a tart humming with raw power.', recipeType: 'cooking', recipeKey: 'crystalline_energy_tart' },
+    'recipe_livyatans_grand_steak': { name: 'Recipe: Livyatan\'s Grand Steak', type: 'recipe', price: 1200, description: 'A recipe for a meal granting colossal vitality.', recipeType: 'cooking', recipeKey: 'livyatans_grand_steak' },
+    'recipe_nectar_of_the_soul': { name: 'Recipe: Nectar of the Soul', type: 'recipe', price: 1200, description: 'A recipe that deepens the spiritual reservoir.', recipeType: 'cooking', recipeKey: 'nectar_of_the_soul' },
+    'recipe_feast_of_fortune': { name: 'Recipe: Feast of Fortune', type: 'recipe', price: 1500, description: 'A recipe for a platter that attracts immense fortune.', recipeType: 'cooking', recipeKey: 'feast_of_fortune' },
+    'recipe_alacrity_sorbet': { name: 'Recipe: Alacrity Sorbet', type: 'recipe', price: 1500, description: 'A recipe for a sorbet that infuses unnatural speed.', recipeType: 'cooking', recipeKey: 'alacrity_sorbet' },
+    'recipe_mindfire_curry': { name: 'Recipe: Mindfire Curry', type: 'recipe', price: 2000, description: 'A recipe for a curry that enhances learning.', recipeType: 'cooking', recipeKey: 'mindfire_curry' },
+    'recipe_phoenix_down_roast': { name: 'Recipe: Phoenix Down Roast', type: 'recipe', price: 2000, description: 'A recipe for a meal that can bring one back from the brink.', recipeType: 'cooking', recipeKey: 'phoenix_down_roast' },
+    'recipe_abyssal_ambrosia': { name: 'Recipe: Abyssal Ambrosia', type: 'recipe', price: 2000, description: 'A recipe that restores the deepest wells of magic.', recipeType: 'cooking', recipeKey: 'abyssal_ambrosia' },
+    'recipe_brew_health_potion_home': { name: 'Alchemical Recipe: Health Potion', type: 'recipe', price: 150, description: 'A recipe for a basic healing draught.', recipeType: 'alchemy', recipeKey: 'brew_health_potion_home' },
+    'recipe_brew_mana_potion_home': { name: 'Alchemical Recipe: Mana Potion', type: 'recipe', price: 150, description: 'A recipe for a basic mana restorative.', recipeType: 'alchemy', recipeKey: 'brew_mana_potion_home' },
+    'recipe_brew_cinderstop': { name: 'Alchemical Recipe: Cinderstop Potion', type: 'recipe', price: 200, description: 'A recipe for a fire resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_cinderstop' },
+    'recipe_brew_dampclear': { name: 'Alchemical Recipe: Dampclear Potion', type: 'recipe', price: 200, description: 'A recipe for a water resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_dampclear' },
+    'recipe_brew_windwail': { name: 'Alchemical Recipe: Windwail Potion', type: 'recipe', price: 200, description: 'A recipe for a wind resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_windwail' },
+    'recipe_brew_rockshut': { name: 'Alchemical Recipe: Rockshut Potion', type: 'recipe', price: 200, description: 'A recipe for an earth resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_rockshut' },
+    'recipe_brew_zapsipper': { name: 'Alchemical Recipe: Zapsipper Potion', type: 'recipe', price: 200, description: 'A recipe for a lightning resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_zapsipper' },
+    'recipe_brew_vinekill': { name: 'Alchemical Recipe: Vinekill Potion', type: 'recipe', price: 200, description: 'A recipe for a nature resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_vinekill' },
+    'recipe_brew_lightcloser': { name: 'Alchemical Recipe: Lightcloser Potion', type: 'recipe', price: 200, description: 'A recipe for a light resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_lightcloser' },
+    'recipe_brew_lampside': { name: 'Alchemical Recipe: Lampside Potion', type: 'recipe', price: 200, description: 'A recipe for a void resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_lampside' },
+    'recipe_brew_condensed_health_potion_home': { name: 'Alchemical Recipe: Condensed Health Potion', type: 'recipe', price: 400, description: 'A recipe for a stronger healing draught.', recipeType: 'alchemy', recipeKey: 'brew_condensed_health_potion_home' },
+    'recipe_brew_condensed_mana_potion_home': { name: 'Alchemical Recipe: Condensed Mana Potion', type: 'recipe', price: 400, description: 'A recipe for a stronger mana restorative.', recipeType: 'alchemy', recipeKey: 'brew_condensed_mana_potion_home' },
+    'recipe_brew_hearthstall': { name: 'Alchemical Recipe: Hearthstall Potion', type: 'recipe', price: 600, description: 'A recipe for an improved fire resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_hearthstall' },
+    'recipe_brew_waterdam': { name: 'Alchemical Recipe: Waterdam Potion', type: 'recipe', price: 600, description: 'A recipe for an improved water resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_waterdam' },
+    'recipe_brew_gustshield': { name: 'Alchemical Recipe: Gustshield Potion', type: 'recipe', price: 600, description: 'A recipe for an improved wind resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_gustshield' },
+    'recipe_brew_quakestable': { name: 'Alchemical Recipe: Quakestable Potion', type: 'recipe', price: 600, description: 'A recipe for an improved earth resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_quakestable' },
+    'recipe_brew_strikestop': { name: 'Alchemical Recipe: Strikestop Potion', type: 'recipe', price: 600, description: 'A recipe for an improved lightning resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_strikestop' },
+    'recipe_brew_growthstall': { name: 'Alchemical Recipe: Growthstall Potion', type: 'recipe', price: 600, description: 'A recipe for an improved nature resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_growthstall' },
+    'recipe_brew_sundown': { name: 'Alchemical Recipe: Sundown Potion', type: 'recipe', price: 600, description: 'A recipe for an improved light resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_sundown' },
+    'recipe_brew_sunrise': { name: 'Alchemical Recipe: Sunrise Potion', type: 'recipe', price: 600, description: 'A recipe for an improved void resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_sunrise' },
+    'recipe_brew_superior_health_potion_home': { name: 'Alchemical Recipe: Superior Health Potion', type: 'recipe', price: 1200, description: 'A recipe for a superior healing draught.', recipeType: 'alchemy', recipeKey: 'brew_superior_health_potion_home' },
+    'recipe_brew_superior_mana_potion_home': { name: 'Alchemical Recipe: Superior Mana Potion', type: 'recipe', price: 1200, description: 'A recipe for a superior mana restorative.', recipeType: 'alchemy', recipeKey: 'brew_superior_mana_potion_home' },
+    'recipe_brew_blazeback': { name: 'Alchemical Recipe: Blazeback Potion', type: 'recipe', price: 2000, description: 'A recipe for a masterwork fire resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_blazeback' },
+    'recipe_brew_floodwall': { name: 'Alchemical Recipe: Floodwall Potion', type: 'recipe', price: 2000, description: 'A recipe for a masterwork water resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_floodwall' },
+    'recipe_brew_stormsapper': { name: 'Alchemical Recipe: Stormsapper Potion', type: 'recipe', price: 2000, description: 'A recipe for a masterwork wind resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_stormsapper' },
+    'recipe_brew_fissurewalker': { name: 'Alchemical Recipe: Fissurewalker Potion', type: 'recipe', price: 2000, description: 'A recipe for a masterwork earth resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_fissurewalker' },
+    'recipe_brew_thunderground': { name: 'Alchemical Recipe: Thunderground Potion', type: 'recipe', price: 2000, description: 'A recipe for a masterwork lightning resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_thunderground' },
+    'recipe_brew_jungleward': { name: 'Alchemical Recipe: Jungleward Potion', type: 'recipe', price: 2000, description: 'A recipe for a masterwork nature resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_jungleward' },
+    'recipe_brew_smitestopper': { name: 'Alchemical Recipe: Smitestopper Potion', type: 'recipe', price: 2000, description: 'A recipe for a masterwork light resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_smitestopper' },
+    'recipe_brew_voidshield': { name: 'Alchemical Recipe: Voidshield Potion', type: 'recipe', price: 2000, description: 'A recipe for a masterwork void resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_voidshield' },
+
+     // --- Potions & Consumables ---
+    'health_potion': {name: 'Health Potion', type: 'healing', amount: 20, price: 30, description: "A simple vial that restores a small amount of health.", alchemyType: 'base_potion'},
+    'condensed_health_potion': {name: 'Condensed Health Potion', type: 'healing', amount: 50, price: 75, description: "A heavy, concentrated mixture of refined herbs and purified mountain water. This potion is thicker and more potent than its normal counterpart, designed to provide substantial, immediate relief.", alchemyType: 'base_potion'},
     'superior_health_potion': {name: 'Superior Health Potion', type: 'healing', amount: 100, price: 200, description: "A potent draught that restores a moderate amount of health."},
-    'mana_potion': {name: 'Mana Potion', type: 'mana_restore', amount: 50, price: 40, description: "A swirling blue liquid that restores magical energy."},
-    // MODIFICATION: Fixed typo "Condesed"
-    'condensed_mana_potion': {name: 'Condensed Mana Potion', type: 'mana_restore', amount: 100, price: 100, description: "An oxidized flask containing a potent brew of crushed celestial beetles and distilled shadow essence. It provides a sharp, invigorating shock to the mind, clearing the fog of battle-weariness."},
-    // MODIFICATION: Fixed typo "Superion"
+    'mana_potion': {name: 'Mana Potion', type: 'mana_restore', amount: 50, price: 40, description: "A swirling blue liquid that restores magical energy.", alchemyType: 'base_potion'},
+    'condensed_mana_potion': {name: 'Condensed Mana Potion', type: 'mana_restore', amount: 100, price: 100, description: "An oxidized flask containing a potent brew of crushed celestial beetles and distilled shadow essence. It provides a sharp, invigorating shock to the mind, clearing the fog of battle-weariness.", alchemyType: 'base_potion'},
     'superior_mana_potion': {name: 'Superior Mana Potion', type: 'mana_restore', amount: 150, price: 250, description: "A masterwork of alchemy. The shimmering liquid is pure, crystallized Arcane Energy, providing not just mana, but a momentary conduit to the raw source of magic itself."},
+    'strength_potion': { name: 'Strength Potion', type: 'buff', price: 150, effect: { type: 'strength', multiplier: 1.5, duration: 4 }, description: 'Temporarily increases physical damage.' },
+    'stonehide_potion': { name: 'Stonehide Potion', type: 'buff', price: 200, effect: { type: 'stonehide', multiplier: 2, duration: 4 }, description: 'Temporarily increases defense.' },
+    'potion_of_brilliance': { name: 'Potion of Brilliance', type: 'buff', encounterDuration: 3, price: 500, effect: { type: 'temp_intelligence', multiplier: 1.25, duration: 3 }, description: 'Temporarily increases Magical Damage by 25% for 3 encounters.' },
+    'potion_of_clarity': { name: 'Potion of Clarity', type: 'buff', encounterDuration: 3, price: 500, effect: { type: 'temp_focus', multiplier: 1.25, duration: 3 }, description: 'Temporarily increases Max MP by 25% for 3 encounters.' },
+    'cleansing_potion': { name: 'Cleansing Potion', type: 'cleanse', price: 250, description: 'Removes all negative status effects.' },
+
+    // Elemental Resistance Potions
+    'cinderstop_potion': { name: 'Cinderstop Potion', type: 'buff', price: 100, description: 'Grants 5% Fire resistance for 10 turns.', effect: { type: 'resist_fire', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
+    'dampclear_potion': { name: 'Dampclear Potion', type: 'buff', price: 100, description: 'Grants 5% Water resistance for 10 turns.', effect: { type: 'resist_water', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
+    'windwail_potion': { name: 'Windwail Potion', type: 'buff', price: 100, description: 'Grants 5% Wind resistance for 10 turns.', effect: { type: 'resist_wind', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
+    'rockshut_potion': { name: 'Rockshut Potion', type: 'buff', price: 100, description: 'Grants 5% Earth resistance for 10 turns.', effect: { type: 'resist_earth', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
+    'zapsipper_potion': { name: 'Zapsipper Potion', type: 'buff', price: 100, description: 'Grants 5% Lightning resistance for 10 turns.', effect: { type: 'resist_lightning', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
+    'vinekill_potion': { name: 'Vinekill Potion', type: 'buff', price: 100, description: 'Grants 5% Nature resistance for 10 turns.', effect: { type: 'resist_nature', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
+    'lightcloser_potion': { name: 'Lightcloser Potion', type: 'buff', price: 100, description: 'Grants 5% Light resistance for 10 turns.', effect: { type: 'resist_light', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
+    'lampside_potion': { name: 'Lampside Potion', type: 'buff', price: 100, description: 'Grants 5% Void resistance for 10 turns.', effect: { type: 'resist_void', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
+    'hearthstall_potion': { name: 'Hearthstall Potion', type: 'buff', price: 300, description: 'Grants 10% Fire resistance for 10 turns.', effect: { type: 'resist_fire', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
+    'waterdam_potion': { name: 'Waterdam Potion', type: 'buff', price: 300, description: 'Grants 10% Water resistance for 10 turns.', effect: { type: 'resist_water', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
+    'gustshield_potion': { name: 'Gustshield Potion', type: 'buff', price: 300, description: 'Grants 10% Wind resistance for 10 turns.', effect: { type: 'resist_wind', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
+    'quakestable_potion': { name: 'Quakestable Potion', type: 'buff', price: 300, description: 'Grants 10% Earth resistance for 10 turns.', effect: { type: 'resist_earth', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
+    'strikestop_potion': { name: 'Strikestop Potion', type: 'buff', price: 300, description: 'Grants 10% Lightning resistance for 10 turns.', effect: { type: 'resist_lightning', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
+    'growthstall_potion': { name: 'Growthstall Potion', type: 'buff', price: 300, description: 'Grants 10% Nature resistance for 10 turns.', effect: { type: 'resist_nature', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
+    'sundown_potion': { name: 'Sundown Potion', type: 'buff', price: 300, description: 'Grants 10% Light resistance for 10 turns.', effect: { type: 'resist_light', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
+    'sunrise_potion': { name: 'Sunrise Potion', type: 'buff', price: 300, description: 'Grants 10% Void resistance for 10 turns.', effect: { type: 'resist_void', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
+    'blazeback_potion': { name: 'Blazeback Potion', type: 'buff', price: 800, description: 'Grants 20% Fire resistance for 10 turns.', effect: { type: 'resist_fire', multiplier: 0.80, duration: 10 } },
+    'floodwall_potion': { name: 'Floodwall Potion', type: 'buff', price: 800, description: 'Grants 20% Water resistance for 10 turns.', effect: { type: 'resist_water', multiplier: 0.80, duration: 10 } },
+    'stormsapper_potion': { name: 'Stormsapper Potion', type: 'buff', price: 800, description: 'Grants 20% Wind resistance for 10 turns.', effect: { type: 'resist_wind', multiplier: 0.80, duration: 10 } },
+    'fissurewalker_potion': { name: 'Fissurewalker Potion', type: 'buff', price: 800, description: 'Grants 20% Earth resistance for 10 turns.', effect: { type: 'resist_earth', multiplier: 0.80, duration: 10 } },
+    'thunderground_potion': { name: 'Thunderground Potion', type: 'buff', price: 800, description: 'Grants 20% Lightning resistance for 10 turns.', effect: { type: 'resist_lightning', multiplier: 0.80, duration: 10 } },
+    'jungleward_potion': { name: 'Jungleward Potion', type: 'buff', price: 800, description: 'Grants 20% Nature resistance for 10 turns.', effect: { type: 'resist_nature', multiplier: 0.80, duration: 10 } },
+    'smitestopper_potion': { name: 'Smitestopper Potion', type: 'buff', price: 800, description: 'Grants 20% Light resistance for 10 turns.', effect: { type: 'resist_light', multiplier: 0.80, duration: 10 } },
+    'voidshield_potion': { name: 'Voidshield Potion', type: 'buff', price: 800, description: 'Grants 20% Void resistance for 10 turns.', effect: { type: 'resist_void', multiplier: 0.80, duration: 10 } },
+
+    // Experimental Potions
+    'mysterious_concoction_t1': { name: 'Mysterious Concoction (Tier 1)', type: 'experimental', tier: 1, price: 10, description: 'An unpredictable brew. Who knows what it does? Drink up and find out.' },
+    'mysterious_concoction_t2': { name: 'Mysterious Concoction (Tier 2)', type: 'experimental', tier: 2, price: 50, description: 'A complex and unstable mixture. Potentially powerful, potentially poisonous.' },
+    'mysterious_concoction_t3': { name: 'Mysterious Concoction (Tier 3)', type: 'experimental', tier: 3, price: 150, description: 'This barely-contained liquid chaos could change your fate... or just give you a stomach ache.' },
+
+
+    // --- Ingredients & Materials ---
+    // Junk (for selling)
     'goblin_ear': {name: 'Goblin Ear', type: 'junk', price: 5, description: "A grotesque trophy."},
     'wolf_pelt': {name: 'Wolf Pelt', type: 'junk', price: 12, description: "A thick and coarse pelt."},
     'rat_tail': {name: 'Rat Tail', type: 'junk', price: 2, description: "It's... a rat tail."},
     'spider_venom': {name: 'Spider Venom', type: 'junk', price: 10, description: "A vial of potent venom."},
     'dragon_scale': {name: 'Dragon Scale', type: 'junk', price: 50, description: "A shimmering, nigh-indestructible scale."},
-    'rabbit_meat': {name: 'Rabbit Meat', type: 'junk', price: 4, description: "Could make a good stew."},
+    'rock': {name: 'Useless Rock', type: 'junk', price: 0, description: 'It... was probably something more interesting a moment ago.'},
+
+    // Food Ingredients
+    'rabbit_meat': {name: 'Rabbit Meat', type: 'food_ingredient', price: 4, description: "Could make a good stew.", cookingType: 'meat'},
+    'wolf_meat': {name: 'Wolf Meat', type: 'food_ingredient', price: 20, description: 'Tough and gamy, but filling.', cookingType: 'meat'},
+    'chicken_meat': {name: 'Chicken Meat', type: 'food_ingredient', price: 15, description: 'Surprisingly normal-tasting meat from a cockatrice.', cookingType: 'meat'},
+    'horse_meat': {name: 'Horse Meat', type: 'food_ingredient', price: 30, description: 'Meat from a unicorn. Tastes magical and a little sad.', cookingType: 'meat'},
+    'whale_meat': {name: 'Whale Meat', type: 'food_ingredient', price: 100, description: 'A massive cut of blubbery meat from a Livyatan.'},
+    'wild_wine': {name: 'Wild Wine', type: 'food_ingredient', price: 25, description: 'A rough, potent wine favored by bandits and outlaws.', alchemyType: 'catalyst'},
+
+    // Alchemy Ingredients
     'chimera_claw': {name: 'Chimera Claw', type: 'alchemy', price: 200, description: 'A razor-sharp claw from a Chimera, still dripping with poison.'},
     'orc_liver': { name: 'Orc Liver', type: 'alchemy', price: 25, description: 'A key ingredient for strength potions.' },
     'cockatrice_venom_gland': { name: 'Cockatrice Venom Gland', type: 'alchemy', price: 40, description: 'Can be used to create potions that harden the skin.' },
     'unicorn_horn_fragment': { name: 'Unicorn Horn Fragment', type: 'alchemy', price: 100, description: 'A shard of a unicorn horn, brimming with purifying magic.' },
-    'slime_glob': { name: 'Slime Glob', type: 'alchemy', price: 8, description: 'A versatile, gelatinous substance.' },
+    'slime_glob': { name: 'Slime Glob', type: 'alchemy', price: 8, description: 'A versatile, gelatinous substance.', alchemyType: 'catalyst' },
     'soul_armor_shard': { name: 'Soul Armor Shard', type: 'alchemy', price: 500, description: 'A fragment of a Living Armor, humming with contained spiritual energy.' },
     'vacuum_lining': { name: 'Vacuum Lining', type: 'alchemy', price: 1500, description: 'A strange, reality-warping membrane from inside a Livyatan.'},
     'mountain_rock': { name: 'Mountain Rock', type: 'alchemy', price: 1000, description: 'A chunk of rock humming with the power of a mountain.'},
     'dragon_heart_item': { name: 'Dragon Heart', type: 'alchemy', price: 2000, description: 'The still-warm heart of a slain dragon.'},
     'void_heart': { name: 'Void Heart', type: 'alchemy', price: 2000, description: 'A pulsating shard of darkness from a Dullahan.'},
+    'troll_blood': {name: 'Troll Blood', type: 'alchemy', price: 50, description: 'Viscous, green blood that slowly regenerates. A powerful alchemical ingredient.', alchemyType: 'catalyst'},
+
+    // --- Special & Crafting Items ---
     'undying_heart': { name: 'Undying Heart', type: 'special', price: 1000, description: 'A pulsating heart that refuses to stop beating. Can be equipped to grant a single revival per day.' },
-    'strength_potion': { name: 'Strength Potion', type: 'buff', price: 150, effect: { type: 'strength', multiplier: 1.5, duration: 4 }, description: 'Temporarily increases physical damage.' },
-    'stonehide_potion': { name: 'Stonehide Potion', type: 'buff', price: 200, effect: { type: 'stonehide', multiplier: 2, duration: 4 }, description: 'Temporarily increases defense.' },
-    'cleansing_potion': { name: 'Cleansing Potion', type: 'cleanse', price: 250, description: 'Removes all negative status effects.' },
-    'fire_essence': { name: 'Fire Essence', type: 'enchant', price: 100, description: 'The pure, searing essence of fire.' },
-    'water_essence': { name: 'Water Essence', type: 'enchant', price: 100, description: 'The pure, flowing essence of water.' },
-    'earth_essence': { name: 'Earth Essence', type: 'enchant', price: 100, description: 'The pure, stoic essence of earth.' },
-    'wind_essence': { name: 'Wind Essence', type: 'enchant', price: 100, description: 'The pure, rushing essence of wind.' },
-    'lightning_essence': { name: 'Lightning Essence', type: 'enchant', price: 100, description: 'The pure, crackling essence of lightning.' },
-    'nature_essence': { name: 'Nature Essence', type: 'enchant', price: 100, description: 'The pure, vibrant essence of nature.' },
-    'light_essence': { name: 'Light Essence', type: 'enchant', price: 100, description: 'The pure, radiant essence of light.' },
-    'void_essence': { name: 'Void Essence', type: 'enchant', price: 100, description: 'The pure, silent essence of the void.' },
-    'potion_of_brilliance': { name: 'Potion of Brilliance', type: 'buff', encounterDuration: 3, price: 500, effect: { type: 'temp_intelligence', multiplier: 1.25, duration: 3 }, description: 'Temporarily increases Magical Damage by 25% for 3 encounters.' },
-    'potion_of_clarity': { name: 'Potion of Clarity', type: 'buff', encounterDuration: 3, price: 500, effect: { type: 'temp_focus', multiplier: 1.25, duration: 3 }, description: 'Temporarily increases Max MP by 25% for 3 encounters.' },
+    'fire_essence': { name: 'Fire Essence', type: 'enchant', price: 100, description: 'The pure, searing essence of fire.', alchemyType: 'secondary_reagent' },
+    'water_essence': { name: 'Water Essence', type: 'enchant', price: 100, description: 'The pure, flowing essence of water.', alchemyType: 'secondary_reagent' },
+    'earth_essence': { name: 'Earth Essence', type: 'enchant', price: 100, description: 'The pure, stoic essence of earth.', alchemyType: 'secondary_reagent' },
+    'wind_essence': { name: 'Wind Essence', type: 'enchant', price: 100, description: 'The pure, rushing essence of wind.', alchemyType: 'secondary_reagent' },
+    'lightning_essence': { name: 'Lightning Essence', type: 'enchant', price: 100, description: 'The pure, crackling essence of lightning.', alchemyType: 'secondary_reagent' },
+    'nature_essence': { name: 'Nature Essence', type: 'enchant', price: 100, description: 'The pure, vibrant essence of nature.', alchemyType: 'secondary_reagent' },
+    'light_essence': { name: 'Light Essence', type: 'enchant', price: 100, description: 'The pure, radiant essence of light.', alchemyType: 'secondary_reagent' },
+    'void_essence': { name: 'Void Essence', type: 'enchant', price: 100, description: 'The pure, silent essence of the void.', alchemyType: 'secondary_reagent' },
     'bestiary_notebook': {name: 'Bestiary Notebook', type: 'key', price: 0, description: "A leather-bound book from a nervous researcher named Betty. Used to catalogue monster observations."},
-    // MODIFICATION: Added seeds for the garden
-    'sunpetal_seed': {name: 'Sunpetal Seed', type: 'seed', price: 50, description: "A seed that seems to glow with a faint, warm light."},
-    'moonbloom_seed': {name: 'Moonbloom Seed', type: 'seed', price: 50, description: "A dark, smooth seed that feels cool to the touch."}
+    // --- Gardening ---
+    // Seeds
+    'blackwheat_seed': {name: 'Blackwheat Seed', type: 'seed', price: 15, rarity: 'Common', description: 'A common seed for a hardy grain.'},
+    'cinnamonwood_seed': {name: 'Cinnamonwood Seed', type: 'seed', price: 15, rarity: 'Common', description: 'A common seed for a fragrant tree.'},
+    'brineflower_seed': { name: 'Brineflower Seed', type: 'seed', price: 100, rarity: 'Uncommon', description: 'An uncommon seed for a salt-tolerant flower.' },
+    'beetsnip_seed': {name: 'Beetsnip Carrot Seed', type: 'seed', price: 15, rarity: 'Common', description: 'A common seed for a sweet root vegetable.'},
+    'sunshine_flower_seed': { name: 'Sunshine Flower Seed', type: 'seed', price: 50, rarity: 'Uncommon', description: 'An uncommon seed for a bright, cheerful flower.' },
+    'sealotus_lily_seed': { name: 'Sealotus Lily Seed', type: 'seed', price: 50, rarity: 'Uncommon', description: 'An uncommon seed for a beautiful water lily.' },
+    'sweet_dandelion_seed': { name: 'Sweet Dandelion Seed', type: 'seed', price: 50, rarity: 'Uncommon', description: 'An uncommon seed for a surprisingly tasty weed.' },
+    'ground_tater_seed': { name: 'Ground Tater Seed', type: 'seed', price: 50, rarity: 'Uncommon', description: 'An uncommon seed for a starchy tuber.' },
+    'fulgurbloom_seed': { name: 'Fulgurbloom Seed', type: 'seed', price: 50, rarity: 'Uncommon', description: 'An uncommon seed that crackles with faint energy.' },
+    'orchidvine_seed': { name: 'Orchidvine Seed', type: 'seed', price: 50, rarity: 'Uncommon', description: 'An uncommon seed for a climbing vine with exotic fruit.' },
+    'lantern_rose_seed': { name: 'Lantern Rose Seed', type: 'seed', price: 50, rarity: 'Uncommon', description: 'An uncommon seed for a flower that glows faintly.' },
+    'blackleaf_seed': { name: 'Blackleaf Seed', type: 'seed', price: 50, rarity: 'Uncommon', description: 'An uncommon seed for a plant with dark, mysterious leaves.' },
+    'koriandre_seed': { name: 'Koriandre Seed', type: 'seed', price: 50, rarity: 'Uncommon', description: 'An uncommon seed for a pungent herb.' },
+    'jet_pepper_seed': { name: 'Jet Pepper Seed', type: 'seed', price: 50, rarity: 'Uncommon', description: 'An uncommon seed for a spicy pepper.' },
+    'dragon_chili_seed': { name: 'Dragon Chili Seed', type: 'seed', price: 50, rarity: 'Uncommon', description: 'An uncommon seed for an intensely hot chili.' },
+    'screaming_lotus_seed': { name: 'Screaming Lotus Seed', type: 'seed', price: 15, rarity: 'Common', description: 'A common seed that seems to vibrate.' },
+    'maizemother_seed': { name: 'Maizemother Seed', type: 'seed', price: 150, rarity: 'Rare', description: 'A rare seed for a massive, multi-colored corn.' },
+    
+    // Saplings
+    'crystal_apple_sapling': { name: 'Crystal Apple Sapling', type: 'sapling', price: 250, rarity: 'Rare', description: 'A rare sapling that will grow into a tree bearing crystalline apples.' },
+    'exploding_citrus_sapling': { name: 'Exploding Citrus Sapling', type: 'sapling', price: 250, rarity: 'Rare', description: 'A rare sapling for a tree with... volatile fruit.' },
+    'blood_peach_sapling': { name: 'Blood Peach Sapling', type: 'sapling', price: 250, rarity: 'Rare', description: 'A rare sapling for a tree that produces deep red, life-giving peaches.' },
+    'ice_cherry_sapling': { name: 'Ice Cherry Sapling', type: 'sapling', price: 250, rarity: 'Rare', description: 'A rare sapling that grows cherries with a chilling effect.' },
+
+    // Harvested Plants
+    'blackwheat': {name: 'Blackwheat', type: 'food_ingredient', price: 30, rarity: 'Common', description: 'A dark, hardy grain.', alchemyType: 'secondary_reagent', cookingType: 'veggie'},
+    'cinnamonwood_log': {name: 'Cinnamonwood Log', type: 'food_ingredient', price: 30, rarity: 'Common', description: 'A fragrant log.', alchemyType: 'secondary_reagent', cookingType: 'veggie'},
+    'brineflower_leaf': {name: 'Brineflower Leaf', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'A salty leaf.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
+    'beetsnip_carrot': {name: 'Beetsnip Carrot', type: 'food_ingredient', price: 30, rarity: 'Common', description: 'A sweet and earthy root vegetable.', alchemyType: 'secondary_reagent', cookingType: 'veggie'},
+    'sunshine_flower': {name: 'Sunshine Flower', type: 'alchemy', price: 100, rarity: 'Uncommon', description: 'A flower that radiates warmth.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
+    'sealotus_pad': {name: 'Sealotus Pad', type: 'alchemy', price: 100, rarity: 'Uncommon', description: 'A lily pad with calming properties.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
+    'sweet_dandelion': {name: 'Sweet Dandelion', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'A tasty, edible flower.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
+    'ground_tater': {name: 'Ground Tater', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'A large, starchy potato.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
+    'fulgurbloom': {name: 'Fulgurbloom', type: 'alchemy', price: 100, rarity: 'Uncommon', description: 'A flower that crackles with electrical energy.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
+    'orchidvine_fruit': {name: 'Orchidvine Fruit', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'An exotic and flavorful fruit.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
+    'lantern_rose': {name: 'Lantern Rose', type: 'alchemy', price: 100, rarity: 'Uncommon', description: 'A rose that gives off a soft, steady light.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
+    'blackleaf': {name: 'Blackleaf', type: 'alchemy', price: 100, rarity: 'Uncommon', description: 'A leaf used in shadowy concoctions.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
+    'koriandre_sprig': {name: 'Koriandre Sprig', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'A sprig of a strong, pungent herb.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
+    'jet_pepper': {name: 'Jet Pepper', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'A very spicy pepper.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
+    'dragon_chili': {name: 'Dragon Chili', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'An excruciatingly hot chili.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
+    'screaming_lotus': { name: 'Screaming Lotus', type: 'alchemy', price: 30, rarity: 'Common', description: 'A flower that emits a low hum.', alchemyType: 'secondary_reagent', cookingType: 'veggie' },
+    'maizemother_cob': {name: 'Maizemother Cob', type: 'food_ingredient', price: 300, rarity: 'Rare', description: 'A massive cob of corn with kernels like jewels.', cookingType: 'veggie'},
+    'crystal_apple': {name: 'Crystal Apple', type: 'food_ingredient', price: 500, rarity: 'Rare', description: 'A crisp apple with translucent, crystalline flesh.', alchemyType: 'secondary_reagent'},
+    'exploding_citrus': {name: 'Exploding Citrus', type: 'alchemy', price: 500, rarity: 'Rare', description: 'A citrus fruit that fizzes and pops. Handle with care.', alchemyType: 'secondary_reagent'},
+    'blood_peach': {name: 'Blood Peach', type: 'food_ingredient', price: 500, rarity: 'Rare', description: 'A juicy peach with deep red flesh that invigorates the body.', alchemyType: 'secondary_reagent'},
+    'ice_cherry': {name: 'Ice Cherry', type: 'food_ingredient', price: 500, rarity: 'Rare', description: 'A cherry that is perpetually cold to the touch.', alchemyType: 'secondary_reagent'}
 };
+
+const SEEDS = {
+    // Common - 15 mins
+    'blackwheat_seed': { growsInto: 'blackwheat', growthTime: 15 * 60 * 1000 },
+    'cinnamonwood_seed': { growsInto: 'cinnamonwood_log', growthTime: 15 * 60 * 1000 },
+    'beetsnip_seed': { growsInto: 'beetsnip_carrot', growthTime: 15 * 60 * 1000 },
+    'screaming_lotus_seed': { growsInto: 'screaming_lotus', growthTime: 15 * 60 * 1000 },
+    
+    // Uncommon - 1 hour
+    'brineflower_seed': { growsInto: 'brineflower_leaf', growthTime: 60 * 60 * 1000 },
+    'sunshine_flower_seed': { growsInto: 'sunshine_flower', growthTime: 60 * 60 * 1000 },
+    'sealotus_lily_seed': { growsInto: 'sealotus_pad', growthTime: 60 * 60 * 1000 },
+    'sweet_dandelion_seed': { growsInto: 'sweet_dandelion', growthTime: 60 * 60 * 1000 },
+    'ground_tater_seed': { growsInto: 'ground_tater', growthTime: 60 * 60 * 1000 },
+    'fulgurbloom_seed': { growsInto: 'fulgurbloom', growthTime: 60 * 60 * 1000 },
+    'orchidvine_seed': { growsInto: 'orchidvine_fruit', growthTime: 60 * 60 * 1000 },
+    'lantern_rose_seed': { growsInto: 'lantern_rose', growthTime: 60 * 60 * 1000 },
+    'blackleaf_seed': { growsInto: 'blackleaf', growthTime: 60 * 60 * 1000 },
+    'koriandre_seed': { growsInto: 'koriandre_sprig', growthTime: 60 * 60 * 1000 },
+    'jet_pepper_seed': { growsInto: 'jet_pepper', growthTime: 60 * 60 * 1000 },
+    'dragon_chili_seed': { growsInto: 'dragon_chili', growthTime: 60 * 60 * 1000 },
+
+    // Rare - 3 hours
+    'maizemother_seed': { growsInto: 'maizemother_cob', growthTime: 3 * 60 * 60 * 1000 },
+    'crystal_apple_sapling': { growsInto: 'crystal_apple', growthTime: 3 * 60 * 60 * 1000 },
+    'exploding_citrus_sapling': { growsInto: 'exploding_citrus', growthTime: 3 * 60 * 60 * 1000 },
+    'blood_peach_sapling': { growsInto: 'blood_peach', growthTime: 3 * 60 * 60 * 1000 },
+    'ice_cherry_sapling': { growsInto: 'ice_cherry', growthTime: 3 * 60 * 60 * 1000 }
+};
+
 const LURES = {
     'no_lure': { name: 'None', price: 0, description: 'No lure equipped.' },
     'goblin_scent_gland': { name: 'Goblin Scent Gland', price: 50, description: 'The potent smell seems to attract goblins.', lureTarget: 'goblin', uses: 5 },
@@ -535,6 +772,47 @@ const LURES = {
     'silken_cocoon': { name: 'Silken Cocoon', price: 150, description: 'A pulsating cocoon that attracts large, hungry spiders.', lureTarget: 'cave_spider', uses: 5 },
     'petrified_field_mouse': { name: 'Petrified Field Mouse', price: 175, description: 'The sight of this statue seems to attract the territorial gaze of a Cockatrice.', lureTarget: 'cockatrice', uses: 5 },
     'grave_dust': { name: 'Grave Dust', price: 200, description: 'A pouch of dust from a desecrated grave. It calls to those who command the dead.', lureTarget: 'necromancer', uses: 5 }
+};
+
+const HOME_IMPROVEMENTS = {
+    storage: {
+        name: 'Storage Solutions',
+        upgrades: [
+            { name: 'Expanded Chest', description: 'Upgrades storage to 25 unique item slots, with stacks up to 25.', cost: 400, limits: { unique: 25, stack: 25 } },
+            { name: 'Walk-in Closet', description: 'Upgrades storage to 50 unique item slots, with stacks up to 50.', cost: 1600, limits: { unique: 50, stack: 50 } },
+            { name: 'The Vault', description: 'Upgrades storage to 100 unique item slots, with stacks up to 100.', cost: 6000, limits: { unique: 100, stack: 100 } }
+        ]
+    },
+    garden: {
+        name: 'Landscaping Services',
+        upgrades: [
+            { name: 'Garden Reclamation', description: 'Unlocks a basic 2x2 farming plot in your backyard.', cost: 300, size: {width: 2, height: 2} },
+            { name: 'Fertile Fields', description: 'Expands the garden to a 4x4 plot.', cost: 1200, size: {width: 4, height: 4} },
+            { name: 'Arboretum Annex', description: 'Expands the garden to 6x6 and adds a special 2x2 plot for a tree.', cost: 5000, size: {width: 6, height: 6}, treeSize: {width: 2, height: 2} },
+            { name: 'Grove of Plenty', description: 'Maximizes the garden to 8x8 with a larger 3x3 tree plot.', cost: 14000, size: {width: 8, height: 8}, treeSize: {width: 3, height: 3} }
+        ]
+    },
+    kitchen: {
+        name: 'Culinary Corner',
+        upgrades: [
+            { name: 'Kitchen & Pantry', description: 'Unlocks a new "Cooking" interface in your house to create stat-boosting foods.', cost: 1000 }
+        ]
+    },
+    alchemy: {
+        name: 'Alchemical Ambitions',
+        upgrades: [
+            { name: 'Home Alchemy Set', description: 'Allows you to brew basic Tier 1 potions (Health, Mana, etc.) at home.', cost: 1200 },
+            { name: 'Professional Alembic', description: 'Upgrades your set to brew more complex Tier 2 potions.', cost: 8000 },
+            { name: 'Magnum Opus Laboratory', description: 'The ultimate setup, allowing you to craft the most powerful Tier 3 concoctions.', cost: 24000 }
+        ]
+    },
+    training: {
+        name: 'Combat & Conditioning',
+        upgrades: [
+            { name: 'Sparring Circle', description: 'Unlocks a "Train" option for a simple 1v1 battle against a dummy to test your damage.', cost: 4000 },
+            { name: 'Arena of Champions', description: 'Upgrades the training grounds to a fully customizable arena. Select grids and enemies from your Bestiary.', cost: 40000 }
+        ]
+    }
 };
 
 const SPELLS = {
@@ -617,7 +895,7 @@ const SPELLS = {
         tiers: [
             { name: 'Tremorstrike', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'earth_essence': 10 }, description: "Slam your power into the ground, creating a localized tremor to stagger nearby foes." },
             { name: 'Earthquake', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'earth_essence': 20 }, description: "Shake the very foundations of the earth, causing the ground to rupture and damage your enemies." },
-            { name: 'Ravine Creation', cost: 60, damage: [6, 6], cap: 10, description: "Violently tear the earth asunder, crushing all caught within the cataclysm." }
+            { name: 'Ravine Creation', cost: 60, damage: [6, 6], cap: 10, description: "Violently tear the earth asunder, crushing all who stand against you." }
         ]
     },
     'earth_support': {
@@ -758,53 +1036,6 @@ const SPELLS = {
     },
 };
 
-const MONSTER_SPECIES = {
-    // Tier 1
-    'goblin': { key: 'goblin', emoji: '👺', name: 'Goblin', class: 'Humanoid', tier: 1, base_hp: 20, base_strength: 3, base_defense: 0, range: 1, movement: { speed: 2, type: 'ground' }, base_xp: 25, base_gold: 15, spell_resistance: 0.05, loot_table: {'health_potion': 0.1, 'goblin_ear': 0.5, 'dagger': 0.1, 'rusty_sword': 0.15, 'wooden_shield': 0.05, 'wooden_wand': 0.02} },
-    'rabid_rabbit': { key: 'rabid_rabbit', emoji: '🐇', name: 'Rabid Rabbit', class: 'Beast', tier: 1, base_hp: 25, base_strength: 2, base_defense: 1, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 25, base_gold: 8, spell_resistance: 0, loot_table: {'rabbit_meat': 0.6} },
-    'slime': { key: 'slime', emoji: '🦠', name: 'Slime', class: 'Monstrosity', tier: 1, base_hp: 28, base_strength: 2, base_defense: 2, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 22, base_gold: 10, spell_resistance: 0.1, loot_table: {'slime_glob': 0.5}, damage_type: 'magical' },
-    'skeleton': { key: 'skeleton', emoji: '💀', name: 'Skeleton', class: 'Undead', tier: 1, base_hp: 18, base_strength: 3, base_defense: 2, range: 1, movement: { speed: 2, type: 'ground' }, base_xp: 20, base_gold: 10, spell_resistance: 0.1, loot_table: {'rusty_sword': 0.1, 'dagger': 0.05, 'wooden_shield': 0.05, 'iron_buckler': 0.03, 'cracked_orb': 0.02, 'undying_heart': 0.02, 'grave_scythe': 0.005} },
-    
-    // Tier 2
-    'bandit': { key: 'bandit', emoji: '🤠', name: 'Bandit', class: 'Humanoid', tier: 2, base_hp: 45, base_strength: 8, base_defense: 3, range: 4, movement: { speed: 2, type: 'ground' }, base_xp: 50, base_gold: 30, spell_resistance: 0.05, loot_table: {'health_potion': 0.25, 'dagger': 0.15, 'rusty_sword': 0.1, 'steel_longsword': 0.05, 'iron_kite_shield': 0.05, 'iron_buckler': 0.05, 'padded_leather': 0.08, 'silenced_leather_armor': 0.02, 'hardwood_staff': 0.02} },
-    'dire_wolf': { key: 'dire_wolf', emoji: '🐺', name: 'Dire Wolf', class: 'Beast', tier: 2, base_hp: 60, base_strength: 6, base_defense: 2, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 40, base_gold: 15, spell_resistance: 0, loot_table: {'health_potion': 0.15, 'wolf_pelt': 0.4} },
-    'giant_rat': { key: 'giant_rat', emoji: '🐀', name: 'Giant Rat', class: 'Monstrosity', tier: 2, base_hp: 40, base_strength: 5, base_defense: 1, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 35, base_gold: 10, spell_resistance: 0, loot_table: {'rat_tail': 0.6} },
-    'armored_zombie': { key: 'armored_zombie', emoji: '🧟', name: 'Armored Zombie', class: 'Undead', tier: 2, base_hp: 50, base_strength: 7, base_defense: 5, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 45, base_gold: 20, spell_resistance: 0.15, loot_table: {'dagger': 0.05, 'steel_longsword': 0.08, 'heavy_greatsword': 0.03, 'iron_kite_shield': 0.05, 'brass_shield': 0.03, 'padded_leather': 0.05, 'chainmail_armor': 0.03, 'magical_orb': 0.02, 'undying_heart': 0.05, 'grave_scythe': 0.02, 'elemental_sword': 0.01}, damage_type: 'magical' },
-    
-    // Tier 3
-    'orc_berserker': { key: 'orc_berserker', emoji: '👹', name: 'Orc Berserker', class: 'Humanoid', tier: 3, ability: 'enrage', base_hp: 70, base_strength: 12, base_defense: 4, range: 1, movement: { speed: 2, type: 'ground' }, base_xp: 80, base_gold: 40, spell_resistance: 0.1, loot_table: {'health_potion': 0.3, 'steel_longsword': 0.1, 'heavy_greatsword': 0.08, 'obsidian_axe': 0.05, 'sunderers_battleaxe': 0.02, 'orc_liver': 0.3, 'brass_shield': 0.05, 'titanium_parrying_shield': 0.02, 'chainmail_armor': 0.05, 'half_plate_armor': 0.02, 'cypresswood_staff': 0.02, 'dual_longswords': 0.02, 'bone_club': 0.1} },
-    'cave_spider': { key: 'cave_spider', emoji: '🕷️', name: 'Cave Spider', class: 'Beast', tier: 3, ability: 'poison_web', base_hp: 90, base_strength: 9, base_defense: 3, range: 3, movement: { speed: 2, type: 'ground' }, base_xp: 75, base_gold: 30, spell_resistance: 0, loot_table: {'spider_venom': 0.5, 'eye_of_medusa': 0.01} },
-    'cockatrice': { key: 'cockatrice', emoji: '🐔', name: 'Cockatrice', class: 'Monstrosity', tier: 3, ability: 'petrification', base_hp: 80, base_strength: 10, base_defense: 5, range: 1, movement: { speed: 3, type: 'flying' }, base_xp: 90, base_gold: 50, spell_resistance: 0.2, loot_table: {'cockatrice_venom_gland': 0.3, 'eye_of_medusa': 0.02, 'arcane_focus': 0.02, 'elemental_sword': 0.02}, damage_type: 'magical' },
-    'necromancer': { key: 'necromancer', emoji: '🧙', name: 'Necromancer', class: 'Undead', tier: 3, ability: 'necromancy', base_hp: 60, base_strength: 8, base_defense: 2, range: 5, movement: { speed: 1, type: 'ground' }, base_xp: 100, base_gold: 60, spell_resistance: 0.3, loot_table: {'mana_potion': 0.2, 'vampiric_dagger': 0.02, 'assassin_cloak_armor': 0.02, 'staff_of_loss': 0.02, 'archmages_robes': 0.01, 'undying_heart': 0.1, 'grave_scythe': 0.03, 'headless_executioner': 0.01, 'elemental_sword': 0.02}, damage_type: 'magical' },
-    
-    // Tier 4
-    'one_eyed_troll': { key: 'one_eyed_troll', emoji: '👺', name: 'One-Eyed Troll', class: 'Humanoid', tier: 4, ability: 'ultra_focus', base_hp: 150, base_strength: 20, base_defense: 8, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 350, base_gold: 175, spell_resistance: 0.1, loot_table: {'superior_health_potion': 0.2, 'obsidian_axe': 0.08, 'sunderers_battleaxe': 0.04, 'heavy_slabshield': 0.03, 'steel_plate_armor': 0.03, 'staff_of_the_magi': 0.01, 'trollblood_shield': 0.03, 'bone_club': 0.15, 'trolls_knight_sword': 0.05} },
-    'unicorn': { key: 'unicorn', emoji: '🦄', name: 'Unicorn', class: 'Beast', tier: 4, ability: 'healing', base_hp: 170, base_strength: 15, base_defense: 5, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 320, base_gold: 160, spell_resistance: 0.25, loot_table: {'unicorn_horn_fragment': 0.5, 'golden_greatbow': 0.05, 'obsidian_lamina': 0.02, 'purifying_crystal_shield': 0.02, 'elemental_sword': 0.03}, damage_type: 'magical' },
-    'chimera': { key: 'chimera', emoji: '🦁', name: 'Chimera', class: 'Monstrosity', tier: 4, ability: 'true_poison', base_hp: 160, base_strength: 18, base_defense: 10, range: 3, movement: { speed: 3, type: 'flying' }, base_xp: 400, base_gold: 200, spell_resistance: 0.15, loot_table: {'golden_greatbow': 0.03, 'eye_of_medusa': 0.03, 'crystal_ball': 0.01, 'spellblade_of_echoes': 0.03, 'chimera_claw': 0.3, 'elemental_sword': 0.03, 'condensed_health_potion': 0.3}, damage_type: 'magical' },
-    'living_armor': { key: 'living_armor', emoji: '🛡️', name: 'Living Armor', class: 'Undead', tier: 4, ability: 'living_shield', base_hp: 120, base_strength: 17, base_defense: 15, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 380, base_gold: 190, spell_resistance: 0.5, loot_table: {'obsidian_axe': 0.05, 'masterwork_spear': 0.08, 'tower_greatshield': 0.05, 'exa_reflector': 0.01, 'soul_armor_shard': 0.1, 'steel_plate_armor': 0.05, 'adamantine_armor': 0.01, 'spiked_retaliator': 0.02, 'mirror_mail': 0.01, 'undying_heart': 0.2, 'the_bloodletter': 0.03, 'unending_dance': 0.005, 'headless_executioner': 0.02, 'elemental_sword': 0.03, 'superior_health_potion': 0.1}, damage_type: 'hybrid' },
-    
-    // Tier 5
-    'mountain_goliath': { key: 'mountain_goliath', emoji: '⛰️', name: 'Mountain Goliath', class: 'Humanoid', tier: 5, ability: 'earthshaker', base_hp: 300, base_strength: 28, base_defense: 12, range: 1, movement: { speed: 1, type: 'ground' }, base_xp: 1200, base_gold: 600, spell_resistance: 0.15, loot_table: {'sunderers_battleaxe': 0.05, 'earthshaker_hammer': 0.01, 'heavy_slabshield': 0.02, 'mountain_rock': 0.1, 'bone_club': 0.2, 'giant_hunter': 0.005, 'superior_health_potion': 0.5} },
-    'livyatan': { key: 'livyatan', emoji: '🐳', name: 'Livyatan', class: 'Beast', tier: 5, ability: 'swallow', base_hp: 400, base_strength: 22, base_defense: 10, range: 1, movement: { speed: 2, type: 'flying' }, base_xp: 1100, base_gold: 550, spell_resistance: 0.1, loot_table: {'vacuum_greatbow': 0.01, 'lightning_javelin': 0.05, 'vacuum_lining': 0.2, 'giant_hunter': 0.005, 'elemental_sword': 0.05, 'superior_mana_potion': 0.4}, damage_type: 'magical' },
-    'dragon': { key: 'dragon', emoji: '🐉', name: 'Dragon', class: 'Monstrosity', tier: 5, ability: 'scorch_earth', base_hp: 350, base_strength: 25, base_defense: 18, range: 5, movement: { speed: 3, type: 'flying' }, base_xp: 1500, base_gold: 750, spell_resistance: 0.2, loot_table: {'dragon_scale': 0.5, 'dragon_scale_cragblade': 0.01, 'dragon_heart_item': 0.1, 'giant_hunter': 0.005, 'elemental_sword': 0.05, 'superior_health_potion': 0.5}, damage_type: 'hybrid' },
-    'dullahan': { key: 'dullahan', emoji: '👻', name: 'Dullahan', class: 'Undead', tier: 5, ability: 'alive_again', base_hp: 250, base_strength: 26, base_defense: 14, range: 1, movement: { speed: 3, type: 'ground' }, base_xp: 1350, base_gold: 700, spell_resistance: 0.25, loot_table: {'vampiric_dagger': 0.04, 'obsidian_lamina': 0.03, 'void_greatsword': 0.01, 'adamantine_armor': 0.02, 'void_heart': 0.1, 'undying_heart': 0.4, 'the_bloodletter': 0.04, 'headless_executioner': 0.03, 'giant_hunter': 0.005, 'elemental_sword': 0.05, 'superior_mana_potion': 0.4}, damage_type: 'hybrid' }
-};
-
-const MONSTER_RARITY = {
-    'common': {name: 'Common', multiplier: 1.0, rewardMultiplier: 1.0, rarityIndex: 1},
-    'uncommon': {name: 'Uncommon', multiplier: 1.2, rewardMultiplier: 1.3, rarityIndex: 2},
-    'rare': {name: 'Rare', multiplier: 1.5, rewardMultiplier: 1.8, rarityIndex: 3},
-    'epic': {name: 'Epic', multiplier: 2.0, rewardMultiplier: 2.5, rarityIndex: 4},
-    'legendary': {name: 'Legendary', multiplier: 2.5, rewardMultiplier: 3.5, rarityIndex: 5}
-};
-
-const MONSTER_CLASS_DAMAGE = {
-    'Humanoid': { baseDice: 1, dieSides: 8 },
-    'Beast': { baseDice: 2, dieSides: 4 },
-    'Monstrosity': { baseDice: 3, dieSides: 3 },
-    'Undead': { baseDice: 1, dieSides: 6 }
-};
-
 const QUESTS = {
         'exterminate_goblin': { tier: 1, title: 'Goblin Cull', target: 'goblin', required: 10, reward: { xp: 375, gold: 150 }, description: 'The forest is overrun with goblins. Thin their numbers.' },
         'exterminate_rabid_rabbit': { tier: 1, title: 'Rabbit Stew', target: 'rabid_rabbit', required: 10, reward: { xp: 300, gold: 75 }, description: 'A local hunter wants rabid rabbits gone. Permanently.' },
@@ -837,9 +1068,9 @@ const QUESTS = {
         'collect_dragon_scales': { tier: 5, title: 'Indestructible Armor', type: 'collection', target: 'dragon_scale', required: 5, reward: { xp: 800, gold: 500 }, description: 'The king\'s blacksmith wants to forge armor from the scales of a dragon.' },
         'collect_earthshaker': { tier: 5, title: 'Might of the Mountain', type: 'collection', target: 'earthshaker_hammer', required: 1, reward: { xp: 5000, gold: 12000 }, description: 'The Dwarven king will pay handsomely for the return of the legendary Earthshaker Hammer.' },
         
-        'brew_health_potions': { tier: 1, title: 'Basic Brewing', type: 'creation', target: 'health_potion', required: 5, reward: { xp: 100, gold: 200 }, description: 'The town alchemist needs a hand brewing a batch of basic Health Potions.' },
-        'brew_strength_potions': { tier: 3, title: 'Liquid Courage', type: 'creation', target: 'potion_of_giant_strength', required: 3, reward: { xp: 300, gold: 500 }, description: 'The captain of the guard wants Strength Potions to give his soldiers an edge.' },
-        'brew_cleansing_potions': { tier: 4, title: 'Purification Ritual', type: 'creation', target: 'potion_of_clarity', required: 2, reward: { xp: 500, gold: 600 }, description: 'The high priest needs Cleansing Potions for a temple ritual.' },
+        'brew_health_potions': { tier: 1, title: 'Basic Brewing', type: 'collection', target: 'health_potion', required: 5, reward: { xp: 100, gold: 200 }, description: 'The town alchemist needs a hand brewing a batch of basic Health Potions.' },
+        'brew_strength_potions': { tier: 3, title: 'Liquid Courage', type: 'collection', target: 'potion_of_giant_strength', required: 3, reward: { xp: 300, gold: 500 }, description: 'The captain of the guard wants Strength Potions to give his soldiers an edge.' },
+        'brew_cleansing_potions': { tier: 4, title: 'Purification Ritual', type: 'collection', target: 'potion_of_clarity', required: 2, reward: { xp: 500, gold: 600 }, description: 'The high priest needs Cleansing Potions for a temple ritual.' },
 };
 
 const LEGACY_QUESTS = {
@@ -853,8 +1084,52 @@ const LEGACY_QUESTS = {
     }
 };
 
+const MYSTERIOUS_CONCOCTION_EFFECTS = {
+    good: [
+        { message: "You feel a surge of insight! You've gained some experience!", apply: (p) => p.gainXp(Math.floor(p.xpToNextLevel * 0.2)) },
+        { message: "Your senses sharpen! You can spot weaknesses more easily!", apply: (p) => p.statusEffects.bonus_crit = { duration: 10, critChance: 0.15 } },
+        { message: "You feel light on your feet!", apply: (p) => p.statusEffects.bonus_speed = { duration: 10, move: 2, dodge: 0.1 } },
+        { message: "Your reach extends unnaturally!", apply: (p) => p.statusEffects.bonus_range = { duration: 10, range: 2 } },
+        { message: "A shimmering barrier forms around you!", apply: (p) => p.statusEffects.alchemical_barrier = { duration: Infinity, hp: Math.floor(p.maxHp * 0.2) } },
+    ],
+    bad: [
+        { message: "The potion burns on the way down, sapping your vitality!", apply: (p) => p.takeDamage(Math.floor(p.maxHp * 0.05), true) },
+        { message: "Your connection to the arcane feels weak...", apply: (p) => p.statusEffects.magic_dampen = { duration: 10, multiplier: 0.5 } },
+        { message: "You feel a chilling vulnerability to a random element!", apply: (p) => { const elements = ['fire', 'water', 'earth', 'wind', 'lightning', 'nature']; p.statusEffects.elemental_vuln = { duration: 10, element: elements[Math.floor(Math.random() * elements.length)] }; } },
+        { message: "Your legs feel heavy and slow.", apply: (p) => p.statusEffects.slowed = { duration: 10, move: -2 } },
+        { message: "Your vision blurs, making it hard to aim.", apply: (p) => p.statusEffects.inaccurate = { duration: 10, accuracy: -0.2 } },
+        { message: "You feel a strange pull, as if monsters are drawn to you.", apply: (p) => p.statusEffects.monster_lure = { duration: 10 } },
+        { message: "You feel clumsy and exposed.", apply: (p) => p.statusEffects.clumsy = { duration: 10, dodge: -0.2 } },
+        { message: "Your hands tremble, making every action uncertain.", apply: (p) => p.statusEffects.fumble = { duration: 10, chance: 0.2 } },
+        { message: "The concoction drains your energy!", apply: (p) => { p.mp = Math.floor(p.mp * 0.5); } },
+        { message: "A jinx! One of your items has transformed!", apply: (p) => { const consumables = Object.keys(p.inventory.items).filter(k => ITEMS[k] && ITEMS[k].type !== 'key' && ITEMS[k].type !== 'junk' && k !== 'mysterious_concoction_t1' && k !== 'mysterious_concoction_t2' && k !== 'mysterious_concoction_t3'); if(consumables.length > 0) { const itemToJinx = consumables[Math.floor(Math.random()*consumables.length)]; p.inventory.items[itemToJinx]--; if(p.inventory.items[itemToJinx] <= 0) delete p.inventory.items[itemToJinx]; p.addToInventory('rock', 1, false); } } },
+    ]
+};
+
+const RECIPE_DROPS_BY_TIER = {
+    cooking: {
+        1: ['recipe_rabbit_roast', 'recipe_humming_medley', 'recipe_fortifying_meat_pie', 'recipe_spiced_root_stew', 'recipe_hunters_lunch', 'recipe_travelers_skewer', 'recipe_sages_loaf', 'recipe_hearty_grain_stew', 'recipe_clarifying_broth'],
+        2: ['recipe_spiced_wolf_steak', 'recipe_arcane_fruit_tart', 'recipe_loaded_tater', 'recipe_calming_tea_ceremony', 'recipe_lucky_greens_salad', 'recipe_fiery_meat_platter', 'recipe_focusing_stir_fry', 'recipe_restorative_bird_soup', 'recipe_salty_seafood_stew'],
+        3: ['recipe_steak_of_divine_power', 'recipe_crystalline_energy_tart', 'recipe_livyatans_grand_steak', 'recipe_nectar_of_the_soul', 'recipe_feast_of_fortune', 'recipe_alacrity_sorbet', 'recipe_mindfire_curry', 'recipe_phoenix_down_roast', 'recipe_abyssal_ambrosia']
+    },
+    alchemy: {
+        1: ['recipe_brew_health_potion_home', 'recipe_brew_mana_potion_home', 'recipe_brew_cinderstop', 'recipe_brew_dampclear', 'recipe_brew_windwail', 'recipe_brew_rockshut', 'recipe_brew_zapsipper', 'recipe_brew_vinekill', 'recipe_brew_lightcloser', 'recipe_brew_lampside'],
+        2: ['recipe_brew_condensed_health_potion_home', 'recipe_brew_condensed_mana_potion_home', 'recipe_brew_stonehide_potion_home', 'recipe_brew_hearthstall', 'recipe_brew_waterdam', 'recipe_brew_gustshield', 'recipe_brew_quakestable', 'recipe_brew_strikestop', 'recipe_brew_growthstall', 'recipe_brew_sundown', 'recipe_brew_sunrise'],
+        3: ['recipe_brew_superior_health_potion_home', 'recipe_brew_superior_mana_potion_home', 'recipe_brew_strength_potion_home', 'recipe_brew_blazeback', 'recipe_brew_floodwall', 'recipe_brew_stormsapper', 'recipe_brew_fissurewalker', 'recipe_brew_thunderground', 'recipe_brew_jungleward', 'recipe_brew_smitestopper', 'recipe_brew_voidshield']
+    }
+};
+
 const SHOP_INVENTORY = {
     'Potions & Items': ['health_potion', 'mana_potion', 'condensed_health_potion', 'condensed_mana_potion'],
+    'Seeds': ['blackwheat_seed', 'cinnamonwood_seed', 'brineflower_seed', 'beetsnip_seed'],
+    'Recipes': [
+        // Cooking Tier 1
+        'recipe_rabbit_roast', 'recipe_humming_medley', 'recipe_fortifying_meat_pie', 'recipe_spiced_root_stew',
+        // Alchemy Tier 1
+        'recipe_brew_health_potion_home', 'recipe_brew_mana_potion_home', 'recipe_brew_cinderstop',
+        'recipe_brew_dampclear', 'recipe_brew_windwail', 'recipe_brew_rockshut',
+        'recipe_brew_zapsipper', 'recipe_brew_vinekill', 'recipe_brew_lightcloser', 'recipe_brew_lampside'
+    ],
     'Weapons': ['rusty_sword', 'wooden_stick', 'soldiers_spear', 'farmers_glaive', 'parrying_dagger', 'light_scythe', 'flowing_blade'],
     'Gear': ['travelers_garb', 'leather_armor', 'padded_leather', 'wooden_shield']
 };
@@ -878,75 +1153,21 @@ const BLACK_MARKET_INVENTORY = {
     'Lures': ['goblin_scent_gland', 'sweet_grass_scent', 'rotten_cheese', 'chemical_lure', 'bandit_coin', 'wolf_musk', 'war_horn_fragment', 'silken_cocoon', 'petrified_field_mouse', 'grave_dust']
 };
 
-const ALCHEMY_RECIPES = {
-
-};
-
-const BLACKSMITH_RECIPES = {
-    'craft_earthshaker': { output: 'earthshaker_hammer', ingredients: { 'mountain_rock': 2 }, cost: 5000 },
-    'brew_purifying_shield': { output: 'purifying_crystal_shield', ingredients: { 'unicorn_horn_fragment': 5 }, cost: 1500 },
-    'brew_exa_reflector': { output: 'exa_reflector', ingredients: { 'soul_armor_shard': 1 }, cost: 2500 },
-    'craft_soul_steel': { output: 'soul_steel_armor', ingredients: { 'soul_armor_shard': 5, 'adamantine_armor': 1 }, cost: 5000},
-    'craft_vacuum_encaser': { output: 'vacuum_encaser', ingredients: { 'vacuum_lining': 3 }, cost: 3000},
-    'craft_claw_of_chimera': { output: 'claw_of_chimera', ingredients: { 'chimera_claw': 2 }, cost: 1000 },
-    'craft_holy_beast_halberd': { output: 'holy_beast_halberd', ingredients: { 'unicorn_horn_fragment': 5 }, cost: 2500 },
-    'craft_livyatans_scaleclaw': { output: 'livyatans_scaleclaw', ingredients: { 'soul_armor_shard': 3, 'vacuum_lining': 2 }, cost: 8000 },
-    'craft_the_black_knife': { output: 'the_black_knife', ingredients: { 'void_heart': 1, 'vacuum_lining': 4 }, cost: 9000 },
-    'craft_grims_beloved': { output: 'grims_beloved', ingredients: { 'void_heart': 2, 'soul_armor_shard': 4 }, cost: 10000 },
-    'craft_giant_hunter': { output: 'giant_hunter', ingredients: { 'mountain_rock': 2, 'vacuum_lining': 2, 'dragon_scale': 2, 'void_heart': 2 }, cost: 15000 },
-    // MODIFICATION: Added recipe for blacksmith's hammer
-    'craft_blacksmiths_hammer': { output: 'blacksmiths_workhammer', ingredients: { 'dwarven_warhammer': 1, 'soul_armor_shard': 2 }, cost: 3000 }
-};
-
-const MAGIC_SHOP_RECIPES = {
-    'craft_mountain_carver': { output: 'mountain_carver', ingredients: { 'mountain_rock': 1 }, cost: 6000 },
-    'craft_deep_sea_staff': { output: 'deep_sea_staff', ingredients: { 'vacuum_lining': 1 }, cost: 6000 },
-    'craft_dragons_heart': { output: 'dragons_heart', ingredients: { 'dragon_heart_item': 1 }, cost: 7500 },
-    'craft_blackshadow_staff': { output: 'blackshadow_staff', ingredients: { 'void_heart': 1 }, cost: 9000 }
-};
-
-const ENCHANTING_COSTS = {
-    'Broken': { essence: 1, gold: 50 },
-    'Common': { essence: 5, gold: 250 },
-    'Uncommon': { essence: 10, gold: 500 },
-    'Rare': { essence: 15, gold: 1500 },
-    'Epic': { essence: 20, gold: 5000 },
-    'Legendary': { essence: 30, gold: 10000 }
-};
-
-const WITCH_COVEN_RECIPES = {
-    'transmute_fire_essence': { output: 'fire_essence', ingredients: { 'slime_glob': 5, 'goblin_ear': 2 }, cost: 100 },
-    'transmute_water_essence': { output: 'water_essence', ingredients: { 'slime_glob': 5, 'rat_tail': 2 }, cost: 100 },
-    'transmute_earth_essence': { output: 'earth_essence', ingredients: { 'slime_glob': 5, 'rabbit_meat': 2 }, cost: 100 },
-    'transmute_wind_essence': { output: 'wind_essence', ingredients: { 'slime_glob': 5, 'wolf_pelt': 2 }, cost: 100 },
-    'potion_giant_strength': { output: 'potion_of_giant_strength', ingredients: { 'orc_liver': 5 }, cost: 250, hearts: 1 },
-    'potion_fortitude': { output: 'potion_of_fortitude', ingredients: { 'cockatrice_venom_gland': 5 }, cost: 250, hearts: 1 },
-    'potion_brilliance': { output: 'potion_of_brilliance', ingredients: { 'spider_venom': 5 }, cost: 250, hearts: 1 },
-    'potion_clarity': { output: 'potion_of_clarity', ingredients: { 'unicorn_horn_fragment': 2 }, cost: 250, hearts: 1 },
-    'brew_health': { output: 'health_potion', ingredients: { 'slime_glob': 2 }, cost: 10 },
-    'brew_mana': { output: 'mana_potion', ingredients: { 'slime_glob': 2 }, cost: 15 },
-    'brew_condensed_health': { output: 'condensed_health_potion', ingredients: { 'slime_glob': 10 }, cost: 50 },
-    'brew_condensed_mana': { output: 'condensed_mana_potion', ingredients: { 'slime_glob': 10 }, cost: 60 },
-    'brew_super_health': { output: 'superior_health_potion', ingredients: { 'slime_glob': 20, 'orc_liver' : 2 }, cost: 100 },
-    'brew_super_mana': { output: 'superior_mana_potion', ingredients: { 'slime_glob': 20, 'cockatrice_venom_gland': 2 }, cost: 120 },
-};
-
-const WITCH_COVEN_SERVICES = {
-    resetStats: { gold: 5000, hearts: 5 },
-    changeRace: { gold: 10000, hearts: 10 },
-    changeClass: { gold: 10000, hearts: 10 },
-    changeBackground: { gold: 10000, hearts: 10 }
-};
 
 const CHANGELOG_DATA = [
     {
-        version: "v5.4 - The Welcome Home Update",
-        date: "2025-10-14",
+        version: "v0.6.1 - Hearth of the Home Update",
+        date: "2025-10-22",
         changes: [
-            "Added a tutorial. Now you have no excuse for losing to a rabbit.",
-            "The Library is open. Go read about monster weaknesses for a change.",
-            "Players can now own a house. Stop paying that greedy innkeeper.",
-            "Added difficulty sliders. Choose whether to breeze through or suffer."
+            "NEW CHARACTER OPTIONS! Master the arcane with the brilliant new <b>Artificer</b> Class! Soar to victory with the avian <b>Pinionfolk</b> Race! Your customization just hit MAX LEVEL!",
+            "MASSIVE EXPANSION! The <b>'Your House'</b> is now your personal, profit-generating fortress! Check out the five brand new modules you need RIGHT NOW:",
+            "    - <b>Storage Area (3 Sizes—Small, Medium, Large!):</b> Tired of inventory management? Dump your glorious loot safely! Never drop another legendary item!",
+            "    - <b>Garden Area:</b> Go from bare dirt to a booming jungle! Grow high-stat trees and essential, buff-boosting veggies! Green thumbs GUARANTEED!",
+            "    - <b>Kitchen:</b> STOP EATING STALE BREAD! Collect ancient recipes and cook gourmet meals that give HUGE permanent and temporary battlefield ADVANTAGES!",
+            "    - <b>Alchemy Lab (3 Tiers of Excellence!):</b> Why buy cheap swill? Mix your own high-potency potions! Go from novice brewer (Tier 1) to ALCHEMICAL GOD (Tier 3)! Experiment and PROFIT!",
+            "    - <b>Training Grounds (Regular & Advanced!):</b> Get ripped! Test your new gear and spells against CUSTOM-SIMULATED enemies! Practice makes perfect (and rich)!",
+            "Smoother than polished obsidian! We SQUASHED those movement and targeting errors around the battle grids—say goodbye to missed attacks!",
+            "More quality-of-life improvements and general bug fixes than you can shake a stick at! This patch FEELS GOOD, people!"
         ]
     },
     {
@@ -1021,4 +1242,3 @@ const CHANGELOG_DATA = [
         ]
     }
 ];
-

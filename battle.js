@@ -1,5 +1,15 @@
+let preTrainingState = null;
+let isProcessingAction = false; // Flag to prevent action spamming
+
 // --- BATTLE FUNCTIONS ---
-function startBattle(biomeKey) {
+function startBattle(biomeKey, trainingConfig = null) {
+    if (trainingConfig) {
+        preTrainingState = { hp: player.hp, mp: player.mp };
+    } else {
+        preTrainingState = null;
+    }
+
+    isProcessingAction = false; // Reset action lock at the start of every battle
     gameState.isPlayerTurn = true;
     gameState.battleEnded = false;
     gameState.currentBiome = biomeKey;
@@ -46,6 +56,34 @@ function startBattle(biomeKey) {
         enemy.y = enemyCell.y;
         
         currentEnemies.push(enemy);
+
+    } else if (trainingConfig) {
+        // --- TRAINING BATTLE SETUP ---
+        const gridSize = trainingConfig.gridSize;
+        const gridData = BATTLE_GRIDS[`square_${gridSize}x${gridSize}`] || BATTLE_GRIDS['square_5x5'];
+        gameState.gridWidth = gridData.width;
+        gameState.gridHeight = gridData.height;
+        gameState.gridLayout = gridData.layout;
+        
+        player.x = Math.floor(gridSize / 2);
+        player.y = gridSize - 1;
+
+        const occupiedCells = new Set([`${player.x},${player.y}`]);
+
+        trainingConfig.enemies.forEach((enemyConfig, index) => {
+            const species = MONSTER_SPECIES[enemyConfig.key];
+            const rarity = MONSTER_RARITY[enemyConfig.rarity];
+            if (species && rarity) {
+                const enemy = new Enemy(species, rarity, player.level);
+                // Simple placement logic for training
+                enemy.x = Math.floor(gridSize / 2) + index - Math.floor(trainingConfig.enemies.length / 2);
+                enemy.y = 0;
+                if (!occupiedCells.has(`${enemy.x},${enemy.y}`)) {
+                    currentEnemies.push(enemy);
+                    occupiedCells.add(`${enemy.x},${enemy.y}`);
+                }
+            }
+        });
 
     } else {
         // --- STANDARD BATTLE SETUP ---
@@ -105,6 +143,9 @@ function startBattle(biomeKey) {
             if (rand > 0.8) { numEnemies = 3; } 
             else if (rand > 0.5) { numEnemies = 2; }
         }
+        
+        if (player.statusEffects.monster_lure) numEnemies = Math.min(5, numEnemies + 2); // Add more monsters if lured
+
         for (let i = 0; i < numEnemies; i++) {
             const enemy = generateEnemy(biomeKey);
             const enemyCell = getUnoccupiedCell(enemySpawnArea);
@@ -178,15 +219,24 @@ function startBattle(biomeKey) {
         }
     }
 
-    const biome = BIOMES[biomeKey];
-    if (biome && biome.theme) {
-        applyTheme(biome.theme);
+    if (!trainingConfig) {
+        const biome = BIOMES[biomeKey];
+        if (biome && biome.theme) {
+            applyTheme(biome.theme);
+        }
+    } else {
+        applyTheme('town'); // Use a neutral theme for training
     }
     
     lastViewBeforeInventory = 'battle';
     gameState.currentView = 'battle'; 
     const enemyNames = currentEnemies.map(e => `<span class="font-bold text-red-400">${e.name}</span>`).join(', ');
-    addToLog(`You encounter: ${enemyNames} in the ${BIOMES[biomeKey].name}!`); 
+    
+    if (trainingConfig) {
+        addToLog(`You begin a training session against: ${enemyNames}!`, 'text-yellow-300');
+    } else {
+        addToLog(`You encounter: ${enemyNames} in the ${BIOMES[biomeKey].name}!`); 
+    }
     renderBattleGrid(); 
 
     if (isTutorialBattle) {
@@ -276,7 +326,7 @@ function renderBattleActions(template) {
 }
 
 function handleCellClick(x, y) {
-    if (!gameState.isPlayerTurn) return;
+    if (!gameState.isPlayerTurn || isProcessingAction) return;
 
     const cells = document.querySelectorAll('.grid-cell');
     
@@ -284,9 +334,11 @@ function handleCellClick(x, y) {
     const clickedObstacle = gameState.gridObjects.find(o => o.x === x && o.y === y && o.type === 'obstacle');
 
     if (gameState.action === 'move') {
+        isProcessingAction = true; // Lock actions
         cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable'));
         movePlayer(x, y);
     } else if (gameState.action === 'attack') {
+        isProcessingAction = true; // Lock actions
         if (clickedEnemy) {
             const targetIndex = currentEnemies.indexOf(clickedEnemy);
             performAttack(targetIndex);
@@ -295,8 +347,10 @@ function handleCellClick(x, y) {
         } else {
              gameState.action = null; // Cancel action if clicking empty space
              cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable'));
+             isProcessingAction = false; // Unlock actions
         }
     } else if (gameState.action === 'magic_cast') {
+        isProcessingAction = true; // Lock actions
         if (clickedEnemy) {
             const targetIndex = currentEnemies.indexOf(clickedEnemy);
             castSpell(gameState.spellToCast, targetIndex);
@@ -305,6 +359,7 @@ function handleCellClick(x, y) {
             gameState.action = null;
             gameState.spellToCast = null;
             cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable'));
+            isProcessingAction = false; // Unlock actions
         }
     }
 }
@@ -335,9 +390,21 @@ function isCellBlocked(x, y, forEnemy = false, canFly = false) {
 
 
 async function movePlayer(x, y) {
+    if (isCellBlocked(x, y)) {
+        addToLog("You can't move there, it's blocked!", 'text-red-400');
+        gameState.action = null;
+        document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('walkable'));
+        isProcessingAction = false; // Unlock actions on invalid move
+        return;
+    }
+
+    let moveDistance = 3;
+    if(player.statusEffects.bonus_speed) moveDistance += player.statusEffects.bonus_speed.move;
+    if(player.statusEffects.slowed) moveDistance = Math.max(1, moveDistance + player.statusEffects.slowed.move);
+
     const path = findPath({x: player.x, y: player.y}, {x, y});
 
-    if (path && path.length > 1 && path.length <= 4) { // Path length is steps + 1
+    if (path && path.length > 1 && path.length <= (moveDistance + 1)) { // Path length is steps + 1
         gameState.isPlayerTurn = false;
 
         for (let i = 1; i < path.length; i++) {
@@ -353,17 +420,21 @@ async function movePlayer(x, y) {
         gameState.action = null;
         const cells = document.querySelectorAll('.grid-cell');
         cells.forEach(c => c.classList.remove('walkable'));
+        isProcessingAction = false; // Unlock actions after invalid path
     }
 }
 
 function performAttackOnObstacle(obstacle) {
     const weapon = player.equippedWeapon;
-    const weaponRange = weapon.range || (weapon.class === 'Lance' ? 2 : 1);
+    let weaponRange = weapon.range || 1;
+    if(player.statusEffects.bonus_range) weaponRange += player.statusEffects.bonus_range.range;
+
     const dx = Math.abs(player.x - obstacle.x);
     const dy = Math.abs(player.y - obstacle.y);
 
     if (dx + dy > weaponRange) {
         addToLog("You are too far away to attack the obstacle!", 'text-red-400');
+        isProcessingAction = false; // Unlock on failure
         return;
     }
 
@@ -372,7 +443,26 @@ function performAttackOnObstacle(obstacle) {
 
     obstacle.hp -= 1;
     if (obstacle.hp <= 0) {
-        addToLog("You destroyed the obstacle!", "text-green-400");
+        addToLog(`You destroyed the ${obstacle.name}!`, "text-green-400");
+        
+        // Seed drop logic from obstacles
+        const dropChance = 0.1 + (player.luck / 200); // 10% base + luck
+        if (Math.random() < dropChance) {
+            const seedRarities = ['Common', 'Uncommon', 'Rare'];
+            const seedWeights = [70, 25, 5]; // 70% C, 25% U, 5% R
+            const chosenRarity = choices(seedRarities, seedWeights);
+            
+            const availableSeeds = Object.keys(ITEMS).filter(key => {
+                const details = ITEMS[key];
+                return details && (details.type === 'seed' || details.type === 'sapling') && details.rarity === chosenRarity;
+            });
+
+            if (availableSeeds.length > 0) {
+                const seedKey = availableSeeds[Math.floor(Math.random() * availableSeeds.length)];
+                player.addToInventory(seedKey, 1);
+            }
+        }
+
         const index = gameState.gridObjects.indexOf(obstacle);
         if (index > -1) {
             gameState.gridObjects.splice(index, 1);
@@ -426,22 +516,21 @@ function performAttack(targetIndex) {
     const weapon = player.equippedWeapon; 
     const target = currentEnemies[targetIndex];
     if (!target || !target.isAlive()) {
+        isProcessingAction = false; // Unlock if target is invalid
         renderBattleGrid();
         return;
     };
 
-    // Determine weapon range, including class perks
+    // Determine weapon range
     let weaponRange = weapon.range || 1;
-    if (weapon.class === 'Lance') {
-         weaponRange = weapon.range || 2;
-         if(weapon.name === 'Holy Beast Halberd') weaponRange = 3;
-    }
+    if(player.statusEffects.bonus_range) weaponRange += player.statusEffects.bonus_range.range;
     
     const dx = Math.abs(player.x - target.x);
     const dy = Math.abs(player.y - target.y);
 
     if(dx + dy > weaponRange){
         addToLog("You are too far away to attack!", 'text-red-400');
+        isProcessingAction = false; // Unlock if out of range
         return;
     }
 
@@ -524,9 +613,11 @@ function performAttack(targetIndex) {
         }
 
         // --- CRITICAL HIT CALCULATION (REWORKED) ---
+        let critChance = player.critChance;
+        if(player.statusEffects.bonus_crit) critChance += player.statusEffects.bonus_crit.critChance;
         const canWeaponCrit = weapon.class === 'Dagger' || weapon.effect?.critChance;
+        
         if (canWeaponCrit) {
-            let critChance = player.critChance; // Start with the player's base chance
             if (weapon.class === 'Dagger') critChance += 0.1; // Add Dagger perk
             if (weapon.effect?.critChance) critChance += weapon.effect.critChance; // Add specific weapon effect bonus
         
@@ -652,6 +743,7 @@ function castSpell(spellKey, targetIndex) {
     const playerSpell = player.spells[spellKey];
     if (!playerSpell) {
         addToLog(`You do not know this spell.`, 'text-red-400');
+        isProcessingAction = false; // Unlock
         return;
     }
 
@@ -664,7 +756,14 @@ function castSpell(spellKey, targetIndex) {
 
     if (catalyst.name === 'None') {
         addToLog(`You need to equip a catalyst to cast spells!`, 'text-blue-400');
+        isProcessingAction = false; // Unlock
         renderBattleGrid();
+        return;
+    }
+    
+    if(player.statusEffects.magic_dampen) {
+        addToLog(`Your connection to the arcane is weakened! You cannot cast spells!`, 'text-red-500');
+        isProcessingAction = false; // Unlock
         return;
     }
 
@@ -677,12 +776,14 @@ function castSpell(spellKey, targetIndex) {
     
     if (player.mp < spellCost) {
         addToLog(`Not enough MP to cast ${spell.name}!`, 'text-blue-400');
+        isProcessingAction = false; // Unlock
         return;
     }
     
     const target = currentEnemies[targetIndex];
     if (spellData.type === 'st' || spellData.type === 'aoe') {
         if (!target || !target.isAlive()) {
+            isProcessingAction = false; // Unlock
             renderBattleGrid();
             return;
         }
@@ -694,6 +795,7 @@ function castSpell(spellKey, targetIndex) {
         if (dx + dy > catalystRange) {
             addToLog("Target is out of range for this spell!", 'text-red-400');
             gameState.isPlayerTurn = true;
+            isProcessingAction = false; // Unlock
             renderBattleGrid();
             return;
         }
@@ -724,7 +826,9 @@ function castSpell(spellKey, targetIndex) {
 
         const baseMagicDamage = rollDice(diceCount, spell.damage[1], `Player Spell: ${spell.name}`);
         calcLog.baseDamage = baseMagicDamage;
-        const magicStat = player.intelligence + Math.floor(player.focus / 2);
+        
+        let magicStat = player.intelligence + Math.floor(player.focus / 2);
+
         
         let magicDamage = baseMagicDamage;
         const statMultiplier = 1 + magicStat / 20;
@@ -838,7 +942,7 @@ function castSpell(spellKey, targetIndex) {
                         { x: target.x - 1, y: target.y }, { x: target.x + 1, y: target.y }
                     ];
                     splashDamageMultiplier = 0.5;
-                } else if (tierIndex === 1) { // Tier 2: 8 surrounding tiles
+                } else if (tierIndex >= 1) { // Tier 2 & 3: 8 surrounding tiles
                     splashTargets = [
                         { x: target.x - 1, y: target.y - 1 }, { x: target.x, y: target.y - 1 }, { x: target.x + 1, y: target.y - 1 },
                         { x: target.x - 1, y: target.y }, { x: target.x + 1, y: target.y },
@@ -945,7 +1049,11 @@ function battleAction(type, actionData = null) {
 
     switch (type) {
         case 'move':
-            const reachableCells = findReachableCells({x: player.x, y: player.y}, 3);
+            let moveDistance = 3;
+            if(player.statusEffects.bonus_speed) moveDistance += player.statusEffects.bonus_speed.move;
+            if(player.statusEffects.slowed) moveDistance = Math.max(1, moveDistance + player.statusEffects.slowed.move);
+            
+            const reachableCells = findReachableCells({x: player.x, y: player.y}, moveDistance);
             cells.forEach(c => {
                 const x = parseInt(c.dataset.x);
                 const y = parseInt(c.dataset.y);
@@ -956,10 +1064,7 @@ function battleAction(type, actionData = null) {
             break;
         case 'attack':
             let weaponRange = player.equippedWeapon.range || 1;
-            if (player.equippedWeapon.class === 'Lance') {
-                 weaponRange = player.equippedWeapon.range || 2;
-                 if(player.equippedWeapon.name === 'Holy Beast Halberd') weaponRange = 3;
-            }
+            if(player.statusEffects.bonus_range) weaponRange += player.statusEffects.bonus_range.range;
 
             cells.forEach(c => {
                 const x = parseInt(c.dataset.x);
@@ -1048,7 +1153,18 @@ function battleAction(type, actionData = null) {
                 addToLog(`You successfully escaped!`, 'text-green-400');
                 $('#inventory-btn').disabled = false;
                 $('#character-sheet-btn').disabled = false;
-                setTimeout(renderTownSquare, 1500);
+                
+                if (preTrainingState !== null) {
+                    addToLog("Exiting training session.", "text-cyan-300");
+                    player.hp = preTrainingState.hp;
+                    player.mp = preTrainingState.mp;
+                    preTrainingState = null;
+                    updateStatsView();
+                    setTimeout(renderTrainingGrounds, 1500);
+                } else {
+                    setTimeout(renderTownSquare, 1500);
+                }
+
             } else {
                 addToLog(`You failed to escape!`, 'text-red-400');
                 setTimeout(enemyTurn, 400);
@@ -1092,35 +1208,31 @@ function checkVictory() {
 
 function checkBattleStatus(isReaction = false) {
     if (gameState.battleEnded) return;
-    let allDefeated = true;
+
+    const defeatedEnemiesThisCheck = [];
+    
     for (let i = currentEnemies.length - 1; i >= 0; i--) {
         const enemy = currentEnemies[i];
-        if (!enemy.isAlive()) {
-            if (enemy.speciesData.class === 'Undead' && !enemy.revived && enemy.ability !== 'alive_again') {
-                addToLog(`${enemy.name} reforms from shattered bones!`, 'text-gray-400 font-bold');
-                enemy.hp = Math.floor(enemy.maxHp * 0.5);
-                enemy.revived = true;
-                allDefeated = false;
-            } else if (enemy.ability === 'alive_again' && Math.random() < enemy.reviveChance) {
-                addToLog(`${enemy.name} rises again!`, 'text-purple-600 font-bold');
-                enemy.hp = Math.floor(enemy.maxHp * 0.5);
-                enemy.reviveChance /= 2;
-                allDefeated = false;
-            } else {
-                // --- On-Kill Effects ---
-                if (player.equippedWeapon.effect?.healOnKill) {
-                    const healAmount = Math.floor(player.maxHp * player.equippedWeapon.effect.healOnKill);
-                    player.hp = Math.min(player.maxHp, player.hp + healAmount);
-                    addToLog(`Your weapon drinks the life force of the fallen, healing you for ${healAmount} HP!`, 'text-green-400');
-                }
+        if (enemy.isAlive()) continue;
 
-                if (player.statusEffects.swallowed && player.statusEffects.swallower === enemy) {
-                    delete player.statusEffects.swallowed;
-                    addToLog(`You are freed as the ${enemy.name} collapses!`, 'text-green-500');
-                }
+        if (enemy.speciesData.class === 'Undead' && !enemy.revived && enemy.ability !== 'alive_again') {
+            addToLog(`${enemy.name} reforms from shattered bones!`, 'text-gray-400 font-bold');
+            enemy.hp = Math.floor(enemy.maxHp * 0.5);
+            enemy.revived = true;
+        } else if (enemy.ability === 'alive_again' && Math.random() < enemy.reviveChance) {
+            addToLog(`${enemy.name} rises again!`, 'text-purple-600 font-bold');
+            enemy.hp = Math.floor(enemy.maxHp * 0.5);
+            enemy.reviveChance /= 2;
+        } else {
+            defeatedEnemiesThisCheck.push(enemy);
+            currentEnemies.splice(i, 1);
+        }
+    }
 
-                addToLog(`You have defeated ${enemy.name}!`, 'text-green-400 font-bold');
-                
+    if (defeatedEnemiesThisCheck.length > 0) {
+        defeatedEnemiesThisCheck.forEach(enemy => {
+            addToLog(`You have defeated ${enemy.name}!`, 'text-green-400 font-bold');
+            if (preTrainingState === null) {
                 if (enemy.rarityData.name === 'Legendary') {
                     const speciesKey = enemy.speciesData.key;
                     if (!player.legacyQuestProgress[speciesKey]) {
@@ -1128,22 +1240,20 @@ function checkBattleStatus(isReaction = false) {
                         addToLog(`*** LEGACY QUEST UPDATE: Legendary ${enemy.speciesData.name} slain! ***`, 'text-purple-300 font-bold');
                     }
                 }
-
                 player.gainXp(enemy.xpReward); 
                 player.gold += enemy.goldReward;
                 addToLog(`You found <span class="font-bold">${enemy.goldReward}</span> G.`, 'text-yellow-400');
                 
-                // --- Loot Drop Logic ---
+                // Loot Drop Logic
                 for (const item in enemy.lootTable) { 
                     let dropChance = enemy.lootTable[item];
-                    // Blacksmith's Hammer perk
+                    if (player.foodBuffs.loot_chance) dropChance *= player.foodBuffs.loot_chance.value;
                     const itemDetails = getItemDetails(item);
                     if (player.equippedWeapon.effect?.lootBonus && (itemDetails.class || ['Armor', 'Weapon'].includes(itemDetails.type))) {
                         dropChance *= 2;
                     }
-
                     if (Math.random() < dropChance) { 
-                        player.addToInventory(item); 
+                        player.addToInventory(item, 1, true); 
                     } 
                 }
                 
@@ -1154,19 +1264,68 @@ function checkBattleStatus(isReaction = false) {
                         addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300'); 
                     } 
                 }
-                currentEnemies.splice(i, 1);
             }
-        } else {
-            allDefeated = false;
+        });
+
+        if (player.equippedWeapon.effect?.healOnKill && preTrainingState === null) {
+            const healAmount = Math.floor(player.maxHp * player.equippedWeapon.effect.healOnKill * defeatedEnemiesThisCheck.length);
+            player.hp = Math.min(player.maxHp, player.hp + healAmount);
+            addToLog(`Your weapon drinks the life force of the fallen, healing you for ${healAmount} HP!`, 'text-green-400');
         }
     }
 
+    const allDefeated = currentEnemies.every(enemy => !enemy.isAlive());
+
     if (allDefeated) {
         gameState.battleEnded = true;
-        addToLog(`VICTORY! All enemies have been defeated.`, 'text-yellow-200 font-bold text-lg');
+        isProcessingAction = false; 
 
+        if (preTrainingState === null && (player.house.kitchenTier > 0 || player.house.alchemyTier > 0)) {
+            const totalRarityIndex = defeatedEnemiesThisCheck.reduce((acc, enemy) => acc + enemy.rarityData.rarityIndex, 0);
+            const recipeDropChance = 0.05 + (player.luck / 500) + (totalRarityIndex * 0.02);
+            
+            if (Math.random() < recipeDropChance) {
+                let possibleRecipes = [];
+                const highestTier = defeatedEnemiesThisCheck.reduce((max, e) => Math.max(max, e.speciesData.tier), 1);
+                
+                if (player.house.kitchenTier > 0) {
+                    for (let i = 1; i <= highestTier; i++) {
+                        if (RECIPE_DROPS_BY_TIER.cooking[i]) {
+                            possibleRecipes.push(...RECIPE_DROPS_BY_TIER.cooking[i]);
+                        }
+                    }
+                }
+                if (player.house.alchemyTier > 0) {
+                     for (let i = 1; i <= highestTier; i++) {
+                        if (RECIPE_DROPS_BY_TIER.alchemy[i]) {
+                            possibleRecipes.push(...RECIPE_DROPS_BY_TIER.alchemy[i]);
+                        }
+                    }
+                }
+                
+                const unlearnedRecipes = possibleRecipes.filter(key => {
+                    const details = getItemDetails(key); // Use the helper function
+                    if (!details) return false; // Add a guard clause to prevent crashes
+                    if (details.recipeType === 'cooking') return !player.knownCookingRecipes.includes(details.recipeKey);
+                    if (details.recipeType === 'alchemy') return !player.knownAlchemyRecipes.includes(details.recipeKey);
+                    return false;
+                });
+
+                if (unlearnedRecipes.length > 0) {
+                    const recipeToDrop = unlearnedRecipes[Math.floor(Math.random() * unlearnedRecipes.length)];
+                    player.addToInventory(recipeToDrop, 1, true); // Verbose log
+                }
+            }
+        }
+        
+        if (preTrainingState !== null) {
+             addToLog(`Training Complete!`, 'text-cyan-300 font-bold text-lg');
+        } else {
+            addToLog(`VICTORY! All enemies have been defeated.`, 'text-yellow-200 font-bold text-lg');
+        }
+        
         if (tutorialState.isActive && tutorialState.sequence[tutorialState.currentIndex]?.trigger?.type === 'enemy_death') {
-            setTimeout(advanceTutorial, 1000); // Give a moment to read the victory message
+            setTimeout(advanceTutorial, 1000);
             return;
         }
         
@@ -1221,7 +1380,7 @@ function handlePlayerEndOfTurn() {
 
 
     for (const effectKey in effects) {
-        if (effects[effectKey].duration) {
+        if (effects[effectKey].duration && effects[effectKey].duration !== Infinity) {
             effects[effectKey].duration--;
             if (effects[effectKey].duration <= 0) {
                 delete effects[effectKey];
@@ -1419,6 +1578,16 @@ function beginPlayerTurn() {
         checkPlayerDeath();
         return;
     }
+    
+    isProcessingAction = false; // Player can now act
+
+    // --- Handle Start-of-Turn Concoction Effects ---
+    if (player.statusEffects.fumble && Math.random() < player.statusEffects.fumble.chance) {
+        addToLog("You fumble, wasting your turn!", "text-red-500 font-bold");
+        setTimeout(enemyTurn, 500);
+        return;
+    }
+    // --- End Concoction Effects ---
 
     gameState.action = null; 
 
@@ -1483,12 +1652,18 @@ async function checkPlayerDeath() {
 
             ['weapons', 'armor', 'shields', 'catalysts'].forEach(category => {
                 const items = player.inventory[category];
+                if (!items) return;
                 const amountToDrop = Math.floor(items.length / 2);
                 for (let i = 0; i < amountToDrop; i++) {
+                    if (items.length === 0) break;
                     const randomIndex = Math.floor(Math.random() * items.length);
+                    
                     // Ensure we don't drop the default "None" items
-                    const itemDetails = getItemDetails(items[randomIndex]);
+                    const droppedItemKey = items[randomIndex];
+                    const itemDetails = getItemDetails(droppedItemKey);
+
                     if (itemDetails && itemDetails.rarity !== 'Broken') {
+                        // Remove the item from inventory first
                         items.splice(randomIndex, 1);
                         itemsDropped++;
                     }
@@ -1497,6 +1672,31 @@ async function checkPlayerDeath() {
 
             if (itemsDropped > 0) {
                 addToLog('You lost some of your items and equipment in the fall.', 'text-red-500');
+            }
+
+            // Verify equipped items are still in inventory and unequip if necessary
+            const weaponKey = findKeyByName(player.equippedWeapon.name, WEAPONS);
+            if (weaponKey && player.equippedWeapon.rarity !== 'Broken' && !player.inventory.weapons.includes(weaponKey)) {
+                addToLog(`Your equipped ${player.equippedWeapon.name} was dropped!`, 'text-red-600 font-bold');
+                unequipItem('weapon');
+            }
+            
+            const armorKey = findKeyByName(player.equippedArmor.name, ARMOR);
+            if (armorKey && player.equippedArmor.rarity !== 'Broken' && !player.inventory.armor.includes(armorKey)) {
+                addToLog(`Your equipped ${player.equippedArmor.name} was dropped!`, 'text-red-600 font-bold');
+                unequipItem('armor');
+            }
+
+            const shieldKey = findKeyByName(player.equippedShield.name, SHIELDS);
+            if (shieldKey && player.equippedShield.rarity !== 'Broken' && !player.inventory.shields.includes(shieldKey)) {
+                addToLog(`Your equipped ${player.equippedShield.name} was dropped!`, 'text-red-600 font-bold');
+                unequipItem('shield');
+            }
+
+            const catalystKey = findKeyByName(player.equippedCatalyst.name, CATALYSTS);
+            if (catalystKey && player.equippedCatalyst.rarity !== 'Broken' && !player.inventory.catalysts.includes(catalystKey)) {
+                addToLog(`Your equipped ${player.equippedCatalyst.name} was dropped!`, 'text-red-600 font-bold');
+                unequipItem('catalyst');
             }
 
             setTimeout(() => {
