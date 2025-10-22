@@ -1121,7 +1121,7 @@ const RECIPE_DROPS_BY_TIER = {
 
 const SHOP_INVENTORY = {
     'Potions & Items': ['health_potion', 'mana_potion', 'condensed_health_potion', 'condensed_mana_potion'],
-    'Seeds': ['blackwheat_seed', 'cinnamonwood_seed', 'brineflower_seed', 'beetsnip_seed'],
+    'Seeds': ['blackwheat_seed', 'cinnamonwood_seed', 'screaming_lotus_seed', 'beetsnip_seed'],
     'Recipes': [
         // Cooking Tier 1
         'recipe_rabbit_roast', 'recipe_humming_medley', 'recipe_fortifying_meat_pie', 'recipe_spiced_root_stew',
