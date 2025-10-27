@@ -103,8 +103,8 @@ const TUTORIAL_SEQUENCES = {
             type: 'modal',
             content: "Now let's see how you fight, chump!"
         },
-        { 
-            id: 'battle_intro', 
+        {
+            id: 'battle_intro',
             targetId: '#battle-grid',
             position: 'top',
             content: "These are your actions: Move, Attack, Magic, Item, and Flee. The grid is the battlefield. You're blue, they're red. Simple. Now, go smash that goblin!"
@@ -114,15 +114,16 @@ const TUTORIAL_SEQUENCES = {
             type: 'trigger_only', // Make the step's purpose explicit
             trigger: { type: 'enemy_death' }
         },
-        { 
-            id: 'outro', 
-            type: 'modal', 
-            content: "Heh, you won. Not bad... for a rookie. That's everything I can teach ya. If you need a refresher on any of this, go read a book at the library. Now get out of my sight. Good luck out there, and try not to die." 
+        {
+            id: 'outro',
+            type: 'modal',
+            // Slightly modified outro text
+            content: "Heh, you won. Not bad... for a rookie. That's everything I can teach ya. If you need a refresher on any of this, go read a book at the library. Now get back to town. Good luck out there, and try not to die."
         },
          {
-            id: 'show_post_battle',
-            type: 'trigger_only',
-            preAction: 'renderPostBattleMenu'
+            id: 'return_to_town', // Changed step ID
+            type: 'trigger_only', // Changed type
+            preAction: 'renderTownSquare' // *** CHANGED: Go directly to town square ***
         }
     ],
     commercial_district_tour: [

@@ -350,6 +350,297 @@ function renderCharacterSheet(isLevelUp = false) {
     render(container);
 }
 
+function renderCharacterCreation() {
+    $('#start-screen').classList.add('hidden');
+    const creationScreen = $('#character-creation-screen');
+    creationScreen.classList.remove('hidden');
+
+    // Ensure all steps are hidden initially, then show step 0
+    for (let i = 0; i <= 4; i++) { // Hide steps 0 through 4
+        const step = $(`#creation-step-${i}`);
+        if (step) step.classList.add('hidden');
+    }
+    $('#creation-step-0').classList.remove('hidden'); // Show difficulty selection first
+
+    if (isTutorialEnabled) {
+        startTutorialSequence('creation_welcome');
+    }
+
+    // Initialize creationState, including elementalAffinity
+    let creationState = { name: '', gender: null, race: null, class: null, background: null, difficulty: 'hardcore', elementalAffinity: null };
+
+    const switchStep = (from, to) => {
+        $(`#creation-step-${from}`)?.classList.add('hidden'); // Add safety check
+        $(`#creation-step-${to}`)?.classList.remove('hidden'); // Add safety check
+
+        // Focus the name input if switching to Step 1
+        if (to === 1) {
+             $('#new-char-name')?.focus(); // Add safety check
+        }
+
+        if (isTutorialEnabled) {
+            // Trigger tutorial steps based on the step being switched *to*
+            if (to === 1) startTutorialSequence('creation_step1'); // Covers Name/Gender
+            // Note: Race, Class, Background tutorials are handled within their respective steps if needed
+            // else if (to === 2) { /* Maybe trigger race tutorial? */ }
+            // else if (to === 3) startTutorialSequence('creation_step2'); // Class
+            // else if (to === 4) startTutorialSequence('creation_step3'); // Background
+        }
+    };
+
+    // --- Difficulty Step (0) ---
+    $('#difficulty-easy').onclick = () => { creationState.difficulty = 'easy'; switchStep(0, 1); };
+    $('#difficulty-medium').onclick = () => { creationState.difficulty = 'medium'; switchStep(0, 1); };
+    $('#difficulty-hardcore').onclick = () => { creationState.difficulty = 'hardcore'; switchStep(0, 1); };
+    $('#creation-back-to-start-btn').onclick = showStartScreen; // Back to main menu
+
+    // --- Name & Gender Step (1) ---
+    const genderButtons = document.querySelectorAll('#gender-selection button');
+    genderButtons.forEach(button => {
+        button.onclick = () => {
+            genderButtons.forEach(btn => {
+                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
+                btn.classList.add('btn-primary');
+            });
+            button.classList.add('bg-yellow-600', 'border-yellow-800');
+            button.classList.remove('btn-primary');
+            creationState.gender = button.dataset.gender;
+        };
+    });
+    $('#back-to-step-0-btn').onclick = () => switchStep(1, 0); // Back to Difficulty
+    $('#to-step-2-btn').onclick = () => { // Forward to Race
+        const nameInput = $('#new-char-name');
+        creationState.name = nameInput.value.trim();
+        let hasError = false;
+
+        if (!creationState.name) {
+            nameInput.classList.add('border-red-500'); hasError = true;
+        } else { nameInput.classList.remove('border-red-500'); }
+
+        if (!creationState.gender) {
+            $('#gender-label').classList.add('animate-pulse', 'text-red-400');
+            setTimeout(() => $('#gender-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
+            hasError = true;
+        }
+
+        if (!hasError) {
+            switchStep(1, 2);
+        }
+    };
+
+    // --- Race Step (2) ---
+    const affinityContainer = $('#elemental-affinity-container');
+    const affinitySelect = $('#elemental-affinity-select');
+    affinitySelect.value = 'fire'; // Default to fire
+    creationState.elementalAffinity = 'fire'; // Set default state
+    affinitySelect.innerHTML = Object.keys(ELEMENTS)
+        .filter(e => e !== 'none' && e !== 'healing')
+        .map(e => `<option value="${e}">${capitalize(e)}</option>`)
+        .join('');
+    affinitySelect.onchange = () => {
+        creationState.elementalAffinity = affinitySelect.value;
+    };
+
+    const raceListContainer = $('#race-selection-list');
+    raceListContainer.innerHTML = ''; // Clear previous buttons if any
+    Object.keys(RACES).forEach(raceKey => {
+        const raceData = RACES[raceKey];
+        const button = document.createElement('button');
+        button.className = 'btn btn-primary w-full text-left';
+        button.dataset.race = raceKey;
+        button.textContent = raceKey;
+
+        const raceDetailsBox = $('#race-details'); // Details box for this step
+
+        button.addEventListener('mouseenter', () => {
+            let statsHtml = Object.entries(raceData)
+                .filter(([key]) => key !== 'description' && key !== 'passive')
+                .map(([stat, value]) => `<div class="grid grid-cols-2"><span>${stat}</span><span class="font-bold text-yellow-300 text-right">${value}</span></div>`)
+                .join('');
+
+            let abilityHtml = '';
+            if (raceData.passive) {
+                abilityHtml = `<h5 class="font-bold mt-3 mb-1 text-cyan-300">Passive: ${raceData.passive.name}</h5>
+                               <p>${raceData.passive.description}</p>`;
+                // Removed the evolution description rendering for character creation
+            }
+
+            raceDetailsBox.innerHTML = `
+                <h4 id="race-details-name" class="font-bold text-xl text-yellow-300 mb-2">${raceKey}</h4>
+                <p id="race-details-description" class="text-sm text-gray-400 mb-4">${raceData.description}</p>
+                <div id="race-details-stats" class="text-sm space-y-1 mb-4">${statsHtml}</div>
+                <div id="race-details-ability" class="text-xs border-t border-slate-600 pt-2 mt-2">${abilityHtml}</div>`;
+        });
+
+        button.addEventListener('click', () => {
+            document.querySelectorAll('#race-selection-list button').forEach(btn => {
+                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
+                btn.classList.add('btn-primary');
+            });
+            button.classList.add('bg-yellow-600', 'border-yellow-800');
+            button.classList.remove('btn-primary');
+            creationState.race = raceKey;
+
+            // Show/Hide Affinity Dropdown
+            if (raceKey === 'Elementals') {
+                affinityContainer.classList.remove('hidden');
+                creationState.elementalAffinity = affinitySelect.value; // Ensure state matches dropdown
+            } else {
+                affinityContainer.classList.add('hidden');
+                creationState.elementalAffinity = null; // Clear affinity if not Elemental
+            }
+            // Trigger mouseenter to update details on click
+            button.dispatchEvent(new MouseEvent('mouseenter'));
+        });
+        raceListContainer.appendChild(button);
+    });
+
+    $('#back-to-step-1-btn').onclick = () => switchStep(2, 1); // Back to Name/Gender
+    $('#to-step-3-btn').onclick = () => { // Forward to Class
+        let hasError = false;
+        if (!creationState.race) {
+            $('#race-label').classList.add('animate-pulse', 'text-red-400');
+            setTimeout(() => $('#race-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
+            hasError = true;
+        }
+        if (creationState.race === 'Elementals' && !creationState.elementalAffinity) {
+            $('#elemental-affinity-label').classList.add('animate-pulse', 'text-red-400');
+            setTimeout(() => $('#elemental-affinity-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
+            hasError = true;
+        }
+        if (!hasError) {
+            switchStep(2, 3);
+        }
+    };
+
+    // --- Class Step (3) ---
+    const classListContainer = $('#class-selection-list');
+    classListContainer.innerHTML = ''; // Clear previous buttons
+    Object.keys(CLASSES).forEach(classKey => {
+        const classData = CLASSES[classKey];
+        const button = document.createElement('button');
+        button.className = 'btn btn-primary w-full text-left';
+        button.dataset.class = classKey;
+        button.textContent = classData.name;
+
+        const classDetailsBox = $('#class-details'); // Details box for this step
+
+        button.addEventListener('mouseenter', () => {
+            let statsHtml = '<h5 class="font-bold mt-3 mb-1 text-yellow-300">Stat Bonuses</h5>';
+            statsHtml += '<div class="grid grid-cols-2">';
+            statsHtml += Object.entries(classData.bonusStats).map(([stat, value]) => {
+                const sign = value > 0 ? '+' : '';
+                const color = value > 0 ? 'text-green-400' : 'text-red-400';
+                return `<span>${capitalize(stat)}</span><span class="${color} text-right">${sign}${value}</span>`;
+            }).join('');
+            statsHtml += '</div>';
+
+            let gearHtml = '<h5 class="font-bold mt-3 mb-1 text-yellow-300">Starting Gear</h5>';
+            const gear = Object.values(classData.startingEquipment)
+                              .map(key => getItemDetails(key)?.name)
+                              .filter(Boolean).join(', ') || 'None';
+            gearHtml += `<p class="text-xs">${gear}</p>`;
+
+             let abilityHtml = '';
+             const abilityData = classData.signatureAbility;
+             if (abilityData && abilityData.name !== "Placeholder Signature") { // Check if not placeholder
+                 abilityHtml = `<h5 class="font-bold mt-3 mb-1 text-cyan-300">Ability: ${abilityData.name} <span class="text-gray-400 font-normal">(${capitalize(abilityData.type)})</span></h5>
+                                <p>${abilityData.description}</p>`;
+                 if (abilityData.cost > 0) {
+                      abilityHtml += `<p class="text-blue-400">Cost: ${abilityData.cost} MP</p>`;
+                 }
+             } else {
+                  abilityHtml = `<h5 class="font-bold mt-3 mb-1 text-gray-500">Ability: None defined yet</h5>`;
+             }
+
+
+            classDetailsBox.innerHTML = `
+                <h4 id="class-details-name" class="font-bold text-xl text-yellow-300 mb-2">${classData.name}</h4>
+                <p id="class-details-description" class="text-sm text-gray-400 mb-4">${classData.description}</p>
+                <div id="class-details-stats" class="text-sm space-y-1 mb-4">${statsHtml}${gearHtml}</div>
+                <div id="class-details-ability" class="text-xs border-t border-slate-600 pt-2 mt-2">${abilityHtml}</div>`;
+        });
+
+        button.addEventListener('click', () => {
+            document.querySelectorAll('#class-selection-list button').forEach(btn => {
+                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
+                btn.classList.add('btn-primary');
+            });
+            button.classList.add('bg-yellow-600', 'border-yellow-800');
+            button.classList.remove('btn-primary');
+            creationState.class = classKey; // Store the KEY
+            // Trigger mouseenter to update details on click
+            button.dispatchEvent(new MouseEvent('mouseenter'));
+        });
+        classListContainer.appendChild(button);
+    });
+
+    $('#back-to-step-2-btn').onclick = () => switchStep(3, 2); // Back to Race
+    $('#to-step-4-btn').onclick = () => { // Forward to Background
+        if (!creationState.class) {
+            $('#class-label').classList.add('animate-pulse', 'text-red-400');
+            setTimeout(() => $('#class-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
+            return;
+        }
+        switchStep(3, 4);
+    };
+
+    // --- Background Step (4) ---
+    const backgroundListContainer = $('#background-selection-list');
+    backgroundListContainer.innerHTML = ''; // Clear previous buttons
+    Object.keys(BACKGROUNDS).forEach(bgKey => {
+        const bgData = BACKGROUNDS[bgKey];
+        const button = document.createElement('button');
+        button.className = 'btn btn-primary w-full text-left';
+        button.dataset.bg = bgKey;
+        button.textContent = bgData.name;
+
+        const backgroundDetailsBox = $('#background-details'); // Details box for this step
+
+        button.addEventListener('mouseenter', () => {
+            let detailsHtml = '<h5 class="font-bold mt-3 mb-1 text-yellow-300">Favored Stats</h5>';
+            const favoredStats = bgData.favoredStats.map(s => capitalize(s)).join(', ') || 'All';
+            detailsHtml += `<p class="text-xs">${favoredStats}</p>`;
+
+            backgroundDetailsBox.innerHTML = `
+                <h4 id="background-details-name" class="font-bold text-xl text-yellow-300 mb-2">${bgData.name}</h4>
+                <p id="background-details-description" class="text-sm text-gray-400 mb-4">${bgData.description}</p>
+                <div id="background-details-stats" class="text-sm space-y-1">${detailsHtml}</div>`;
+        });
+
+        button.addEventListener('click', () => {
+            document.querySelectorAll('#background-selection-list button').forEach(btn => {
+                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
+                btn.classList.add('btn-primary');
+            });
+            button.classList.add('bg-yellow-600', 'border-yellow-800');
+            button.classList.remove('btn-primary');
+            creationState.background = bgKey; // Store the KEY
+             // Trigger mouseenter to update details on click
+             button.dispatchEvent(new MouseEvent('mouseenter'));
+        });
+        backgroundListContainer.appendChild(button);
+    });
+
+    $('#back-to-step-3-btn').onclick = () => switchStep(4, 3); // Back to Class
+    $('#finalize-creation-btn').onclick = () => { // Finalize
+        if (!creationState.background) {
+            $('#background-label').classList.add('animate-pulse', 'text-red-400');
+            setTimeout(() => $('#background-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
+            return;
+        }
+
+        if (isTutorialEnabled) {
+            startTutorialSequence('creation_finalize');
+            advanceTutorial(creationState.name); // Pass name to final message
+        }
+
+        setTimeout(() => {
+            initGame(creationState.name, creationState.gender, creationState.race, creationState.class, creationState.background, creationState.difficulty, creationState.elementalAffinity);
+        }, isTutorialEnabled ? 2500 : 0);
+    };
+}
+
 
 window.setStatAllocationAmount = function(amount) {
     statAllocationAmount = amount;
