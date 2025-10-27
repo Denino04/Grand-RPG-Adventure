@@ -1953,14 +1953,15 @@ function checkVictory() {
         // Handle tutorial battle end
         const isTutorialBattle = tutorialState.isActive && tutorialState.sequence[tutorialState.currentIndex]?.trigger?.type === 'enemy_death';
         if (isTutorialBattle) {
-            // Show a simple modal, then advance
-            showModal("Victory!", "You defeated the goblin! You're ready to explore the town.", "Continue", () => {
-                advanceTutorial(); // This will trigger the post-battle menu and next step
-            });
-            return; // Don't show standard post-battle menu yet
+            // *** REVERTED CHANGE: Let the tutorial sequence handle the next step via advanceTutorial ***
+            // The 'wait_for_goblin_death' trigger is met, so advance the tutorial sequence.
+            // This will show the 'outro' modal defined in dialogue.js.
+            // The modal's button will now call completeBattleTutorial().
+            advanceTutorial(); // Let the tutorial system show the final modal
+            return true; // Indicate victory occurred, tutorial handles next step
         }
 
-        // Standard post-battle
+        // Standard post-battle (if not tutorial)
         setTimeout(renderPostBattleMenu, 1000);
         return true; // Indicate victory occurred
     }

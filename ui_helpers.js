@@ -83,16 +83,20 @@ function addToLog(message, colorClass = '') {
     p.innerHTML = cleanMessage; // Use cleaned message
     p.className = `mb-1 ${colorClass}`; // Apply specified class
 
-    // Prepend the new message instead of appending
-    logElement.insertBefore(p, logElement.firstChild);
+    // *** SCROLL FIX: Append child ***
+    logElement.appendChild(p);
 
-    // Limit log length to, say, 100 entries
+    // *** SCROLL FIX: Defer scrollTop update ***
+    requestAnimationFrame(() => {
+        // Keep the log scrolled to the bottom.
+        logElement.scrollTop = logElement.scrollHeight;
+    });
+
     const maxLogEntries = 100;
     while (logElement.children.length > maxLogEntries) {
-        logElement.removeChild(logElement.lastChild);
+        logElement.removeChild(logElement.firstChild); // Remove oldest from the top
     }
 }
-
 
 // =================================================================================
 // SECTION 2: VIEW & UI STATE MANAGEMENT
@@ -867,8 +871,13 @@ function showTutorialStep(step, content) {
                 btn.onclick = () => advanceTutorial(choiceText);
                 choiceContainer.appendChild(btn);
             });
+        // *** TUTORIAL FIX: Check for custom action on modal button ***
+        } else if (step.nextButtonAction) {
+            nextBtn.style.display = 'block';
+            // Evaluate the custom action string (use Function constructor for safety over eval)
+            nextBtn.onclick = new Function(step.nextButtonAction);
         } else {
-             // Show standard 'Next' button for modals
+             // Show standard 'Next' button for modals if no custom action
              nextBtn.style.display = 'block';
              nextBtn.onclick = advanceTutorial;
         }
@@ -1031,6 +1040,11 @@ function setupTutorialTrigger(trigger) {
     }
 }
 
+function completeBattleTutorial() {
+    console.log("Completing battle tutorial...");
+    endTutorial(); // Properly clear tutorial state
+    renderTownSquare(); // Navigate to town
+}
 
 function endTutorial() {
     const box = $('#tutorial-box');

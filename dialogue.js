@@ -111,20 +111,17 @@ const TUTORIAL_SEQUENCES = {
         },
         {
             id: 'wait_for_goblin_death',
-            type: 'trigger_only', // Make the step's purpose explicit
+            type: 'trigger_only', // Waits for the enemy_death trigger from battle.js
             trigger: { type: 'enemy_death' }
         },
         {
             id: 'outro',
             type: 'modal',
-            // Slightly modified outro text
-            content: "Heh, you won. Not bad... for a rookie. That's everything I can teach ya. If you need a refresher on any of this, go read a book at the library. Now get back to town. Good luck out there, and try not to die."
-        },
-         {
-            id: 'return_to_town', // Changed step ID
-            type: 'trigger_only', // Changed type
-            preAction: 'renderTownSquare' // *** CHANGED: Go directly to town square ***
+            content: "Heh, you won. Not bad... for a rookie. That's everything I can teach ya. If you need a refresher on any of this, go read a book at the library. Now get back to town. Good luck out there, and try not to die.",
+            // *** CHANGED: Use a custom function on button click ***
+            nextButtonAction: 'completeBattleTutorial()' // This function will be defined in ui_helpers.js
         }
+        // *** REMOVED return_to_town step ***
     ],
     commercial_district_tour: [
         { id: 'commercial_explained', targetId: '#main-view', position: 'top', content: "Right, the market. That's the General Store, the Blacksmith's forge, and that shady alley... that's the Black Market. Go back to the Town Square when you're done looking.", trigger: { type: 'click', targetId: 'button[onclick*="renderTownSquare"]', setFlag: 'commercial_visited' } }
