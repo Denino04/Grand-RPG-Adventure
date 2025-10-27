@@ -11,6 +11,19 @@ let logElement;
 let mainView;
 let characterSheetOriginalStats = null;
 
+function getItemDetails(itemKey) {
+    // Check all potential data sources
+    return WEAPONS[itemKey]
+        || ARMOR[itemKey]
+        || SHIELDS[itemKey]
+        || CATALYSTS[itemKey]
+        || ITEMS[itemKey]
+        || LURES[itemKey]
+        || SPELLS[itemKey] // Check spells for tooltips
+        || COOKING_RECIPES[itemKey] // Check cooking recipes for tooltips
+        // Add other data sources like ALCHEMY_RECIPES if needed for tooltips later
+        || null; // Return null if not found anywhere
+}
 /**
  * Initializes key DOM element references after the page loads.
  * This prevents errors from trying to access elements that don't exist yet.
@@ -47,7 +60,8 @@ function rollDice(numDice, sides, purpose = 'Generic Roll') {
         const purposeText = typeof purpose === 'string' ? purpose : purpose.source;
         addToLog(`DEBUG (Dice): ${purposeText} - Rolled ${numDice}d${sides} -> [${rolls.join(', ')}] = ${total}`, 'text-gray-500');
     }
-    return total;
+    // Return both total and the individual rolls
+    return { total: total, rolls: rolls };
 }
 
 /**
@@ -86,20 +100,40 @@ function render(viewElement) {
 
     mainView.innerHTML = '';
     mainView.appendChild(viewElement);
+
+    // Update body class for CSS-based button visibility
+    // Remove previous view classes first
+    document.body.className = document.body.className.replace(/\s?view-\S+/g, '');
+    // Add the new view class if in game
+    if (document.body.classList.contains('in-game')) {
+        document.body.classList.add(`view-${gameState.currentView}`);
+    } else {
+         // Ensure no view class exists if not in game
+         document.body.className = document.body.className.replace(/\s?view-\S+/g, '');
+    }
+
+
     updateDebugView();
-    updatePersistentButtons();
+    updatePersistentButtons(); // Call this to handle any potential JS logic needed, even if CSS controls visibility
 }
 
 /**
- * Shows or hides the persistent settings/exit buttons based on the game state.
+ * Function to handle visibility or other state changes for persistent buttons.
+ * Visibility is now primarily controlled by CSS via body classes set in render().
  */
 function updatePersistentButtons() {
     const persistentButtons = $('#persistent-buttons');
     if (!persistentButtons) return;
-    
-    // Show buttons when in-game, but not during a battle.
-    const showButtons = document.body.classList.contains('in-game') && gameState.currentView !== 'battle';
-    persistentButtons.classList.toggle('hidden', !showButtons);
+
+    // We don't need to add/remove 'hidden' class here anymore for visibility.
+    // CSS handles showing/hiding based on body.view-* classes.
+    // This function can remain empty or be used for other button state logic later.
+
+    // Example: You could disable buttons based on game state here if needed
+    // const settingsButton = persistentButtons.querySelector('button[onclick*="renderSettingsMenu"]');
+    // if (settingsButton) {
+    //     settingsButton.disabled = someCondition;
+    // }
 }
 
 
@@ -250,7 +284,7 @@ function showTooltip(itemKey, event) {
         if (details.amount && details.type === 'healing') content += `<p class="text-green-400">Heals: ${details.amount} HP</p>`;
         if (details.type === 'mana_restore') content += `<p class="text-blue-400">Restores: ${details.amount} MP</p>`;
         if (details.uses) content += `<p class="text-purple-300">Uses: ${details.uses}</p>`;
-        
+
         if (details.effect) {
             content += '<div class="mt-2 pt-2 border-t border-gray-600 text-cyan-300 text-xs"><ul class="list-disc list-inside space-y-1">';
             const effect = details.effect;
@@ -341,7 +375,7 @@ function showEnemyInfo(enemy, event) {
 
     let content = `<h4 class="font-bold text-red-400 mb-1">${enemy.name}</h4>`;
     content += `<p>HP: ${enemy.hp} / ${enemy.maxHp}</p>`;
-    
+
     tooltipElement.innerHTML = content;
     tooltipElement.style.display = 'block';
     activeTooltipItem = `enemy-${enemy.name}`;
@@ -350,7 +384,7 @@ function showEnemyInfo(enemy, event) {
     let y = event.clientY + 15;
     if (x + tooltipElement.offsetWidth > window.innerWidth) x = event.clientX - tooltipElement.offsetWidth - 15;
     if (y + tooltipElement.offsetHeight > window.innerHeight) y = event.clientY - tooltipElement.offsetHeight - 15;
-    
+
     tooltipElement.style.left = `${x}px`;
     tooltipElement.style.top = `${y}px`;
 }
@@ -377,7 +411,7 @@ let tutorialState = {
 
 function startTutorialSequence(sequenceKey) {
     if (!isTutorialEnabled) return;
-    
+
     if(sequenceKey === 'main_game_screen') {
         const skipBtn = $('#skip-tutorial-btn');
         skipBtn.classList.remove('hidden');
@@ -399,7 +433,7 @@ function advanceTutorial(param = '') {
         tutorialState.currentTriggerController.abort();
         tutorialState.currentTriggerController = null;
     }
-    
+
     const currentStep = tutorialState.sequence[tutorialState.currentIndex];
 
     if (param && currentStep?.type === 'choice') {
@@ -426,7 +460,7 @@ function advanceTutorial(param = '') {
     if (step.type === 'checkpoint') {
         const requiredFlags = step.requiredFlags || [];
         const hasAllFlags = requiredFlags.every(flag => tutorialState.flags.has(flag));
-        
+
         if (hasAllFlags) {
             advanceTutorial();
             return;
@@ -450,13 +484,13 @@ function advanceTutorial(param = '') {
             return;
         }
     }
-    
+
     let content = step.content;
-    const charName = player ? player.name : param; 
+    const charName = player ? player.name : param;
     if (charName && content && content.includes('<Charname>')) {
         content = content.replace(/<Charname>/g, charName);
     }
-    
+
     if (step.preAction === 'enableWilderness') {
         const wildernessBtn = document.querySelector('button[onclick*="renderWildernessMenu"]');
         if(wildernessBtn) wildernessBtn.disabled = false;
@@ -476,7 +510,7 @@ function showTutorialStep(step, content) {
     const text = $('#tutorial-text');
     const nextBtn = $('#tutorial-next-btn');
     const choiceContainer = $('#tutorial-choice-buttons');
-    
+
     text.innerHTML = content || '';
     box.classList.remove('hidden');
     choiceContainer.innerHTML = '';
@@ -543,10 +577,10 @@ function showTutorialStep(step, content) {
                 box.classList.add('arrow-left');
                 break;
         }
-        
+
         left = Math.max(10, Math.min(left, window.innerWidth - boxRect.width - 10));
         top = Math.max(10, Math.min(top, window.innerHeight - boxRect.height - 10));
-        
+
         box.style.left = `${left}px`;
         box.style.top = `${top}px`;
         box.style.transform = '';
@@ -620,7 +654,7 @@ function endTutorial() {
     }
     const wildernessBtn = document.querySelector('button[onclick*="renderWildernessMenu"]');
     if(wildernessBtn) wildernessBtn.disabled = false;
-    
+
     if (gameState.currentView !== 'town' && player) {
         renderTownSquare();
     }
@@ -640,14 +674,14 @@ function logDamageCalculation({ source, targetName, baseDamage, steps, finalDama
     let logMessage = `<div class="text-xs p-2 bg-slate-900/50 rounded border border-slate-700">`;
     logMessage += `<strong class="text-yellow-300">DEBUG: [${source}] -> ${targetName}</strong><br>`;
     logMessage += `<strong>Base Damage (Dice Roll):</strong> ${baseDamage}<br>`;
-    
+
     steps.forEach(step => {
         logMessage += `<strong>${step.description}:</strong> ${step.value} => <span class="text-cyan-400">${step.result}</span><br>`;
     });
 
     logMessage += `<strong>Final Damage Applied (after defense):</strong> <strong class="text-red-400">${finalDamage}</strong>`;
     logMessage += `</div>`;
-    
+
     addToLog(logMessage, 'text-gray-400');
 }
 
@@ -785,7 +819,7 @@ function debugUpdateVariables() {
 
     player.hp = Math.min(player.hp, player.maxHp);
     player.mp = Math.min(player.mp, player.maxMp);
-    
+
     addToLog('DEBUG: Player stats updated.', 'text-gray-500');
     updateStatsView();
     populateDebugStatInputs();
@@ -817,7 +851,7 @@ const PALETTES = {
  */
 function applyTheme(themeName = 'default') {
     const palette = PALETTES[themeName] || PALETTES['default'];
-    
+
     // Shared button colors that can be overridden by a specific theme.
     const finalPalette = {
         '--btn-action-bg': '#dc2626', '--btn-action-bg-hover': '#ef4444', '--btn-action-border': '#991b1b', '--btn-action-border-hover': '#b91c1c',
@@ -831,5 +865,4 @@ function applyTheme(themeName = 'default') {
         document.documentElement.style.setProperty(key, finalPalette[key]);
     }
 }
-
 

@@ -8,22 +8,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=MedievalSharp&display=swap" rel="stylesheet">
-    
+
     <!-- Firebase SDKs (Updated to v9 Compat libraries for better performance) -->
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-    <script>
-      window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-    </script>
-    <script defer src="/_vercel/insights/script.js"></script>
-    
+
     <!-- Vercel Analytics (hosting-specific) -->
     <script>
         window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
     </script>
     <script src="/_vercel/insights/script.js"></script>
-    
+
     <style>
         /* --- Root Variables & Themes --- */
         :root {
@@ -75,6 +71,16 @@
                 padding: 1rem 0;
             }
         }
+        #persistent-buttons {
+            display: none;
+        }
+
+        /* --- Show ONLY when in-game AND NOT in a forbidden view --- */
+        /* This rule says: If the body has 'in-game' BUT NOT 'view-battle', NOR 'view-inventory',
+           NOR 'view-character_sheet', NOR 'view-character_sheet_levelup', THEN display the buttons */
+        body.in-game:not(.view-battle):not(.view-inventory):not(.view-character_sheet):not(.view-character_sheet_levelup) #persistent-buttons {
+            display: flex;
+        }
 
         /* --- Page Wrapper Visibility --- */
         #menu-wrapper, #game-wrapper {
@@ -87,7 +93,7 @@
         #game-wrapper { display: none; }
         body.in-game #menu-wrapper { display: none; }
         body.in-game #game-wrapper { display: flex; }
-        
+
         /* --- Authentication Visibility Rules --- */
         body.logged-out #post-auth-section { display: none; }
         body.logged-in #auth-buttons { display: none; }
@@ -154,7 +160,7 @@
         #tutorial-box.arrow-right::after { top: 50%; left: 100%; margin-top: -10px; border-width: 10px; border-color: transparent transparent transparent #fcd34d; }
         #tutorial-box.arrow-top::after { bottom: 100%; left: 50%; margin-left: -10px; border-width: 10px; border-color: transparent transparent #fcd34d transparent; }
         #tutorial-box.arrow-bottom::after { top: 100%; left: 50%; margin-left: -10px; border-width: 10px; border-color: #fcd34d transparent transparent transparent; }
-        
+
         /* --- Battle Grid --- */
         .grid-cell { border: 1px solid #4a5568; background-color: #2d3748; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; color: white; cursor: pointer; transition: background-color 0.2s; position: relative; font-size: 1.5rem; line-height: 1; }
         .enemy-hp-bar-bg { position: absolute; bottom: 4px; left: 10%; width: 80%; height: 5px; background-color: rgba(0,0,0,0.7); border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.2); }
@@ -208,12 +214,14 @@
     </style>
 </head>
 <body class="">
-    <!-- Menu Wrapper -->
+
+    <!-- Menu Wrapper (Handles Start, Creation, Load, etc.) -->
     <div id="menu-wrapper">
+        <!-- Start Screen -->
         <div id="start-screen" class="text-center p-4">
             <h1 class="font-medieval text-6xl text-yellow-300 mb-8">Chronicles of Cocytus</h1>
             <div class="space-y-4">
-                
+
                 <!-- Pre-Authentication Buttons -->
                 <div id="auth-buttons">
                     <button id="google-signin-btn" class="btn btn-primary text-2xl px-8 py-4">
@@ -224,7 +232,7 @@
                     </button>
                      <button id="anonymous-signin-btn" class="btn btn-primary text-xl px-8 py-3 mt-2">Play as Guest</button>
                 </div>
-                
+
                 <!-- Post-Authentication Section -->
                 <div id="post-auth-section">
                     <div class="space-y-4">
@@ -236,7 +244,8 @@
                         <button id="sign-out-btn" class="btn btn-action text-lg px-6 py-2">Sign Out</button>
                     </div>
                 </div>
-    
+
+                <!-- Import / Other Buttons -->
                 <div class="flex items-center justify-center space-x-2 pt-4">
                     <input type="text" id="import-save-input" placeholder="Paste Save Key..." class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 w-64">
                     <button id="import-save-btn" class="btn btn-primary text-lg">Import</button>
@@ -251,17 +260,19 @@
                 </div>
             </div>
         </div>
-        
+
+        <!-- Changelog/Load/Graveyard Screen Container -->
         <div id="changelog-screen" class="w-full max-w-2xl p-6 bg-slate-900 rounded-lg shadow-lg hidden">
-            <!-- Changelog/Load/Graveyard Menu content will be injected here -->
+            <!-- Content will be injected here -->
         </div>
-        
+
+        <!-- Character Creation Screen -->
         <div id="character-creation-screen" class="w-full max-w-4xl p-6 bg-slate-900 rounded-lg shadow-lg hidden">
             <h2 class="font-medieval text-4xl mb-6 text-center text-yellow-400">Create Your Hero</h2>
 
-            <!-- Difficulty Step -->
+            <!-- Step 0: Difficulty -->
             <div id="creation-step-0">
-                <h3 class="text-xl font-bold mb-4 text-center">Choose Your Difficulty</h3>
+                <h3 class="text-xl font-bold mb-4 text-center">Step 1 of 5: Choose Your Difficulty</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
                     <div id="difficulty-easy" class="p-4 bg-slate-800 rounded-lg border-2 border-transparent hover:border-green-400 cursor-pointer">
                         <h4 class="font-bold text-2xl text-green-400">Child's Play</h4>
@@ -277,50 +288,68 @@
                     </div>
                 </div>
                 <div class="mt-8 flex justify-center">
-                    <button id="creation-back-to-start-btn" class="btn btn-action">Back</button>
+                    <button id="creation-back-to-start-btn" class="btn btn-action">Back to Menu</button>
                 </div>
             </div>
-            
-            <!-- Step 1: Name, Gender, Race -->
+
+            <!-- Step 1: Name & Gender -->
             <div id="creation-step-1" class="hidden">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <h3 class="text-xl font-bold mb-4 text-center">Step 2 of 5: Name & Gender</h3>
+                 <div class="max-w-md mx-auto space-y-6">
                     <div>
-                        <div class="mb-6">
-                            <label for="new-char-name" class="block text-lg font-bold mb-2">Name</label>
-                            <input type="text" id="new-char-name" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400">
-                        </div>
-                        <div class="mb-6">
-                            <h3 id="gender-label" class="text-lg font-bold mb-2">Gender</h3>
-                            <div id="gender-selection" class="flex gap-4">
-                                <button data-gender="Male" class="btn btn-primary flex-1">Male</button>
-                                <button data-gender="Female" class="btn btn-primary flex-1">Female</button>
-                                <button data-gender="Neutral" class="btn btn-primary flex-1">Neutral</button>
-                            </div>
-                        </div>
+                        <label for="new-char-name" class="block text-lg font-bold mb-2">Name</label>
+                        <input type="text" id="new-char-name" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400">
                     </div>
                     <div>
-                         <h3 id="race-label" class="text-lg font-bold mb-2">Race</h3>
-                         <div class="grid grid-cols-2 gap-4">
-                            <div id="race-selection-list" class="flex flex-col gap-2 h-80 overflow-y-auto inventory-scrollbar pr-2">
-                                <!-- Race buttons will be populated by JS -->
-                            </div>
-                            <div id="race-details" class="bg-slate-800 p-4 rounded-lg h-80 overflow-y-auto inventory-scrollbar">
-                                <h4 id="race-details-name" class="font-bold text-xl text-yellow-300 mb-2">Select a Race</h4>
-                                <p id="race-details-description" class="text-sm text-gray-400 mb-4"></p>
-                                <div id="race-details-stats" class="text-sm space-y-1"></div>
-                            </div>
-                         </div>
+                        <h3 id="gender-label" class="text-lg font-bold mb-2">Gender</h3>
+                        <div id="gender-selection" class="flex gap-4">
+                            <button data-gender="Male" class="btn btn-primary flex-1">Male</button>
+                            <button data-gender="Female" class="btn btn-primary flex-1">Female</button>
+                            <button data-gender="Neutral" class="btn btn-primary flex-1">Neutral</button>
+                        </div>
                     </div>
-                </div>
+                 </div>
                  <div class="mt-8 flex justify-center gap-4">
                     <button id="back-to-step-0-btn" class="btn btn-action">Back</button>
-                    <button id="to-step-2-btn" class="btn btn-primary">Next: Choose Class</button>
+                    <button id="to-step-2-btn" class="btn btn-primary">Next: Choose Race</button>
+                 </div>
+            </div>
+
+            <!-- Step 2: Race -->
+            <div id="creation-step-2" class="hidden">
+                <h3 id="race-label" class="text-lg font-bold mb-2 text-center">Step 3 of 5: Choose Your Race</h3>
+                 <div class="grid grid-cols-2 gap-4">
+                    <!-- Race List -->
+                    <div id="race-selection-list" class="flex flex-col gap-2 h-[360px] overflow-y-auto inventory-scrollbar pr-2"> <!-- Adjusted Height -->
+                        <!-- Race buttons will be populated by JS -->
+                    </div>
+                    <!-- Race Details + Affinity -->
+                    <div class="flex flex-col"> <!-- Use flex column for details + affinity -->
+                        <div id="race-details" class="bg-slate-800 p-4 rounded-lg flex-grow overflow-y-auto inventory-scrollbar mb-4"> <!-- Adjusted Height (flex-grow) -->
+                            <h4 id="race-details-name" class="font-bold text-xl text-yellow-300 mb-2">Select a Race</h4>
+                            <p id="race-details-description" class="text-sm text-gray-400 mb-4"></p>
+                            <div id="race-details-stats" class="text-sm space-y-1 mb-4"></div>
+                            <!-- ABILITY PLACEHOLDER (inside details box) -->
+                            <div id="race-details-ability" class="text-xs border-t border-slate-600 pt-2 mt-2"></div>
+                        </div>
+                        <!-- Elemental Affinity Dropdown -->
+                        <div id="elemental-affinity-container" class="hidden flex-shrink-0"> <!-- Added flex-shrink-0 -->
+                            <label id="elemental-affinity-label" for="elemental-affinity-select" class="block text-lg font-bold mb-2">Elemental Affinity</label>
+                            <select id="elemental-affinity-select" class="font-sans w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                                <!-- Options populated by JS -->
+                            </select>
+                        </div>
+                    </div>
+                 </div>
+                 <div class="mt-8 flex justify-center gap-4">
+                    <button id="back-to-step-1-btn" class="btn btn-action">Back</button>
+                    <button id="to-step-3-btn" class="btn btn-primary">Next: Choose Class</button>
                 </div>
             </div>
-    
-            <!-- Step 2: Class Selection -->
-            <div id="creation-step-2" class="hidden">
-                <h3 id="class-label" class="text-lg font-bold mb-2 text-center">Choose Your Class</h3>
+
+            <!-- Step 3: Class Selection -->
+            <div id="creation-step-3" class="hidden">
+                <h3 id="class-label" class="text-lg font-bold mb-2 text-center">Step 4 of 5: Choose Your Class</h3>
                 <div class="grid grid-cols-2 gap-4">
                     <div id="class-selection-list" class="flex flex-col gap-2 h-80 overflow-y-auto inventory-scrollbar pr-2">
                         <!-- Class buttons will be populated by JS -->
@@ -328,18 +357,20 @@
                     <div id="class-details" class="bg-slate-800 p-4 rounded-lg h-80 overflow-y-auto inventory-scrollbar">
                         <h4 id="class-details-name" class="font-bold text-xl text-yellow-300 mb-2">Select a Class</h4>
                         <p id="class-details-description" class="text-sm text-gray-400 mb-4"></p>
-                        <div id="class-details-stats" class="text-sm space-y-1"></div>
+                        <div id="class-details-stats" class="text-sm space-y-1 mb-4"></div>
+                        <!-- ABILITY PLACEHOLDER (inside details box) -->
+                        <div id="class-details-ability" class="text-xs border-t border-slate-600 pt-2 mt-2"></div>
                     </div>
                 </div>
                 <div class="mt-8 flex justify-center gap-4">
-                    <button id="back-to-step-1-btn" class="btn btn-action">Back</button>
-                    <button id="to-step-3-btn" class="btn btn-primary">Next: Choose Background</button>
+                    <button id="back-to-step-2-btn" class="btn btn-action">Back</button>
+                    <button id="to-step-4-btn" class="btn btn-primary">Next: Choose Background</button>
                 </div>
             </div>
-    
-            <!-- Step 3: Background Selection -->
-            <div id="creation-step-3" class="hidden">
-                <h3 id="background-label" class="text-lg font-bold mb-2 text-center">Choose Your Background</h3>
+
+            <!-- Step 4: Background Selection -->
+            <div id="creation-step-4" class="hidden">
+                <h3 id="background-label" class="text-lg font-bold mb-2 text-center">Step 5 of 5: Choose Your Background</h3>
                 <div class="grid grid-cols-2 gap-4">
                     <div id="background-selection-list" class="flex flex-col gap-2 h-80 overflow-y-auto inventory-scrollbar pr-2">
                         <!-- Background buttons will be populated by JS -->
@@ -351,12 +382,13 @@
                     </div>
                 </div>
                 <div class="mt-8 flex justify-center gap-4">
-                    <button id="back-to-step-2-btn" class="btn btn-action">Back</button>
+                    <button id="back-to-step-3-btn" class="btn btn-action">Back</button>
                     <button id="finalize-creation-btn" class="btn btn-primary">Finalize Creation</button>
                 </div>
             </div>
         </div>
-        
+
+        <!-- Old Save Race Selection Screen -->
          <div id="old-save-race-selection-screen" class="w-full max-w-4xl p-6 bg-slate-900 rounded-lg shadow-lg hidden">
             <h2 class="font-medieval text-4xl mb-2 text-center text-yellow-400">Update Character</h2>
             <p class="text-center text-gray-400 mb-6">Your save file is from an older version. Please select a race for <strong id="old-save-char-name"></strong> to continue.</p>
@@ -364,17 +396,29 @@
                  <div id="old-save-race-list" class="flex flex-col gap-2 h-72 overflow-y-auto inventory-scrollbar pr-2">
                     <!-- Race buttons will be populated by JS -->
                 </div>
-                <div id="old-save-race-details" class="bg-slate-800 p-4 rounded-lg h-72">
-                    <h4 id="old-save-race-name" class="font-bold text-xl text-yellow-300 mb-2">Select a Race</h4>
-                    <p id="old-save-race-description" class="text-sm text-gray-400 mb-4"></p>
-                    <div id="old-save-race-stats" class="text-sm space-y-1"></div>
+                 <div> <!-- Wrapper div -->
+                    <div id="old-save-race-details" class="bg-slate-800 p-4 rounded-lg h-[240px] mb-4 overflow-y-auto inventory-scrollbar"> <!-- Adjusted height -->
+                        <h4 id="old-save-race-name" class="font-bold text-xl text-yellow-300 mb-2">Select a Race</h4>
+                        <p id="old-save-race-description" class="text-sm text-gray-400 mb-4"></p>
+                        <div id="old-save-race-stats" class="text-sm space-y-1 mb-4"></div>
+                        <!-- ABILITY PLACEHOLDER (Old Save - inside details box) -->
+                        <div id="old-save-race-ability" class="text-xs border-t border-slate-600 pt-2 mt-2"></div>
+                    </div>
+                    <!-- ELEMENTAL AFFINITY FOR OLD SAVES -->
+                    <div id="old-save-elemental-affinity-container" class="hidden">
+                        <label id="old-save-elemental-affinity-label" for="old-save-elemental-affinity-select" class="block text-lg font-bold mb-2">Elemental Affinity</label>
+                        <select id="old-save-elemental-affinity-select" class="font-sans w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                            <!-- Options populated by JS -->
+                        </select>
+                    </div>
                      <div class="text-center mt-6">
                         <button id="confirm-old-save-race-btn" class="btn btn-primary" disabled>Confirm Race</button>
                     </div>
-                </div>
+                 </div>
             </div>
         </div>
-    
+
+        <!-- Old Save Class/Background Selection Screen -->
         <div id="old-save-class-background-screen" class="w-full max-w-6xl p-6 bg-slate-900 rounded-lg shadow-lg hidden">
             <h2 class="font-medieval text-4xl mb-2 text-center text-yellow-400">Update Your Hero</h2>
             <p class="text-center text-gray-400 mb-6">Your save file is from an older version. Please select a Class and Background for <strong id="old-save-cb-char-name"></strong> to continue.</p>
@@ -389,7 +433,9 @@
                         <div id="old-save-class-details" class="bg-slate-800 p-4 rounded-lg h-80 overflow-y-auto inventory-scrollbar">
                             <h4 id="old-save-class-details-name" class="font-bold text-xl text-yellow-300 mb-2">Select a Class</h4>
                             <p id="old-save-class-details-description" class="text-sm text-gray-400 mb-4"></p>
-                            <div id="old-save-class-details-stats" class="text-sm space-y-1"></div>
+                            <div id="old-save-class-details-stats" class="text-sm space-y-1 mb-4"></div>
+                            <!-- ABILITY PLACEHOLDER (Old Save - inside details box) -->
+                            <div id="old-save-class-ability" class="text-xs border-t border-slate-600 pt-2 mt-2"></div>
                         </div>
                     </div>
                 </div>
@@ -412,13 +458,14 @@
                 <button id="confirm-old-save-class-background-btn" class="btn btn-primary text-xl px-8 py-3" disabled>Confirm Choices</button>
             </div>
         </div>
-    </div>
-    
+    </div> <!-- End Menu Wrapper -->
+
     <!-- Game Wrapper -->
     <div id="game-wrapper">
-        <div id="game-container" class="relative w-full max-w-7xl md:h-screen md:max-h-[900px] flex flex-col md:flex-row border-2 rounded-lg shadow-2xl">
-            <div id="persistent-buttons" class="hidden absolute top-4 right-4 flex gap-2 z-20">
-                <button onclick="renderSettingsMenu()" class="btn btn-primary !p-2 !rounded-full w-10 h-10 flex items-center justify-center" aria-label="Settings" title="Settings">
+        <div id="game-container" class="relative w-full max-w-6xl md:h-screen md:max-h-[900px] flex flex-col md:flex-row border-2 rounded-lg shadow-2xl">
+            <!-- Persistent Buttons (Settings/Exit) -->
+            <div id="persistent-buttons" class="absolute top-16 right-16 flex gap-4 z-20">
+                <button onclick="renderSettingsMenu(gameState.currentView)" class="btn btn-primary !p-2 !rounded-full w-10 h-10 flex items-center justify-center" aria-label="Settings" title="Settings">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
                 <button onclick="exitGame()" class="btn btn-action !p-2 !rounded-full w-10 h-10 text-xl leading-none flex items-center justify-center" aria-label="Leave Game" title="Leave Game">
@@ -426,13 +473,14 @@
                 </button>
             </div>
             <button id="skip-tutorial-btn" class="hidden absolute top-2 right-2 btn btn-action z-30">Skip Tutorial</button>
-            <aside class="w-full md:w-1/3 bg-slate-800 rounded-l-lg flex flex-col">
+            <!-- Stats Sidebar -->
+            <aside class="w-full md:w-1/4 bg-slate-800 rounded-l-lg flex flex-col">
                 <section id="stats-view" class="p-6 flex-grow overflow-y-auto inventory-scrollbar">
                      <div id="stats-screen-tutorial-target">
                         <h2 id="player-name" class="font-medieval text-2xl text-center mb-1">Player Name</h2>
                         <p id="player-details" class="text-center text-sm text-gray-400 mb-4">Gender | Race</p>
                      </div>
-                     
+
                      <div class="grid grid-cols-2 gap-2 text-center mb-4">
                          <div>
                              <p class="font-bold text-lg" id="player-level">1</p>
@@ -457,9 +505,9 @@
                             <div class="w-full bg-gray-600 rounded-full h-2.5"><div id="player-xp-bar" class="bg-yellow-400 h-2.5 rounded-full" style="width: 0%"></div></div>
                         </div>
                      </div>
-    
+
                      <hr class="border-gray-600 my-4">
-    
+
                      <div id="equipment-tutorial-target">
                          <h3 class="font-bold text-lg mb-2 text-yellow-300">Equipment</h3>
                          <div class="space-y-2 text-sm">
@@ -470,9 +518,9 @@
                              <p><strong>Lure:</strong> <span id="equipped-lure"></span></p>
                          </div>
                      </div>
-    
+
                      <hr class="border-gray-600 my-4">
-                     
+
                       <div id="quests-tutorial-target">
                         <h3 class="font-bold text-lg mb-2 text-yellow-300">Quests</h3>
                         <div class="space-y-2 text-sm">
@@ -480,14 +528,15 @@
                             <p id="legacy-quest-tracker" class="text-purple-400"></p>
                         </div>
                     </div>
-    
+
                 </section>
                 <div id="inv-char-buttons-tutorial-target" class="px-6 pb-6 pt-4 border-t border-gray-600 flex flex-col gap-2">
                      <button id="inventory-btn" onclick="gameState.currentView !== 'inventory' ? renderInventory() : returnFromInventory()" class="btn btn-primary w-full">Inventory</button>
                      <button id="character-sheet-btn" onclick="gameState.currentView !== 'character_sheet' ? renderCharacterSheet() : returnFromInventory()" class="btn btn-primary w-full">Character</button>
                 </div>
             </aside>
-            <main class="w-full md:w-2/3 flex flex-col p-4">
+            <!-- Main View & Game Log -->
+            <main class="w-full md:w-3/4 flex flex-col p-4">
                 <div id="main-view" class="bg-slate-900/50 rounded-lg flex-grow flex items-center justify-center p-6 min-h-[300px] md:min-h-0 overflow-y-auto inventory-scrollbar">
                     <!-- Main game content (town, battle, etc.) -->
                 </div>
@@ -498,23 +547,26 @@
                 </div>
             </main>
         </div>
-    </div>
+    </div> <!-- End Game Wrapper -->
 
+    <!-- Fixed Overlays (Tooltips, Popups, Debug) -->
     <div id="tooltip" class="hidden fixed p-3 rounded-lg text-sm shadow-xl w-64 z-50 pointer-events-none"></div>
     <div id="enemy-info-display" class="hidden fixed bg-slate-800/80 p-2 rounded-lg text-sm border border-slate-600 z-10"></div>
-
     <div id="betty-encounter-popup" class="hidden fixed bottom-5 right-5 bg-slate-800 border-2 border-purple-400 p-4 rounded-lg shadow-2xl max-w-sm cursor-pointer z-20">
-        <p class="font-bold text-purple-200">A nervous woman whispers...</p>
-        <p class="text-gray-300">"Psst... Adventurer... Over here..."</p>
+        <!-- Betty popup content -->
     </div>
-
+    <div id="tutorial-box" class="hidden fixed bg-slate-800 border-2 border-yellow-400 p-4 rounded-lg shadow-2xl max-w-xs z-50 transition-all duration-300">
+        <p id="tutorial-text" class="text-gray-300"></p>
+        <button id="tutorial-next-btn" class="btn btn-primary mt-4 w-full">Next</button>
+        <div id="tutorial-choice-buttons" class="mt-4 flex gap-2"></div>
+    </div>
     <div id="debug-panel" class="hidden fixed bottom-4 right-4 bg-gray-900 border border-gray-700 p-4 rounded-lg shadow-lg w-96 h-1/2 flex flex-col">
         <h3 class="text-lg font-bold mb-2 text-center">Debug Panel</h3>
         <div class="flex-grow overflow-y-auto text-xs pr-2 inventory-scrollbar">
             <div class="mb-2">
                 <h4 class="font-bold mb-1">Modify Stats</h4>
                 <div class="space-y-3">
-                    
+                    <!-- Stat inputs -->
                     <div>
                         <h5 class="font-semibold text-white mb-1">General</h5>
                         <div class="grid grid-cols-2 gap-x-2 gap-y-1 items-center">
@@ -530,8 +582,7 @@
                             <input type="number" id="debug-xpMultiplier" step="0.1" class="text-black rounded px-1">
                         </div>
                     </div>
-    
-                    <div>
+                     <div>
                         <h5 class="font-semibold text-white mb-1">Vitals</h5>
                         <div class="grid grid-cols-2 gap-x-2 gap-y-1 items-center">
                             <label for="debug-hp" class="text-white text-right text-xs">Current HP:</label>
@@ -544,8 +595,7 @@
                             <input type="number" id="debug-bonusMp" class="text-black rounded px-1">
                         </div>
                     </div>
-    
-                    <div>
+                     <div>
                         <h5 class="font-semibold text-white mb-1">Base Attributes</h5>
                         <div class="grid grid-cols-2 gap-x-2 gap-y-1 items-center">
                             <label for="debug-vigor" class="text-white text-right text-xs">Vigor:</label>
@@ -562,8 +612,7 @@
                             <input type="number" id="debug-luck" class="text-black rounded px-1">
                         </div>
                     </div>
-                    
-                    <div>
+                     <div>
                         <h5 class="font-semibold text-white mb-1">Derived Bonuses</h5>
                         <div class="grid grid-cols-2 gap-x-2 gap-y-1 items-center">
                             <label for="debug-bonusPhysicalDamage" class="text-white text-right text-xs">Bonus Phys Dmg:</label>
@@ -580,7 +629,6 @@
                             <input type="number" id="debug-bonusEvasion" step="0.01" class="text-black rounded px-1">
                         </div>
                     </div>
-    
                 </div>
                 <button onclick="debugUpdateVariables()" class="btn btn-primary w-full mt-2 text-sm">Update</button>
             </div>
@@ -594,33 +642,25 @@
             <pre id="debug-content" class="bg-gray-800 p-2 rounded whitespace-pre-wrap break-all"></pre>
         </div>
     </div>
-    
+
     <!-- Templates -->
     <template id="template-death">
          <div class="text-center">
             <h1 class="font-medieval text-8xl text-red-700">YOU DIED</h1>
         </div>
     </template>
-
     <template id="template-battle">
         <div class="flex flex-col justify-center items-center">
             <div id="battle-grid" class="grid gap-1 w-full max-w-sm aspect-square mb-4">
                 <!-- Grid cells will be generated by JS -->
             </div>
-            <div id="battle-actions" class="flex flex-wrap justify-center items-center gap-4">
+            <div id="battle-actions" class="grid grid-cols-3 gap-3 justify-items-center w-full max-w-lg">
                 <!-- Battle action buttons rendered here -->
             </div>
         </div>
     </template>
-    
-    <!-- Tutorial Box -->
-    <div id="tutorial-box" class="hidden fixed bg-slate-800 border-2 border-yellow-400 p-4 rounded-lg shadow-2xl max-w-xs z-50 transition-all duration-300">
-        <p id="tutorial-text" class="text-gray-300"></p>
-        <button id="tutorial-next-btn" class="btn btn-primary mt-4 w-full">Next</button>
-        <div id="tutorial-choice-buttons" class="mt-4 flex gap-2"></div>
-    </div>
 
-    <!-- Game Scripts (Deferred for better performance) -->
+    <!-- Game Scripts (Keep at the end) -->
     <script src="game_data.js"></script>
     <script src="recipe_data.js"></script>
     <script src="dialogue.js"></script>
@@ -631,4 +671,3 @@
     <script src="main.js"></script>
 </body>
 </html>
-

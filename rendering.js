@@ -1,5 +1,7 @@
 let statAllocationAmount = 1;
 let storageSortOrder = 'category';
+// State for inventory tab
+let inventoryActiveTab = 'consumables'; // Default tab
 
 function setStorageSortOrder(order) {
     storageSortOrder = order;
@@ -11,7 +13,7 @@ function getWeaponStatsString(weapon) {
 
     let stats = [];
     stats.push(`${weapon.damage[0]}d${weapon.damage[1]}`);
-    
+
     // Add specific weapon effect stats
     if(weapon.effect?.critChance) stats.push(`Crit: ${weapon.effect.critChance*100}%`);
     if(weapon.effect?.armorPierce) stats.push(`Pierce: ${weapon.effect.armorPierce*100}%`);
@@ -31,11 +33,11 @@ function getCatalystStatsString(catalyst) {
     if (catalyst.effect?.spell_crit_chance) stats.push(`${catalyst.effect.spell_crit_chance * 100}% Crit`);
     if (catalyst.effect?.spell_vamp) stats.push(`Vamp`);
     if (catalyst.effect?.spell_penetration) stats.push(`Pen`);
-    if (catalyst.effect?.spell_sniper) stats.push(`Sniper`);
+    // Removed spell_sniper display
     if (catalyst.effect?.overdrive) stats.push(`Overdrive`);
     if (catalyst.effect?.battlestaff) stats.push(`Battlestaff`);
     if (catalyst.effect?.spell_weaver) stats.push(`Weaver`);
-    if (catalyst.effect?.ranged_chance) stats.push(`Ranged Eva`);
+    // Removed ranged_chance display
     return `${catalyst.name}${stats.length > 0 ? ` (${stats.join(', ')})` : ''}`;
 }
 
@@ -52,28 +54,49 @@ function updateStatsView() {
         console.warn("Stats view elements not found, skipping UI update.");
         return;
     }
-    elements.name.textContent = player.name; 
+    elements.name.textContent = player.name;
     let detailsText = [];
     if (player.gender) detailsText.push(player.gender);
-    if (player.race) detailsText.push(player.race);
+    if (player.race) {
+        detailsText.push(player.race);
+        // Add elemental affinity to details if it exists
+        if (player.race === 'Elementals' && player.elementalAffinity) {
+            detailsText.push(`(${capitalize(player.elementalAffinity)})`);
+        }
+    }
     if (player.class) detailsText.push(player.class);
     if (player.background) detailsText.push(player.background);
     if (player.difficulty) detailsText.push(capitalize(player.difficulty));
     elements.details.textContent = detailsText.join(' | ');
 
-    elements.level.textContent = player.level; 
+    elements.level.textContent = player.level;
     elements.gold.textContent = player.gold;
-    elements.hp.textContent = `${player.hp} / ${player.maxHp}`; 
-    elements.mp.textContent = `${player.mp} / ${player.maxMp}`; 
+    elements.hp.textContent = `${player.hp} / ${player.maxHp}`;
+    elements.mp.textContent = `${player.mp} / ${player.maxMp}`;
     elements.xp.textContent = `${player.xp} / ${player.xpToNextLevel}`;
-    
-    $('#player-hp-bar').style.width = `${(player.hp / player.maxHp) * 100}%`;
-    $('#player-mp-bar').style.width = `${(player.mp / player.maxMp) * 100}%`;
-    $('#player-xp-bar').style.width = `${(player.xp / player.xpToNextLevel) * 100}%`;
+
+     // Calculate HP percentage safely
+     const currentHp = Number(player.hp) || 0;
+     const maxHp = Number(player.maxHp) || 1; // Avoid division by zero
+     const hpPercent = maxHp > 0 ? Math.max(0, Math.min(100, (currentHp / maxHp) * 100)) : 0;
+     $('#player-hp-bar').style.width = `${hpPercent}%`;
+
+     // Calculate MP percentage safely
+     const currentMp = Number(player.mp) || 0;
+     const maxMp = Number(player.maxMp) || 1; // Avoid division by zero
+     const mpPercent = maxMp > 0 ? Math.max(0, Math.min(100, (currentMp / maxMp) * 100)) : 0;
+     $('#player-mp-bar').style.width = `${mpPercent}%`; // Use safe percentage
+
+     // Calculate XP percentage safely
+     const currentXp = Number(player.xp) || 0;
+     const nextLevelXp = Number(player.xpToNextLevel) || 1; // Avoid division by zero
+     const xpPercent = nextLevelXp > 0 ? Math.max(0, Math.min(100, (currentXp / nextLevelXp) * 100)) : 0;
+     $('#player-xp-bar').style.width = `${xpPercent}%`; // Use safe percentage
+
 
     elements.weapon.innerHTML = getWeaponStatsString(player.equippedWeapon);
     elements.catalyst.textContent = getCatalystStatsString(player.equippedCatalyst);
-    
+
     const armor = player.equippedArmor;
     let armorStats = [`Def: ${armor.defense}`];
     if (armor.blockChance > 0) armorStats.push(`Block: ${Math.round(armor.blockChance * 100)}%`);
@@ -87,24 +110,27 @@ function updateStatsView() {
     if (shield.effect?.type === 'parry') shieldStats.push(`Parry: ${Math.round(shield.effect.chance * 100)}%`);
     const shieldElementText = player.shieldElement !== 'none' ? ` <span class="font-bold text-cyan-300">[${capitalize(player.shieldElement)}]</span>` : '';
     elements.shield.innerHTML = `${shield.name} (${shieldStats.join(', ')})` + shieldElementText;
-    
+
     elements.lure.textContent = LURES[player.equippedLure].name;
-    
+
     if (player.activeQuest) {
-        const quest = getQuestDetails(player.activeQuest); 
+        const quest = getQuestDetails(player.activeQuest);
         if (quest) {
             let progress = player.questProgress;
-            if (player.activeQuest.category === 'collection') { 
+            if (player.activeQuest.category === 'collection' || player.activeQuest.category === 'creation') {
                 progress = 0;
                 const itemDetails = getItemDetails(quest.target);
                 if (itemDetails) {
-                    if (quest.target in ITEMS) progress = player.inventory.items[quest.target] || 0;
-                    else {
+                     if (quest.target in ITEMS) progress = player.inventory.items[quest.target] || 0;
+                     else {
                         let category;
                         if (quest.target in WEAPONS) category = 'weapons';
                         else if (quest.target in ARMOR) category = 'armor';
                         else if (quest.target in SHIELDS) category = 'shields';
-                        if(category) progress = player.inventory[category].filter(item => item === quest.target).length;
+                        else if (quest.target in CATALYSTS) category = 'catalysts';
+                        if(category && player.inventory[category]) {
+                           progress = player.inventory[category].filter(item => item === quest.target).length;
+                        }
                     }
                 }
             }
@@ -116,385 +142,124 @@ function updateStatsView() {
     const completedCount = Object.keys(player.legacyQuestProgress).length;
     const totalCount = legacyQuest.targets.length;
     elements.legacyQuestTracker.innerHTML = `<strong class="text-purple-400">Legacy:</strong> ${legacyQuest.title} (${completedCount} / ${totalCount})`;
-    
+
     updateDebugView();
 }
 
-function renderCharacterCreation() {
-    $('#start-screen').classList.add('hidden');
-    const creationScreen = $('#character-creation-screen');
-    creationScreen.classList.remove('hidden');
+// --- NEW HELPER FUNCTIONS FOR renderCharacterSheet ---
 
-    for (let i = 0; i <= 3; i++) {
-        const step = $(`#creation-step-${i}`);
-        if(step) step.classList.add('hidden');
-    }
-    $('#creation-step-0').classList.remove('hidden');
-    $('#new-char-name').focus();
+/**
+ * Builds the HTML for the Main Stats allocation section.
+ * @param {number} currentStatPoints - The player's available stat points.
+ * @returns {string} HTML string for the main stats.
+ */
+function _buildCharSheetMainStats(currentStatPoints) {
+    const mainStats = ['vigor', 'focus', 'stamina', 'strength', 'intelligence', 'luck'];
+    return mainStats.map(stat => {
+        const bonusStatKey = 'bonus' + capitalize(stat);
+        const pointsSpentThisSession = (player[bonusStatKey] || 0) - (characterSheetOriginalStats[bonusStatKey] || 0);
+        const canDecrease = pointsSpentThisSession >= statAllocationAmount;
+        const canIncrease = currentStatPoints >= statAllocationAmount;
 
-    if (isTutorialEnabled) {
-        startTutorialSequence('creation_welcome');
-    }
-
-    let creationState = { name: '', gender: null, race: null, class: null, background: null, difficulty: 'hardcore' };
-
-    const switchStep = (from, to) => {
-        $(`#creation-step-${from}`).classList.add('hidden');
-        $(`#creation-step-${to}`).classList.remove('hidden');
-
-        if (isTutorialEnabled) {
-            if (to === 1) startTutorialSequence('creation_step1');
-            else if (to === 2) startTutorialSequence('creation_step2');
-            else if (to === 3) startTutorialSequence('creation_step3');
-        }
-    };
-
-    // --- Event Listeners for Navigation ---
-    $('#creation-back-to-start-btn').onclick = showStartScreen;
-    $('#back-to-step-0-btn').onclick = () => switchStep(1, 0);
-
-    $('#to-step-2-btn').onclick = () => {
-        const nameInput = $('#new-char-name');
-        creationState.name = nameInput.value.trim();
-        let hasError = false;
-
-        if (!creationState.name) {
-            nameInput.classList.add('border-red-500'); hasError = true;
-        } else { nameInput.classList.remove('border-red-500'); }
-
-        if (!creationState.gender) {
-            $('#gender-label').classList.add('animate-pulse', 'text-red-400');
-            setTimeout(() => $('#gender-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
-            hasError = true;
-        }
-
-        if (!creationState.race) {
-             $('#race-label').classList.add('animate-pulse', 'text-red-400');
-            setTimeout(() =>  $('#race-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
-            hasError = true;
-        }
-
-        if (!hasError) {
-            switchStep(1, 2);
-        }
-    };
-
-    $('#back-to-step-1-btn').onclick = () => switchStep(2, 1);
-    
-    $('#to-step-3-btn').onclick = () => {
-        if (!creationState.class) {
-             $('#class-label').classList.add('animate-pulse', 'text-red-400');
-            setTimeout(() =>  $('#class-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
-            return;
-        }
-        switchStep(2, 3);
-    };
-    
-    $('#back-to-step-2-btn').onclick = () => switchStep(3, 2);
-
-    $('#finalize-creation-btn').onclick = () => {
-        if (!creationState.background) {
-            $('#background-label').classList.add('animate-pulse', 'text-red-400');
-            setTimeout(() => $('#background-label').classList.remove('animate-pulse', 'text-red-400'), 1000);
-            return;
-        }
-        
-        if (isTutorialEnabled) {
-            startTutorialSequence('creation_finalize');
-            advanceTutorial(creationState.name); // Pass name to final message
-        }
-        
-        setTimeout(() => {
-            initGame(creationState.name, creationState.gender, creationState.race, creationState.class, creationState.background, creationState.difficulty);
-        }, isTutorialEnabled ? 2500 : 0);
-    };
-
-    $('#difficulty-easy').onclick = () => { creationState.difficulty = 'easy'; switchStep(0, 1); };
-    $('#difficulty-medium').onclick = () => { creationState.difficulty = 'medium'; switchStep(0, 1); };
-    $('#difficulty-hardcore').onclick = () => { creationState.difficulty = 'hardcore'; switchStep(0, 1); };
-
-    const genderButtons = document.querySelectorAll('#gender-selection button');
-    genderButtons.forEach(button => {
-        button.onclick = () => {
-            genderButtons.forEach(btn => {
-                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
-                btn.classList.add('btn-primary');
-            });
-            button.classList.add('bg-yellow-600', 'border-yellow-800');
-            button.classList.remove('btn-primary');
-            creationState.gender = button.dataset.gender;
-        };
-    });
-
-    const raceListContainer = $('#race-selection-list');
-    raceListContainer.innerHTML = '';
-    Object.keys(RACES).forEach(raceKey => {
-        const button = document.createElement('button');
-        button.className = 'btn btn-primary w-full text-left';
-        button.dataset.race = raceKey;
-        button.textContent = raceKey;
-        button.onmouseenter = () => {
-            const raceData = RACES[raceKey];
-            $('#race-details-name').textContent = raceKey;
-            $('#race-details-description').textContent = raceData.description;
-            const statsContainer = $('#race-details-stats');
-            statsContainer.innerHTML = Object.entries(raceData)
-                .filter(([key]) => key !== 'description')
-                .map(([stat, value]) => `<div class="grid grid-cols-2"><span>${stat}</span><span class="font-bold text-yellow-300 text-right">${value}</span></div>`)
-                .join('');
-        };
-        button.onclick = () => {
-            document.querySelectorAll('#race-selection-list button').forEach(btn => {
-                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
-                btn.classList.add('btn-primary');
-            });
-            button.classList.add('bg-yellow-600', 'border-yellow-800');
-            button.classList.remove('btn-primary');
-            creationState.race = raceKey;
-        };
-        raceListContainer.appendChild(button);
-    });
-
-    const classListContainer = $('#class-selection-list');
-    classListContainer.innerHTML = '';
-    Object.keys(CLASSES).forEach(classKey => {
-        const classData = CLASSES[classKey];
-        const button = document.createElement('button');
-        button.className = 'btn btn-primary w-full text-left';
-        button.dataset.class = classKey;
-        button.textContent = classData.name;
-        button.onmouseenter = () => {
-            $('#class-details-name').textContent = classData.name;
-            $('#class-details-description').textContent = classData.description;
-            let detailsHtml = '<h5 class="font-bold mt-3 mb-1 text-yellow-300">Stat Bonuses</h5>';
-            detailsHtml += '<div class="grid grid-cols-2">';
-            detailsHtml += Object.entries(classData.bonusStats).map(([stat, value]) => {
-                const sign = value > 0 ? '+' : '';
-                const color = value > 0 ? 'text-green-400' : 'text-red-400';
-                return `<span>${capitalize(stat)}</span><span class="${color} text-right">${sign}${value}</span>`;
-            }).join('');
-            detailsHtml += '</div>';
-            
-            detailsHtml += '<h5 class="font-bold mt-3 mb-1 text-yellow-300">Starting Gear</h5>';
-            const gear = Object.values(classData.startingEquipment).map(key => getItemDetails(key)?.name).filter(Boolean).join(', ');
-            detailsHtml += `<p class="text-xs">${gear}</p>`;
-
-            $('#class-details-stats').innerHTML = detailsHtml;
-        };
-        button.onclick = () => {
-             document.querySelectorAll('#class-selection-list button').forEach(btn => {
-                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
-                btn.classList.add('btn-primary');
-            });
-            button.classList.add('bg-yellow-600', 'border-yellow-800');
-            button.classList.remove('btn-primary');
-            creationState.class = classKey;
-        };
-        classListContainer.appendChild(button);
-    });
-    
-    const backgroundListContainer = $('#background-selection-list');
-    backgroundListContainer.innerHTML = '';
-    Object.keys(BACKGROUNDS).forEach(bgKey => {
-        const bgData = BACKGROUNDS[bgKey];
-        const button = document.createElement('button');
-        button.className = 'btn btn-primary w-full text-left';
-        button.dataset.bg = bgKey;
-        button.textContent = bgData.name;
-        button.onmouseenter = () => {
-            $('#background-details-name').textContent = bgData.name;
-            $('#background-details-description').textContent = bgData.description;
-            let detailsHtml = '<h5 class="font-bold mt-3 mb-1 text-yellow-300">Favored Stats</h5>';
-            const favoredStats = bgData.favoredStats.map(s => capitalize(s)).join(', ') || 'All';
-            detailsHtml += `<p class="text-xs">${favoredStats}</p>`;
-            $('#background-details-stats').innerHTML = detailsHtml;
-        };
-        button.onclick = () => {
-             document.querySelectorAll('#background-selection-list button').forEach(btn => {
-                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
-                btn.classList.add('btn-primary');
-            });
-            button.classList.add('bg-yellow-600', 'border-yellow-800');
-            button.classList.remove('btn-primary');
-            creationState.background = bgKey;
-        };
-        backgroundListContainer.appendChild(button);
-    });
+        return `<div class="grid grid-cols-3 items-center bg-slate-800 px-1 py-0.5 rounded">
+                    <span class="font-semibold capitalize text-sm col-span-1">${stat}</span>
+                    <div class="col-span-2 flex items-center justify-end">
+                        <button onclick="deallocatePoint('${stat}', statAllocationAmount)" class="btn btn-action text-sm py-0 px-2 leading-none w-7 h-7" ${!canDecrease ? 'disabled' : ''}>-</button>
+                        <span class="text-sm mx-1 w-8 text-center font-semibold">${player[stat]}</span>
+                        <button onclick="allocatePoint('${stat}', statAllocationAmount)" class="btn btn-primary text-sm py-0 px-2 leading-none w-7 h-7" ${!canIncrease ? 'disabled' : ''}>+</button>
+                    </div>
+                 </div>`;
+    }).join('');
 }
 
-
-function renderRaceSelectionForOldSave(savedData, saveKey, isImport) {
-    showStartScreen(); 
-    $('#start-screen').classList.add('hidden');
-    $('#old-save-race-selection-screen').classList.remove('hidden');
-
-    $('#old-save-char-name').textContent = savedData.name;
-    let selectedRace = null;
-    
-    const raceListContainer = $('#old-save-race-list');
-    const confirmBtn = $('#confirm-old-save-race-btn');
-    raceListContainer.innerHTML = '';
-
-    Object.keys(RACES).forEach(raceKey => {
-        const button = document.createElement('button');
-        button.className = 'btn btn-primary w-full text-left';
-        button.dataset.race = raceKey;
-        button.textContent = raceKey;
-        button.onmouseenter = () => {
-            const raceData = RACES[raceKey];
-            $('#old-save-race-name').textContent = raceKey;
-            $('#old-save-race-description').textContent = raceData.description;
-            const statsContainer = $('#old-save-race-stats');
-            statsContainer.innerHTML = Object.entries(raceData)
-                .filter(([key]) => key !== 'description')
-                .map(([stat, value]) => `<div class="grid grid-cols-2"><span>${stat}</span><span class="font-bold text-yellow-300 text-right">${value}</span></div>`)
-                .join('');
-        };
-        button.onclick = () => {
-            document.querySelectorAll('#old-save-race-list button').forEach(btn => {
-                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
-                btn.classList.add('btn-primary');
-            });
-            button.classList.add('bg-yellow-600', 'border-yellow-800');
-            button.classList.remove('btn-primary');
-            selectedRace = raceKey;
-            confirmBtn.disabled = false;
-        };
-        raceListContainer.appendChild(button);
-    });
-
-    confirmBtn.onclick = () => {
-        if (selectedRace) {
-            savedData.race = selectedRace;
-            const updatedSaveData = JSON.stringify(savedData);
-            localStorage.setItem(`rpgSaveData_${saveKey}`, updatedSaveData);
-            loadGameFromKey(saveKey, isImport);
-        }
+/**
+ * Builds the HTML for the Derived Stats section.
+ * @returns {string} HTML string for the derived stats.
+ */
+function _buildCharSheetDerivedStats() {
+    const derivedStats = {
+        'Max HP': 'maxHp', 'Max MP': 'maxMp',
+        'Physical Def': 'physicalDefense', 'Magical Def': 'magicalDefense',
+        'Physical Dmg Bonus': 'physicalDamageBonus', 'Magical Dmg Bonus': 'magicalDamageBonus',
+        'Crit Chance': 'critChance', 'Evasion Chance': 'evasionChance', 'Debuff Resist': 'resistanceChance'
     };
-}
 
-function renderClassBackgroundSelectionForOldSave(savedData, saveKey, isImport) {
-    showStartScreen(); 
-    $('#start-screen').classList.add('hidden');
-    $('#old-save-class-background-screen').classList.remove('hidden');
-
-    $('#old-save-cb-char-name').textContent = savedData.name;
-    let selectedClass = null;
-    let selectedBackground = null;
-    
-    const confirmBtn = $('#confirm-old-save-class-background-btn');
-
-    function checkSelections() {
-        if (selectedClass && selectedBackground) {
-            confirmBtn.disabled = false;
-        }
-    }
-
-    // --- Class Selection ---
-    const classListContainer = $('#old-save-class-list');
-    classListContainer.innerHTML = '';
-    Object.keys(CLASSES).forEach(classKey => {
-        const classData = CLASSES[classKey];
-        const button = document.createElement('button');
-        button.className = 'btn btn-primary w-full text-left';
-        button.dataset.class = classKey;
-        button.textContent = classData.name;
-        button.onmouseenter = () => {
-            $('#old-save-class-details-name').textContent = classData.name;
-            $('#old-save-class-details-description').textContent = classData.description;
-             let detailsHtml = '<h5 class="font-bold mt-3 mb-1 text-yellow-300">Stat Bonuses</h5>';
-            detailsHtml += '<div class="grid grid-cols-2">';
-            detailsHtml += Object.entries(classData.bonusStats).map(([stat, value]) => {
-                const sign = value > 0 ? '+' : '';
-                const color = value > 0 ? 'text-green-400' : 'text-red-400';
-                return `<span>${capitalize(stat)}</span><span class="${color} text-right">${sign}${value}</span>`;
-            }).join('');
-            detailsHtml += '</div>';
-            $('#old-save-class-details-stats').innerHTML = detailsHtml;
-        };
-        button.addEventListener('click', () => {
-             document.querySelectorAll('#old-save-class-list button').forEach(btn => {
-                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
-                btn.classList.add('btn-primary');
-            });
-            button.classList.add('bg-yellow-600', 'border-yellow-800');
-            button.classList.remove('btn-primary');
-            selectedClass = classKey;
-            checkSelections();
-        });
-        classListContainer.appendChild(button);
-    });
-
-    // --- Background Selection ---
-    const backgroundListContainer = $('#old-save-background-list');
-    backgroundListContainer.innerHTML = '';
-    Object.keys(BACKGROUNDS).forEach(bgKey => {
-        const bgData = BACKGROUNDS[bgKey];
-        const button = document.createElement('button');
-        button.className = 'btn btn-primary w-full text-left';
-        button.dataset.bg = bgKey;
-        button.textContent = bgData.name;
-        button.onmouseenter = () => {
-            $('#old-save-background-details-name').textContent = bgData.name;
-            $('#old-save-background-details-description').textContent = bgData.description;
-            let detailsHtml = '<h5 class="font-bold mt-3 mb-1 text-yellow-300">Favored Stats</h5>';
-            const favoredStats = bgData.favoredStats.map(s => capitalize(s)).join(', ') || 'All';
-            detailsHtml += `<p class="text-xs">${favoredStats}</p>`;
-            $('#old-save-background-details-stats').innerHTML = detailsHtml;
-        };
-        button.addEventListener('click', () => {
-             document.querySelectorAll('#old-save-background-list button').forEach(btn => {
-                btn.classList.remove('bg-yellow-600', 'border-yellow-800');
-                btn.classList.add('btn-primary');
-            });
-            button.classList.add('bg-yellow-600', 'border-yellow-800');
-            button.classList.remove('btn-primary');
-            selectedBackground = bgKey;
-            checkSelections();
-        });
-        backgroundListContainer.appendChild(button);
-    });
-
-    confirmBtn.onclick = () => {
-        if (selectedClass && selectedBackground) {
-            savedData.class = CLASSES[selectedClass].name;
-            savedData.background = BACKGROUNDS[selectedBackground].name;
-            savedData.backgroundKey = selectedBackground;
-
-            const classData = CLASSES[selectedClass];
-            for (const stat in classData.bonusStats) {
-                if (savedData.hasOwnProperty(stat.toLowerCase())) {
-                    savedData[stat.toLowerCase()] += classData.bonusStats[stat];
-                }
+    return Object.entries(derivedStats).map(([label, key]) => {
+        let value = player[key];
+        if (typeof value === 'number') {
+            if (key.includes('Chance') || key.includes('Resist')) {
+                 value = `${(value * 100).toFixed(1)}%`;
+            } else {
+                 value = Math.floor(value);
             }
-
-            if (!savedData.inventory) savedData.inventory = { items: {}, weapons: [], catalysts: [], armor: [], shields: [], lures: {} };
-            if (!savedData.spells) savedData.spells = {};
-
-            Object.keys(classData.startingItems).forEach(key => {
-                savedData.inventory.items[key] = (savedData.inventory.items[key] || 0) + classData.startingItems[key];
-            });
-
-             Object.keys(classData.startingEquipment).forEach(type => {
-                const itemKey = classData.startingEquipment[type];
-                const category = `${type}s`;
-                if(savedData.inventory[category] && !savedData.inventory[category].includes(itemKey)){
-                    savedData.inventory[category].push(itemKey);
-                }
-            });
-
-            Object.keys(classData.startingSpells).forEach(key => {
-                if (!savedData.spells[key]) {
-                     savedData.spells[key] = { tier: classData.startingSpells[key] };
-                }
-            });
-
-            const updatedSaveData = JSON.stringify(savedData);
-            localStorage.setItem(`rpgSaveData_${saveKey}`, updatedSaveData);
-            loadGameFromKey(saveKey, isImport);
-        }
-    };
+         } else {
+             value = 'N/A';
+         }
+        return `<div class="flex justify-between text-xs"><span>${label}:</span><span class="font-semibold">${value}</span></div>`;
+    }).join('');
 }
+
+/**
+ * Builds the HTML for the Racial Passive and Class Ability sections.
+ * @returns {object} Object containing HTML for both sections.
+ */
+function _buildCharSheetAbilities() {
+    // Racial Passive
+    const racialPassiveData = RACES[player.race]?.passive;
+    let racialPassiveHtml = '';
+    if (racialPassiveData) {
+        racialPassiveHtml = `<p class="font-semibold text-cyan-300">${racialPassiveData.name}</p>
+                             <p class="text-gray-400 mt-1">${racialPassiveData.description}</p>`;
+        const evolutionText = racialPassiveData.evolutionDescription || racialPassiveData.evolution;
+        if (evolutionText && player.level >= 20) {
+             racialPassiveHtml += `<p class="text-green-400 mt-1">Level 20+ Evolution: ${evolutionText}</p>`;
+        }
+    } else {
+        racialPassiveHtml = `<p class="text-gray-500">None</p>`;
+    }
+
+    // Class Ability
+    const signatureAbilityData = player.signatureAbilityData;
+    let classAbilityHtml = '';
+    console.log("DEBUG renderCharacterSheet: Checking player.signatureAbilityData just before rendering:", signatureAbilityData ? JSON.stringify(signatureAbilityData) : 'Signature Ability Data is null/undefined');
+    if (signatureAbilityData) {
+        classAbilityHtml = `<p class="font-semibold text-cyan-300">${signatureAbilityData.name} <span class="text-gray-400 font-normal">(${capitalize(signatureAbilityData.type)})</span></p>
+                            <p class="text-gray-400 mt-1">${signatureAbilityData.description}</p>`;
+        if (signatureAbilityData.cost > 0 && signatureAbilityData.type !== 'toggle') {
+            classAbilityHtml += `<p class="text-blue-400 text-xs">Cost: ${signatureAbilityData.cost} MP</p>`;
+        }
+    } else {
+        classAbilityHtml = `<p class="text-gray-500">None</p>`;
+    }
+
+    return { racialPassiveHtml, classAbilityHtml };
+}
+
+/**
+ * Builds the HTML for the Active Food Buffs section.
+ * @returns {string} HTML string for food buffs.
+ */
+function _buildCharSheetFoodBuffs() {
+    let foodBuffsHtml = '';
+    let hasBuffs = false;
+    for (const buffKey in player.foodBuffs) {
+        hasBuffs = true;
+        const buff = player.foodBuffs[buffKey];
+        const statName = buffKey.replace(/_/g, ' ');
+        let valueDisplay = '';
+        if (buffKey === 'movement_speed') {
+             valueDisplay = `+${buff.value}`;
+        } else {
+             valueDisplay = `+${((buff.value - 1) * 100).toFixed(0)}%`;
+        }
+        foodBuffsHtml += `<div class="flex justify-between text-xs"><span>${capitalize(statName)}:</span><span class="font-semibold text-green-400">${valueDisplay} (${buff.duration} enc.)</span></div>`;
+    }
+    if (!hasBuffs) {
+        foodBuffsHtml = `<p class="text-center text-gray-500 text-xs">None</p>`;
+    }
+    return foodBuffsHtml;
+}
+
 
 function renderCharacterSheet(isLevelUp = false) {
     if (gameState.currentView === 'battle') {
@@ -502,91 +267,81 @@ function renderCharacterSheet(isLevelUp = false) {
         return;
     }
     if (!player) return;
+
+    // Snapshot current stats if opening the sheet for allocation
     if (!characterSheetOriginalStats) {
         characterSheetOriginalStats = {
             vigor: player.vigor, focus: player.focus, stamina: player.stamina,
             strength: player.strength, intelligence: player.intelligence, luck: player.luck,
-            statPoints: player.statPoints,
-            bonusVigor: player.bonusVigor, bonusFocus: player.bonusFocus, bonusStamina: player.bonusStamina,
-            bonusStrength: player.bonusStrength, bonusIntelligence: player.bonusIntelligence, bonusLuck: player.bonusLuck
+            statPoints: player.statPoints || 0,
+            bonusVigor: player.bonusVigor || 0, bonusFocus: player.bonusFocus || 0, bonusStamina: player.bonusStamina || 0,
+            bonusStrength: player.bonusStrength || 0, bonusIntelligence: player.bonusIntelligence || 0, bonusLuck: player.bonusLuck || 0
         };
     }
 
-    lastViewBeforeInventory = 'character_sheet';
-    gameState.currentView = isLevelUp ? 'character_sheet_levelup' : 'character_sheet';
+    lastViewBeforeInventory = 'character_sheet'; // Set the return view
+    gameState.currentView = isLevelUp ? 'character_sheet_levelup' : 'character_sheet'; // Set current view state
 
-    const mainStats = ['vigor', 'focus', 'stamina', 'strength', 'intelligence', 'luck'];
-    const derivedStats = {
-        'Max HP': 'maxHp', 'Max MP': 'maxMp', 
-        'Physical Def': 'physicalDefense', 'Magical Def': 'magicalDefense',
-        'Physical Dmg': 'physicalDamageBonus', 'Magical Dmg': 'magicalDamageBonus',
-        'Crit Chance': 'critChance', 'Evasion Chance': 'evasionChance', 'Debuff Resist': 'resistanceChance'
-    };
+    const currentStatPoints = player.statPoints || 0;
+    const hasChanges = currentStatPoints !== characterSheetOriginalStats.statPoints;
 
-    const hasChanges = player.statPoints !== characterSheetOriginalStats.statPoints;
+    // --- Build HTML using helper functions ---
+    const mainStatsHtml = _buildCharSheetMainStats(currentStatPoints);
+    const derivedStatsHtml = _buildCharSheetDerivedStats();
+    const { racialPassiveHtml, classAbilityHtml } = _buildCharSheetAbilities();
+    const foodBuffsHtml = _buildCharSheetFoodBuffs();
 
-    let html = `<div class="w-full text-left">
+
+    // --- Assemble Final HTML ---
+    // This is now much cleaner and just assembles the parts.
+    let html = `
+    <div class="w-full text-left">
         <h2 class="font-medieval text-2xl mb-2 text-center">Character Sheet</h2>
-        
+
+        <!-- Allocation Controls -->
         <div class="flex justify-between items-center mb-2 p-1 bg-slate-900/50 rounded-lg text-sm">
             <div>
                 <span class="mr-2 font-semibold">Allocate:</span>
-                <button onclick="setStatAllocationAmount(1)" class="btn ${statAllocationAmount === 1 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-12">1x</button>
-                <button onclick="setStatAllocationAmount(5)" class="btn ${statAllocationAmount === 5 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-12">5x</button>
-                <button onclick="setStatAllocationAmount(25)" class="btn ${statAllocationAmount === 25 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-12">25x</button>
+                <button onclick="setStatAllocationAmount(1)" class="btn ${statAllocationAmount === 1 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-10">1x</button>
+                <button onclick="setStatAllocationAmount(5)" class="btn ${statAllocationAmount === 5 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-10">5x</button>
+                <button onclick="setStatAllocationAmount(25)" class="btn ${statAllocationAmount === 25 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-10">25x</button>
             </div>
-            <p class="text-green-400 font-bold">Points: <span id="stat-points">${player.statPoints}</span></p>
+            <p class="text-green-400 font-bold">Points: <span id="stat-points">${currentStatPoints}</span></p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-            <div>
-                <h3 class="font-bold text-lg text-yellow-300 mb-1">Main Stats</h3>
-                <div class="space-y-1">`;
-    
-    mainStats.forEach(stat => {
-        const pointsSpentOnStat = player[stat] - characterSheetOriginalStats[stat];
-        html += `<div class="grid grid-cols-3 items-center bg-slate-800 p-1 rounded-lg">
-                    <span class="font-bold capitalize text-sm col-span-1">${stat}</span>
-                    <div class="col-span-2 flex items-center justify-end">
-                        <button onclick="deallocatePoint('${stat}', statAllocationAmount)" class="btn btn-action text-base py-0 px-2 leading-none w-7" ${pointsSpentOnStat < statAllocationAmount ? 'disabled' : ''}>-</button>
-                        <span class="text-base mx-2 w-8 text-center">${player[stat]}</span>
-                        <button onclick="allocatePoint('${stat}', statAllocationAmount)" class="btn btn-primary text-base py-0 px-2 leading-none w-7" ${player.statPoints < statAllocationAmount ? 'disabled' : ''}>+</button>
-                    </div>
-                 </div>`;
-    });
-    
-    html += `</div></div>
-            <div>
-                 <h3 class="font-bold text-lg text-yellow-300 mb-1">Derived Stats</h3>
-                 <div class="space-y-0.5 text-xs bg-slate-800 p-2 rounded-lg h-48 overflow-y-auto inventory-scrollbar">`;
-
-    Object.entries(derivedStats).forEach(([label, key]) => {
-        let value = player[key];
-        if (key.includes('Chance')) value = `${(value * 100).toFixed(1)}%`;
-        html += `<div class="flex justify-between"><span>${label}:</span><span class="font-semibold">${value}</span></div>`;
-    });
-
-    html += `</div></div></div>
-
-        <h3 class="font-bold text-lg text-yellow-300 mt-3 mb-1 text-center">Active Food Buffs</h3>
-        <div id="food-buff-tracker" class="space-y-0.5 text-xs bg-slate-800 p-2 rounded-lg h-24 overflow-y-auto inventory-scrollbar">`;
-
-    let hasBuffs = false;
-    for (const buffKey in player.foodBuffs) {
-        hasBuffs = true;
-        const buff = player.foodBuffs[buffKey];
-        const statName = buffKey.replace(/_/g, ' ');
-        html += `<div class="flex justify-between"><span>${capitalize(statName)}:</span><span class="font-semibold text-green-400">+${((buff.value - 1) * 100).toFixed(0)}% (${buff.duration} encounters)</span></div>`;
-    }
-
-    if (!hasBuffs) {
-        html += `<p class="text-center text-gray-500">None</p>`;
-    }
-
-    html += `</div>
-        <div class="text-center mt-2 flex justify-center gap-4">
-            <button onclick="resetStatAllocation()" class="btn btn-action" ${!hasChanges ? 'disabled' : ''}>Reset</button>
-            <button onclick="confirmStatAllocation()" class="btn btn-primary">Done</button>
+        <!-- Stats & Abilities Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+            <!-- Left Column: Stats -->
+            <div class="space-y-2">
+                <div>
+                    <h3 class="font-bold text-lg text-yellow-300 mb-1">Main Stats</h3>
+                    <div class="space-y-px">${mainStatsHtml}</div>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg text-yellow-300 mb-1 mt-2">Derived Stats</h3>
+                    <div class="space-y-0.5 bg-slate-800 p-2 rounded">${derivedStatsHtml}</div>
+                </div>
+            </div>
+            <!-- Right Column: Abilities & Buffs -->
+            <div class="space-y-2 mt-2 md:mt-0">
+                 <div>
+                    <h3 class_ ="font-bold text-lg text-yellow-300 mb-1">Racial Passive</h3>
+                    <div class="text-xs bg-slate-800 p-2 rounded">${racialPassiveHtml}</div>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg text-yellow-300 mb-1">Class Ability</h3>
+                    <div class="text-xs bg-slate-800 p-2 rounded">${classAbilityHtml}</div>
+                </div>
+                 <div>
+                    <h3 class="font-bold text-lg text-yellow-300 mb-1">Active Food Buffs</h3>
+                    <div id="food-buff-tracker" class="space-y-0.5 bg-slate-800 p-2 rounded">${foodBuffsHtml}</div>
+                 </div>
+                 <!-- Action Buttons moved to right column bottom -->
+                 <div class="text-center mt-2 flex justify-center gap-4">
+                    <button onclick="resetStatAllocation()" class="btn btn-action" ${!hasChanges ? 'disabled' : ''}>Reset</button>
+                    <button onclick="confirmStatAllocation()" class="btn btn-primary">Done</button>
+                </div>
+            </div>
         </div>
     </div>`;
 
@@ -603,93 +358,122 @@ window.setStatAllocationAmount = function(amount) {
 
 
 window.allocatePoint = function(stat, amount) {
-    if (player.statPoints >= amount) {
+     const currentStatPoints = player.statPoints || 0;
+    if (currentStatPoints >= amount) {
         player[stat]+= amount;
         const bonusStatKey = 'bonus' + capitalize(stat);
-        player[bonusStatKey]+= amount;
-        
-        player.recalculateGrowthBonuses();
-        
-        player.statPoints-= amount;
+         // Ensure bonus stat exists before adding
+         player[bonusStatKey] = (player[bonusStatKey] || 0) + amount;
+
+
+        player.recalculateGrowthBonuses(); // Recalculate derived stats
+
+        player.statPoints = currentStatPoints - amount; // Update points
+        // Refresh HP/MP fully when allocating points
         player.hp = player.maxHp;
         player.mp = player.maxMp;
-        updateStatsView();
-        renderCharacterSheet(gameState.currentView === 'character_sheet_levelup');
+        updateStatsView(); // Update main UI
+        renderCharacterSheet(gameState.currentView === 'character_sheet_levelup'); // Re-render sheet
     }
 }
 
 window.deallocatePoint = function(stat, amount) {
     const bonusStatKey = 'bonus' + capitalize(stat);
-    const pointsSpentOnStat = player[bonusStatKey] - (characterSheetOriginalStats ? characterSheetOriginalStats[bonusStatKey] : 0);
+    // Calculate points spent ONLY in this session
+     const originalBonusStat = characterSheetOriginalStats ? (characterSheetOriginalStats[bonusStatKey] || 0) : 0;
+     const currentBonusStat = player[bonusStatKey] || 0;
+    const pointsSpentThisSession = currentBonusStat - originalBonusStat;
 
 
-    if (pointsSpentOnStat >= amount) {
-        player[stat] -= amount;
-        player[bonusStatKey] -= amount;
+    // Check if we can actually decrease by the desired amount
+    if (pointsSpentThisSession >= amount) {
+        player[stat] -= amount; // Decrease base stat
+        player[bonusStatKey] = currentBonusStat - amount; // Decrease bonus stat
 
-        player.recalculateGrowthBonuses();
 
-        player.statPoints += amount;
+        player.recalculateGrowthBonuses(); // Recalculate derived
+
+        player.statPoints = (player.statPoints || 0) + amount; // Refund points
+        // Refresh HP/MP fully
         player.hp = player.maxHp;
         player.mp = player.maxMp;
-        updateStatsView();
-        renderCharacterSheet(gameState.currentView === 'character_sheet_levelup');
+        updateStatsView(); // Update main UI
+        renderCharacterSheet(gameState.currentView === 'character_sheet_levelup'); // Re-render sheet
     }
 }
+
 
 function resetStatAllocation() {
     if (!characterSheetOriginalStats) return;
 
-    player.vigor = characterSheetOriginalStats.vigor;
-    player.focus = characterSheetOriginalStats.focus;
-    player.stamina = characterSheetOriginalStats.stamina;
-    player.strength = characterSheetOriginalStats.strength;
-    player.intelligence = characterSheetOriginalStats.intelligence;
-    player.luck = characterSheetOriginalStats.luck;
+    // Reset base stats by subtracting the difference added this session
+    player.vigor -= ((player.bonusVigor || 0) - (characterSheetOriginalStats.bonusVigor || 0));
+    player.focus -= ((player.bonusFocus || 0) - (characterSheetOriginalStats.bonusFocus || 0));
+    player.stamina -= ((player.bonusStamina || 0) - (characterSheetOriginalStats.bonusStamina || 0));
+    player.strength -= ((player.bonusStrength || 0) - (characterSheetOriginalStats.bonusStrength || 0));
+    player.intelligence -= ((player.bonusIntelligence || 0) - (characterSheetOriginalStats.bonusIntelligence || 0));
+    player.luck -= ((player.bonusLuck || 0) - (characterSheetOriginalStats.bonusLuck || 0));
 
-    player.bonusVigor = characterSheetOriginalStats.bonusVigor;
-    player.bonusFocus = characterSheetOriginalStats.bonusFocus;
-    player.bonusStamina = characterSheetOriginalStats.bonusStamina;
-    player.bonusStrength = characterSheetOriginalStats.bonusStrength;
-    player.bonusIntelligence = characterSheetOriginalStats.bonusIntelligence;
-    player.bonusLuck = characterSheetOriginalStats.bonusLuck;
-    
-    player.statPoints = characterSheetOriginalStats.statPoints;
-    
-    player.recalculateGrowthBonuses();
+
+    // Reset bonus stats to original values
+    player.bonusVigor = characterSheetOriginalStats.bonusVigor || 0;
+    player.bonusFocus = characterSheetOriginalStats.bonusFocus || 0;
+    player.bonusStamina = characterSheetOriginalStats.bonusStamina || 0;
+    player.bonusStrength = characterSheetOriginalStats.bonusStrength || 0;
+    player.bonusIntelligence = characterSheetOriginalStats.bonusIntelligence || 0;
+    player.bonusLuck = characterSheetOriginalStats.bonusLuck || 0;
+
+    // Restore original stat points
+    player.statPoints = characterSheetOriginalStats.statPoints || 0;
+
+
+    player.recalculateGrowthBonuses(); // Recalculate derived stats
+    // Refresh HP/MP
     player.hp = player.maxHp;
     player.mp = player.maxMp;
 
+
     addToLog("Stat allocation has been reset.", "text-yellow-400");
-    updateStatsView();
-    renderCharacterSheet(gameState.currentView === 'character_sheet_levelup');
+    updateStatsView(); // Update main UI
+    renderCharacterSheet(gameState.currentView === 'character_sheet_levelup'); // Re-render sheet
 }
 
 function confirmStatAllocation() {
     if (!player) return;
-    characterSheetOriginalStats = null; 
+    characterSheetOriginalStats = null; // Clear the original stats snapshot
     addToLog("Your attributes have been confirmed.", "text-green-400");
-    saveGame();
-    
+    saveGame(); // Save the allocated points
+
+
+    // Determine where to go next
     if (gameState.currentView === 'character_sheet_levelup') {
-        renderTownSquare();
+        renderTownSquare(); // Go to town after level up allocation
     } else {
-        returnFromInventory(); 
+        returnFromInventory(); // Go back to the previous view if just checking sheet
     }
 }
 
+// ... (rest of the functions remain the same) ...
 
 function returnFromInventory() {
+     // If coming back from character sheet, ensure original stats are cleared
+     if (lastViewBeforeInventory === 'character_sheet' || gameState.currentView === 'character_sheet_levelup') {
+          characterSheetOriginalStats = null;
+     }
+
+    // NEW: Reset active inventory tab when leaving inventory/sheet
+    inventoryActiveTab = 'consumables'; // Reset to default
+
     switch (lastViewBeforeInventory) {
         case 'town': renderTownSquare(); break;
-        case 'character_sheet': renderTownSquare(); break; 
+        case 'character_sheet': renderTownSquare(); break; // Go back to town if closed from sheet normally
         case 'commercial_district': renderCommercialDistrict(); break;
         case 'arcane_quarter': renderArcaneQuarter(); break;
         case 'residential_district': renderResidentialDistrict(); break;
         case 'quest_board': renderQuestBoard(); break;
         case 'inn': renderInn(); break;
         case 'sage_tower_train': renderSageTowerTrain(); break;
-        case 'sage_tower_menu': renderSageTowerMenu(); break; 
+        case 'sage_tower_menu': renderSageTowerMenu(); break;
         case 'sage_tower_buy': renderSageTowerBuy(); break;
         case 'sage_tower_craft': renderSageTowerCraft(); break;
         case 'shop': renderShop('store'); break;
@@ -699,19 +483,30 @@ function returnFromInventory() {
         case 'black_market': renderShop('black_market'); break;
         case 'witchs_coven': renderWitchsCoven(); break;
         case 'sell': renderSell(); break;
-        case 'battle': renderBattleGrid(); break;
+        case 'battle': renderBattleGrid(); break; // Shouldn't happen, but fallback
         case 'post_battle': renderPostBattleMenu(); break;
         case 'wilderness': renderWildernessMenu(); break;
-        case 'settings': renderTownSquare(); break;
+        case 'settings': renderTownSquare(); break; // Or return to the view before settings
+         case 'house': renderHouse(); break; // Added house case
+         case 'house_storage': renderHouseStorage(); break;
+         case 'garden': renderGarden(); break;
+         case 'kitchen': renderKitchen(); break;
+         case 'alchemy_lab': renderAlchemyLab(); break;
+         case 'training_grounds': renderTrainingGrounds(); break;
+         case 'library': renderLibrary(); break; // Added library
+         case 'enchanter': renderEnchanter(); break; // Added enchanter
         default: renderTownSquare();
     }
 }
 
+
 function exitGame() {
     addToLog('Saving your progress...');
-    saveGame();
+    saveGame(); // Ensure game is saved before exiting
     setTimeout(() => {
-        window.location.hash = 'menu';
+        window.location.hash = 'menu'; // Navigate back to menu
+        // showStartScreen might be called by hash change, but call directly too for safety
+         showStartScreen();
     }, 1000);
 }
 
@@ -735,8 +530,8 @@ function renderWildernessMenu() {
                         <h3 class="font-bold text-yellow-300 text-lg">${biome.name}</h3>
                         <p class="text-sm text-gray-400 mt-1">${biome.description}</p>
                     </div>
-                    ${isUnlocked 
-                        ? `<button onclick="startBattle('${biomeKey}')" class="btn btn-primary ml-4">Explore</button>` 
+                    ${isUnlocked
+                        ? `<button onclick="startBattle('${biomeKey}')" class="btn btn-primary ml-4">Explore</button>`
                         : `<div class="text-right ml-4">
                                <p class="font-bold text-red-400">Locked</p>
                                <p class="text-xs text-gray-500">Requires Level ${requiredLevel}</p>
@@ -773,10 +568,10 @@ function renderTownSquare() {
 
     if (player.level >= 10 && player.bettyQuestState === 'not_started' && !player.dialogueFlags.bettyEncounterReady) {
         if (Math.random() < 0.05) {
-            player.dialogueFlags.bettyEncounterReady = true; 
+            player.dialogueFlags.bettyEncounterReady = true;
         }
     }
-    
+
     if (player.dialogueFlags.bettyEncounterReady && player.bettyQuestState === 'not_started') {
         bettyPopup.classList.remove('hidden');
         bettyPopup.innerHTML = `<p class="font-bold text-purple-200">A nervous woman whispers...</p><p class="text-gray-300">"Psst... Adventurer... Over here..."</p>`;
@@ -799,7 +594,7 @@ function renderTownSquare() {
         { name: 'Arcane Quarter', action: "renderArcaneQuarter()", class: 'btn-primary' },
         { name: 'Residential Area', action: "renderResidentialDistrict()", class: 'btn-primary' },
     ];
-    
+
     if (player.house.owned) {
         buttons.push({ name: 'Your House', action: "renderHouse()", class: 'btn-primary' });
     } else if (player.level >= 4) {
@@ -817,7 +612,7 @@ function renderTownSquare() {
         <div class="grid grid-cols-2 gap-4 w-full max-w-md">
             ${buttons.map(btn => `<button onclick="${btn.action}" class="btn ${btn.class}" ${btn.disabled ? 'disabled' : ''}>${btn.name}</button>`).join('')}
         </div>`;
-    
+
     container.innerHTML = html;
     render(container);
 
@@ -911,7 +706,7 @@ function renderHouseStorage() {
                 });
             }
         });
-        
+
         hasContent = allItems.length > 0;
         if (!hasContent) {
             const message = type === 'inventory' ? 'Your inventory is empty of unequipped items.' : 'Your storage is empty.';
@@ -931,7 +726,7 @@ function renderHouseStorage() {
                 return a.details.name.localeCompare(b.details.name);
             });
         }
-        
+
         // 3. Render the sorted list
         let html = '';
         let currentCategory = '';
@@ -941,16 +736,16 @@ function renderHouseStorage() {
                 // Add a full-width header for the category
                 html += `<h4 class="font-bold text-yellow-300 mt-4 mb-2 text-sm uppercase tracking-wider col-span-full">${capitalize(currentCategory)}</h4>`;
             }
-            
+
             const arrow = type === 'inventory' ? '↓' : '↑';
             const countText = item.count > 1 ? ` (x${item.count})` : (item.category === 'lures' ? ` (x${item.count} uses)`: '');
-            
+
             html += `<div class="flex justify-between items-center p-2 bg-slate-900/50 rounded text-sm">
                 <span onmouseover="showTooltip('${item.key}', event)" onmouseout="hideTooltip()">${item.details.name}${countText}</span>
                 <button onclick="${moveAction}('${item.category}', '${item.key}')" class="btn btn-primary text-lg py-0 px-3 leading-none">${arrow}</button>
             </div>`;
         });
-        
+
         return `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">${html}</div>`;
     };
 
@@ -969,7 +764,7 @@ function renderHouseStorage() {
     const storageTier = player.house.storageTier || 0;
     const baseLimits = { unique: 10, stack: 10 };
     const limits = HOME_IMPROVEMENTS.storage.upgrades[storageTier - 1]?.limits || baseLimits;
-    
+
     const allStorageItems = [
         ...Object.keys(storage.items),
         ...Object.keys(storage.lures),
@@ -984,7 +779,7 @@ function renderHouseStorage() {
         <div class="w-full max-w-4xl mx-auto flex flex-col h-full">
             <h2 class="font-medieval text-3xl mb-2 text-center">Storage Chest</h2>
             <p class="text-center text-sm text-gray-400 mb-4">Capacity: ${uniqueItemCount} / ${limits.unique} Unique Items | Max Stack: ${limits.stack}</p>
-            
+
             <div class="flex-grow flex flex-col bg-slate-800 rounded-lg overflow-hidden">
                 <!-- Inventory Section -->
                 <div class="p-4 flex-1 overflow-y-auto inventory-scrollbar">
@@ -1029,9 +824,9 @@ function renderHouseStorage() {
     const container = document.createElement('div');
     container.className = 'w-full h-full';
     container.innerHTML = html;
-    
+
     render(container);
-    
+
     // Custom adjustments for this full-screen-like view
     mainView.classList.remove('items-center', 'p-6');
     mainView.classList.add('p-2');
@@ -1087,7 +882,7 @@ function renderSettingsMenu(originView = 'town') {
             <button onclick="returnFromInventory()" class="btn btn-primary">Back</button>
         </div>
     </div>`;
-    
+
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -1109,7 +904,7 @@ function renderResidentialDistrict() {
 
     let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Residential District</h2>
                 <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
-    
+
     locations.forEach(loc => {
         html += `<button onclick="${loc.action}" class="btn btn-primary">${loc.name}</button>`;
     });
@@ -1118,7 +913,7 @@ function renderResidentialDistrict() {
              <div class="mt-8">
                 <button onclick="renderTownSquare()" class="btn btn-action">Back to Town Square</button>
              </div>`;
-    
+
     container.innerHTML = html;
     render(container);
 }
@@ -1127,7 +922,7 @@ function renderLibrary() {
     updateRealTimePalette();
     lastViewBeforeInventory = 'library';
     gameState.currentView = 'library';
-    
+
     let html = `<div class="w-full h-full flex flex-col text-left">
         <h2 class="font-medieval text-3xl mb-4 text-center">The Library</h2>
         <div class="flex-grow flex gap-6 overflow-hidden">
@@ -1218,16 +1013,16 @@ function renderBook(bookKey, chapterIndex = 0) {
     let html = `<div class="text-left">
         <h3 class="font-bold text-xl text-yellow-300 mb-1">${book.title}</h3>
         <p class="text-xs text-gray-400 mb-4">By ${book.author}</p>
-        
+
         <div class="mb-4 flex flex-wrap gap-2 border-b border-gray-600 pb-2">`;
-    
+
     book.chapters.forEach((chap, index) => {
         const isActive = index === chapterIndex;
         html += `<button onclick="renderBook('${bookKey}', ${index})" class="text-sm px-3 py-1 rounded ${isActive ? 'bg-yellow-600 text-slate-900 font-bold' : 'bg-slate-700 hover:bg-slate-600'}">${chap.title}</button>`;
     });
 
     html += `</div>`;
-    
+
     if (book.chapters[chapterIndex]) {
         html += `<div class="prose prose-invert max-w-none text-gray-300">${book.chapters[chapterIndex].content}</div>`;
     } else if (book.chapters.length > 0) {
@@ -1260,8 +1055,8 @@ function renderCommercialDistrict() {
     container.className = 'flex flex-col items-center justify-center w-full h-full';
 
     const locations = [
-        { name: 'General Store', action: "renderShop('store')" }, 
-        { name: 'Blacksmith', action: "renderBlacksmithMenu()" }, 
+        { name: 'General Store', action: "renderShop('store')" },
+        { name: 'Blacksmith', action: "renderBlacksmithMenu()" },
         { name: 'Black Market', action: "renderShop('black_market')" }
     ];
 
@@ -1271,7 +1066,7 @@ function renderCommercialDistrict() {
 
     let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Commercial District</h2>
                 <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
-    
+
     locations.forEach(loc => {
         html += `<button onclick="${loc.action}" class="btn btn-primary">${loc.name}</button>`;
     });
@@ -1280,7 +1075,7 @@ function renderCommercialDistrict() {
              <div class="mt-8">
                 <button onclick="renderTownSquare()" class="btn btn-action">Back to Town Square</button>
              </div>`;
-    
+
     container.innerHTML = html;
     render(container);
 }
@@ -1294,14 +1089,14 @@ function renderArcaneQuarter() {
     container.className = 'flex flex-col items-center justify-center w-full h-full';
 
     const locations = [
-        { name: "Sage's Tower", action: "renderSageTowerMenu()" }, 
-        { name: 'Enchanter', action: "renderEnchanter()" }, 
+        { name: "Sage's Tower", action: "renderSageTowerMenu()" },
+        { name: 'Enchanter', action: "renderEnchanter()" },
         { name: "Witch's Coven", action: "renderWitchsCoven()" }
     ];
 
     let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Arcane Quarter</h2>
                 <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
-    
+
     locations.forEach(loc => {
         html += `<button onclick="${loc.action}" class="btn btn-magic">${loc.name}</button>`;
     });
@@ -1310,7 +1105,7 @@ function renderArcaneQuarter() {
              <div class="mt-8">
                 <button onclick="renderTownSquare()" class="btn btn-action">Back to Town Square</button>
              </div>`;
-    
+
     container.innerHTML = html;
     render(container);
 }
@@ -1319,11 +1114,11 @@ function renderHomeImprovements(activeCategoryKey = 'storage') {
     updateRealTimePalette();
     lastViewBeforeInventory = 'commercial_district';
     gameState.currentView = 'home_improvements';
-    
+
     let html = `<div class="w-full h-full flex flex-col text-left">
         <h2 class="font-medieval text-3xl mb-1 text-center">Foundation & Fortune</h2>
         <p class="text-sm text-gray-400 text-center mb-4">"Gizmo at your service! More space? Bigger booms? Pointy-er practice dummies? You want it, I got it... for a price!"</p>
-        
+
         <div class="flex-grow flex flex-col md:flex-row gap-6 overflow-hidden">
             <div class="w-full md:w-1/3 flex flex-col gap-2">
                 <h3 class="font-bold text-lg text-yellow-300">Upgrade Categories</h3>
@@ -1349,7 +1144,7 @@ function renderHomeImprovements(activeCategoryKey = 'storage') {
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
-    
+
     // Now call the function to render the details for the active category
     renderUpgradeCategory(activeCategoryKey);
 }
@@ -1383,7 +1178,7 @@ function renderUpgradeCategory(categoryKey) {
     html += `<hr class="border-slate-600 my-4">
              <h4 class="font-bold text-md text-gray-300 mb-2">Current Status</h4>
              <p class="text-sm text-gray-400">Current Tier: ${currentTier}</p>`;
-    
+
     if (currentTier > 0) {
         const currentUpgrade = category.upgrades[currentTier - 1];
         if(categoryKey === 'storage') {
@@ -1408,10 +1203,10 @@ function renderUpgradeCategory(categoryKey) {
 }
 
 function renderWitchsCoven(subView = 'main') {
-    applyTheme('necropolis'); 
+    applyTheme('necropolis');
     lastViewBeforeInventory = 'witchs_coven';
     gameState.currentView = 'witchs_coven';
-    
+
     const hearts = player.inventory.items['undying_heart'] || 0;
     let html = `<div class="w-full text-center">
         <h2 class="font-medieval text-3xl mb-2">Witch's Coven</h2>
@@ -1473,26 +1268,50 @@ function renderWitchsCoven(subView = 'main') {
                  <p class="mb-6">The witch can reshape your very being, but it will be costly.</p>
                  <div class="space-y-4 max-w-lg mx-auto text-left">`;
         const raceCost = WITCH_COVEN_SERVICES.changeRace;
+        // Build race options, pre-selecting current race
+        const raceOptions = Object.keys(RACES).map(r => `<option value="${r}" ${player.race === r ? 'selected' : ''}>${r}</option>`).join('');
+        // Build element options
+        const elementOptions = Object.keys(ELEMENTS)
+            .filter(e => e !== 'none' && e !== 'healing')
+            .map(e => `<option value="${e}" ${player.elementalAffinity === e ? 'selected' : ''}>${capitalize(e)}</option>`)
+            .join('');
+
         html += `<div class="p-3 bg-slate-800 rounded-lg">
             <p class="font-bold">Change Race (Cost: ${raceCost.gold} G, ${raceCost.hearts} Hearts)</p>
-            <div class="flex gap-2 mt-2">
-                <select id="race-change-select" class="flex-grow bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">${Object.keys(RACES).map(r => `<option value="${r}">${r}</option>`).join('')}</select>
+            <div class="flex flex-col sm:flex-row gap-2 mt-2">
+                <select id="race-change-select" class="flex-grow bg-gray-800 text-white border border-gray-600 rounded px-2 py-1" onchange="toggleAffinitySelect(this.value, 'race-change-select-affinity-container')">
+                    ${raceOptions}
+                </select>
+                <!-- NEW: Elemental Affinity Dropdown for Race Change -->
+                <div id="race-change-select-affinity-container" class="${player.race === 'Elementals' ? '' : 'hidden'} flex-grow">
+                    <select id="race-change-select-affinity" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">
+                        ${elementOptions}
+                    </select>
+                </div>
                 <button onclick="changeCharacterAspect('race', document.getElementById('race-change-select').value)" class="btn btn-primary">Change</button>
             </div>
         </div>`;
+
         const classCost = WITCH_COVEN_SERVICES.changeClass;
+        // Build class options, pre-selecting current class
+        const classOptions = Object.keys(CLASSES).map(c => `<option value="${c}" ${player._classKey === c ? 'selected' : ''}>${CLASSES[c].name}</option>`).join('');
+
         html += `<div class="p-3 bg-slate-800 rounded-lg">
             <p class="font-bold">Change Class (Cost: ${classCost.gold} G, ${classCost.hearts} Hearts)</p>
             <div class="flex gap-2 mt-2">
-                <select id="class-change-select" class="flex-grow bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">${Object.keys(CLASSES).map(c => `<option value="${c}">${CLASSES[c].name}</option>`).join('')}</select>
+                <select id="class-change-select" class="flex-grow bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">${classOptions}</select>
                 <button onclick="changeCharacterAspect('class', document.getElementById('class-change-select').value)" class="btn btn-primary">Change</button>
             </div>
         </div>`;
+
         const bgCost = WITCH_COVEN_SERVICES.changeBackground;
+         // Build background options, pre-selecting current background
+        const bgOptions = Object.keys(BACKGROUNDS).map(b => `<option value="${b}" ${player.backgroundKey === b ? 'selected' : ''}>${BACKGROUNDS[b].name}</option>`).join('');
+
         html += `<div class="p-3 bg-slate-800 rounded-lg">
             <p class="font-bold">Change Background (Cost: ${bgCost.gold} G, ${bgCost.hearts} Hearts)</p>
             <div class="flex gap-2 mt-2">
-                <select id="bg-change-select" class="flex-grow bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">${Object.keys(BACKGROUNDS).map(b => `<option value="${b}">${BACKGROUNDS[b].name}</option>`).join('')}</select>
+                <select id="bg-change-select" class="flex-grow bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">${bgOptions}</select>
                 <button onclick="changeCharacterAspect('background', document.getElementById('bg-change-select').value)" class="btn btn-primary">Change</button>
             </div>
         </div>`;
@@ -1507,6 +1326,14 @@ function renderWitchsCoven(subView = 'main') {
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
+}
+
+// Helper function for Witch's Coven
+function toggleAffinitySelect(raceKey, containerId) {
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.classList.toggle('hidden', raceKey !== 'Elementals');
+    }
 }
 
 
@@ -1610,24 +1437,25 @@ function renderQuestBoard() {
     lastViewBeforeInventory = 'quest_board';
     gameState.currentView = 'quest_board';
     let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">Quest Board</h2>`;
-    
+
     if (player.activeQuest) {
         const quest = getQuestDetails(player.activeQuest);
         let progress = player.questProgress;
         let canComplete = progress >= quest.required;
 
-        if (player.activeQuest.category === 'collection') {
+        if (player.activeQuest.category === 'collection' || player.activeQuest.category === 'creation') {
             progress = 0;
             const itemDetails = getItemDetails(quest.target);
             if (itemDetails) {
                  if (quest.target in ITEMS) {
                      progress = player.inventory.items[quest.target] || 0;
-                } else { 
+                } else {
                     let category;
                     if (quest.target in WEAPONS) category = 'weapons';
                     else if (quest.target in ARMOR) category = 'armor';
                     else if (quest.target in SHIELDS) category = 'shields';
-                    if(category) {
+                    else if (quest.target in CATALYSTS) category = 'catalysts';
+                    if(category && player.inventory[category]) {
                         progress = player.inventory[category].filter(item => item === quest.target).length;
                     }
                 }
@@ -1659,12 +1487,12 @@ function renderQuestBoard() {
                 availableQuests.push({ ...quest, category: category, key: questKey });
             }
         }
-        
+
         availableQuests = availableQuests.filter(quest => !player.questsTakenToday.includes(quest.key));
 
-        const rng = seededRandom(player.seed); 
+        const rng = seededRandom(player.seed);
         const offeredQuests = shuffleArray(availableQuests, rng).slice(0, numQuestsToShow);
-        
+
         html += `<div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`
         if (offeredQuests.length > 0) {
             html += offeredQuests.map(quest => {
@@ -1680,7 +1508,7 @@ function renderQuestBoard() {
         }
         html += `</div>`;
     }
-    html += `<div class="text-center mt-4"><button onclick="renderResidentialDistrict()" class="btn btn-primary">Back</button></div></div>`; 
+    html += `<div class="text-center mt-4"><button onclick="renderResidentialDistrict()" class="btn btn-primary">Back</button></div></div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -1689,11 +1517,11 @@ function renderQuestBoard() {
     if (newScrollable) newScrollable.scrollTop = scrollPos;
 }
 
-function renderInn() { 
+function renderInn() {
     updateRealTimePalette();
     lastViewBeforeInventory = 'inn';
-    gameState.currentView = 'inn'; 
-    const cost = 10 + 5 * player.level; 
+    gameState.currentView = 'inn';
+    const cost = 10 + 5 * player.level;
     let html = `<h2 class="font-medieval text-3xl mb-4 text-center">The Weary Traveler Inn</h2><p class="mb-4 text-center">A night's rest costs ${cost} G. You will be fully restored.</p><div class="flex justify-center gap-4"><button onclick="restAtInn(${cost})" class="btn btn-primary" ${player.gold < cost ? 'disabled' : ''}>Rest for the night</button><button onclick="renderResidentialDistrict()" class="btn btn-primary">Back</button></div>${player.gold < cost ? '<p class="text-red-400 mt-2 text-center">You cannot afford a room.</p>' : ''}`;
     const container = document.createElement('div');
     container.innerHTML = html;
@@ -1710,16 +1538,16 @@ function renderShop(type) {
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
 
     let inventory, title;
-    
+
     // Create a mutable copy of the base inventory
     let shopInventory = JSON.parse(JSON.stringify(SHOP_INVENTORY));
-    
+
     switch (type) {
         case 'store':
             // --- DYNAMIC RECIPE LOGIC FOR GENERAL STORE ---
             const rng = seededRandom(player.seed);
             let availableRecipes = [];
-            
+
             // Determine which recipes to potentially show based on house upgrades
             if (player.house.kitchenTier > 0) {
                  const cookingRecipes = shopInventory['Recipes'].filter(key => ITEMS[key] && ITEMS[key].recipeType === 'cooking');
@@ -1731,10 +1559,10 @@ function renderShop(type) {
                  const shuffled = shuffleArray([...alchemyRecipes], rng);
                  availableRecipes.push(...shuffled.slice(0, 3));
             }
-            
+
             // Assign the dynamically selected recipes to the shop's inventory for this render
             shopInventory['Recipes'] = availableRecipes;
-            
+
             inventory = shopInventory;
             title = 'General Store';
             lastViewBeforeInventory = 'shop';
@@ -1759,7 +1587,7 @@ function renderShop(type) {
         if (inventory[category].length === 0) continue;
         itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
         itemsHtml += '<div class="space-y-2">';
-        
+
         itemsHtml += createItemList({
             items: inventory[category],
             detailsFn: getItemDetails,
@@ -1771,7 +1599,7 @@ function renderShop(type) {
                 `;
             }
         });
-        
+
         itemsHtml += '</div>';
     }
     let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderCommercialDistrict()" class="btn btn-primary">Back</button></div></div>`;
@@ -1807,7 +1635,7 @@ function renderBlacksmithMenu() {
 function renderBlacksmithBuy() {
     const scrollable = mainView.querySelector('.inventory-scrollbar');
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
-    
+
     lastViewBeforeInventory = 'blacksmith_buy';
     gameState.currentView = 'blacksmith_buy';
 
@@ -1816,7 +1644,7 @@ function renderBlacksmithBuy() {
         if (BLACKSMITH_INVENTORY[category].length === 0) continue;
         itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
         itemsHtml += '<div class="space-y-2">';
-        
+
         itemsHtml += createItemList({
             items: BLACKSMITH_INVENTORY[category],
             detailsFn: getItemDetails,
@@ -1828,7 +1656,7 @@ function renderBlacksmithBuy() {
                 `;
             }
         });
-        
+
         itemsHtml += '</div>';
     }
     let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">Buy Equipment</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4"><button onclick="renderBlacksmithMenu()" class="btn btn-primary">Back</button></div></div>`;
@@ -1843,7 +1671,7 @@ function renderBlacksmithBuy() {
 function renderBlacksmithCraft() {
     const scrollable = mainView.querySelector('.inventory-scrollbar');
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
-    
+
     lastViewBeforeInventory = 'blacksmith_craft';
     gameState.currentView = 'blacksmith_craft';
 
@@ -1851,7 +1679,7 @@ function renderBlacksmithCraft() {
     for (const recipeKey in BLACKSMITH_RECIPES) {
         const recipe = BLACKSMITH_RECIPES[recipeKey];
         const productDetails = getItemDetails(recipe.output);
-        
+
         let hasIngredients = true;
         let ingredientsList = [];
         for (const ingredientKey in recipe.ingredients) {
@@ -1860,9 +1688,16 @@ function renderBlacksmithCraft() {
 
             if(ITEMS[ingredientKey]) {
                 playerAmount = player.inventory.items[ingredientKey] || 0;
-            } else if (ARMOR[ingredientKey]) { 
+            } else if (ARMOR[ingredientKey]) {
                 playerAmount = player.inventory.armor.filter(i => i === ingredientKey).length;
+            } else if (WEAPONS[ingredientKey]) {
+                 playerAmount = player.inventory.weapons.filter(i => i === ingredientKey).length;
+            } else if (SHIELDS[ingredientKey]) {
+                 playerAmount = player.inventory.shields.filter(i => i === ingredientKey).length;
+            } else if (CATALYSTS[ingredientKey]) {
+                 playerAmount = player.inventory.catalysts.filter(i => i === ingredientKey).length;
             }
+
 
             if (playerAmount < requiredAmount) {
                 hasIngredients = false;
@@ -1917,7 +1752,7 @@ function renderSell() {
     gameState.currentView = 'sell';
 
     let sellableHtml = '';
-    const categories = ['items', 'weapons', 'armor', 'shields'];
+    const categories = ['items', 'weapons', 'armor', 'shields', 'catalysts'];
     let hasSellableItems = false;
 
     categories.forEach(category => {
@@ -1925,6 +1760,9 @@ function renderSell() {
         if (category === 'items') {
             itemsInCategory = Object.keys(player.inventory.items);
         } else {
+            if (!Array.isArray(player.inventory[category])) {
+                 player.inventory[category] = [];
+            }
             itemsInCategory = [...new Set(player.inventory[category])];
         }
 
@@ -1932,7 +1770,7 @@ function renderSell() {
             let categoryHtml = '';
             itemsInCategory.forEach(key => {
                 const details = getItemDetails(key);
-                if (details && details.price > 0) { 
+                if (details && details.price > 0 && details.type !== 'key') {
                     const sellPrice = Math.floor(details.price / 4);
                     let count = 0;
                      if (category === 'items') {
@@ -1941,7 +1779,14 @@ function renderSell() {
                         count = player.inventory[category].filter(i => i === key).length;
                     }
 
-                    if (count > 0) {
+                     // Don't list equipped items for sale
+                    const isEquipped = (category === 'weapons' && player.equippedWeapon.name === details.name) ||
+                                     (category === 'armor' && player.equippedArmor.name === details.name) ||
+                                     (category === 'shields' && player.equippedShield.name === details.name) ||
+                                     (category === 'catalysts' && player.equippedCatalyst.name === details.name);
+
+
+                    if (count > 0 && !isEquipped) {
                         hasSellableItems = true;
                         categoryHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
                                         <span>${details.name} (x${count})</span>
@@ -1974,7 +1819,7 @@ function renderSell() {
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
-    
+
     const newScrollable = mainView.querySelector('.inventory-scrollbar');
     if (newScrollable) newScrollable.scrollTop = scrollPos;
 }
@@ -1995,9 +1840,9 @@ function renderSageTowerTrain() {
         }
         spellsByElement[spell.element].push(spellKey);
     }
-    
+
     const elementOrder = ['none', 'fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'void', 'healing'];
-    
+
     let html = `<div class="w-full">
         <h2 class="font-medieval text-3xl mb-4 text-center">Train Spells</h2>
         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-4">`;
@@ -2006,23 +1851,23 @@ function renderSageTowerTrain() {
         if (spellsByElement[element]) {
             html += `<div class="space-y-3">
                         <h3 class="font-medieval text-xl text-yellow-300 border-b-2 border-yellow-300/30 pb-1">${capitalize(element)} Spells</h3>`;
-            
+
             spellsByElement[element].forEach(spellKey => {
                 const spellTree = SPELLS[spellKey];
                 const playerSpell = player.spells[spellKey];
                 const currentTier = playerSpell ? playerSpell.tier : 0;
                 const spellDetails = spellTree.tiers[currentTier - 1] || spellTree.tiers[0];
-                
+
                 html += `<div class="p-3 bg-slate-800 rounded-lg text-left">`;
 
-                if (currentTier === 0) { 
+                if (currentTier === 0) {
                     const canAfford = player.gold >= spellTree.learnCost;
                     html += `<div class="flex justify-between items-center">
                                 <h3 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name}</h3>
                                 <button onclick="upgradeSpell('${spellKey}')" class="btn btn-primary" ${!canAfford ? 'disabled' : ''}>Learn</button>
                             </div>
                             <p class="text-sm text-gray-400">Cost: ${spellTree.learnCost} G</p>`;
-                } else if (currentTier < spellTree.tiers.length) { 
+                } else if (currentTier < spellTree.tiers.length) {
                     const upgradeData = spellTree.tiers[currentTier - 1];
                     const canAffordGold = player.gold >= upgradeData.upgradeCost;
                     const hasEssences = Object.entries(upgradeData.upgradeEssences || {}).every(([key, val]) => (player.inventory.items[key] || 0) >= val);
@@ -2035,7 +1880,7 @@ function renderSageTowerTrain() {
                             </div>
                              <p class="text-sm text-gray-400">Next: ${spellTree.tiers[currentTier].name}</p>
                              <p class="text-sm text-gray-400">Cost: ${upgradeData.upgradeCost} G, ${essenceList}</p>`;
-                } else { 
+                } else {
                      html += `<div class="flex justify-between items-center">
                                 <h3 class="font-bold text-lg text-cyan-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name} (Max Tier)</h3>
                                 <span class="text-gray-500">Mastered</span>
@@ -2075,7 +1920,7 @@ function renderSageTowerBuy() {
         if (MAGIC_SHOP_INVENTORY[category].length === 0) continue;
         itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
         itemsHtml += '<div class="space-y-2">';
-        
+
         itemsHtml += createItemList({
             items: MAGIC_SHOP_INVENTORY[category],
             detailsFn: getItemDetails,
@@ -2087,7 +1932,7 @@ function renderSageTowerBuy() {
                 `;
             }
         });
-        
+
         itemsHtml += '</div>';
     }
 
@@ -2118,7 +1963,7 @@ function renderSageTowerCraft() {
     for (const recipeKey in MAGIC_SHOP_RECIPES) {
         const recipe = MAGIC_SHOP_RECIPES[recipeKey];
         const productDetails = getItemDetails(recipe.output);
-        
+
         let hasIngredients = true;
         let ingredientsList = [];
         for (const ingredientKey in recipe.ingredients) {
@@ -2168,173 +2013,270 @@ function renderSageTowerCraft() {
     if (newScrollable) newScrollable.scrollTop = scrollPos;
 }
 
+// Inventory Tab Switching
+window.setInventoryTab = function(tabName) {
+    inventoryActiveTab = tabName;
+    renderInventory(); // Re-render with the new active tab
+}
+
 function renderInventory() {
     if (gameState.currentView === 'battle') {
         addToLog("You cannot access your full inventory during combat! Use the 'Item' command instead.", 'text-red-400');
         return;
     }
-    const scrollables = mainView.querySelectorAll('.inventory-scrollbar');
-    const scrollPositions = Array.from(scrollables).map(el => el.scrollTop);
+    // Store scroll position of the *active* list before re-rendering
+    const activeList = mainView.querySelector(`#inventory-${inventoryActiveTab}-list`);
+    const scrollPos = activeList ? activeList.scrollTop : 0;
 
-    gameState.currentView = 'inventory'; 
+    lastViewBeforeInventory = gameState.currentView; // Store the actual previous view
+    gameState.currentView = 'inventory';
 
-    const renderKeyItemsList = () => {
-        const keyItems = Object.keys(player.inventory.items).filter(key => {
-            const details = getItemDetails(key);
-            return details && details.type === 'key';
-        });
+    // --- Tab Definitions ---
+    const tabs = [
+        { key: 'spells', icon: '✨', title: 'Spells' },
+        { key: 'key_items', icon: '🔑', title: 'Key Items' },
+        { key: 'consumables', icon: '🧪', title: 'Consumables' },
+        { key: 'weapons', icon: '⚔️', title: 'Weapons' },
+        { key: 'catalysts', icon: '🔮', title: 'Catalysts' },
+        { key: 'armor', icon: '⛊', title: 'Armor' },
+        { key: 'shields', icon: '🛡️', title: 'Shields' },
+        { key: 'lures', icon: '🎣', title: 'Lures' }
+    ];
 
-        if (keyItems.length === 0) return '';
+    // --- Helper to Render Lists (Modified for Consumable Sorting) ---
+    const renderList = (category, title) => {
+        let list = [];
+        let itemCounts = {};
+        let html = ''; // Start empty
 
-        let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">Key Items</h3><div class="space-y-2">`;
-        html += keyItems.map(key => {
-            const details = getItemDetails(key);
-            if (!details) return '';
+        // Define the desired order for consumable types
+        const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'enchant', 'experimental'];
+        const typeMap = {
+            'healing': 'Healing Potions',
+            'mana_restore': 'Mana Potions',
+            'buff': 'Buff Potions',
+            'cleanse': 'Cleansing Items',
+            'enchant': 'Essences',
+            'experimental': 'Mysterious Concoctions'
+        };
 
-            let buttonHtml = '';
-            if (key === 'bestiary_notebook') {
-                buttonHtml = `<button onclick="event.stopPropagation(); renderBestiaryMenu('inventory')" class="btn btn-primary text-sm py-1 px-3">Open</button>`;
-            }
 
-            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span>${buttonHtml}</div>`;
-        }).join('');
-        html += `</div>`;
+        if (category === 'items') {
+            // Get all consumable keys first
+            const allConsumableKeys = Object.keys(player.inventory.items).filter(key => {
+                const details = getItemDetails(key);
+                // Ensure it's a consumable type we want to display here
+                return details && ['healing', 'mana_restore', 'buff', 'cleanse', 'experimental', 'enchant'].includes(details.type);
+            });
+
+             // Map to objects with details for sorting
+             const itemsWithDetails = allConsumableKeys.map(key => ({ key, details: getItemDetails(key) }));
+
+             // Sort the items: first by type order, then alphabetically by name
+             itemsWithDetails.sort((a, b) => {
+                 const typeAIndex = consumableOrder.indexOf(a.details.type);
+                 const typeBIndex = consumableOrder.indexOf(b.details.type);
+                 if (typeAIndex !== typeBIndex) {
+                     // Handle cases where a type might not be in consumableOrder (shouldn't happen with filter)
+                     const finalAIndex = typeAIndex === -1 ? consumableOrder.length : typeAIndex;
+                     const finalBIndex = typeBIndex === -1 ? consumableOrder.length : typeBIndex;
+                     return finalAIndex - finalBIndex;
+                 }
+                 return a.details.name.localeCompare(b.details.name);
+             });
+
+             // The 'list' will now be the sorted array of {key, details} objects
+             list = itemsWithDetails;
+
+
+        } else if (category === 'lures') {
+            list = Object.keys(player.inventory.lures).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name)); // Sort lures alphabetically
+        } else { // Equipment
+            if (!Array.isArray(player.inventory[category])) player.inventory[category] = [];
+            // Filter out invalid keys
+            player.inventory[category] = player.inventory[category].filter(key => getItemDetails(key));
+
+            player.inventory[category].forEach(key => itemCounts[key] = (itemCounts[key] || 0) + 1);
+            list = Object.keys(itemCounts).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name)); // Sort equipment alphabetically
+        }
+
+        if ((category === 'items' && list.length === 0) || (category !== 'items' && (!list || list.length === 0))) {
+            return `<p class="text-gray-400 text-center mt-4">No ${title.toLowerCase()} found.</p>`;
+        }
+
+        html += `<div id="inventory-${category}-list" class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-2">`; // Added space-y-2
+
+        // --- Render Consumables with Subheaders ---
+        let currentSubType = ''; // Track the current sub-type for headers
+        if (category === 'items') {
+            list.forEach(itemObj => { // list is now array of {key, details}
+                const key = itemObj.key;
+                const details = itemObj.details;
+                 if (!details) return; // Should not happen with filtering
+
+                 // Check if the sub-type changed to add a header
+                 const subType = details.type;
+                 if (subType !== currentSubType) {
+                     currentSubType = subType;
+                     const subHeader = typeMap[subType] || capitalize(subType);
+                     html += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2">${subHeader}</h4>`;
+                 }
+
+
+                 let countStr = '';
+                 let count = player.inventory.items[key] || 0;
+                 if (count > 1) countStr = `(x${count})`;
+
+                 let buttonHtml = '';
+                 let action = `useItem('${key}')`;
+                 let buttonClass = 'btn-item';
+                 let buttonText = 'Use';
+                 if (details.type === 'enchant') {
+                     action = '';
+                     buttonText = 'Enchant';
+                 }
+                 buttonHtml = `<button onclick="${action}" class="btn ${buttonClass} text-sm py-1 px-3" ${action === '' ? 'disabled' : ''}>${buttonText}</button>`;
+
+                 html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr}</span>${buttonHtml}</div>`;
+            });
+        }
+        // --- Render Other Categories (Equipment, Lures) ---
+        else {
+             list.forEach(key => {
+                 const details = getItemDetails(key);
+                 if (!details) return;
+
+                 let countStr = '';
+                 let count = 0;
+
+                 if (category === 'lures') {
+                     count = player.inventory.lures[key] || 0;
+                     countStr = `(x${count} uses)`;
+                 } else { // Equipment counts
+                     count = itemCounts[key] || 0;
+                     if (count > 1) countStr = `(x${count})`;
+                 }
+
+                 const isEquipped = (category === 'weapons' && WEAPONS[key] === player.equippedWeapon) ||
+                                  (category === 'catalysts' && CATALYSTS[key] === player.equippedCatalyst) ||
+                                  (category === 'armor' && ARMOR[key] === player.equippedArmor) ||
+                                  (category === 'shields' && SHIELDS[key] === player.equippedShield) ||
+                                  (category === 'lures' && key === player.equippedLure);
+                 const equippedText = isEquipped ? "<span class='text-green-400 font-bold ml-2'>[E]</span>" : ""; // Use double quotes outside, single inside
+                 let buttonHtml = '';
+
+                 if (isEquipped) {
+                     let itemType = category.slice(0, -1);
+                     if (category === 'armor') itemType = 'armor';
+                     if (category === 'lures') itemType = 'lure';
+                     const isDefaultItem = (itemType === 'weapon' && details.name === WEAPONS['fists'].name) ||
+                                           (itemType === 'catalyst' && details.name === CATALYSTS['no_catalyst'].name) ||
+                                           (itemType === 'armor' && details.name === ARMOR['travelers_garb'].name) ||
+                                           (itemType === 'shield' && details.name === SHIELDS['no_shield'].name) ||
+                                           (itemType === 'lure' && key === 'no_lure');
+                     if (!isDefaultItem) {
+                         buttonHtml = `<button onclick="unequipItem('${itemType}')" class="btn btn-action text-sm py-1 px-3">Unequip</button>`;
+                     }
+                 } else if (['weapons', 'catalysts', 'armor', 'shields', 'lures'].includes(category)) {
+                     buttonHtml = `<button onclick="equipItem('${key}')" class="btn btn-primary text-sm py-1 px-3">Equip</button>`;
+                 }
+                 html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr} ${equippedText}</span>${buttonHtml}</div>`;
+            });
+        }
+
+
+        html += `</div>`; // Close scrollable div
         return html;
     };
 
-    const renderList = (category, title) => { 
-        let list;
-        let itemCounts = {};
-
-        if (category === 'items') {
-            list = Object.keys(player.inventory.items);
-        } else if (category === 'lures') {
-            list = Object.keys(player.inventory.lures);
-        } else {
-            if (!Array.isArray(player.inventory[category])) {
-                 player.inventory[category] = [];
-            }
-            player.inventory[category] = player.inventory[category].filter(key => {
-                const isValid = getItemDetails(key);
-                if (!isValid) {
-                    console.warn(`Removed invalid item key "${key}" from inventory category "${category}".`);
-                }
-                return isValid;
-            });
-            
-            player.inventory[category].forEach(key => {
-                itemCounts[key] = (itemCounts[key] || 0) + 1;
-            });
-            list = Object.keys(itemCounts);
-        }
-        
-        if (!list || list.length === 0) return ''; 
-        
-        let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${title}</h3><div class="space-y-2">`; 
-        html += list.map(key => { 
-            const details = getItemDetails(key); 
-            if (!details) return '';
-
-            if (category === 'items' && (details.type === 'key' || details.type === 'seed' || details.type === 'sapling')) {
-                return ''; 
-            }
-
-            let countStr = '';
-
-            if (category === 'items') {
-                countStr = `(x${player.inventory.items[key]})`;
-            } else if (category === 'lures') {
-                countStr = `(x${player.inventory.lures[key]} uses)`;
-            }
-            else {
-                 if (itemCounts[key] > 1) {
-                    countStr = `(x${itemCounts[key]})`;
-                }
-            }
-
-            const isEquipped = (category === 'weapons' && WEAPONS[key] === player.equippedWeapon) || 
-                             (category === 'catalysts' && CATALYSTS[key] === player.equippedCatalyst) ||
-                             (category === 'armor' && ARMOR[key] === player.equippedArmor) ||
-                             (category === 'shields' && SHIELDS[key] === player.equippedShield) ||
-                             (category === 'lures' && key === player.equippedLure); 
-            const equippedText = isEquipped ? '<span class="text-green-400 font-bold ml-2">[Equipped]</span>' : ''; 
-            let buttonHtml = ''; 
-            if (category === 'items' && details.type !== 'junk' && details.type !== 'alchemy' && details.type !== 'key' && !details.cookingType && !details.type.startsWith('recipe')) { 
-                buttonHtml = `<button onclick="useItem('${key}')" class="btn btn-item text-sm py-1 px-3">Use</button>`; 
-            } else if (isEquipped) {
-                let itemType = category.slice(0, -1);
-                if (category === 'armor') itemType = 'armor';
-                if (category === 'lures') itemType = 'lure';
-
-                const isDefaultItem = (itemType === 'weapon' && player.equippedWeapon.name === WEAPONS['fists'].name) ||
-                                      (itemType === 'catalyst' && player.equippedCatalyst.name === CATALYSTS['no_catalyst'].name) ||
-                                      (itemType === 'armor' && player.equippedArmor.name === ARMOR['travelers_garb'].name) ||
-                                      (itemType === 'shield' && player.equippedShield.name === SHIELDS['no_shield'].name) ||
-                                      (itemType === 'lure' && player.equippedLure === 'no_lure');
-
-                if (!isDefaultItem) {
-                    buttonHtml = `<button onclick="unequipItem('${itemType}')" class="btn btn-action text-sm py-1 px-3">Unequip</button>`;
-                }
-            } else if (['weapons', 'catalysts', 'armor', 'shields', 'lures'].includes(category)) { 
-                buttonHtml = `<button onclick="equipItem('${key}')" class="btn btn-primary text-sm py-1 px-3">Equip</button>`; 
-            }
-            return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr} ${equippedText}</span>${buttonHtml}</div>`; }).join(''); 
-            html += `</div>`; 
-        return html; 
-    }; 
+    // --- Helper to Render Spellbook ---
     const renderSpellbook = () => {
-        let html = `<h3 class="font-medieval text-xl mt-4 mb-2 text-purple-300">Spellbook</h3><div class="space-y-2">`;
+        let html = '';
         const knownSpells = Object.keys(player.spells);
         if (knownSpells.length === 0) {
-            html += `<p class="text-gray-400">You have not learned any spells.</p>`;
+            html += `<p class="text-gray-400 text-center mt-4">You have not learned any spells.</p>`;
         } else {
-            knownSpells.forEach(key => {
+             html += `<div id="inventory-spells-list" class="space-y-2 h-full overflow-y-auto inventory-scrollbar pr-2">`;
+            knownSpells.sort((a,b) => SPELLS[a].tiers[0].name.localeCompare(SPELLS[b].tiers[0].name)).forEach(key => {
                 const spellTree = SPELLS[key];
-                if (!spellTree) { 
-                    console.warn(`Spell key "${key}" not found in SPELLS data. Skipping render.`);
-                    return;
-                }
+                if (!spellTree) return;
                 const playerSpell = player.spells[key];
                 const details = spellTree.tiers[playerSpell.tier - 1];
-
                 let buttonHtml = '';
                 if (spellTree.element === 'healing') {
-                    buttonHtml = `<button onclick="castHealingSpellOutsideCombat('${key}')" class="btn btn-item text-sm py-1 px-3">Cast</button>`;
+                    buttonHtml = `<button onclick="castHealingSpellOutsideCombat('${key}')" class="btn btn-item text-sm py-1 px-3" ${player.hp >= player.maxHp ? 'disabled' : ''}>Cast</button>`;
                 }
 
-                html += `<div class="p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)">
+                html += `<div class="p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)">
                             <div class="flex justify-between items-center">
-                                <span class="font-bold text-purple-200">${details.name} (Tier ${playerSpell.tier})</span>
-                                <div class="flex items-center gap-4">
-                                    <span class="text-blue-400">${details.cost} MP</span>
+                                <span class="font-bold text-purple-200">${details.name} (T${playerSpell.tier})</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-blue-400 text-xs">${details.cost} MP</span>
                                     ${buttonHtml}
                                 </div>
                             </div>
-                            <p class="text-sm text-gray-400 mt-1">${details.description || ''}</p>
                          </div>`;
             });
+             html += `</div>`;
         }
-        html += `</div>`;
         return html;
     };
+
+    // --- Helper to Render Key Items ---
+    const renderKeyItemsList = () => {
+        const keyItems = Object.keys(player.inventory.items).filter(key => getItemDetails(key)?.type === 'key');
+        let html = '';
+        if (keyItems.length === 0) {
+             html += `<p class="text-gray-400 text-center mt-4">No key items found.</p>`;
+        } else {
+             html += `<div id="inventory-key_items-list" class="space-y-2 h-full overflow-y-auto inventory-scrollbar pr-2">`;
+            html += keyItems.map(key => {
+                const details = getItemDetails(key);
+                if (!details) return '';
+                let buttonHtml = '';
+                if (key === 'bestiary_notebook') {
+                    buttonHtml = `<button onclick="event.stopPropagation(); renderBestiaryMenu('inventory')" class="btn btn-primary text-sm py-1 px-3">Open</button>`;
+                }
+                return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span>${buttonHtml}</div>`;
+            }).join('');
+             html += `</div>`;
+        }
+        return html;
+    };
+
+    // --- Build Tab Buttons ---
+    let tabHtml = '<div class="flex flex-wrap gap-1 mb-2">';
+    tabs.forEach(tab => {
+        const isActive = inventoryActiveTab === tab.key;
+        const bgColor = isActive ? 'bg-yellow-600 border-yellow-800' : 'bg-slate-700 hover:bg-slate-600 border-slate-900';
+        tabHtml += `<button onclick="setInventoryTab('${tab.key}')" class="btn ${bgColor} text-xs py-1 px-2 flex items-center gap-1"> ${tab.icon} ${tab.title}</button>`;
+    });
+    tabHtml += '</div>';
+
+    // --- Determine Content for Right Pane ---
+    let rightPaneContent = '';
+    switch (inventoryActiveTab) {
+        case 'spells': rightPaneContent = renderSpellbook(); break;
+        case 'key_items': rightPaneContent = renderKeyItemsList(); break;
+        case 'consumables': rightPaneContent = renderList('items', 'Consumables'); break;
+        case 'weapons': rightPaneContent = renderList('weapons', 'Weapons'); break;
+        case 'catalysts': rightPaneContent = renderList('catalysts', 'Catalysts'); break;
+        case 'armor': rightPaneContent = renderList('armor', 'Armor'); break;
+        case 'shields': rightPaneContent = renderList('shields', 'Shields'); break;
+        case 'lures': rightPaneContent = renderList('lures', 'Lures'); break;
+        default: rightPaneContent = renderList('items', 'Consumables'); // Default to consumables
+    }
+
+
+    // --- Assemble Final HTML ---
     let html = `
-        <div class="w-full text-left">
-            <h2 class="font-medieval text-3xl mb-4 text-center">Inventory & Spells</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 h-80">
-                <div class="h-full overflow-y-auto inventory-scrollbar pr-2">
-                    ${renderSpellbook()}
-                    ${renderKeyItemsList()}
-                </div>
-                <div class="h-full overflow-y-auto inventory-scrollbar pr-2">
-                    ${renderList('items', 'Items')}
-                    ${renderList('weapons', 'Weapons')}
-                    ${renderList('catalysts', 'Catalysts')}
-                    ${renderList('armor', 'Armor')}
-                    ${renderList('shields', 'Shields')}
-                    ${renderList('lures', 'Lures')}
-                </div>
+        <div class="w-full text-left h-full flex flex-col">
+            <h2 class="font-medieval text-3xl mb-2 text-center">Inventory</h2>
+            ${tabHtml}
+            <div class="flex-grow overflow-hidden h-72">
+                ${rightPaneContent}
             </div>
-            <div class="text-center mt-4">
+            <div class="text-center mt-3">
                 <button onclick="returnFromInventory()" class="btn btn-primary">Back</button>
             </div>
         </div>`;
@@ -2342,29 +2284,40 @@ function renderInventory() {
     container.innerHTML = html;
     render(container);
 
-    const newScrollables = mainView.querySelectorAll('.inventory-scrollbar');
-    newScrollables.forEach((el, index) => {
-        if (scrollPositions[index] !== undefined) {
-            el.scrollTop = scrollPositions[index];
-        }
-    });
+    // Restore scroll position for the active list
+    const newActiveList = mainView.querySelector(`#inventory-${inventoryActiveTab}-list`);
+    if (newActiveList) {
+        newActiveList.scrollTop = scrollPos;
+    }
 }
 
 function renderBattle(subView = 'main', actionData = null) {
      if (gameState.battleEnded) return;
+     // Allow item use even if no enemies (e.g., healing potion)
      if (currentEnemies.length === 0 && subView !== 'item') return;
 
      if (subView === 'main') {
         renderBattleGrid();
-     } else if (subView === 'attack' || subView === 'magic_target') {
+     } else if (subView === 'attack' || subView === 'magic_target' || subView === 'item_target') { // Combined target selection
         let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Choose a Target</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
+        let buttonAction, buttonClass;
+
+        if (subView === 'attack') {
+             buttonAction = 'performAttack';
+             buttonClass = 'btn-action';
+        } else if (subView === 'magic_target'){ // Fixed the space to underscore here
+            buttonAction = `castSpell('${actionData.spellKey}', index)`; // Need index placeholder
+             buttonClass = 'btn-magic';
+        } else { // item_target
+             buttonAction = `useItem('${actionData.itemKey}', true, index)`; // Need index placeholder
+             buttonClass = 'btn-item';
+        }
+
+
         currentEnemies.forEach((enemy, index) => {
             if (enemy.isAlive()) {
-                 if (subView === 'attack') {
-                    html += `<button onclick="performAttack(${index})" class="btn btn-action">${enemy.name}</button>`;
-                } else { 
-                    html += `<button onclick="castSpell('${actionData.spellKey}', ${index})" class="btn btn-magic">${enemy.name}</button>`;
-                }
+                 const finalAction = buttonAction.replace('index', index); // Replace placeholder with actual index
+                 html += `<button onclick="${finalAction}" class="btn ${buttonClass}">${enemy.name}</button>`;
             }
         });
         html += `</div><button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>`;
@@ -2379,17 +2332,26 @@ function renderBattle(subView = 'main', actionData = null) {
                 return ''; // Skip rendering this invalid spell
             }
             const spell = spellTree.tiers[player.spells[key].tier - 1];
-            
-            // Check concoction debuff
-            let finalCost = spell.cost;
-            if(player.statusEffects.magic_dampen) finalCost = spell.cost; // Show original cost, but check will fail on cast
-            const canCast = player.mp >= finalCost;
 
-            return `<button onclick="battleAction('magic_select', {spellKey: '${key}'})" class="btn btn-magic w-full text-left" ${!canCast ? 'disabled' : ''} onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
-                        <div class="flex justify-between"><span>${spell.name}</span><span>${finalCost} MP</span></div>
+            // Calculate cost with potential modifications (display only)
+            let displayCost = spell.cost;
+            const catalyst = player.equippedCatalyst;
+            const armor = player.equippedArmor;
+            if (catalyst.effect?.mana_discount) displayCost = Math.max(1, displayCost - catalyst.effect.mana_discount);
+            if (armor.effect?.mana_discount) displayCost = Math.max(1, displayCost - armor.effect.mana_discount);
+            if (player._classKey === 'warlock' && player.signatureAbilityToggleActive) displayCost = Math.ceil(displayCost * 1.25);
+            if (player._classKey === 'magus' && player.activeModeIndex > -1) displayCost = Math.ceil(displayCost * 1.30);
+            if (player.statusEffects.magic_dampen) displayCost = Math.floor(displayCost * (1 / player.statusEffects.magic_dampen.multiplier));
+
+
+            const canCast = player.mp >= displayCost; // Check against potentially modified cost
+
+            // Pass only the spell key string in onclick
+            return `<button onclick="battleAction('magic_select', '${key}')" class="btn btn-magic w-full text-left" ${!canCast ? 'disabled' : ''} onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
+                        <div class="flex justify-between"><span>${spell.name}</span><span>${displayCost} MP</span></div>
                     </button>`;
         }).join('');
-        
+
         let html = `<div class="w-full text-center">
                         <h2 class="font-medieval text-3xl mb-4">Cast a Spell</h2>
                         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 mb-4">
@@ -2402,22 +2364,63 @@ function renderBattle(subView = 'main', actionData = null) {
         container.innerHTML = html;
         render(container);
      } else if (subView === 'item') {
-        let itemsHtml = Object.keys(player.inventory.items)
+        // --- MODIFICATION START: Organize items by type ---
+        let itemsHtml = '';
+        const usableItems = Object.keys(player.inventory.items)
             .filter(key => {
                 const item = ITEMS[key];
-                return item && item.type !== 'junk' && item.type !== 'alchemy' && item.type !== 'key' && !item.cookingType;
+                // Filter for usable types
+                return item && ['healing', 'mana_restore', 'buff', 'cleanse', 'enchant', 'experimental'].includes(item.type);
             })
-            .map(key => {
-                const item = ITEMS[key];
+            .map(key => ({ key, details: ITEMS[key] })); // Map to include details
+
+        // Define the order and headers for categories
+        const typeOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'enchant', 'experimental'];
+        const typeMap = {
+            'healing': 'Healing Potions',
+            'mana_restore': 'Mana Potions',
+            'buff': 'Buff Items',
+            'cleanse': 'Cleansing Items',
+            'enchant': 'Essences',
+            'experimental': 'Mysterious Concoctions'
+        };
+
+        // Sort items: first by type order, then alphabetically by name
+        usableItems.sort((a, b) => {
+            const typeAIndex = typeOrder.indexOf(a.details.type);
+            const typeBIndex = typeOrder.indexOf(b.details.type);
+            if (typeAIndex !== typeBIndex) {
+                const finalAIndex = typeAIndex === -1 ? typeOrder.length : typeAIndex;
+                const finalBIndex = typeBIndex === -1 ? typeOrder.length : typeBIndex;
+                return finalAIndex - finalBIndex;
+            }
+            return a.details.name.localeCompare(b.details.name);
+        });
+
+        let currentType = '';
+        if (usableItems.length > 0) {
+            usableItems.forEach(itemObj => {
+                const key = itemObj.key;
+                const item = itemObj.details;
                 const count = player.inventory.items[key];
-                let action = `useItem('${key}', true)`; 
-                if (item.type === 'enchant') {
-                    action = `battleAction('item_select', {itemKey: '${key}'})`; 
+
+                // Add subheader if type changes
+                if (item.type !== currentType) {
+                    currentType = item.type;
+                    const header = typeMap[currentType] || capitalize(currentType);
+                    // Adjust grid column span based on number of columns later if needed
+                    itemsHtml += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2 col-span-1 md:col-span-2">${header}</h4>`;
                 }
-                return `<button onclick="${action}" class="btn btn-item w-full text-left" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"><div class="flex justify-between"><span>${item.name}</span><span>x${count}</span></div></button>`;
-            }).join('');
-        if (!itemsHtml) { itemsHtml = `<p class="text-gray-400 text-center col-span-2">You have no usable items.</p>`; }
-        
+
+                let action = `battleAction('item_select', {itemKey: '${key}'})`; // Use item_select action
+
+                itemsHtml += `<button onclick="${action}" class="btn btn-item w-full text-left" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"><div class="flex justify-between"><span>${item.name}</span><span>x${count}</span></div></button>`;
+            });
+        } else {
+            itemsHtml = `<p class="text-gray-400 text-center col-span-1 md:col-span-2">You have no usable items.</p>`;
+        }
+        // --- MODIFICATION END ---
+
         let html = `<div class="w-full text-center">
                         <h2 class="font-medieval text-3xl mb-4">Use an Item</h2>
                         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 mb-4">
@@ -2429,23 +2432,15 @@ function renderBattle(subView = 'main', actionData = null) {
         const container = document.createElement('div');
         container.innerHTML = html;
         render(container);
-     } else if (subView === 'item_target') { 
-        let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Use ${ITEMS[actionData.itemKey].name} on...</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
-        currentEnemies.forEach((enemy, index) => {
-            if (enemy.isAlive()) {
-                html += `<button onclick="useItem('${actionData.itemKey}', true, ${index})" class="btn btn-item">${enemy.name}</button>`;
-            }
-        });
-        html += `</div><button onclick="renderBattle('item')" class="btn btn-primary">Back</button>`;
-        renderBattle('item_target', actionData);
-    }
+     }
 }
 
 function renderPostBattleMenu() {
     $('#inventory-btn').disabled = false;
     $('#character-sheet-btn').disabled = false;
     player.clearEncounterBuffs();
-    
+    gameState.activeDrone = null; // Clear drone
+
     // If it was a training battle, restore state and go back to training grounds
     if (preTrainingState !== null) {
         addToLog("Training session ended. Restoring your resources.", "text-cyan-300");
@@ -2459,11 +2454,11 @@ function renderPostBattleMenu() {
 
     gameState.currentView = 'post_battle';
     lastViewBeforeInventory = 'post_battle';
-    
+
     // DO NOT ADVANCE TUTORIAL HERE. It's handled after the "outro" modal.
 
     const biomeKey = gameState.currentBiome;
-    if (!biomeKey) { 
+    if (!biomeKey) {
         renderTownSquare();
         return;
     }
@@ -2486,7 +2481,7 @@ function renderGraveyard() {
     let html = `<div class="w-full text-center">
         <h2 class="font-medieval text-3xl mb-4 text-center">Graveyard</h2>
         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3 text-left">`;
-    
+
     if (graveyard.length === 0) {
         html += `<p class="text-gray-400 text-center">No heroes have fallen... yet.</p>`;
     } else {
@@ -2507,7 +2502,7 @@ function renderGraveyard() {
     </div>`;
 
     $('#start-screen').classList.add('hidden');
-    const screenContainer = $('#changelog-screen'); 
+    const screenContainer = $('#changelog-screen');
     screenContainer.innerHTML = html;
     screenContainer.classList.remove('hidden');
 }
@@ -2535,7 +2530,7 @@ function renderChangelog() {
              <div class="text-center mt-6">
                 <button onclick="showStartScreen()" class="btn btn-primary">Back</button>
              </div>`;
-    
+
     changelogScreen.innerHTML = html;
 }
 
@@ -2550,13 +2545,13 @@ window.castHealingSpellOutsideCombat = function(spellKey) {
 
     const catalyst = player.equippedCatalyst;
     if (!catalyst || catalyst.name === 'None') {
-        addToLog("You need a catalyst equipped to cast spells.", "text-red-400");
+        addToLog("You need a catalyst equipped to cast spells.", 'text-red-400');
         return;
     }
-    
+
     const playerSpell = player.spells[spellKey];
     const spell = spellData.tiers[playerSpell.tier - 1];
-    
+
     let finalSpellCost = spell.cost;
     const armor = player.equippedArmor;
     if (catalyst.effect?.mana_discount) {
@@ -2577,14 +2572,33 @@ window.castHealingSpellOutsideCombat = function(spellKey) {
     const spellAmp = catalyst.effect?.spell_amp || 0;
     diceCount = Math.min(spell.cap, diceCount + spellAmp);
 
-    const healAmount = rollDice(diceCount, spell.damage[1], `Healing Spell: ${spell.name}`) + player.magicalDamageBonus;
-    
+    let healAmount = rollDice(diceCount, spell.damage[1], `Healing Spell: ${spell.name}`).total + player.magicalDamageBonus;
+
+    // --- ELEMENTAL: Innate Elementalist (Healing) ---
+    if (player.race === 'Elementals' && player.elementalAffinity === 'healing') {
+        const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
+        healAmount = Math.floor(healAmount * damageBonus);
+        if (player.level >= 20) {
+            let extraDieRoll = rollDice(1, spell.damage[1], 'Elemental Evo Die').total;
+            let cappedExtraDamage = Math.min( (spell.cap * spell.damage[1]) - healAmount, extraDieRoll); // Cap extra die damage
+            healAmount += cappedExtraDamage;
+        }
+    }
+    // --- End Elemental Logic ---
+    // --- DRAGONBORN: Bloodline Attunement (Healing) ---
+    if (player.race === 'Dragonborn') {
+        const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
+        healAmount = Math.floor(healAmount * damageBonus);
+    }
+    // --- End Dragonborn Logic ---
+
+
     player.hp = Math.min(player.maxHp, player.hp + healAmount);
 
     addToLog(`You cast ${spell.name} and recover <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-green-300');
-    
+
     updateStatsView();
-    renderInventory(); 
+    renderInventory();
 }
 
 function renderBestiaryMenu(origin = 'inventory') {
@@ -2616,8 +2630,8 @@ function renderBestiaryMenu(origin = 'inventory') {
 // --- BETTY DIALOGUE FUNCTIONS ---
 
 function startBettyDialogue() {
-    gameState.currentView = 'dialogue'; 
-    $('#betty-encounter-popup').classList.add('hidden'); 
+    gameState.currentView = 'dialogue';
+    $('#betty-encounter-popup').classList.add('hidden');
 
     if (!player.dialogueFlags.bettyMet) {
         player.dialogueFlags.bettyMet = true;
@@ -2657,9 +2671,9 @@ function renderBettyDialogue(sceneKey) {
         const option = scene.options[key];
         dialogueHtml += `<button onclick="handleBettyResponse('${sceneKey}', '${key}')" class="btn btn-primary text-left">${option.text}</button>`;
     }
-    
+
     dialogueHtml += `</div></div></div>`;
-    
+
     const container = document.createElement('div');
     container.innerHTML = dialogueHtml;
     render(container);
@@ -2684,7 +2698,7 @@ function handleBettyResponse(sceneKey, optionKey) {
         } else if (sceneKey === 'quest_proposal') {
             let nextHtml = '';
             switch(optionKey) {
-                case 'A': 
+                case 'A':
                     player.bettyQuestState = 'accepted';
                     player.addToInventory('bestiary_notebook');
                     nextHtml = `<div class="w-full h-full flex flex-col items-center justify-center p-4"><div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
@@ -2694,11 +2708,11 @@ function handleBettyResponse(sceneKey, optionKey) {
                     container.innerHTML = nextHtml;
                     render(container);
                     break;
-                case 'B': 
+                case 'B':
                     player.bettyQuestState = 'declined';
-                    setTimeout(renderTown, 2000); 
+                    setTimeout(renderTown, 2000);
                     break;
-                case 'C': 
+                case 'C':
                     player.bettyQuestState = 'accepted';
                     player.addToInventory('bestiary_notebook');
                     nextHtml = `<div class="w-full h-full flex flex-col items-center justify-center p-4"><div class="w-full max-w-2xl mx-auto p-4 bg-slate-800 rounded-lg text-center">
@@ -2710,7 +2724,7 @@ function handleBettyResponse(sceneKey, optionKey) {
                     break;
             }
         }
-    }, 2500); 
+    }, 2500);
 }
 
 function renderBettyQuestProposal() {
@@ -2728,9 +2742,9 @@ function renderBettyQuestProposal() {
         const option = scene.options[key];
         dialogueHtml += `<button onclick="handleBettyResponse('quest_proposal', '${key}')" class="btn btn-primary text-left">${option.text}</button>`;
     }
-    
+
     dialogueHtml += `</div></div></div>`;
-    
+
     const container = document.createElement('div');
     container.innerHTML = dialogueHtml;
     render(container);
@@ -2804,7 +2818,7 @@ function renderGarden() {
     let html = `<div class="w-full text-center">
         <h2 class="font-medieval text-3xl mb-2">Your Garden</h2>
         <p class="text-gray-400 mb-4">Click an empty plot to plant a seed, or a grown plant to harvest.</p>
-        
+
         <div class="flex flex-col md:flex-row justify-center items-center md:items-start gap-4 w-full">
             <div class="inline-grid gap-2 p-4 bg-slate-900/50 rounded-lg" style="grid-template-columns: repeat(${width}, 1fr);">`;
 
@@ -2855,7 +2869,7 @@ function renderPlot(plot, index, isTreePlot) {
 
     if (plot && plot.seed) {
         const seedInfo = SEEDS[plot.seed];
-        action = ''; 
+        action = '';
         title = `Planted: ${getItemDetails(plot.seed).name}`;
         const timeRemaining = (plot.plantedAt + seedInfo.growthTime) - Date.now();
 
@@ -2863,8 +2877,8 @@ function renderPlot(plot, index, isTreePlot) {
             case 0: content = '🌱'; title += ' (Seedling)'; break;
             case 1: content = isTreePlot ? '🌳' : '🌿'; title += ' (Sprout)'; break;
             case 2: content = isTreePlot ? '🌳' : '🌿'; plotClass='garden-plot-growing'; title += ' (Growing)'; break;
-            case 3: 
-                content = isTreePlot ? '🌲' : '🌻'; 
+            case 3:
+                content = isTreePlot ? '🌲' : '🌻';
                 plotClass='garden-plot-ready';
                 action = `harvestPlant(${index}, ${isTreePlot})`;
                 title = 'Ready to Harvest!';
@@ -2876,7 +2890,7 @@ function renderPlot(plot, index, isTreePlot) {
             title += ` - ${formatTime(timeRemaining)} remaining`;
         }
     }
-    
+
     return `<div onclick="${action}" class="garden-plot ${isTreePlot ? 'tree-plot' : ''} ${plotClass}" title="${title}">${content}${timerHtml}</div>`;
 }
 
@@ -2891,12 +2905,12 @@ function showSeedSelection(plotIndex, isTreePlot) {
 
     const seedType = isTreePlot ? 'sapling' : 'seed';
     seedTitle.textContent = isTreePlot ? "Select a Sapling to Plant" : "Select a Seed to Plant";
-    
+
     let availableSeeds = Object.keys(player.inventory.items).filter(key => {
         const item = ITEMS[key];
         return item && (item.type === seedType) && player.inventory.items[key] > 0;
     });
-    
+
     if (availableSeeds.length === 0) {
         addToLog(`You have no ${seedType}s to plant.`, "text-yellow-400");
         return;
@@ -2930,7 +2944,7 @@ function renderKitchen() {
         <h2 class="font-medieval text-3xl mb-2">Kitchen</h2>
         <p class="text-gray-400 mb-6">Combine ingredients to cook hearty meals. Note: Food buffs do not stack.</p>
         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3 max-w-lg mx-auto text-left">`;
-    
+
     if (player.knownCookingRecipes.length === 0) {
         html += `<p class="text-center text-gray-500">You don't know any recipes. Find or buy some to get started!</p>`;
     } else {
@@ -2947,7 +2961,11 @@ function renderKitchen() {
                 }
             }
         });
-            
+
+        for(const type in availableIngredients) {
+            availableIngredients[type].sort((a,b) => a.price - b.price);
+        }
+
         player.knownCookingRecipes.forEach(recipeKey => {
             const recipe = COOKING_RECIPES[recipeKey];
             if (!recipe) return;
@@ -2969,7 +2987,7 @@ function renderKitchen() {
                     const details = getItemDetails(reqKey);
                     ingredientName = details ? details.name : reqKey;
                 }
-                
+
                 if (currentAmount < requiredAmount) {
                     canCook = false;
                     ingredientsHtml.push(`<span class="text-red-400">${ingredientName} (${currentAmount}/${requiredAmount})</span>`);
@@ -2977,7 +2995,7 @@ function renderKitchen() {
                      ingredientsHtml.push(`<span class="text-gray-400">${ingredientName} (${currentAmount}/${requiredAmount})</span>`);
                 }
             }
-            
+
             html += `<div class="p-3 bg-slate-800 rounded-lg ${!canCook ? 'opacity-60' : ''}">
                 <div class="flex justify-between items-center">
                     <h4 class="font-bold text-lg ${!canCook ? 'text-gray-500' : 'text-yellow-300'}" onmouseover="showTooltip('${recipeKey}', event)" onmouseout="hideTooltip()">${recipe.name}</h4>
@@ -3034,12 +3052,12 @@ function renderAlchemyLab() {
         const displayName = hasItems ? `${details.name} (x${slotContents.length})` : `Ingredient ${index + 1}`;
         const leftClickAction = `openIngredientPicker(${index})`;
         const rightClickAction = hasItems ? `removeLastIngredient(${index}); event.preventDefault()` : '';
-        
+
         return `
-            <div class="alchemy-slot ${slotClass} ${details ? 'filled' : ''}" 
-                 onclick="${leftClickAction}" 
+            <div class="alchemy-slot ${slotClass} ${details ? 'filled' : ''}"
+                 onclick="${leftClickAction}"
                  oncontextmenu="${rightClickAction}"
-                 onmouseover="showTooltip('${hasItems ? slotContents[0] : ''}', event)" 
+                 onmouseover="showTooltip('${hasItems ? slotContents[0] : ''}', event)"
                  onmouseout="hideTooltip()">
                 ${displayName}
                 <div class="alchemy-connector"></div>
@@ -3053,7 +3071,7 @@ function renderAlchemyLab() {
         <div class="w-full text-left">
             <h2 class="font-medieval text-3xl mb-2 text-center">Home Alchemy Lab</h2>
             <p class="text-center text-gray-400 mb-6">Tier ${alchemyTier} Station. Left-click a slot to add ingredients. Right-click to remove.</p>
-            
+
             <div class="alchemy-station">
                 ${slotsHtml}
                 <div class="alchemy-slot alchemy-output ${outputDetails ? 'filled' : ''}" onmouseover="showTooltip('${alchemyState.outputKey || ''}', event)" onmouseout="hideTooltip()">
@@ -3071,7 +3089,7 @@ function renderAlchemyLab() {
                 <button onclick="renderHouse()" class="btn btn-primary">Back to House</button>
             </div>
         </div>`;
-    
+
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -3082,7 +3100,7 @@ function openIngredientPicker(slotIndex) {
     if (!pickerContainer) return;
 
     const slotContents = alchemyState.slots[slotIndex] || [];
-    
+
     // An empty slot can accept any alchemy ingredient.
     // A non-empty slot can only accept more of the same ingredient.
     const currentItemInSlot = slotContents.length > 0 ? slotContents[0] : null;
@@ -3098,9 +3116,9 @@ function openIngredientPicker(slotIndex) {
         const canAddToSlot = !currentItemInSlot || currentItemInSlot === key;
         return details && details.alchemyType && (player.inventory.items[key] > (usedCounts[key] || 0)) && canAddToSlot;
     });
-    
+
     if (availableItems.length === 0) {
-        const message = currentItemInSlot 
+        const message = currentItemInSlot
             ? `You have no more ${getItemDetails(currentItemInSlot).name} to add.`
             : 'You have no more alchemy ingredients to add.';
         addToLog(message, 'text-yellow-400');
@@ -3157,7 +3175,7 @@ function brewFromStation() {
     if (ingredients.length === 0) return;
 
     const outcome = determineBrewingOutcome(ingredients);
-    
+
     if (brewHomePotion(ingredients, outcome)) {
         if (outcome.success) {
             alchemyState.outputKey = outcome.potion;
@@ -3190,7 +3208,7 @@ function renderTrainingGrounds() {
         html += `<div class="max-w-2xl mx-auto text-left space-y-4 p-4 border border-yellow-600 rounded-lg mt-6">
             <h3 class="font-bold text-xl text-yellow-300 text-center">Arena of Champions (Tier 2)</h3>
             <p class="text-gray-400 text-center text-sm mb-4">Design your own custom encounter.</p>
-            
+
             <div>
                 <label for="t2-enemy-count" class="block font-bold text-lg mb-2">Number of Enemies (1-5)</label>
                 <input type="number" id="t2-enemy-count" value="1" min="1" max="5" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">
@@ -3218,7 +3236,7 @@ function renderTrainingGrounds() {
             <div>
                 <label for="t1-enemy-select" class="block font-bold text-lg mb-2">Enemy Dummy</label>
                 <select id="t1-enemy-select" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">`;
-        
+
         if (defeatedEnemies.length > 0) {
             defeatedEnemies.forEach(enemyKey => {
                 const enemy = MONSTER_SPECIES[enemyKey];
@@ -3229,7 +3247,7 @@ function renderTrainingGrounds() {
         }
         html += `   </select>
             </div>
-            
+
             <div>
                 <label for="t1-grid-size-select" class="block font-bold text-lg mb-2">Arena Size</label>
                 <select id="t1-grid-size-select" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">
@@ -3268,7 +3286,7 @@ function renderTrainingGrounds() {
 function generateEnemyConfigRows(count) {
     const container = document.getElementById('t2-enemy-configs');
     if (!container) return;
-    
+
     const defeatedEnemies = Object.keys(player.legacyQuestProgress || {});
     const enemyOptions = defeatedEnemies.map(key => `<option value="${key}">${MONSTER_SPECIES[key].name}</option>`).join('');
     const rarityOptions = Object.keys(MONSTER_RARITY).map(key => `<option value="${key}">${MONSTER_RARITY[key].name}</option>`).join('');
@@ -3324,4 +3342,102 @@ window.startTrainingBattle = function(tier) {
     startBattle(null, trainingConfig);
 }
 
+
+// Function to render Cook's On-Field Cooking UI
+function renderOnFieldCookingUI() {
+    let html = `<div class="w-full text-center">
+        <h2 class="font-medieval text-3xl mb-2">On-Field Cooking</h2>
+        <p class="text-gray-400 mb-4">Select a recipe to prepare. Missing ingredients will cost MP.</p>
+        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3 max-w-lg mx-auto text-left">`;
+
+    if (player.knownCookingRecipes.length === 0) {
+        html += `<p class="text-center text-gray-500">You don't know any recipes!</p>`;
+    } else {
+        const availableIngredients = { meat: [], veggie: [], seasoning: [] };
+        Object.keys(player.inventory.items).forEach(itemKey => {
+            const details = getItemDetails(itemKey);
+            if (details && details.cookingType) {
+                const count = player.inventory.items[itemKey];
+                if(count > 0) {
+                    for (let i = 0; i < count; i++) {
+                        availableIngredients[details.cookingType].push({ key: itemKey, price: details.price, rarity: details.rarity || 'Common' });
+                    }
+                }
+            }
+        });
+        for(const type in availableIngredients) availableIngredients[type].sort((a,b) => a.price - b.price);
+
+        player.knownCookingRecipes.forEach(recipeKey => {
+            const recipe = COOKING_RECIPES[recipeKey];
+            if (!recipe) return;
+
+            let ingredientsHtml = [];
+            let mpCostForMissing = 0;
+            const mpCosts = { 'Common': 5, 'Uncommon': 10, 'Rare': 15, 'Epic': 20, 'Legendary': 25, 'Broken': 0 };
+
+            // Create temporary copies for checking availability without consuming yet
+            let tempAvailable = JSON.parse(JSON.stringify(availableIngredients));
+            let tempInventory = JSON.parse(JSON.stringify(player.inventory.items));
+
+
+            for (const reqKey in recipe.ingredients) {
+                const requiredAmount = recipe.ingredients[reqKey];
+                let usedCount = 0;
+                let ingredientName = '';
+                const isGeneric = ['meat', 'veggie', 'seasoning'].includes(reqKey);
+
+                if (isGeneric) {
+                    ingredientName = capitalize(reqKey);
+                    for (let i = 0; i < requiredAmount; i++) {
+                        if (tempAvailable[reqKey].length > 0) {
+                            const itemUsed = tempAvailable[reqKey].shift(); // Use the cheapest available
+                             // Decrement count in temp inventory to track specifics
+                             if(tempInventory[itemUsed.key]) tempInventory[itemUsed.key]--;
+                            usedCount++;
+                        } else {
+                            mpCostForMissing += mpCosts['Common']; // Assume Common for generic missing
+                        }
+                    }
+                     ingredientsHtml.push(`${ingredientName} (${usedCount}/${requiredAmount})`);
+                } else { // Specific ingredient
+                    const details = getItemDetails(reqKey);
+                    ingredientName = details ? details.name : reqKey;
+                    const currentAmount = tempInventory[reqKey] || 0;
+                    const amountToUse = Math.min(currentAmount, requiredAmount);
+                    if (amountToUse > 0) {
+                        tempInventory[reqKey] -= amountToUse; // Decrement from temp
+                        usedCount = amountToUse;
+                    }
+                    const missingAmount = requiredAmount - usedCount;
+                    if (missingAmount > 0) {
+                        const rarityCost = mpCosts[details?.rarity || 'Common'] || mpCosts['Common'];
+                        mpCostForMissing += missingAmount * rarityCost;
+                    }
+                    ingredientsHtml.push(`${ingredientName} (${usedCount}/${requiredAmount})`);
+                }
+            }
+
+            const canAfford = player.mp >= mpCostForMissing;
+            const costText = mpCostForMissing > 0 ? `<span class="text-blue-400">(${mpCostForMissing} MP)</span>` : '';
+
+            html += `<div class="p-3 bg-slate-800 rounded-lg ${!canAfford ? 'opacity-60' : ''}">
+                <div class="flex justify-between items-center">
+                    <h4 class="font-bold text-lg ${!canAfford ? 'text-gray-500' : 'text-yellow-300'}" onmouseover="showTooltip('${recipeKey}', event)" onmouseout="hideTooltip()">${recipe.name} ${costText}</h4>
+                    <button onclick="executeOnFieldCooking('${recipeKey}')" class="btn btn-primary" ${!canAfford ? 'disabled' : ''}>Cook</button>
+                </div>
+                <p class="text-sm text-gray-500">Requires: ${ingredientsHtml.join(', ')}</p>
+            </div>`;
+        });
+    }
+
+    html += `</div>
+        <div class="mt-6">
+            <button onclick="renderBattleGrid()" class="btn btn-action">Cancel</button>
+        </div>
+    </div>`;
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container); // Replace main view with this UI
+}
 
