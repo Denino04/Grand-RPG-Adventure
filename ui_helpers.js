@@ -12,17 +12,51 @@ let mainView;
 let characterSheetOriginalStats = null;
 
 function getItemDetails(itemKey) {
-    // Check all potential data sources
-    return WEAPONS[itemKey]
-        || ARMOR[itemKey]
-        || SHIELDS[itemKey]
-        || CATALYSTS[itemKey]
-        || ITEMS[itemKey]
-        || LURES[itemKey]
-        || SPELLS[itemKey] // Check spells for tooltips
-        || COOKING_RECIPES[itemKey] // Check cooking recipes for tooltips
-        // Add other data sources like ALCHEMY_RECIPES if needed for tooltips later
-        || null; // Return null if not found anywhere
+    // *** DEBUGGING LOGS START ***
+    console.log(`getItemDetails called with key: "${itemKey}"`);
+    console.log(`  - typeof WEAPONS: ${typeof WEAPONS}, typeof ARMOR: ${typeof ARMOR}, typeof SHIELDS: ${typeof SHIELDS}, typeof CATALYSTS: ${typeof CATALYSTS}, typeof ITEMS: ${typeof ITEMS}, typeof LURES: ${typeof LURES}, typeof SPELLS: ${typeof SPELLS}, typeof COOKING_RECIPES: ${typeof COOKING_RECIPES}`);
+    // *** DEBUGGING LOGS END ***
+
+    // --- REWRITTEN LOGIC with IF statements ---
+    if (typeof WEAPONS !== 'undefined' && WEAPONS && WEAPONS[itemKey]) {
+        console.log(`  - Found "${itemKey}" in WEAPONS.`);
+        return WEAPONS[itemKey];
+    }
+    if (typeof ARMOR !== 'undefined' && ARMOR && ARMOR[itemKey]) {
+        console.log(`  - Found "${itemKey}" in ARMOR.`);
+        return ARMOR[itemKey];
+    }
+    if (typeof SHIELDS !== 'undefined' && SHIELDS && SHIELDS[itemKey]) {
+        console.log(`  - Found "${itemKey}" in SHIELDS.`);
+        return SHIELDS[itemKey];
+    }
+    if (typeof CATALYSTS !== 'undefined' && CATALYSTS && CATALYSTS[itemKey]) {
+        console.log(`  - Found "${itemKey}" in CATALYSTS.`);
+        return CATALYSTS[itemKey];
+    }
+    if (typeof ITEMS !== 'undefined' && ITEMS && ITEMS[itemKey]) {
+        console.log(`  - Found "${itemKey}" in ITEMS.`);
+        return ITEMS[itemKey];
+    }
+    if (typeof LURES !== 'undefined' && LURES && LURES[itemKey]) {
+        console.log(`  - Found "${itemKey}" in LURES.`);
+        return LURES[itemKey];
+    }
+    if (typeof SPELLS !== 'undefined' && SPELLS && SPELLS[itemKey]) {
+        // Spells might need different handling if structure varies,
+        // but for tooltip purposes, returning the base object might be okay.
+        console.log(`  - Found "${itemKey}" in SPELLS.`);
+        return SPELLS[itemKey];
+    }
+    if (typeof COOKING_RECIPES !== 'undefined' && COOKING_RECIPES && COOKING_RECIPES[itemKey]) {
+        console.log(`  - Found "${itemKey}" in COOKING_RECIPES.`);
+        return COOKING_RECIPES[itemKey];
+    }
+    // Add checks for ALCHEMY_RECIPES if needed here
+
+    // *** Fallback if not found anywhere ***
+    console.warn(`  - Item key "${itemKey}" NOT FOUND in any data object.`);
+    return null; // Return null if not found
 }
 /**
  * Initializes key DOM element references after the page loads.
@@ -48,7 +82,7 @@ function capitalize(str) {
  * @param {number} numDice The number of dice to roll.
  * @param {number} sides The number of sides on each die.
  * @param {string|object} purpose A description of the roll's purpose for debugging.
- * @returns {object} An object containing the total and the individual rolls: { total: number, rolls: number[] }.
+ * @returns {number} The sum of all dice rolls.
  */
 function rollDice(numDice, sides, purpose = 'Generic Roll') {
     let rolls = [];
@@ -63,7 +97,6 @@ function rollDice(numDice, sides, purpose = 'Generic Roll') {
     // Return both total and the individual rolls
     return { total: total, rolls: rolls };
 }
-
 
 /**
  * Adds a message to the in-game log.
@@ -92,6 +125,8 @@ function addToLog(message, colorClass = '') {
         logElement.scrollTop = logElement.scrollHeight;
     });
 
+
+    // Limit log length to, say, 100 entries
     const maxLogEntries = 100;
     while (logElement.children.length > maxLogEntries) {
         logElement.removeChild(logElement.firstChild); // Remove oldest from the top
@@ -105,38 +140,17 @@ function addToLog(message, colorClass = '') {
 /**
  * Clears the main view and renders a new element in its place.
  * Also handles tooltips and updates persistent UI elements.
- * @param {HTMLElement | DocumentFragment | Text | string} viewElement The new element, fragment, text node, or HTML string to render.
+ * @param {HTMLElement} viewElement The new element to render.
  */
 function render(viewElement) {
-    // Ensure mainView is initialized
-    if (!mainView) {
-        console.error("Main view element not initialized. Cannot render.");
-        return;
-    }
-
     hideTooltip();
-    hideEnemyInfo(); // Ensure enemy info popup is hidden too
+    hideEnemyInfo();
 
-    // Define base classes - adjust these if needed
     const baseClasses = "bg-slate-900/50 rounded-lg flex-grow flex items-center justify-center p-6 min-h-[300px] md:min-h-0 overflow-y-auto inventory-scrollbar";
-
-    // Apply base classes (consider preserving specific classes if needed)
     mainView.className = baseClasses;
 
-    // Clear previous content
     mainView.innerHTML = '';
-
-    // Append new content based on type
-    if (viewElement instanceof HTMLElement || viewElement instanceof DocumentFragment || viewElement instanceof Text) {
-        mainView.appendChild(viewElement);
-    } else if (typeof viewElement === 'string') {
-        // If it's an HTML string, parse it carefully or use innerHTML
-        // Using innerHTML is simpler here, but be mindful of security if the string comes from untrusted sources
-        mainView.innerHTML = viewElement;
-    } else {
-        console.warn("Invalid content passed to render function:", viewElement);
-        mainView.textContent = "Error rendering view."; // Fallback message
-    }
+    mainView.appendChild(viewElement);
 
     // Update body class for CSS-based button visibility
     // Remove previous view classes first
@@ -149,10 +163,10 @@ function render(viewElement) {
          document.body.className = document.body.className.replace(/\s?view-\S+/g, '');
     }
 
-    updateDebugView(); // Update debug panel if visible
-    updatePersistentButtons(); // Update state/visibility of persistent UI like settings/exit buttons
-}
 
+    updateDebugView();
+    updatePersistentButtons(); // Call this to handle any potential JS logic needed, even if CSS controls visibility
+}
 
 /**
  * Function to handle visibility or other state changes for persistent buttons.
@@ -161,8 +175,18 @@ function render(viewElement) {
 function updatePersistentButtons() {
     const persistentButtons = $('#persistent-buttons');
     if (!persistentButtons) return;
+
+    // We don't need to add/remove 'hidden' class here anymore for visibility.
     // CSS handles showing/hiding based on body.view-* classes.
+    // This function can remain empty or be used for other button state logic later.
+
+    // Example: You could disable buttons based on game state here if needed
+    // const settingsButton = persistentButtons.querySelector('button[onclick*="renderSettingsMenu"]');
+    // if (settingsButton) {
+    //     settingsButton.disabled = someCondition;
+    // }
 }
+
 
 // =================================================================================
 // SECTION 3: REUSABLE UI BUILDER FUNCTIONS
@@ -171,53 +195,55 @@ function updatePersistentButtons() {
 /**
  * Creates a standard button for UI menus.
  * @param {object} config - Configuration for the button.
- * @param {string} config.text - The button text.
- * @param {string} config.onclick - The JS code for the onclick event.
- * @param {string} [config.classes='btn-primary'] - Additional CSS classes.
- * @param {boolean} [config.disabled=false] - Whether the button is disabled.
  * @returns {string} The HTML string for the button.
  */
 function createButton(config) {
     const { text, onclick, classes = 'btn-primary', disabled = false } = config;
-    return `<button onclick="${onclick || ''}" class="btn ${classes}" ${disabled ? 'disabled' : ''}>${text || ''}</button>`;
+    return `<button onclick="${onclick}" class="btn ${classes}" ${disabled ? 'disabled' : ''}>${text}</button>`;
 }
-
 
 /**
  * Creates a generic list of items for shops or crafting menus, sorted by price.
  * @param {object} config - Configuration for the list.
- * @param {string[]} config.items - Array of item keys.
- * @param {function} config.detailsFn - Function to get item details (e.g., getItemDetails).
- * @param {function} config.actionsHtmlFn - Function that returns HTML string for action buttons based on key and details.
  * @returns {string} The HTML string for the list.
  */
 function createItemList(config) {
     const { items, detailsFn, actionsHtmlFn } = config;
     if (!items || items.length === 0) return '';
 
-    // Create objects with details for sorting
     const itemsToSort = items.map(key => {
         const details = detailsFn(key);
-        // Fallback for items potentially missing price or details
-        return { key, price: details?.price || 0, details };
-    }).filter(itemObj => itemObj.details); // Filter out items where detailsFn failed
+        // *** DEBUG: Log key and result of detailsFn ***
+        console.log(`createItemList: Rendering item with key "${key}"`);
+        console.log(`  - Details object found:`, details ? {...details} : details); // Log a copy or the null/undefined
+        return { key, price: details ? (details.price || 0) : 0, details }; // Keep details for name access
+    });
 
-    // Sort by price (ascending)
     itemsToSort.sort((a, b) => a.price - b.price);
 
-    // Generate HTML for the sorted list
     return itemsToSort.map(itemObj => {
         const key = itemObj.key;
-        const details = itemObj.details; // Already fetched
-        const actionsHtml = actionsHtmlFn(key, details); // Generate actions HTML
+        const details = itemObj.details; // Use the details we already fetched
 
-        // Basic structure for each list item
+        // *** DEBUG: Check details.name before rendering ***
+        console.log(`  - Accessing details.name: "${details?.name}" (Type: ${typeof details?.name})`);
+
+        // Handle case where details might be null or name missing AFTER fetching
+        if (!details || !details.name) {
+            console.warn(`  - WARNING: Rendering fallback for key "${key}" because details or name is missing.`);
+            // Fallback display using the key if name is unexpectedly missing
+             return `
+                <div class="flex justify-between items-center p-2 bg-slate-800 rounded">
+                    <span>${key} (Fallback - name missing)</span>
+                    <div>${actionsHtmlFn(key, { name: key, price: 0 })}</div>
+                </div>`;
+        }
+
+        // Normal rendering if name exists
+        const actionsHtml = actionsHtmlFn(key, details);
         return `
-            <div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm"
-                 onmouseover="showTooltip('${key}', event)"
-                 onmouseout="hideTooltip()"
-                 onclick="showTooltip('${key}', event)">
-                <span>${details.name || key}</span> {/* Fallback to key if name missing */}
+            <div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)">
+                <span>${details.name}</span>
                 <div>${actionsHtml}</div>
             </div>`;
     }).join('');
@@ -227,90 +253,46 @@ function createItemList(config) {
 /**
  * Creates a selection list with a details pane (used in character creation).
  * @param {object} config - Configuration object.
- * @param {object} config.data - The data object (e.g., RACES, CLASSES).
- * @param {string} config.listId - The ID of the element to populate with the list.
- * @param {string} config.detailsId - The ID of the element to populate with details.
- * @param {function} config.buttonTextFn - Function(key, data) that returns the text for each button.
- * @param {function} config.detailsHtmlFn - Function(key, data) that returns the HTML for the details pane.
- * @param {function} config.onClickFn - Function(key) called when a button is clicked.
- * @param {string} [config.initialSelectionKey=null] - Key of the item to select initially.
  */
 function createSelectionListWithDetails(config) {
-    const { data, listId, detailsId, buttonTextFn, detailsHtmlFn, onClickFn, initialSelectionKey = null } = config;
+    const { data, listId, buttonTextFn, onHoverFn, onClickFn } = config;
     const listContainer = $(`#${listId}`);
-    const detailsContainer = $(`#${detailsId}`);
-    if (!listContainer || !detailsContainer) {
-        console.error(`Missing container elements: #${listId} or #${detailsId}`);
-        return;
-    }
+    if (!listContainer) return;
 
-    listContainer.innerHTML = ''; // Clear previous list
-
-    // Find the currently selected key (if applicable, e.g., from player object)
-    let selectedKey = initialSelectionKey; // Start with explicit initial, or null
-
+    listContainer.innerHTML = '';
     Object.keys(data).forEach(key => {
         const itemData = data[key];
         const button = document.createElement('button');
-        button.className = 'btn btn-primary w-full text-left'; // Base style
+        button.className = 'btn btn-primary w-full text-left';
         button.dataset.key = key;
-        button.textContent = buttonTextFn(key, itemData); // Get button text
-
-        // Function to update details pane
-        const updateDetails = () => {
-            detailsContainer.innerHTML = detailsHtmlFn(key, itemData);
-        };
-
-        // Function to handle button click
-        const handleClick = () => {
-            // Remove selection style from all buttons in this list
+        button.textContent = buttonTextFn(key, itemData);
+        button.onmouseenter = () => onHoverFn(key, itemData);
+        button.onclick = () => {
             document.querySelectorAll(`#${listId} button`).forEach(btn => {
                 btn.classList.remove('bg-yellow-600', 'border-yellow-800');
                 btn.classList.add('btn-primary');
             });
-            // Apply selection style to the clicked button
             button.classList.add('bg-yellow-600', 'border-yellow-800');
             button.classList.remove('btn-primary');
-
-            selectedKey = key; // Update the selected key
-            updateDetails(); // Update details pane
-            onClickFn(key); // Call the provided click handler
+            onClickFn(key);
         };
-
-        button.onmouseenter = updateDetails; // Update details on hover
-        button.onclick = handleClick; // Handle click logic
-
         listContainer.appendChild(button);
-
-        // If this key matches the initial selection, trigger its click handler
-        if (key === selectedKey) {
-            button.click(); // Programmatically click to select and show details
-        }
     });
-
-    // If no initial selection was made (or found), show placeholder text
-    if (selectedKey === null) {
-        detailsContainer.innerHTML = '<p class="text-gray-400">Select an option from the list.</p>';
-    }
 }
 
 // =================================================================================
 // SECTION 4: TOOLTIP & INFO DISPLAY
 // =================================================================================
 
-let activeTooltipItem = null; // Track which item the tooltip is currently showing for
+let activeTooltipItem = null;
 
 /**
- * Shows a detailed tooltip for an item, spell, recipe, or enemy.
- * Handles positioning to stay within viewport bounds.
- * @param {string} itemKey The key of the item/spell/recipe or a unique enemy identifier (e.g., `enemy-${enemy.name}-${index}`).
+ * Shows a detailed tooltip for an item, spell, or enemy.
+ * @param {string} itemKey The key of the item to display.
  * @param {Event} event The mouse event that triggered the tooltip.
  */
 function showTooltip(itemKey, event) {
     const tooltipElement = $('#tooltip');
-    if (!tooltipElement) return; // Exit if tooltip element doesn't exist
-
-    // If clicking the same item that's already showing tooltip, hide it
     if (event.type === 'click' && tooltipElement.style.display === 'block' && activeTooltipItem === itemKey) {
         hideTooltip();
         return;
@@ -319,380 +301,266 @@ function showTooltip(itemKey, event) {
     let details;
     let content = '';
 
-    // --- Determine Item Type and Generate Content ---
-    if (itemKey.startsWith('enemy-')) {
-        // --- Enemy Tooltip Logic ---
-        // Find the specific enemy instance (assuming currentEnemies is globally accessible)
-        // This part needs refinement if enemy names aren't unique - maybe pass enemy index or object directly?
-        // For now, assuming name is unique enough for tooltip context:
-        const enemyName = itemKey.split('-').slice(1).join('-'); // Extract name
-        const enemy = typeof currentEnemies !== 'undefined'
-            ? currentEnemies.find(e => e.name === enemyName && e.isAlive())
-            : null;
+    // Guard against null/undefined itemKey early
+    if (!itemKey) {
+        hideTooltip();
+        return;
+    }
 
-        if (enemy) {
-            content = `<h4 class="font-bold text-red-400 mb-1">${enemy.name}</h4>`;
-            content += `<p>HP: ${enemy.hp} / ${enemy.maxHp}</p>`;
-            // Add more enemy details if desired (e.g., element, buffs/debuffs)
-            const statusEffects = Object.keys(enemy.statusEffects).map(k => capitalize(k.replace(/_/g, ' '))).join(', ');
-            if (statusEffects) {
-                content += `<p class="text-xs text-yellow-300 mt-1">Status: ${statusEffects}</p>`;
-            }
-        } else {
-            content = '<p class="text-gray-400">Enemy info not found.</p>';
-        }
 
-    } else if (itemKey in SPELLS) {
-        // --- Spell Tooltip Logic ---
+    if (itemKey in SPELLS) {
         const spellTree = SPELLS[itemKey];
-        const playerSpell = player?.spells?.[itemKey]; // Safely access player spells
-        const tier = playerSpell ? playerSpell.tier : 1; // Default to tier 1 if not learned
-        details = spellTree.tiers[tier - 1]; // Get data for the correct tier
+        const playerSpell = player.spells[itemKey];
+        const tier = playerSpell ? playerSpell.tier : 1;
+        details = spellTree.tiers[tier - 1];
 
-        if (details) {
-            content = `<h4 class="font-bold mb-1 text-purple-300">${details.name} (Tier ${tier})</h4>`;
-            content += `<p class="text-xs text-gray-400 mb-2">${capitalize(spellTree.element)} / ${spellTree.type.toUpperCase()}</p>`;
-            if (details.damage) content += `<p class="text-sm">Power: ${details.damage[0]}d${details.damage[1]} (Cap: ${details.cap} dice)</p>`;
-            if (details.cost) content += `<p class="text-sm text-blue-400">MP Cost: ${details.cost}</p>`;
-            if (details.splash) content += `<p class="text-sm">Splash: ${details.splash * 100}% Dmg</p>`;
-            // Add effect description if available
-            if (details.description) {
-                content += `<p class="text-gray-300 mt-2 text-xs italic">${details.description}</p>`;
-            }
-            // Show upgrade info if not max tier
-            if (tier < spellTree.tiers.length) {
-                const upgradeData = spellTree.tiers[tier - 1]; // Upgrade cost is on the *current* tier data
-                const nextTierData = spellTree.tiers[tier];
-                content += '<div class="mt-2 pt-2 border-t border-gray-600 text-xs">';
-                content += `<p>Next Tier: ${nextTierData.name}</p>`;
-                if (upgradeData.upgradeCost) content += `<p>Cost: ${upgradeData.upgradeCost} G</p>`;
-                if (upgradeData.upgradeEssences) {
-                    const essences = Object.entries(upgradeData.upgradeEssences).map(([key, val]) => `${val}x ${getItemDetails(key)?.name || key}`).join(', ');
-                    content += `<p>Essences: ${essences}</p>`;
-                }
-                content += '</div>';
-            } else {
-                 content += '<p class="text-xs text-cyan-300 mt-2 pt-2 border-t border-gray-600">Max Tier Reached</p>';
-            }
-        } else {
-            content = `<p class="text-red-400">Error: Spell details not found for tier ${tier}.</p>`;
-        }
+        content = `<h4 class="font-bold mb-1" style="color: var(--text-accent);">${details.name} (Tier ${tier})</h4>`;
+        content += `<p class="text-xs text-gray-400 mb-2">${capitalize(spellTree.element)} / ${spellTree.type.toUpperCase()}</p>`;
+        if (details.damage) content += `<p>Power: ${details.damage[0]}d${details.damage[1]} (Cap: ${details.cap} dice)</p>`;
+        if (details.cost) content += `<p class="text-blue-400">MP Cost: ${details.cost}</p>`;
+        if (details.splash) content += `<p>Splash Damage: ${details.splash * 100}%</p>`;
+        if (details.description) content += `<p class="text-gray-400 mt-2 text-sm"><em>${details.description}</em></p>`;
 
     } else if (itemKey in COOKING_RECIPES) {
-        // --- Cooking Recipe Tooltip Logic ---
         details = COOKING_RECIPES[itemKey];
-        if (details) {
-            content = `<h4 class="font-bold mb-1 text-yellow-300">${details.name}</h4>`;
-            content += `<p class="text-xs mb-2 text-gray-400">Tier ${details.tier} Cooked Meal</p>`;
-            if (details.description) {
-                content += `<p class="text-gray-300 text-xs italic">${details.description}</p>`;
-            }
-            // Ingredients list
-            const ingredients = Object.entries(details.ingredients).map(([key, val]) => {
-                const ingredientDetails = getItemDetails(key);
-                // Handle generic vs specific ingredient names
-                const name = ingredientDetails ? ingredientDetails.name : capitalize(key);
-                return `${val}x ${name}`;
-            }).join(', ');
-            content += `<p class="text-sm mt-2">Requires: ${ingredients}</p>`;
-            // Effect description
-            const effect = details.effect;
-            if (effect) {
-                content += '<div class="mt-2 pt-2 border-t border-gray-600 text-cyan-300 text-xs"><ul class="list-disc list-inside space-y-1">';
-                if (effect.heal) content += `<li>Heals ${effect.heal} HP</li>`;
-                switch (effect.type) {
-                    case 'buff':
-                        effect.buffs.forEach(buff => {
-                            const statName = buff.stat.replace(/_/g, ' ');
-                            let valueDisplay = '';
-                             if (buff.stat === 'movement_speed') {
-                                valueDisplay = `+${buff.value}`; // Additive
-                             } else {
-                                valueDisplay = `+${((buff.value - 1) * 100).toFixed(0)}%`; // Multiplicative
-                             }
-                            content += `<li>${valueDisplay} ${capitalize(statName)} (${buff.duration} enc.)</li>`;
-                        });
-                        break;
-                    case 'heal_percent': content += `<li>Restores ${effect.heal_percent * 100}% Max HP</li>`; break;
-                    case 'mana_percent': content += `<li>Restores ${effect.mana_percent * 100}% Max MP</li>`; break;
-                    case 'full_restore': content += `<li>Fully restores HP & MP</li>`; break;
-                }
-                content += '</ul></div>';
-            }
-        } else {
-             content = '<p class="text-red-400">Recipe details not found.</p>';
-        }
+        if (!details) return;
 
-    } else {
-        // --- Standard Item Tooltip Logic ---
-        details = getItemDetails(itemKey);
-        if (!details) {
-            // Check if it's potentially an alchemy ingredient key if not found elsewhere
-             if (ALCHEMY_RECIPES[itemKey]) { // Assuming ALCHEMY_RECIPES holds output keys mapped to details
-                details = ALCHEMY_RECIPES[itemKey]; // Attempt to show recipe output details? This might need adjustment based on ALCHEMY_RECIPES structure.
-                // Re-purpose 'details' - add a check or specific handling if needed
-                if(details && details.output && getItemDetails(details.output)){ // Check if it's a recipe object and has an output we can detail
-                    const outputDetails = getItemDetails(details.output);
-                     content = `<h4 class="font-bold mb-1 text-yellow-300">Recipe: ${outputDetails.name}</h4>`;
-                     // Maybe add ingredients here?
-                }
-            }
-            if (!details) return; // Exit if still no details found
-        }
-
-
-        // Build standard item tooltip content
         content = `<h4 class="font-bold mb-1" style="color: var(--text-accent);">${details.name}</h4>`;
-        if (details.rarity) content += `<p class="text-xs mb-2 ${getRarityColorClass(details.rarity)}">${details.rarity}</p>`;
-        else if (details.type === 'key') content += `<p class="text-xs mb-2 text-yellow-300">Key Item</p>`;
-        else content += `<p class="text-xs mb-2 text-gray-400">${capitalize(details.type || 'Item')}</p>`; // Fallback type
+        content += `<p class="text-xs mb-2 text-gray-400">Tier ${details.tier} Cooked Meal</p>`;
+        content += `<p class="text-gray-400 mt-2 text-sm"><em>${details.description}</em></p>`;
 
-
-        // Add relevant stats based on item type
-        if (details.damage) content += `<p class="text-sm">Damage: ${details.damage[0]}d${details.damage[1]}</p>`;
-        if (details.range > 0) content += `<p class="text-sm">Range: ${details.range}</p>`;
-        if (details.defense) content += `<p class="text-sm">Defense: ${details.defense}</p>`;
-        if (details.blockChance > 0) content += `<p class="text-sm">Block: ${(details.blockChance * 100).toFixed(0)}%</p>`;
-        if (details.amount && details.type === 'healing') content += `<p class="text-sm text-green-400">Heals: ${details.amount} HP</p>`;
-        if (details.type === 'mana_restore') content += `<p class="text-sm text-blue-400">Restores: ${details.amount} MP</p>`;
-        if (details.uses && details.type !== 'lure') content += `<p class="text-sm text-purple-300">Uses: ${details.uses}</p>`;
-        if (details.type === 'lure' && details.uses) content += `<p class="text-sm text-purple-300">Base Uses: ${details.uses}</p>`;
-
-
-        // --- Item Effects Section ---
-        if (details.effect || (details.type === 'buff' && details.effect)) { // Check both direct effect and buff type
+        const effect = details.effect;
+        if (effect) {
             content += '<div class="mt-2 pt-2 border-t border-gray-600 text-cyan-300 text-xs"><ul class="list-disc list-inside space-y-1">';
-            const effect = details.effect;
-            // List all possible effect types for clarity
-            if (effect?.critChance) content += `<li>Crit: +${(effect.critChance * 100).toFixed(0)}% chance, x${effect.critMultiplier || 1.5} Dmg</li>`;
-            if (effect?.lifesteal) content += `<li>Lifesteal: ${(effect.lifesteal * 100).toFixed(0)}%</li>`;
-            if (effect?.paralyzeChance) content += `<li>On Hit: ${(effect.paralyzeChance * 100).toFixed(0)}% chance to Paralyze</li>`;
-            if (effect?.toxicChance) content += `<li>On Hit: ${(effect.toxicChance * 100).toFixed(0)}% chance for Toxin</li>`;
-            if (effect?.armorPierce) content += `<li>Armor Pierce: ${(effect.armorPierce * 100).toFixed(0)}%</li>`;
-            if (effect?.bonusVsDragon) content += `<li>Bonus vs. Dragon: x${effect.bonusVsDragon} Dmg</li>`;
-            if (effect?.bonusVsLegendary) content += `<li>Bonus vs. Legendary: x${effect.bonusVsLegendary} Dmg</li>`;
-            if (effect?.doubleStrike) content += `<li>Double Strike (Always)</li>`;
-            if (effect?.doubleStrikeChance) content += `<li>Double Strike: ${(effect.doubleStrikeChance * 100).toFixed(0)}% chance</li>`;
-            if (effect?.revive) content += `<li>Revives wearer once per battle</li>`;
-            if (effect?.spellFollowUp) content += `<li>Follows spell casts with a weapon strike</li>`;
-            if (effect?.petrifyChance) content += `<li>On Hit: ${(effect.petrifyChance * 100).toFixed(0)}% chance to Petrify</li>`;
-            if (effect?.type === 'godslayer') content += `<li>Godslayer: Bonus Dmg = ${(effect.percent_hp_damage * 100).toFixed(0)}% target Max HP</li>`;
-            if (effect?.intScaling) content += `<li>Scales with Intelligence</li>`;
-            if (effect?.elementalBolt) content += `<li>On Hit: Chance for elemental bolt</li>`;
-            if (effect?.uncapCombo) content += `<li>Uncapped Combo Damage Bonus</li>`;
-            if (effect?.healOnKill) content += `<li>On Kill: Heals ${(effect.healOnKill * 100).toFixed(0)}% Max HP</li>`;
-            if (effect?.execute) content += `<li>Execute: Chance below ${(effect.execute * 100).toFixed(0)}% HP</li>`;
-            if (effect?.cleanseChance) content += `<li>On Hit: ${(effect.cleanseChance * 100).toFixed(0)}% chance to Cleanse</li>`;
-            if (effect?.lootBonus) content += `<li>Increases rare material drop chance</li>`;
-            if (effect?.spell_amp) content += `<li>Spell Power: +${effect.spell_amp} Dice</li>`;
-            if (effect?.mana_discount) content += `<li>Spell Cost: -${effect.mana_discount} MP</li>`;
-            if (effect?.mana_regen) content += `<li>Regen: +${effect.mana_regen} MP/turn</li>`;
-            if (effect?.spell_crit_chance) content += `<li>Spell Crit: ${(effect.spell_crit_chance * 100).toFixed(0)}% chance, x${effect.spell_crit_multiplier || 1.5} Dmg</li>`;
-            if (effect?.spell_vamp) content += `<li>Spell Vamp: Kill restores ${(effect.spell_vamp * 100).toFixed(0)}% HP/MP</li>`;
-            if (effect?.spell_penetration) content += `<li>Spell Pen: Ignores ${(effect.spell_penetration * 100).toFixed(0)}% Resist</li>`;
-            if (effect?.spell_sniper) content += `<li>Spell Range: +${(effect.spell_sniper * 100).toFixed(0)}%</li>`;
-            if (effect?.overdrive) content += `<li>Overdrive: ${(effect.overdrive.chance * 100).toFixed(0)}% for x${effect.overdrive.multiplier} Dmg (Costs ${(effect.overdrive.self_damage * 100).toFixed(0)}% HP)</li>`;
-            if (effect?.battlestaff) content += `<li>Battlestaff: Melee scales with Int</li>`;
-            if (effect?.spell_weaver) content += `<li>Spellweaver: ${(effect.spell_weaver * 100).toFixed(0)}% for random element</li>`;
-            if (effect?.ranged_chance) content += `<li>Ranged Evasion: ${(effect.ranged_chance * 100).toFixed(0)}% chance</li>`;
-            if (effect?.hp_regen) content += `<li>Regen: +${effect.hp_regen} HP/turn</li>`;
-            if (effect?.parry) content += `<li>Parry: +${(effect.parry * 100).toFixed(0)}% chance</li>`;
-            if (effect?.attack_follow_up) content += `<li>Retaliate: ${effect.attack_follow_up.damage.join('d')} Dmg</li>`;
-            if (effect?.type === 'debuff_resist') content += `<li>Debuff Resist: +${(effect.chance * 100).toFixed(0)}%</li>`;
-            if (effect?.type === 'reflect') content += `<li>Reflect: ${(effect.amount * 100).toFixed(0)}% Dmg</li>`;
-            if (effect?.type === 'dodge') content += `<li>Dodge: +${(effect.chance * 100).toFixed(0)}% chance</li>`;
-            if (effect?.reflect_damage) content += `<li>Reflect: ${(effect.reflect_damage * 100).toFixed(0)}% Dmg</li>`;
-            // Buff Item Effects
-            if (details.type === 'buff' && effect) {
-                if (effect.type.startsWith('temp_')) { // Encounter buffs from food/special potions
-                    const statName = effect.stat.replace(/_/g, ' ');
-                    const valueDisplay = (effect.stat === 'movement_speed')
-                        ? `+${effect.value}`
-                        : `+${((effect.value - 1) * 100).toFixed(0)}%`;
-                    content += `<li>Effect: ${valueDisplay} ${capitalize(statName)} (${effect.duration} enc.)</li>`;
-                } else { // Standard turn-based buffs from potions
-                    content += `<li>Effect: Grants ${capitalize(effect.type.replace('buff_', '').replace('_', ' '))} (${effect.duration} turns)</li>`;
-                }
+            if (effect.heal) content += `<li>Heals for ${effect.heal} HP</li>`;
+            switch (effect.type) {
+                case 'buff':
+                    effect.buffs.forEach(buff => {
+                        const statName = buff.stat.replace(/_/g, ' ');
+                         let valueDisplay = '';
+                         if (buff.stat === 'movement_speed') {
+                              valueDisplay = `+${buff.value}`;
+                         } else {
+                              valueDisplay = `+${((buff.value - 1) * 100).toFixed(0)}%`;
+                         }
+                        content += `<li>Effect: ${valueDisplay} ${capitalize(statName)} for ${buff.duration} encounters</li>`;
+                    });
+                    break;
+                case 'heal_percent': content += `<li>Effect: Restores ${effect.heal_percent * 100}% of Max HP</li>`; break;
+                case 'mana_percent': content += `<li>Effect: Restores ${effect.mana_percent * 100}% of Max MP</li>`; break;
+                case 'full_restore': content += `<li>Effect: Fully restores HP and MP</li>`; break;
             }
             content += '</ul></div>';
         }
 
+    } else {
+        details = getItemDetails(itemKey);
+        if (!details) return;
 
-        // Description
-        if (details.description) {
-            content += `<p class="text-gray-400 mt-2 text-xs italic">${details.description}</p>`;
-        }
+        content = `<h4 class="font-bold mb-1" style="color: var(--text-accent);">${details.name}</h4>`;
+        if (details.rarity) content += `<p class="text-xs mb-2 text-gray-400">${details.rarity}</p>`;
+        if (details.damage) content += `<p>Damage: ${details.damage[0]}d${details.damage[1]}</p>`;
+        if (details.range > 0) content += `<p>Range: ${details.range}</p>`;
+        if (details.defense) content += `<p>Defense: ${details.defense}</p>`;
+        if (details.blockChance > 0) content += `<p>Block Chance: ${Math.round(details.blockChance * 100)}%</p>`;
+        if (details.amount && details.type === 'healing') content += `<p class="text-green-400">Heals: ${details.amount} HP</p>`;
+        if (details.type === 'mana_restore') content += `<p class="text-blue-400">Restores: ${details.amount} MP</p>`;
+        if (details.uses) content += `<p class="text-purple-300">Uses: ${details.uses}</p>`;
 
-        // Sell price (only show if item is sellable)
-        if (details.price > 0) {
-             content += `<p class="text-xs text-yellow-400 mt-2">Value: ${details.price} G | Sells for: ${Math.floor(details.price / 4)} G</p>`;
+        if (details.effect) {
+            content += '<div class="mt-2 pt-2 border-t border-gray-600 text-cyan-300 text-xs"><ul class="list-disc list-inside space-y-1">';
+            const effect = details.effect;
+            // This is a long list of all possible item effects. They are self-explanatory.
+            if (effect.critChance) content += `<li>Crit: +${effect.critChance * 100}% chance, x${effect.critMultiplier || 1.5} Dmg</li>`;
+            if (effect.lifesteal) content += `<li>Lifesteal: ${effect.lifesteal * 100}%</li>`;
+            if (effect.paralyzeChance) content += `<li>On Hit: ${effect.paralyzeChance * 100}% chance to Paralyze</li>`;
+            if (effect.toxicChance) content += `<li>On Hit: ${effect.toxicChance * 100}% chance to apply a deadly toxin.</li>`;
+            if (effect.armorPierce) content += `<li>Armor Pierce: Ignores ${effect.armorPierce * 100}% of enemy defense</li>`;
+            if (effect.bonusVsDragon) content += `<li>Deals x${effect.bonusVsDragon} damage to Dragons</li>`;
+            if (effect.bonusVsLegendary) content += `<li>Deals x${effect.bonusVsLegendary} damage to Legendary enemies.</li>`;
+            if (effect.doubleStrike) content += `<li>Double Strike: Attacks twice per action.</li>`;
+            if (effect.doubleStrikeChance) content += `<li>Has a ${effect.doubleStrikeChance * 100}% chance to strike twice.</li>`;
+            if (effect.revive) content += `<li>Revives you upon death (once per battle)</li>`;
+            if (effect.spellFollowUp) content += `<li>Launches a phantom strike after casting a spell</li>`;
+            if (effect.petrifyChance) content += `<li>On Hit: ${effect.petrifyChance * 100}% chance to Petrify</li>`;
+            if (effect.type === 'godslayer') content += `<li>Godslayer: Deals bonus damage equal to ${effect.percent_hp_damage * 100}% of the target's max HP.</li>`;
+            if (effect.intScaling) content += `<li>Arcane Edge: Damage scales with Intelligence.</li>`;
+            if (effect.elementalBolt) content += `<li>On Hit: Chance to fire a bolt of the last used spell element.</li>`;
+            if (effect.uncapCombo) content += `<li>Uncapped Combo: Successive hits deal increasing damage.</li>`;
+            if (effect.healOnKill) content += `<li>On Kill: Heals for ${effect.healOnKill * 100}% of your Max HP.</li>`;
+            if (effect.execute) content += `<li>Execute: Chance to instantly kill enemies below ${effect.execute * 100}% HP.</li>`;
+            if (effect.cleanseChance) content += `<li>On Hit: ${effect.cleanseChance * 100}% chance to cleanse a debuff.</li>`;
+            if (effect.lootBonus) content += `<li>On Kill: Increases chance of finding rare materials.</li>`;
+            if (effect.spell_amp) content += `<li>Spell Power: +${effect.spell_amp} Dice</li>`;
+            if (effect.mana_discount) content += `<li>Spell Cost: -${effect.mana_discount} MP</li>`;
+            if (effect.mana_regen) content += `<li>Regen: +${effect.mana_regen} MP/turn</li>`;
+            if (effect.spell_crit_chance) content += `<li>Spell Crit: ${effect.spell_crit_chance * 100}% chance, x${effect.spell_crit_multiplier || 1.5} Dmg</li>`;
+            if (effect.spell_vamp) content += `<li>Spell Vamp: Killing with a spell restores ${effect.spell_vamp * 100}% of enemy's max HP and MP.</li>`;
+            if (effect.spell_penetration) content += `<li>Spell Pen: Spells ignore ${effect.spell_penetration * 100}% of enemy magic resist.</li>`;
+            if (effect.spell_sniper) content += `<li>Spell Sniper: Increases effective range by ${effect.spell_sniper * 100}%.</li>`;
+            if (effect.overdrive) content += `<li>Overdrive: ${effect.overdrive.chance * 100}% chance to deal x${effect.overdrive.multiplier} damage, but you take damage equal to ${effect.overdrive.self_damage * 100}% of your Max HP.</li>`;
+            if (effect.battlestaff) content += `<li>Battlestaff: Your melee attacks also scale with your Intelligence.</li>`;
+            if (effect.spell_weaver) content += `<li>Spellweaver: ${effect.spell_weaver * 100}% chance to apply a random elemental effect.</li>`;
+            if (effect.ranged_chance) content += `<li>${effect.ranged_chance * 100}% chance to evade ranged attacks</li>`;
+            if (effect.hp_regen) content += `<li>Regen: +${effect.hp_regen} HP/turn</li>`;
+            if (effect.parry) content += `<li>Parry Chance: ${Math.round(effect.parry * 100)}%</li>`;
+            if (effect.attack_follow_up) content += `<li>Retaliates for ${effect.attack_follow_up.damage.join('-')} damage</li>`;
+            if (effect.type === 'debuff_resist') content += `<li>+${effect.chance * 100}% Debuff Resistance</li>`;
+            if (effect.type === 'reflect') content += `<li>Reflects ${effect.amount * 100}% of damage taken</li>`;
+            if (effect.type === 'dodge') content += `<li>Dodge Chance: +${Math.round(effect.chance * 100)}%</li>`;
+            if (effect.reflect_damage) content += `<li>Reflects ${effect.reflect_damage * 100}% of damage taken</li>`;
+            if (details.type === 'buff') {
+                if (effect.type.startsWith('temp_')) {
+                    const statName = { 'maxHp': 'Max HP', 'maxMp': 'Max MP', 'physicalDefense': 'Physical Defense', 'magicalDefense': 'Magical Defense', 'physicalDamageBonus': 'Physical Damage', 'magicalDamageBonus': 'Magical Damage' }[effect.stat] || capitalize(effect.stat);
+                    const percentage = Math.round((effect.multiplier - 1) * 100);
+                    content += `<li>Effect: +${percentage}% ${statName} for ${effect.duration} encounters</li>`;
+                } else {
+                    content += `<li>Effect: Grants ${effect.type} for ${effect.duration} turns</li>`;
+                }
+            }
+            content += '</ul></div>';
         }
+        content += `<p class="text-gray-400 mt-2 text-sm"><em>${details.description}</em></p>`;
     }
-
 
     tooltipElement.innerHTML = content;
     tooltipElement.style.display = 'block';
-    activeTooltipItem = itemKey; // Update tracked item
+    activeTooltipItem = itemKey;
 
-    // --- Position Calculation ---
-    // Ensure event coordinates are numbers
-    const eventX = typeof event.clientX === 'number' ? event.clientX : 0;
-    const eventY = typeof event.clientY === 'number' ? event.clientY : 0;
+    let x = event.clientX + 15;
+    let y = event.clientY + 15;
+    if (x + tooltipElement.offsetWidth > window.innerWidth) x = event.clientX - tooltipElement.offsetWidth - 15;
+    if (y + tooltipElement.offsetHeight > window.innerHeight) y = event.clientY - tooltipElement.offsetHeight - 15;
+    tooltipElement.style.left = `${x}px`;
+    tooltipElement.style.top = `${y}px`;
+}
 
-    // Use default offsets
-    let x = eventX + 15;
-    let y = eventY + 15;
+/** Hides the main tooltip. */
+function hideTooltip() {
+    $('#tooltip').style.display = 'none';
+    activeTooltipItem = null;
+}
 
-    // Get tooltip dimensions *after* setting content
-    const tooltipWidth = tooltipElement.offsetWidth;
-    const tooltipHeight = tooltipElement.offsetHeight;
-
-    // Get viewport dimensions
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    // Adjust position if tooltip goes off-screen
-    if (x + tooltipWidth > viewportWidth - 10) { // Add small buffer (10px)
-        x = eventX - tooltipWidth - 15; // Move to the left of cursor
+/**
+ * Shows a simplified tooltip for an enemy in battle.
+ * @param {Enemy} enemy The enemy object.
+ * @param {Event} event The mouse event.
+ */
+function showEnemyInfo(enemy, event) {
+    const tooltipElement = $('#tooltip');
+    if (event.type === 'click' && tooltipElement.style.display === 'block' && activeTooltipItem === `enemy-${enemy.name}`) {
+        hideEnemyInfo();
+        return;
     }
-    if (y + tooltipHeight > viewportHeight - 10) { // Add small buffer
-        y = eventY - tooltipHeight - 15; // Move above cursor
-    }
 
-    // Ensure tooltip doesn't go off the top or left edge either
-    x = Math.max(10, x);
-    y = Math.max(10, y);
+    if (!enemy) return;
+
+    let content = `<h4 class="font-bold text-red-400 mb-1">${enemy.name}</h4>`;
+    content += `<p>HP: ${enemy.hp} / ${enemy.maxHp}</p>`;
+
+    tooltipElement.innerHTML = content;
+    tooltipElement.style.display = 'block';
+    activeTooltipItem = `enemy-${enemy.name}`;
+
+    let x = event.clientX + 15;
+    let y = event.clientY + 15;
+    if (x + tooltipElement.offsetWidth > window.innerWidth) x = event.clientX - tooltipElement.offsetWidth - 15;
+    if (y + tooltipElement.offsetHeight > window.innerHeight) y = event.clientY - tooltipElement.offsetHeight - 15;
 
     tooltipElement.style.left = `${x}px`;
     tooltipElement.style.top = `${y}px`;
 }
 
-
-/** Hides the main tooltip. */
-function hideTooltip() {
-    const tooltipElement = $('#tooltip');
-    if(tooltipElement) {
-        tooltipElement.style.display = 'none';
-    }
+/** Hides the enemy info tooltip. */
+function hideEnemyInfo() {
+    $('#tooltip').style.display = 'none';
     activeTooltipItem = null;
 }
 
+// --- NEW MODAL FUNCTION ---
 /**
- * Shows a simplified tooltip for an enemy in battle (uses main showTooltip now).
- * @param {Enemy} enemy The enemy object.
- * @param {Event} event The mouse event.
- */
-function showEnemyInfo(enemy, event) {
-    if (!enemy) return;
-    // Construct a unique key for the enemy instance, maybe including index if names aren't unique
-    // For simplicity, assuming name is unique enough here. Could be `enemy-${enemy.name}-${index}` if needed.
-    showTooltip(`enemy-${enemy.name}`, event);
-}
-
-
-/** Hides the enemy info tooltip (now just calls hideTooltip). */
-function hideEnemyInfo() {
-    hideTooltip();
-}
-
-
-// --- REWRITTEN MODAL FUNCTION ---
-/**
- * Displays a simple modal popup with enhanced closing options and ARIA attributes.
+ * Displays a simple modal popup.
  * @param {string} title - The title of the modal.
  * @param {string} message - The main text content of the modal.
  * @param {string} buttonText - The text for the confirmation button.
- * @param {function} [onConfirm=null] - Callback function when the button is clicked.
+ * @param {function | string} onConfirm - Callback function OR function name string when the button is clicked.
  */
 function showModal(title, message, buttonText = "OK", onConfirm = null) {
-    // --- Close existing modal if any ---
+    // Remove existing modal if any
     const existingModal = document.getElementById('simple-modal');
     if (existingModal) {
-        // Clean up previous listeners before removing
-        const oldButton = existingModal.querySelector('button');
-        if (oldButton) oldButton.onclick = null; // Remove button listener
-        document.removeEventListener('keydown', existingModal._escapeHandler); // Remove escape listener
-        existingModal.removeEventListener('click', existingModal._overlayClickHandler); // Remove overlay click listener
         existingModal.remove();
     }
 
-    // --- Create modal elements ---
+    // Create modal elements
     const modalOverlay = document.createElement('div');
     modalOverlay.id = 'simple-modal';
-    modalOverlay.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-4 backdrop-blur-sm'; // Increased z-index, added backdrop blur
-    modalOverlay.setAttribute('role', 'dialog');
-    modalOverlay.setAttribute('aria-modal', 'true');
-    modalOverlay.setAttribute('aria-labelledby', 'modal-title');
-    modalOverlay.setAttribute('aria-describedby', 'modal-message');
+    // Added padding, ensured higher z-index
+    modalOverlay.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-[100] p-4';
 
     const modalContent = document.createElement('div');
-    modalContent.className = 'bg-slate-800 p-6 rounded-lg shadow-xl max-w-md w-full text-center border border-slate-600 animate-fade-in'; // Added simple fade-in idea (needs CSS)
+    modalContent.className = 'bg-slate-800 p-6 rounded-lg shadow-xl max-w-md w-full text-center border border-slate-600'; // Added border, width constraints
+    modalContent.setAttribute('role', 'dialog');
+    modalContent.setAttribute('aria-modal', 'true');
+    modalContent.setAttribute('aria-labelledby', 'modal-title');
+    modalContent.setAttribute('aria-describedby', 'modal-message');
 
     const modalTitle = document.createElement('h2');
-    modalTitle.id = 'modal-title'; // For aria-labelledby
+    modalTitle.id = 'modal-title';
     modalTitle.className = 'font-medieval text-2xl mb-4 text-yellow-300';
     modalTitle.textContent = title;
 
     const modalMessage = document.createElement('p');
-    modalMessage.id = 'modal-message'; // For aria-describedby
+    modalMessage.id = 'modal-message';
     modalMessage.className = 'text-gray-300 mb-6';
     modalMessage.textContent = message;
 
     const modalButton = document.createElement('button');
-    modalButton.className = 'btn btn-primary px-6 py-2';
+    modalButton.className = 'btn btn-primary px-6 py-2'; // Standard button styling
     modalButton.textContent = buttonText;
-
-    // --- Close function ---
-    const closeModal = () => {
-        // Clean up listeners
-        document.removeEventListener('keydown', escapeHandler);
-        modalOverlay.removeEventListener('click', overlayClickHandler);
-        modalOverlay.remove(); // Remove modal from DOM
-    };
-
-    // --- Event Handlers ---
     modalButton.onclick = () => {
-        closeModal();
+        modalOverlay.remove(); // Close modal on click
         if (typeof onConfirm === 'function') {
+            onConfirm(); // Execute callback if provided
+        } else if (typeof onConfirm === 'string') {
+            // If it's a string, assume it's a function name in the global scope
             try {
-                onConfirm(); // Execute callback
+                window[onConfirm]();
             } catch (e) {
-                console.error("Error in modal confirm callback:", e);
+                console.error(`Error calling modal confirm function "${onConfirm}":`, e);
             }
         }
     };
 
-    // Close on Escape key
-    const escapeHandler = (event) => {
+    // --- Add background click to close ---
+    modalOverlay.addEventListener('click', (event) => {
+        if (event.target === modalOverlay) { // Only close if clicking the overlay itself
+            modalOverlay.remove();
+        }
+    });
+
+    // --- Add Escape key to close ---
+    const escapeKeyListener = (event) => {
         if (event.key === 'Escape') {
-            closeModal();
+            modalOverlay.remove();
+            document.removeEventListener('keydown', escapeKeyListener); // Clean up listener
         }
     };
-    modalOverlay._escapeHandler = escapeHandler; // Store reference for removal
-    document.addEventListener('keydown', escapeHandler);
+    document.addEventListener('keydown', escapeKeyListener);
 
-    // Close on overlay click (but not content click)
-    const overlayClickHandler = (event) => {
-        if (event.target === modalOverlay) { // Only close if clicking the dark overlay itself
-            closeModal();
-        }
-    };
-    modalOverlay._overlayClickHandler = overlayClickHandler; // Store reference for removal
-    modalOverlay.addEventListener('click', overlayClickHandler);
-
-    // --- Assemble modal ---
+    // Assemble modal
     modalContent.appendChild(modalTitle);
     modalContent.appendChild(modalMessage);
     modalContent.appendChild(modalButton);
     modalOverlay.appendChild(modalContent);
 
-    // --- Add to body ---
+    // Add to body
     document.body.appendChild(modalOverlay);
 
-    // Optional: Focus the button for keyboard navigation
+    // Focus the button for accessibility
     modalButton.focus();
 }
-// --- END REWRITTEN MODAL FUNCTION ---
+// --- END NEW MODAL FUNCTION ---
 
 
 // =================================================================================
@@ -711,128 +579,143 @@ let tutorialState = {
 function startTutorialSequence(sequenceKey) {
     if (!isTutorialEnabled) return;
 
-    // Show skip button only for the main sequence
     if(sequenceKey === 'main_game_screen') {
         const skipBtn = $('#skip-tutorial-btn');
-        if (skipBtn) { // Check if element exists
-            skipBtn.classList.remove('hidden');
-            skipBtn.onclick = endTutorial;
-        } else {
-             console.warn("Skip tutorial button not found.");
-        }
+        skipBtn.classList.remove('hidden');
+        skipBtn.onclick = endTutorial;
     }
 
     const sequence = TUTORIAL_SEQUENCES[sequenceKey];
     if (sequence) {
         tutorialState.isActive = true;
-        tutorialState.sequence = [...sequence]; // Use spread for a shallow copy
+        tutorialState.sequence = [...sequence];
         tutorialState.currentIndex = -1;
-        tutorialState.flags.clear(); // Reset flags for new sequence
-        console.log(`Starting tutorial sequence: ${sequenceKey}`);
+        tutorialState.flags.clear();
         advanceTutorial();
-    } else {
-        console.warn(`Tutorial sequence "${sequenceKey}" not found.`);
     }
 }
 
-
 function advanceTutorial(param = '') {
-    // Abort previous trigger listener if active
+    // --- Abort Previous Trigger ---
     if (tutorialState.currentTriggerController) {
         tutorialState.currentTriggerController.abort();
         tutorialState.currentTriggerController = null;
     }
 
-    const currentStep = tutorialState.sequence[tutorialState.currentIndex];
-
-    // Handle choice branching
-    if (param && currentStep?.type === 'choice') {
-        const choiceBranchKey = currentStep.choices[param];
+    // --- Handle Choice Branching ---
+    const previousStep = tutorialState.sequence[tutorialState.currentIndex]; // Get previous step
+    if (param && previousStep?.type === 'choice') {
+        const choiceBranchKey = previousStep.choices[param];
         const branchSequence = TUTORIAL_SEQUENCES[choiceBranchKey] || [];
         const continuationSequence = TUTORIAL_SEQUENCES['continue_main_tutorial'] || [];
         // Splice in the chosen branch, followed by the main continuation.
         tutorialState.sequence.splice(tutorialState.currentIndex + 1, 0, ...branchSequence, ...continuationSequence);
-        console.log(`Tutorial branched to: ${choiceBranchKey}`);
+        // currentIndex will be incremented below, correctly moving into the new branch
     }
 
-    // Move to the next step index
+    // --- Advance Index & Check for End ---
     tutorialState.currentIndex++;
-    console.log(`Advancing tutorial to index: ${tutorialState.currentIndex}`);
-
-    // Check if sequence ended
     if (tutorialState.currentIndex >= tutorialState.sequence.length) {
-        console.log("Tutorial sequence finished.");
         endTutorial();
         return;
     }
 
+    // --- Get Current Step ---
     let step = tutorialState.sequence[tutorialState.currentIndex];
 
-    // Handle steps that only set up triggers without showing UI
+    // --- Handle Trigger-Only Steps ---
     if (step.type === 'trigger_only') {
-        console.log(`Setting up trigger for step ${step.id || tutorialState.currentIndex}`);
+        // Execute preAction if it exists
+        if (step.preAction && typeof window[step.preAction] === 'function') {
+            try {
+                window[step.preAction]();
+            } catch (e) {
+                console.error(`Error executing preAction "${step.preAction}" for trigger_only step:`, e);
+            }
+        }
+        // Setup the trigger without showing UI
         setupTutorialTrigger(step.trigger);
-        return; // Don't show UI, just wait for trigger
+        return; // Wait for trigger
     }
 
-    // Handle checkpoint logic
+    // --- Handle Checkpoint Steps ---
     if (step.type === 'checkpoint') {
         const requiredFlags = step.requiredFlags || [];
         const hasAllFlags = requiredFlags.every(flag => tutorialState.flags.has(flag));
 
-        console.log(`Checkpoint reached. Required flags: [${requiredFlags.join(', ')}]. Has flags: ${hasAllFlags}`);
-
         if (hasAllFlags) {
-            advanceTutorial(); // Skip checkpoint if flags met
+            console.log("Checkpoint passed, advancing tutorial.");
+            advanceTutorial(); // Skip checkpoint, move to next step
             return;
         } else {
-            // Checkpoint not met, set up triggers for missing flags
+            // Checkpoint not met, set up triggers and show message
+            console.log("Checkpoint not met, setting up triggers.");
             let checkpointContent = "Time to check out the town. Visit the ";
             const remaining = [];
-            // Dynamically set up triggers for whichever flag is missing
+            let triggerSetup = false; // Flag to ensure only one trigger is active
+
             if (!tutorialState.flags.has('commercial_visited')) {
-                 setupTutorialTrigger({ type: 'click', targetId: 'button[onclick*="renderCommercialDistrict"]', nextSequence: 'commercial_district_tour', setFlag: 'commercial_visited' }); // Ensure flag is set on click
+                if (!triggerSetup) {
+                     setupTutorialTrigger({ type: 'click', targetId: 'button[onclick*="renderCommercialDistrict"]', nextSequence: 'commercial_district_tour' });
+                     triggerSetup = true;
+                }
                  remaining.push('Commercial District');
             }
             if (!tutorialState.flags.has('arcane_visited')) {
-                 setupTutorialTrigger({ type: 'click', targetId: 'button[onclick*="renderArcaneQuarter"]', nextSequence: 'arcane_district_tour', setFlag: 'arcane_visited' });
+                 if (!triggerSetup) {
+                    setupTutorialTrigger({ type: 'click', targetId: 'button[onclick*="renderArcaneQuarter"]', nextSequence: 'arcane_district_tour' });
+                     triggerSetup = true;
+                 }
                  remaining.push('Arcane Quarter');
             }
             if (!tutorialState.flags.has('residential_visited')) {
-                 setupTutorialTrigger({ type: 'click', targetId: 'button[onclick*="renderResidentialDistrict"]', nextSequence: 'residential_district_tour', setFlag: 'residential_visited' });
+                 if (!triggerSetup) {
+                     setupTutorialTrigger({ type: 'click', targetId: 'button[onclick*="renderResidentialDistrict"]', nextSequence: 'residential_district_tour' });
+                     triggerSetup = true;
+                 }
                  remaining.push('Residential Area');
             }
-            checkpointContent += remaining.join(' or ') + ".";
-            showTutorialStep(step, checkpointContent); // Show checkpoint message
-            return; // Wait for trigger
+            checkpointContent += remaining.join(', ') + ".";
+            showTutorialStep(step, checkpointContent); // Show the checkpoint message
+            // Wait for trigger, do not automatically advance
+            return;
         }
     }
 
-    // Process step content (e.g., replace placeholders)
+    // --- Handle Standard Steps (Modal, Tooltip) ---
+    // Process content (e.g., replace <Charname>)
     let content = step.content;
-    const charName = player ? player.name : param; // Use player name if available, else param (for finalize)
+    const charName = player ? player.name : param; // Use param if player not loaded yet (creation)
     if (charName && content && content.includes('<Charname>')) {
         content = content.replace(/<Charname>/g, charName);
     }
 
-    // Handle pre-actions before showing the step
-    if (step.preAction === 'enableWilderness') {
-        const wildernessBtn = document.querySelector('button[onclick*="renderWildernessMenu"]');
-        if(wildernessBtn) wildernessBtn.disabled = false;
-        console.log("Wilderness button enabled by tutorial.");
-    }
-    // Handle actions that replace the tutorial step itself
-    if (step.preAction === 'renderPostBattleMenu') {
-        console.log("Rendering post-battle menu via tutorial preAction.");
-        renderPostBattleMenu(); // Render the menu
-        advanceTutorial(); // Immediately advance to the next tutorial step (likely the outro)
-        return; // Don't show the current step's UI
+    // Execute preAction if defined
+    if (step.preAction && typeof window[step.preAction] === 'function') {
+        try {
+            window[step.preAction]();
+        } catch (e) {
+            console.error(`Error executing preAction "${step.preAction}":`, e);
+        }
+    } else if (step.preAction) {
+        console.warn(`Tutorial preAction "${step.preAction}" is defined but not a function.`);
     }
 
-    // Show the actual tutorial step UI
+
+    // Show the step UI (modal or tooltip)
     showTutorialStep(step, content);
+    // Setup trigger AFTER showing the step (unless it's modal/choice handled internally)
+     if (step.type !== 'modal' && step.type !== 'choice') {
+          setupTutorialTrigger(step.trigger);
+     }
 }
 
+
+/**
+ * Shows the tutorial step UI (modal or tooltip).
+ * @param {object} step - The tutorial step object.
+ * @param {string} content - The processed text content for the step.
+ */
 function showTutorialStep(step, content) {
     const box = $('#tutorial-box');
     const text = $('#tutorial-text');
@@ -939,149 +822,120 @@ function showTutorialStep(step, content) {
         box.style.opacity = '1'; // Ensure visible
 
         // Setup the trigger to advance from this step
-        setupTutorialTrigger(step.trigger);
+        // setupTutorialTrigger(step.trigger); // Moved trigger setup back to advanceTutorial
     }
 }
 
 
 function setupTutorialTrigger(trigger) {
     const nextBtn = $('#tutorial-next-btn');
-
-    // Show 'Next' button only if there's no specific trigger defined
-    if (!trigger) {
-        if (nextBtn) { // Check if nextBtn exists
-            nextBtn.style.display = 'block';
-            nextBtn.onclick = advanceTutorial;
-        } else {
-             console.warn("Tutorial 'Next' button not found.");
-        }
+    // Hide 'Next' button ONLY if there IS a trigger defined
+    if (trigger) {
+        nextBtn.style.display = 'none';
     } else {
-        if (nextBtn) nextBtn.style.display = 'none'; // Hide if there's a trigger
+        // Show 'Next' button if there's NO specific trigger for this step
+        nextBtn.style.display = 'block';
+        nextBtn.onclick = advanceTutorial;
     }
 
-    // Abort any previous listener controller
+
     if (tutorialState.currentTriggerController) {
         tutorialState.currentTriggerController.abort();
     }
-    // Create a new controller for the current trigger
     tutorialState.currentTriggerController = new AbortController();
     const { signal } = tutorialState.currentTriggerController;
 
     if (!trigger) return; // Exit if no trigger defined
 
-    // Add event listener based on trigger type
-    try { // Add try-catch for robustness
-        switch (trigger.type) {
-            case 'next_button':
-                // Already handled by the check above
-                break;
-            case 'input':
-                const inputEl = $(`#${trigger.targetId}`);
-                if (inputEl) {
-                    const triggerAdvance = () => {
-                        console.log(`Tutorial advanced by input on #${trigger.targetId}`);
+    // --- Handle Different Trigger Types ---
+    switch (trigger.type) {
+        case 'next_button': // Explicitly handled above, do nothing here
+            break;
+        case 'input':
+            const inputEl = document.querySelector(trigger.targetId); // Use querySelector for robustness
+            if (inputEl) {
+                const triggerAdvance = () => {
+                    console.log("Input trigger activated.");
+                    advanceTutorial();
+                };
+                inputEl.addEventListener('input', triggerAdvance, { once: true, signal });
+                console.log("Input trigger listener added for:", trigger.targetId);
+            } else {
+                 console.warn("Input trigger target not found:", trigger.targetId);
+            }
+            break;
+        case 'click':
+            const clickEls = document.querySelectorAll(trigger.targetId);
+            if (clickEls.length > 0) {
+                 console.log(`Adding click trigger listener(s) for: ${trigger.targetId} (Found ${clickEls.length})`);
+                clickEls.forEach(el => {
+                    const handler = (event) => {
+                        console.log("Click trigger activated for:", trigger.targetId);
+                        // event.stopPropagation(); // Prevent potential double triggers if needed
+                        // event.preventDefault(); // Only if necessary
+
+                        if (trigger.setFlag) {
+                            tutorialState.flags.add(trigger.setFlag);
+                             console.log("Tutorial flag set:", trigger.setFlag);
+                        }
+                        if (trigger.nextSequence) {
+                             console.log("Splicing in next sequence:", trigger.nextSequence);
+                            const nextSeq = TUTORIAL_SEQUENCES[trigger.nextSequence] || [];
+                            tutorialState.sequence.splice(tutorialState.currentIndex + 1, 0, ...nextSeq);
+                        }
                         advanceTutorial();
                     };
-                    inputEl.addEventListener('input', triggerAdvance, { once: true, signal });
-                } else {
-                     console.warn(`Tutorial trigger input element not found: #${trigger.targetId}`);
-                }
-                break;
-            case 'click':
-                // Use querySelectorAll for potentially multiple elements (like biome buttons)
-                const clickEls = document.querySelectorAll(trigger.targetId);
-                if (clickEls.length > 0) {
-                    clickEls.forEach(el => {
-                        const handler = (e) => {
-                             console.log(`Tutorial advanced by click on element matching selector: ${trigger.targetId}`);
-                            // Prevent default if specified (useful for links/buttons that shouldn't navigate immediately)
-                            // if (trigger.preventDefault) e.preventDefault();
-
-                            if (trigger.setFlag) {
-                                console.log(`Setting tutorial flag: ${trigger.setFlag}`);
-                                tutorialState.flags.add(trigger.setFlag);
-                            }
-                            // Splice in next sequence if defined
-                            if (trigger.nextSequence) {
-                                const nextSeq = TUTORIAL_SEQUENCES[trigger.nextSequence] || [];
-                                tutorialState.sequence.splice(tutorialState.currentIndex + 1, 0, ...nextSeq);
-                                console.log(`Spliced in next tutorial sequence: ${trigger.nextSequence}`);
-                            }
-                            advanceTutorial(); // Advance after handling flags/sequences
-                        };
-                        // Add listener with the signal for aborting
-                        el.addEventListener('click', handler, { once: true, signal });
-                    });
-                } else {
-                     console.warn(`Tutorial trigger click target not found: ${trigger.targetId}`);
-                     // Should we auto-advance or just wait? Waiting might be safer.
-                }
-                break;
-             case 'enemy_death':
-                // This trigger type doesn't need a listener here.
-                // It's checked explicitly within the battle logic (checkBattleStatus)
-                // which then calls advanceTutorial().
-                console.log("Waiting for enemy_death trigger from battle logic...");
-                break;
-             default:
-                 console.warn(`Unknown tutorial trigger type: ${trigger.type}`);
-                 // Show next button as a fallback if trigger is unknown?
-                  if (nextBtn) {
-                      nextBtn.style.display = 'block';
-                      nextBtn.onclick = advanceTutorial;
-                  }
-                 break;
-
-        }
-    } catch (error) {
-         console.error("Error setting up tutorial trigger:", error);
-         // Optionally try to recover or end the tutorial
-         // For now, just log the error.
+                    // Use capture phase maybe? Or just standard bubble. Standard seems okay here.
+                    el.addEventListener('click', handler, { once: true, signal });
+                });
+            } else {
+                console.warn("Click trigger target not found:", trigger.targetId);
+            }
+            break;
+         case 'enemy_death':
+             console.log("Enemy death trigger registered. Waiting for battle logic...");
+            // This custom trigger is handled in the battle logic (checkBattleStatus).
+            // No listener needed here, just indicates the tutorial should wait.
+            break;
+        default:
+             console.warn("Unknown tutorial trigger type:", trigger.type);
     }
 }
 
+
+// *** TUTORIAL FIX: Add function to handle completion ***
+/**
+ * Called by the tutorial's final battle modal button.
+ * Ends the tutorial and navigates to the town square.
+ */
 function completeBattleTutorial() {
     console.log("Completing battle tutorial...");
     endTutorial(); // Properly clear tutorial state
     renderTownSquare(); // Navigate to town
 }
 
+
 function endTutorial() {
     const box = $('#tutorial-box');
     const skipBtn = $('#skip-tutorial-btn');
-
     if (box) box.classList.add('hidden');
     if (skipBtn) skipBtn.classList.add('hidden');
 
-    // Clean up listener controller
+    tutorialState.isActive = false;
+    tutorialState.sequence = [];
+    tutorialState.currentIndex = -1;
     if (tutorialState.currentTriggerController) {
         tutorialState.currentTriggerController.abort();
         tutorialState.currentTriggerController = null;
     }
-
-    // Reset tutorial state
-    tutorialState.isActive = false;
-    tutorialState.sequence = [];
-    tutorialState.currentIndex = -1;
-    tutorialState.flags.clear();
-    console.log("Tutorial ended.");
-
-
-    // Ensure wilderness button is enabled after tutorial ends (safety check)
+    // Re-enable wilderness button if it exists
     const wildernessBtn = document.querySelector('button[onclick*="renderWildernessMenu"]');
     if(wildernessBtn) wildernessBtn.disabled = false;
 
+     console.log("Tutorial ended.");
 
-    // If tutorial ends and player isn't in a standard view, maybe default to town?
-    // Avoid redirecting if already in a valid game state like character sheet or battle.
-    const nonRedirectViews = ['battle', 'character_sheet', 'character_sheet_levelup', 'post_battle'];
-    if (player && !nonRedirectViews.includes(gameState.currentView)) {
-        console.log("Tutorial ended, ensuring town square is rendered.");
-        // renderTownSquare(); // Might cause issues if called during another render? Defer slightly.
-        // requestAnimationFrame(renderTownSquare);
-    }
+    // No automatic navigation here, let the calling context decide (e.g., completeBattleTutorial)
 }
-
 
 // =================================================================================
 // SECTION 6: COMBAT LOGIC HELPERS
@@ -1090,65 +944,42 @@ function endTutorial() {
 /**
  * Logs a detailed breakdown of a damage calculation to the game log for debugging.
  * @param {object} calc - The calculation details object.
- * @param {string} calc.source - Origin of the damage (e.g., "Player Attack", "Goblin Attack").
- * @param {string} calc.targetName - Name of the target.
- * @param {number} calc.baseDamage - Initial damage roll total.
- * @param {Array<object>} calc.steps - Array of calculation steps { description: string, value: string, result: number|string }.
- * @param {number} calc.finalDamage - The final damage applied after defense.
  */
-function logDamageCalculation({ source, targetName, baseDamage, steps = [], finalDamage }) { // Added default empty array for steps
+function logDamageCalculation({ source, targetName, baseDamage, steps, finalDamage }) {
     if (!isDebugVisible) return;
 
-    let logMessage = `<div class="text-xs p-2 bg-slate-900/50 rounded border border-slate-700 my-1">`; // Added margin
-    logMessage += `<strong class="text-yellow-300">DEBUG CALC: [${source || 'Unknown Source'}] &rarr; ${targetName || 'Unknown Target'}</strong><br>`;
-    logMessage += `&nbsp;&nbsp;<strong>Base Damage:</strong> ${baseDamage !== undefined ? baseDamage : 'N/A'}<br>`; // Check if baseDamage exists
+    let logMessage = `<div class="text-xs p-2 bg-slate-900/50 rounded border border-slate-700">`;
+    logMessage += `<strong class="text-yellow-300">DEBUG: [${source}] -> ${targetName}</strong><br>`;
+    logMessage += `<strong>Base Damage (Dice Roll):</strong> ${baseDamage}<br>`;
 
     steps.forEach(step => {
-        logMessage += `&nbsp;&nbsp;<strong>${step.description || 'Step'}:</strong> ${step.value || '?'} &rarr; <span class="text-cyan-400">${step.result !== undefined ? step.result : '?'}</span><br>`; // Added checks and arrows
+        logMessage += `<strong>${step.description}:</strong> ${step.value} => <span class="text-cyan-400">${step.result}</span><br>`;
     });
 
-    logMessage += `&nbsp;&nbsp;<strong>Final Applied:</strong> <strong class="text-red-400">${finalDamage !== undefined ? finalDamage : 'N/A'}</strong>`; // Check finalDamage
+    logMessage += `<strong>Final Damage Applied (after defense):</strong> <strong class="text-red-400">${finalDamage}</strong>`;
     logMessage += `</div>`;
 
-    addToLog(logMessage, 'text-gray-500'); // Use a distinct color for debug logs
+    addToLog(logMessage, 'text-gray-400');
 }
-
 
 /**
  * Calculates the damage modifier based on elemental interactions.
- * Returns 2 for super effective, 0.5 for not effective, 1 for neutral.
- * @param {string} attackerElement - The element key of the attacker (e.g., 'fire').
- * @param {string} defenderElement - The element key of the defender (e.g., 'water').
- * @returns {number} The damage modifier (2, 0.5, or 1).
+ * @param {string} attackerElement The element of the attacker.
+ * @param {string} defenderElement The element of the defender.
+ * @returns {number} 2 for super effective, 0.5 for not effective, 1 for neutral.
  */
 function calculateElementalModifier(attackerElement, defenderElement) {
-    // Check for invalid or non-elemental interactions first
     if (!attackerElement || attackerElement === 'none' || !defenderElement || defenderElement === 'none') {
-        return 1; // Neutral modifier
+        return 1;
     }
-
-    // Get element data from the ELEMENTS constant
     const attackerData = ELEMENTS[attackerElement];
-    const defenderData = ELEMENTS[defenderElement]; // Not strictly needed for this logic, but good practice
+    const defenderData = ELEMENTS[defenderElement];
+    if (!attackerData || !defenderData) return 1;
 
-    // Check if data exists (handles potential typos or invalid keys)
-    if (!attackerData || !defenderData) {
-        console.warn(`Invalid element key provided to calculateElementalModifier: Attacker=${attackerElement}, Defender=${defenderElement}`);
-        return 1; // Neutral if data is missing
-    }
-
-    // Check strength/weakness relationships
-    if (attackerData.strength && attackerData.strength.includes(defenderElement)) {
-        return 2; // Super effective
-    }
-    if (attackerData.weakness && attackerData.weakness.includes(defenderElement)) {
-        return 0.5; // Not very effective
-    }
-
-    // Default to neutral if no specific interaction defined
+    if (attackerData.strength.includes(defenderElement)) return 2;
+    if (attackerData.weakness.includes(defenderElement)) return 0.5;
     return 1;
 }
-
 
 // =================================================================================
 // SECTION 7: DEBUG PANEL FUNCTIONS
@@ -1157,216 +988,163 @@ function calculateElementalModifier(attackerElement, defenderElement) {
 function toggleDebug() {
     isDebugVisible = !isDebugVisible;
     const panel = $('#debug-panel');
-    if (!panel) return; // Exit if panel doesn't exist
-
     panel.classList.toggle('hidden', !isDebugVisible);
     if (isDebugVisible) {
-        updateDebugView(); // Populate with current data
-        updateDebugAddItemOptions(); // Populate item dropdown
-        populateDebugStatInputs(); // Populate stat inputs
+        updateDebugView();
+        updateDebugAddItemOptions();
+        populateDebugStatInputs();
     }
 }
 
-// Function to update the debug panel with current game state
 function updateDebugView() {
-    if (!isDebugVisible) return;
-    const debugContentElement = $('#debug-content');
-    if (!debugContentElement) return;
-
-    // Create a simplified representation for logging
-    // Avoid logging potentially huge or circular structures directly
-    const snapshot = {
-        player: player ? {
-            name: player.name,
-            level: player.level,
-            hp: player.hp,
-            mp: player.mp,
-            stats: { V: player.vigor, F: player.focus, Sta: player.stamina, Str: player.strength, I: player.intelligence, L: player.luck },
-            // Add other key player details if needed
-        } : null,
-        gameState: {
-            currentView: gameState.currentView,
-            isPlayerTurn: gameState.isPlayerTurn,
-            action: gameState.action,
-            // Add other key game state details
-        },
-        currentEnemies: Array.isArray(currentEnemies) ? currentEnemies.map(e => ({ name: e.name, hp: e.hp, status: Object.keys(e.statusEffects) })) : []
+    if (!isDebugVisible || !player) return;
+    const content = {
+        player: player,
+        gameState: gameState,
+        currentEnemies: currentEnemies
     };
-
-    try {
-        // Use JSON.stringify with a replacer to handle potential circular refs if any complex objects are added later
-        debugContentElement.textContent = JSON.stringify(snapshot, null, 2); // Pretty print
-    } catch (e) {
-        console.error("Error stringifying debug data:", e);
-        debugContentElement.textContent = "Error displaying game state.";
-    }
+    $('#debug-content').textContent = JSON.stringify(content, (key, value) => {
+        // Prevent circular reference issues if enemy abilities target player etc.
+        if (key === 'source' && value instanceof Entity) return `Entity(${value.name})`;
+        if (key === 'target' && value instanceof Entity) return `Entity(${value.name})`;
+        if (key === 'owner' && value instanceof Entity) return `Entity(${value.name})`;
+        // Simplify large objects if needed for readability
+        // if (key === 'inventory' && value) return "{...inventory data...}";
+        return value;
+    }, 2); // Use 2 spaces for indentation
 }
 
-// Populates the "Add Item" dropdown in the debug panel
+
 function updateDebugAddItemOptions() {
     if (!isDebugVisible) return;
     const itemSelect = $('#debug-item-select');
     if (!itemSelect) return;
+    itemSelect.innerHTML = '';
 
-    itemSelect.innerHTML = ''; // Clear existing options
-
-    // Define categories and their data sources
-    const itemCategories = {
-        'Items': ITEMS,
-        'Weapons': WEAPONS,
-        'Catalysts': CATALYSTS,
-        'Armor': ARMOR,
-        'Shields': SHIELDS,
-        'Lures': LURES
-        // Add Recipes? Seeds? Other categories if needed
-    };
-
-    // Iterate through categories and add items to the dropdown
+    const itemCategories = { 'Weapons': WEAPONS, 'Catalysts': CATALYSTS, 'Armor': ARMOR, 'Shields': SHIELDS, 'Items': ITEMS, 'Lures': LURES };
     for (const categoryName in itemCategories) {
         const optgroup = document.createElement('optgroup');
         optgroup.label = categoryName;
         const sourceObject = itemCategories[categoryName];
-        if (!sourceObject) continue; // Skip if source object doesn't exist
-
-        // Sort keys alphabetically by item name for better usability
+        // Sort items alphabetically within each category
         const sortedKeys = Object.keys(sourceObject).sort((a, b) => {
-            const nameA = sourceObject[a]?.name || a;
-            const nameB = sourceObject[b]?.name || b;
-            return nameA.localeCompare(nameB);
+             const nameA = sourceObject[a].name || a;
+             const nameB = sourceObject[b].name || b;
+             return nameA.localeCompare(nameB);
         });
 
-        sortedKeys.forEach(key => {
+        for (const key of sortedKeys) {
             const item = sourceObject[key];
-            // Ensure item has a name before adding
-            if (item?.name) {
-                const option = document.createElement('option');
-                option.value = key;
-                option.textContent = item.name;
-                optgroup.appendChild(option);
-            }
-        });
-
-        // Only add optgroup if it contains options
-        if (optgroup.children.length > 0) {
-            itemSelect.appendChild(optgroup);
+            if (!item.name) continue; // Skip items without names (like no_shield placeholders if unnamed)
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = item.name;
+            optgroup.appendChild(option);
         }
+        itemSelect.appendChild(optgroup);
     }
 }
 
-// Adds the selected item from the debug dropdown to player inventory
+
 function debugAddItem() {
-    if (!player || !isDebugVisible) return;
-    const itemSelect = $('#debug-item-select');
-    if (!itemSelect) return;
-
-    const itemKey = itemSelect.value;
+    if (!player) return;
+    const itemKey = $('#debug-item-select').value;
     if (itemKey) {
-        player.addToInventory(itemKey, 1, true); // Add one item with logging
-        // No need to call updateDebugView manually, addToLog usually triggers it via render updates
-        // Refresh inventory view if it's currently open
-        if (gameState.currentView === 'inventory') {
-            renderInventory();
-        }
-    } else {
-        addToLog("DEBUG: No item selected to add.", 'text-gray-500');
+        player.addToInventory(itemKey);
+        addToLog(`DEBUG: Added ${getItemDetails(itemKey).name} to inventory.`, 'text-gray-500');
+        if (gameState.currentView === 'inventory') renderInventory();
+        updateDebugView(); // Update debug panel to show new item
     }
 }
 
-// Populates the stat input fields in the debug panel with current player stats
 function populateDebugStatInputs() {
     if (!isDebugVisible || !player) return;
-
-    // Helper function to safely set input value
-    const setInputValue = (id, value) => {
-        const input = $(`#${id}`);
-        if (input) {
-            // Handle potential floating point values for percentages
-            if (typeof value === 'number' && !Number.isInteger(value) && (id.includes('Chance') || id.includes('Evasion'))) {
-                input.value = value.toFixed(3); // Show a few decimal places
-            } else {
-                input.value = value !== undefined ? value : ''; // Set to empty string if undefined
-            }
-        } else {
-             console.warn(`Debug input element not found: #${id}`);
-        }
-    };
-
-    // Populate all relevant stat fields
-    setInputValue('debug-level', player.level);
-    setInputValue('debug-gold', player.gold);
-    setInputValue('debug-xp', player.xp);
-    setInputValue('debug-statPoints', player.statPoints);
-    setInputValue('debug-hp', player.hp);
-    setInputValue('debug-mp', player.mp);
-    setInputValue('debug-xpMultiplier', player.xpMultiplier);
-    setInputValue('debug-vigor', player.vigor);
-    setInputValue('debug-focus', player.focus);
-    setInputValue('debug-stamina', player.stamina);
-    setInputValue('debug-strength', player.strength);
-    setInputValue('debug-intelligence', player.intelligence);
-    setInputValue('debug-luck', player.luck);
-    setInputValue('debug-bonusHp', player.bonusHp);
-    setInputValue('debug-bonusMp', player.bonusMp);
-    setInputValue('debug-bonusPhysicalDamage', player.bonusPhysicalDamage);
-    setInputValue('debug-bonusMagicalDamage', player.bonusMagicalDamage);
-    setInputValue('debug-bonusPhysicalDefense', player.bonusPhysicalDefense);
-    setInputValue('debug-bonusMagicalDefense', player.bonusMagicalDefense);
-    setInputValue('debug-bonusCritChance', player.bonusCritChance);
-    setInputValue('debug-bonusEvasion', player.bonusEvasion);
+    $('#debug-level').value = player.level;
+    $('#debug-gold').value = player.gold;
+    $('#debug-xp').value = player.xp;
+    $('#debug-statPoints').value = player.statPoints;
+    $('#debug-hp').value = player.hp;
+    $('#debug-mp').value = player.mp;
+    $('#debug-xpMultiplier').value = player.xpMultiplier;
+    $('#debug-vigor').value = player.vigor;
+    $('#debug-focus').value = player.focus;
+    $('#debug-stamina').value = player.stamina;
+    $('#debug-strength').value = player.strength;
+    $('#debug-intelligence').value = player.intelligence;
+    $('#debug-luck').value = player.luck;
+    $('#debug-bonusHp').value = player.bonusHp;
+    $('#debug-bonusMp').value = player.bonusMp;
+    $('#debug-bonusPhysicalDamage').value = player.bonusPhysicalDamage;
+    $('#debug-bonusMagicalDamage').value = player.bonusMagicalDamage;
+    $('#debug-bonusPhysicalDefense').value = player.bonusPhysicalDefense;
+    $('#debug-bonusMagicalDefense').value = player.bonusMagicalDefense;
+    $('#debug-bonusCritChance').value = player.bonusCritChance;
+    $('#debug-bonusEvasion').value = player.bonusEvasion;
 }
 
-
-// Updates player stats based on values entered in the debug panel inputs
 function debugUpdateVariables() {
-    if (!player || !isDebugVisible) return;
+    if (!player) return;
+    const int = (id) => parseInt($(`#${id}`).value) || 0;
+    const float = (id) => parseFloat($(`#${id}`).value) || 0;
 
-    // Helper functions to safely parse input values
-    const int = (id, defaultValue = 0) => parseInt($(`#${id}`)?.value) || defaultValue;
-    const float = (id, defaultValue = 0.0) => parseFloat($(`#${id}`)?.value) || defaultValue;
+    // Apply updates
+    player.level = int('debug-level') || player.level;
+    player.gold = int('debug-gold') || player.gold;
+    player.xp = int('debug-xp') || player.xp;
+    player.statPoints = int('debug-statPoints') || player.statPoints;
+    player.xpMultiplier = float('debug-xpMultiplier') || 1;
+    player.hp = int('debug-hp') || player.hp;
+    player.mp = int('debug-mp') || player.mp;
 
-    // Update player object properties
-    player.level = Math.max(1, int('debug-level', player.level)); // Ensure level is at least 1
-    player.gold = Math.max(0, int('debug-gold', player.gold)); // Ensure non-negative gold
-    player.xp = Math.max(0, int('debug-xp', player.xp));
-    player.statPoints = Math.max(0, int('debug-statPoints', player.statPoints));
-    player.xpMultiplier = Math.max(0.1, float('debug-xpMultiplier', player.xpMultiplier)); // Minimum multiplier
-    // Base stats should ideally have a minimum, e.g., 1
-    player.vigor = Math.max(1, int('debug-vigor', player.vigor));
-    player.focus = Math.max(1, int('debug-focus', player.focus));
-    player.stamina = Math.max(1, int('debug-stamina', player.stamina));
-    player.strength = Math.max(1, int('debug-strength', player.strength));
-    player.intelligence = Math.max(1, int('debug-intelligence', player.intelligence));
-    player.luck = Math.max(1, int('debug-luck', player.luck));
-    // Bonus stats can be 0 or positive
-    player.bonusHp = Math.max(0, int('debug-bonusHp', player.bonusHp));
-    player.bonusMp = Math.max(0, int('debug-bonusMp', player.bonusMp));
-    player.bonusPhysicalDamage = Math.max(0, int('debug-bonusPhysicalDamage', player.bonusPhysicalDamage));
-    player.bonusMagicalDamage = Math.max(0, int('debug-bonusMagicalDamage', player.bonusMagicalDamage));
-    player.bonusPhysicalDefense = Math.max(0, int('debug-bonusPhysicalDefense', player.bonusPhysicalDefense));
-    player.bonusMagicalDefense = Math.max(0, int('debug-bonusMagicalDefense', player.bonusMagicalDefense));
-    // Percentages should be clamped, e.g., 0 to 1
-    player.bonusCritChance = Math.max(0, Math.min(1, float('debug-bonusCritChance', player.bonusCritChance)));
-    player.bonusEvasion = Math.max(0, Math.min(1, float('debug-bonusEvasion', player.bonusEvasion)));
+    // Track changes to base stats
+    const oldVigor = player.vigor;
+    const oldFocus = player.focus;
+    const oldStamina = player.stamina;
+    const oldStrength = player.strength;
+    const oldIntelligence = player.intelligence;
+    const oldLuck = player.luck;
 
-    // Recalculate derived stats and ensure HP/MP/XP are valid
-    player.xpToNextLevel = player.calculateXpToNextLevel(); // Update XP needed for new level
-    player.hp = Math.max(0, Math.min(int('debug-hp', player.hp), player.maxHp)); // Clamp current HP
-    player.mp = Math.max(0, Math.min(int('debug-mp', player.mp), player.maxMp)); // Clamp current MP
-    player.xp = Math.min(player.xp, player.xpToNextLevel -1); // Ensure XP doesn't exceed cap (or handle level up?)
+    player.vigor = int('debug-vigor') || player.vigor;
+    player.focus = int('debug-focus') || player.focus;
+    player.stamina = int('debug-stamina') || player.stamina;
+    player.strength = int('debug-strength') || player.strength;
+    player.intelligence = int('debug-intelligence') || player.intelligence;
+    player.luck = int('debug-luck') || player.luck;
 
+    // Update bonus stats (assuming these are points spent, not direct bonuses)
+    // IMPORTANT: If you change base stats, you might need to recalculate spent points or derived bonuses.
+    // For simplicity here, we assume direct modification.
+    player.bonusHp = int('debug-bonusHp');
+    player.bonusMp = int('debug-bonusMp');
+    player.bonusPhysicalDamage = int('debug-bonusPhysicalDamage');
+    player.bonusMagicalDamage = int('debug-bonusMagicalDamage');
+    player.bonusPhysicalDefense = int('debug-bonusPhysicalDefense');
+    player.bonusMagicalDefense = int('debug-bonusMagicalDefense');
+    player.bonusCritChance = float('debug-bonusCritChance');
+    player.bonusEvasion = float('debug-bonusEvasion');
+
+    // --- Recalculate derived stats based on changes ---
+    // If base stats changed, recalculate the *derived* bonuses (like HP/MP from Vigor/Focus)
+    // Note: recalculateGrowthBonuses typically adds based on *bonus* stats, not base.
+    // We might need a full recalculation here or manual adjustment.
+    // For now, let's just update max HP/MP based on new base stats.
+    player.hp = Math.min(player.hp, player.maxHp); // Clamp HP to new maxHP
+    player.mp = Math.min(player.mp, player.maxMp); // Clamp MP to new maxMP
+    player.xpToNextLevel = player.calculateXpToNextLevel(); // Update XP needed
+
+    // If level was changed, might need to adjust totalXP or available stat points
+    player.recalculateLevelFromTotalXp(); // Recalculate level/XP/points consistency
 
     addToLog('DEBUG: Player stats manually updated.', 'text-gray-500');
-    updateStatsView(); // Refresh the main UI display
-    updateDebugView(); // Refresh the debug panel display itself
-    populateDebugStatInputs(); // Re-populate inputs with potentially clamped values
+    updateStatsView(); // Refresh sidebar UI
+    populateDebugStatInputs(); // Update debug panel inputs to reflect changes
+    updateDebugView(); // Update raw debug data view
 }
 
 
 // =================================================================================
 // SECTION 8: THEMING & PALETTES
 // =================================================================================
-
-// Theme definitions (color palettes)
 const PALETTES = {
     'default': { '--bg-main': '#1f2937', '--bg-secondary': '#111827', '--bg-log': 'rgba(0,0,0,0.3)', '--bg-tooltip': '#111827', '--border-main': '#374151', '--text-main': '#d1d5db', '--text-accent': '#fcd34d', '--btn-primary-bg': '#475569', '--btn-primary-bg-hover': '#64748b', '--btn-primary-border': '#1e293b', '--btn-primary-border-hover': '#334155' },
     'town': { '--bg-main': '#44403c', '--bg-secondary': '#292524', '--bg-log': 'rgba(20,10,0,0.3)', '--bg-tooltip': '#292524', '--border-main': '#57534e', '--text-main': '#e7e5e4', '--text-accent': '#f59e0b', '--btn-primary-bg': '#a16207', '--btn-primary-bg-hover': '#b45309', '--btn-primary-border': '#713f12', '--btn-primary-border-hover': '#854d0e' },
@@ -1379,7 +1157,6 @@ const PALETTES = {
     'void': { '--bg-main': '#1a192c', '--bg-secondary': '#000000', '--bg-log': 'rgba(10, 5, 20, 0.5)', '--bg-tooltip': '#000000', '--border-main': '#44337a', '--text-main': '#e9d8fd', '--text-accent': '#d63384', '--btn-primary-bg': '#44337a', '--btn-primary-bg-hover': '#5a439a', '--btn-primary-border': '#2c215d', '--btn-primary-border-hover': '#44337a' },
     'necropolis': { '--bg-main': '#2d3748', '--bg-secondary': '#1a202c', '--bg-log': 'rgba(0,0,0,0.5)', '--bg-tooltip': '#1a202c', '--border-main': '#4a5568', '--text-main': '#a0aec0', '--text-accent': '#9ae6b4', '--btn-primary-bg': '#4a5568', '--btn-primary-bg-hover': '#718096', '--btn-primary-border': '#2d3748', '--btn-primary-border-hover': '#4a5568' },
     'magic': { '--bg-main': '#2c1b47', '--bg-secondary': '#1a102d', '--bg-log': 'rgba(10, 5, 20, 0.5)', '--bg-tooltip': '#1a102d', '--border-main': '#4a3a6b', '--text-main': '#e6defe', '--text-accent': '#f0abfc', '--btn-primary-bg': '#4a3a6b', '--btn-primary-bg-hover': '#6a5a8b', '--btn-primary-border': '#2c215d', '--btn-primary-border-hover': '#4a3a6b' },
-    // Time-based palettes
     'noon': { '--bg-main': '#2aa198', '--bg-secondary': '#248d84', '--bg-log': 'rgba(36, 141, 132, 0.6)', '--bg-tooltip': '#248d84', '--border-main': '#47b5ab', '--text-main': '#fdf6e3', '--text-accent': '#facc15', '--btn-primary-bg': '#073642', '--btn-primary-bg-hover': '#586e75', '--btn-primary-border': '#93a1a1', '--btn-primary-border-hover': '#eee8d5', '--btn-primary-text': '#fdf6e3' },
     'sunset': { '--bg-main': '#d35400', '--bg-secondary': '#aa4400', '--bg-log': 'rgba(255, 240, 230, 0.3)', '--bg-tooltip': '#aa4400', '--border-main': '#f39c12', '--text-main': '#fdf6e3', '--text-accent': '#e74c3c', '--btn-primary-bg': '#8e44ad', '--btn-primary-bg-hover': '#9b59b6', '--btn-primary-border': '#6c3483', '--btn-primary-border-hover': '#8e44ad' },
     'midnight': { '--bg-main': '#0c0c1d', '--bg-secondary': '#05050f', '--bg-log': 'rgba(20, 20, 40, 0.5)', '--bg-tooltip': '#05050f', '--border-main': '#2d2d5a', '--text-main': '#bdc3c7', '--text-accent': '#1abc9c', '--btn-primary-bg': '#2d2d5a', '--btn-primary-bg-hover': '#4a4a8c', '--btn-primary-border': '#1c1c3a', '--btn-primary-border-hover': '#2d2d5a' }
@@ -1390,44 +1167,19 @@ const PALETTES = {
  * @param {string} [themeName='default'] The name of the theme to apply.
  */
 function applyTheme(themeName = 'default') {
-    const palette = PALETTES[themeName] || PALETTES['default']; // Fallback to default if theme not found
+    const palette = PALETTES[themeName] || PALETTES['default'];
 
-    // Define default button colors (can be overridden by specific themes)
-    const defaultButtonColors = {
+    // Shared button colors that can be overridden by a specific theme.
+    const finalPalette = {
         '--btn-action-bg': '#dc2626', '--btn-action-bg-hover': '#ef4444', '--btn-action-border': '#991b1b', '--btn-action-border-hover': '#b91c1c',
         '--btn-magic-bg': '#9333ea', '--btn-magic-bg-hover': '#a855f7', '--btn-magic-border': '#6b21a8', '--btn-magic-border-hover': '#7e22ce',
         '--btn-item-bg': '#16a34a', '--btn-item-bg-hover': '#22c55e', '--btn-item-border': '#15803d', '--btn-item-border-hover': '#16a34a',
         '--btn-flee-bg': '#6b7280', '--btn-flee-bg-hover': '#4b5563', '--btn-flee-border': '#374151', '--btn-flee-border-hover': '#1f2937',
-        // Default primary button colors are part of the 'default' palette
-         '--btn-primary-bg': PALETTES['default']['--btn-primary-bg'],
-         '--btn-primary-bg-hover': PALETTES['default']['--btn-primary-bg-hover'],
-         '--btn-primary-border': PALETTES['default']['--btn-primary-border'],
-         '--btn-primary-border-hover': PALETTES['default']['--btn-primary-border-hover']
+        ...palette
     };
 
-    // Merge default button colors with the selected theme's palette
-    // The theme's specific colors will override the defaults if they exist
-    const finalPalette = { ...defaultButtonColors, ...palette };
-
-    // Apply the final palette to the document's root element
-    const root = document.documentElement;
     for (const key in finalPalette) {
-        if (finalPalette.hasOwnProperty(key)) {
-            root.style.setProperty(key, finalPalette[key]);
-        }
+        document.documentElement.style.setProperty(key, finalPalette[key]);
     }
-     console.log(`Applied theme: ${themeName}`);
 }
 
-// Helper function to get rarity color class
-function getRarityColorClass(rarity) {
-    switch (rarity) {
-        case 'Common': return 'text-gray-400';
-        case 'Uncommon': return 'text-green-400';
-        case 'Rare': return 'text-blue-400';
-        case 'Epic': return 'text-purple-400';
-        case 'Legendary': return 'text-orange-400';
-        case 'Broken': return 'text-red-600';
-        default: return 'text-gray-400';
-    }
-}

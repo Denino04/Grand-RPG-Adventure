@@ -1364,7 +1364,7 @@ const SHOP_INVENTORY = {
         'recipe_brew_zapsipper', 'recipe_brew_vinekill', 'recipe_brew_lightcloser', 'recipe_brew_lampside'
     ],
     'Weapons': ['rusty_sword', 'wooden_stick', 'soldiers_spear', 'farmers_glaive', 'parrying_dagger', 'light_scythe', 'flowing_blade'],
-    'Gear': ['travelers_garb', 'leather_armor', 'padded_leather', 'wooden_shiel d']
+    'Gear': ['travelers_garb', 'leather_armor', 'padded_leather', 'wooden_shield']
 };
 
 const MAGIC_SHOP_INVENTORY = {
