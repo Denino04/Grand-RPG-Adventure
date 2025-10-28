@@ -1604,34 +1604,55 @@ class Enemy extends Entity {
 
 
         // Apply Enrage vulnerability
-        let damageTaken = this.statusEffects.enrage ? Math.floor(damage * 1.5) : damage; // Increase damage *before* defense
+         let damageTaken = this.statusEffects.enrage ? Math.floor(damage * 1.5) : damage;
 
-        // --- Elemental Calculation ---
-        if (effects.element && effects.element !== 'none' && this.element !== 'none') {
-            const modifier = calculateElementalModifier(effects.element, this.element);
-            if (modifier > 1) { // Weakness
-                 damageTaken = Math.floor(damageTaken * modifier); // Increase damage before defense
-                addToLog("It's super effective!", 'text-green-400');
-            } else if (modifier < 1) { // Resistance
-                 damageTaken = Math.floor(damageTaken * modifier); // Decrease damage before defense
-                addToLog("It's not very effective...", 'text-red-500');
+        // --- Elemental Calculation & Debuff Interactions ---
+        let knockbackAmount = 0; // Initialize knockback amount for this damage instance
+        if (effects.element && effects.element !== 'none') {
+            // Apply Elemental Weakness/Resistance first
+            if (this.element !== 'none') {
+                const modifier = calculateElementalModifier(effects.element, this.element);
+                if (modifier !== 1) {
+                    damageTaken = Math.floor(damageTaken * modifier);
+                    addToLog(modifier > 1 ? "It's super effective!" : "It's not very effective...", modifier > 1 ? 'text-green-400' : 'text-red-500');
+                }
             }
+
+            // --- Oil Bomb Interaction (Fire) ---
+            if (effects.element === 'fire' && this.statusEffects.debuff_oiled) {
+                damageTaken *= 2;
+                addToLog(`${this.name} bursts into flames from the oil!`, "text-orange-600 font-bold");
+                delete this.statusEffects.debuff_oiled; // Consume the debuff
+            }
+            // --- NEW: Artificial Light Stone Interaction (Wind) ---
+            else if (effects.element === 'wind' && this.statusEffects.debuff_lightstone_primed) {
+                 const multiplier = this.statusEffects.debuff_lightstone_primed.damageMultiplier || 1.5; // Get multiplier from debuff
+                 damageTaken = Math.floor(damageTaken * multiplier); // Apply damage multiplier
+                 knockbackAmount = this.statusEffects.debuff_lightstone_primed.knockback || 2; // Get knockback from debuff
+                 addToLog(`Light Stone energizes the wind attack!`, "text-yellow-300");
+                 delete this.statusEffects.debuff_lightstone_primed; // Consume the debuff
+            }
+            // --- END NEW LIGHT STONE LOGIC ---
         }
+        // --- End Elemental Calculation & Debuff Interactions ---
+
 
         // Apply defense
+        // Ensure currentDefense is a non-negative number before subtraction
+        currentDefense = Math.max(0, currentDefense || 0);
         const finalDamage = Math.max(0, Math.floor(damageTaken - currentDefense));
         this.hp -= finalDamage;
-
-        // Ensure HP doesn't drop below 0 visually before the death check happens
-        this.hp = Math.max(0, this.hp);
-
+        this.hp = Math.max(0, this.hp); // Prevent HP going below zero visually
 
         // Update grid immediately to show HP change
         if (gameState.currentView === 'battle') {
             renderBattleGrid();
         }
-        return finalDamage;
+
+        // Return an object containing final damage and any triggered effects like knockback
+        return { damageDealt: finalDamage, knockback: knockbackAmount };
     }
+
     async moveTowards(target) {
         const isFlying = this.movement.type === 'flying';
         const path = findPath({x: this.x, y: this.y}, {x: target.x, y: target.y}, isFlying);
@@ -1776,6 +1797,16 @@ function applyStatusEffect(target, effectType, effectData, sourceName) {
     // --- End Aasimar Logic ---
 
     // Apply the effect if not resisted (or if target is not Player)
+    target.statusEffects[effectType] = effectData;
+
+    if (effectType === 'drenched' && target.statusEffects.debuff_viscous) {
+        effectData.duration *= 2; // Double duration
+        effectData.multiplier = (effectData.multiplier || 0.9) - 0.1; // Increase magnitude (make multiplier smaller)
+        addToLog("The viscous liquid enhances the drenching effect!", "text-blue-600 font-bold");
+        delete target.statusEffects.debuff_viscous; // Consume the viscous debuff
+    }
+    // --- End Viscous Liquid Interaction ---
+
     target.statusEffects[effectType] = effectData;
 
     // Log the effect application
@@ -2170,31 +2201,49 @@ function sellItem(category, itemKey, baseSellPrice) { // Renamed price -> baseSe
 
 // *** CORRECTED useItem function definition ***
 function useItem(itemKey, inBattle = false, targetIndex = null) {
-    // Check if player has the item
-    if (!player.inventory.items[itemKey] || player.inventory.items[itemKey] < 1) {
+    // Check if player has the item (explicitly check count is >= 1)
+    const initialCount = Number(player.inventory.items[itemKey]) || 0; // Get count as number
+    if (initialCount < 1) { // Check if count is less than 1
         addToLog("You don't have that item!", 'text-red-400');
         if (inBattle) renderBattle('item'); // Go back to item selection if in battle
         else renderInventory(); // Go back to inventory if out of battle
         return false; // Indicate failure
     }
+
     const details = ITEMS[itemKey];
     if (!details) {
         console.error("Could not find details for item:", itemKey);
         return false; // Indicate failure if item details don't exist
     }
 
-    // Consume the item *before* applying effects
-    player.inventory.items[itemKey]--;
-    if (player.inventory.items[itemKey] <= 0) {
-        delete player.inventory.items[itemKey];
-    }
+    // --- Defer Consumption until *after* targeting checks (if applicable) ---
+    let itemConsumed = false; // Flag to track consumption
 
     addToLog(`You used a <span class="font-bold text-green-300">${details.name}</span>.`);
 
     if (inBattle) gameState.isPlayerTurn = false; // Using an item costs the turn in battle
 
+
     // --- Apply Item Effects ---
     if (details.type === 'experimental') {
+        // --- Consume Experimental Item ---
+        let currentCountExp = Number(player.inventory.items[itemKey]) || 0;
+        if (currentCountExp > 0) {
+            currentCountExp--;
+            if (currentCountExp <= 0) {
+                delete player.inventory.items[itemKey];
+            } else {
+                player.inventory.items[itemKey] = currentCountExp;
+            }
+            itemConsumed = true;
+        } else {
+            // Should not happen due to initial check, but handle defensively
+            addToLog("Error consuming experimental item.", 'text-red-500');
+            if (inBattle) gameState.isPlayerTurn = true; // Give turn back
+            return false;
+        }
+        // --- End Consume ---
+
         const tier = details.tier;
         const numEffects = tier;
         addToLog("The concoction bubbles violently as you drink it...", "text-purple-400");
@@ -2221,49 +2270,115 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
         return true; // Indicate success (item was used)
     }
 
-
-    if (inBattle && details.type === 'enchant') { // Using Essences in battle
+    // --- Targeting Items (Bombs, Stones, Essences in battle) ---
+    if ( (details.type === 'debuff_apply' || details.type === 'debuff_special' || (details.type === 'enchant' && inBattle)) && inBattle) {
         const target = currentEnemies[targetIndex];
         if (targetIndex === null || !target || !target.isAlive()) {
             addToLog("You must select a valid target.", 'text-red-400');
-             // Refund item if target invalid? No, consumed on use attempt.
              if(inBattle) renderBattle('item'); // Go back to item select
+             gameState.isPlayerTurn = true; // Give turn back if targeting failed
+             isProcessingAction = false; // Unlock actions
              return false; // Indicate failure
         }
 
-        const element = itemKey.replace('_essence', '');
-        // Simple damage calculation for essence use
-        const damageRoll = rollDice(1, 8, 'Essence Attack');
-        let damage = damageRoll.total + player.magicalDamageBonus;
-
-        // --- ELEMENTAL: Innate Elementalist (Damage) ---
-        if (player.race === 'Elementals' && element === player.elementalAffinity) {
-            const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
-            damage = Math.floor(damage * damageBonus);
-            if (player.level >= 20) {
-                 damage += rollDice(1, 8, 'Elemental Essence Evo').total; // Add extra die
+        // --- Consume Targeting Item NOW ---
+        let currentCountTarget = Number(player.inventory.items[itemKey]) || 0;
+        if (currentCountTarget > 0) {
+            currentCountTarget--;
+            if (currentCountTarget <= 0) {
+                delete player.inventory.items[itemKey];
+            } else {
+                player.inventory.items[itemKey] = currentCountTarget;
             }
+            itemConsumed = true;
+        } else {
+            // Should not happen, but handle defensively
+            addToLog("Error consuming targeting item.", 'text-red-500');
+            if (inBattle) gameState.isPlayerTurn = true; // Give turn back
+            return false;
         }
-        // --- End Elemental Logic ---
+        // --- End Consume ---
 
 
-        // --- DRAGONBORN: Bloodline Attunement (Damage) ---
-        if (player.race === 'Dragonborn') { // No check for elementalAffinity here
-            const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
-            damage = Math.floor(damage * damageBonus);
+        // Apply minimal damage if specified (bombs/stones)
+        if ((details.type === 'debuff_apply' || details.type === 'debuff_special') && details.effect.damage) {
+            target.takeDamage(details.effect.damage, {element: details.effect.element || 'none'});
+            addToLog(`The ${details.name} hits ${target.name} for minor damage.`);
         }
-        // --- End Dragonborn Logic ---
+
+        // Apply debuff to target or buff to player (bombs/stones)
+        if (details.type === 'debuff_apply') {
+            target.statusEffects[details.effect.type] = { ...details.effect }; // Apply debuff to enemy
+            addToLog(`${target.name} is affected by the ${details.name}!`);
+        } else if (details.type === 'debuff_special') { // Currently only Artificial Light Stone
+            player.statusEffects[details.effect.type] = { ...details.effect }; // Apply buff to player
+            addToLog(`You feel the power of the ${details.name} coursing through you!`);
+        }
+        // Apply Essence damage in battle
+        else if (details.type === 'enchant' && inBattle) {
+            const element = itemKey.replace('_essence', '');
+            // Simple damage calculation for essence use
+            const damageRoll = rollDice(1, 8, 'Essence Attack');
+            let damage = damageRoll.total + player.magicalDamageBonus;
+
+            // --- ELEMENTAL: Innate Elementalist (Damage) ---
+            if (player.race === 'Elementals' && element === player.elementalAffinity) {
+                const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
+                damage = Math.floor(damage * damageBonus);
+                if (player.level >= 20) {
+                     damage += rollDice(1, 8, 'Elemental Essence Evo').total; // Add extra die
+                }
+            }
+            // --- End Elemental Logic ---
 
 
-        addToLog(`You channel the ${details.name}, unleashing a blast of ${element} energy!`, 'text-yellow-300');
-         const finalDamage = target.takeDamage(damage, { isMagic: true, element: element }); // Apply as magic damage
-         addToLog(`It hits ${target.name} for <span class="font-bold text-purple-400">${finalDamage}</span> ${element} damage.`);
-         // Check status immediately after essence use
+            // --- DRAGONBORN: Bloodline Attunement (Damage) ---
+            if (player.race === 'Dragonborn') { // No check for elementalAffinity here
+                const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
+                damage = Math.floor(damage * damageBonus);
+            }
+            // --- End Dragonborn Logic ---
+
+
+            addToLog(`You channel the ${details.name}, unleashing a blast of ${element} energy!`, 'text-yellow-300');
+             const finalDamage = target.takeDamage(damage, { isMagic: true, element: element }); // Apply as magic damage
+             addToLog(`It hits ${target.name} for <span class="font-bold text-purple-400">${finalDamage}</span> ${element} damage.`);
+        }
+
+        updateStatsView(); // Update inventory count
+
+         // Check status immediately after item use
          if (!gameState.battleEnded) {
-            checkBattleStatus(true); // isReaction = true for direct damage items?
+            checkBattleStatus(true); // isReaction = true for direct damage/debuff items?
          }
+          finalizePlayerAction(); // Properly end the turn sequence
+         return true; // Indicate success
 
-    } else { // Standard consumable effects (healing, mana, buffs, cleanse)
+    }
+    // --- End Targeting Items ---
+
+    // --- Standard Consumable Effects (healing, mana, buffs, cleanse) ---
+    // Apply these only if item wasn't a targeting type handled above
+    if (details.type !== 'debuff_apply' && details.type !== 'debuff_special' && !(details.type === 'enchant' && inBattle)) {
+
+        // --- Consume Standard Item ---
+        let currentCountStd = Number(player.inventory.items[itemKey]) || 0;
+        if (currentCountStd > 0) {
+            currentCountStd--;
+            if (currentCountStd <= 0) {
+                delete player.inventory.items[itemKey];
+            } else {
+                player.inventory.items[itemKey] = currentCountStd;
+            }
+            itemConsumed = true;
+        } else {
+             // Should not happen, but handle defensively
+            addToLog("Error consuming standard item.", 'text-red-500');
+            if (inBattle) gameState.isPlayerTurn = true; // Give turn back
+            return false;
+        }
+        // --- End Consume ---
+
         if (details.type === 'healing') {
             const healAmount = details.amount;
             player.hp = Math.min(player.maxHp, player.hp + healAmount);
@@ -2280,6 +2395,7 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
              player.statusEffects[details.effect.type] = { ...details.effect }; // Copy effect data
              addToLog(`You feel the effects of the ${details.name}!`, 'text-yellow-300');
         } else if (details.type === 'cleanse') {
+            // --- General Cleanse ---
             const badEffects = ['poison', 'petrified', 'paralyzed', 'swallowed', 'toxic', 'drenched']; // Added toxic, drenched
             let cleansed = false;
             for (const effect of badEffects) {
@@ -2290,8 +2406,31 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
             }
              if (cleansed) addToLog(`You drink the ${details.name} and feel purified.`, 'text-cyan-300');
              else addToLog(`You drink the ${details.name}, but there were no effects to cleanse.`, 'text-gray-400');
+        } else if (details.type === 'cleanse_specific') {
+            // --- Specific Cleanse (New Items) ---
+            const effectsToCleanse = details.effects_to_cleanse || [];
+            let specificCleansed = false;
+            for (const effect of effectsToCleanse) {
+                if (player.statusEffects[effect]) {
+                    delete player.statusEffects[effect];
+                    specificCleansed = true;
+                }
+            }
+            if (specificCleansed) {
+                 if (itemKey === 'natural_antidote') {
+                    addToLog(`The antidote courses through you, neutralizing the poison!`, 'text-green-400');
+                 } else if (itemKey === 'anti_paralytic_needle') {
+                    addToLog(`The needle jolts your nerves, freeing you from paralysis!`, 'text-yellow-300');
+                 } else {
+                    addToLog(`The ${details.name} cleanses specific ailments.`, 'text-cyan-300'); // Generic fallback
+                 }
+            } else {
+                 addToLog(`You use the ${details.name}, but there were no relevant effects to cleanse.`, 'text-gray-400');
+            }
         }
     }
+    // --- End Standard Consumable Effects ---
+
 
     updateStatsView(); // Update UI after applying effects
 
@@ -2299,9 +2438,10 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
     if (!inBattle) {
         renderInventory(); // Re-render inventory if used outside battle
     } else {
-        // MODIFICATION: Call finalizePlayerAction instead of checkBattleStatus for standard items too
-        // No timeout needed here, finalizePlayerAction handles delays internally if needed.
-        finalizePlayerAction(); // Properly end the turn sequence
+        // Finalize action if it wasn't a targeting item (those finalize above)
+        if (details.type !== 'debuff_apply' && details.type !== 'debuff_special' && details.type !== 'enchant') {
+             finalizePlayerAction(); // Properly end the turn sequence
+        }
     }
     return true; // Indicate success
 }

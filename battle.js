@@ -636,7 +636,7 @@ async function movePlayer(x, y) {
         // Animate movement along the path
         for (let i = 1; i < path.length; i++) {
             // MODIFIED: Increased delay from 150 to 300
-            await new Promise(resolve => setTimeout(resolve, 300)); // Delay between steps
+            await new Promise(resolve => setTimeout(resolve, 150)); // Delay between steps
             player.x = path[i].x;
             player.y = path[i].y;
             renderBattleGrid(); // Re-render grid after each step
@@ -812,7 +812,7 @@ function performAttack(targetIndex) {
     gameState.isPlayerTurn = false;
 
     // --- performSingleAttack function remains unchanged internally ---
-    const performSingleAttack = (attackTarget, isSecondStrike = false) => {
+    const performSingleAttack = async (attackTarget, isSecondStrike = false) => { // Made async
         const calcLog = {
             source: `Player Attack ${isSecondStrike ? '(2)' : ''}`,
             targetName: attackTarget.name,
@@ -1060,7 +1060,10 @@ function performAttack(targetIndex) {
         }
 
         // --- FINAL DAMAGE & LOGGING ---
-        const finalDamage = attackTarget.takeDamage(damage, attackEffects);
+        // *** MODIFICATION: Store return value from takeDamage ***
+        const damageResult = attackTarget.takeDamage(damage, attackEffects);
+        const finalDamage = damageResult.damageDealt; // Get actual damage dealt
+        const knockbackAmountFromAttack = damageResult.knockback; // Get knockback triggered by this hit (e.g., from Lightstone debuff)
 
         calcLog.finalDamage = finalDamage;
         logDamageCalculation(calcLog);
@@ -1069,7 +1072,10 @@ function performAttack(targetIndex) {
         if (attackEffects.element && attackEffects.element !== 'none') {
             damageType = ELEMENTS[attackEffects.element].name;
         }
-        addToLog(`You attack ${attackTarget.name} with ${weapon.name}, dealing <span class="font-bold text-yellow-300">${finalDamage}</span> ${damageType} damage. ${messageLog.join(' ')}`);
+        // Append messageLog content here if needed, or integrate messages earlier
+        let logMessagesCombined = messageLog.join(' '); // Combine messages collected so far
+        addToLog(`You attack ${attackTarget.name} with ${weapon.name}, dealing <span class="font-bold text-yellow-300">${finalDamage}</span> ${damageType} damage. ${logMessagesCombined}`);
+
 
         // --- POST-ATTACK EFFECTS ---
 
@@ -1100,142 +1106,191 @@ function performAttack(targetIndex) {
             }
         }
 
-
-        let lifestealAmount = 0;
-        if (weapon.class === 'Reaper') lifestealAmount += finalDamage * 0.1; // Reaper Perk
-        if (weapon.effect?.lifesteal) lifestealAmount += finalDamage * weapon.effect.lifesteal;
-
-        if (lifestealAmount > 0) {
-            if (attackTarget.speciesData.class !== 'Undead') {
-                const healedAmount = Math.floor(lifestealAmount);
-                if (healedAmount > 0) {
-                    player.hp = Math.min(player.maxHp, player.hp + healedAmount);
-                    addToLog(`You drain <span class="font-bold text-green-400">${healedAmount}</span> HP.`);
-                    updateStatsView();
+        // Apply greases if damage dealt
+        if (finalDamage > 0) {
+            // Poison Grease
+            if (player.statusEffects.buff_poison_grease && !isSecondStrike) {
+                const poisonChance = player.statusEffects.buff_poison_grease.poisonChance + (player.luck / 200);
+                if (player.rollForEffect(poisonChance, 'Poison Grease Proc')) {
+                    const avgWeaponDamage = (weapon.damage[0] * (1 + weapon.damage[1])) / 2;
+                    const poisonDamage = Math.max(1, Math.floor(avgWeaponDamage / 4));
+                    attackTarget.statusEffects.poison = { duration: 4, damage: poisonDamage };
+                    addToLog(`Poisonous grease coats ${attackTarget.name}!`); // Moved log here
                 }
-            } else {
-                addToLog(`You cannot drain life from the undead!`, 'text-gray-400');
+            }
+            // Paralysis Grease
+            if (player.statusEffects.buff_paralysis_grease && !isSecondStrike) {
+                const paralyzeChance = player.statusEffects.buff_paralysis_grease.paralyzeChance + (player.luck / 200);
+                if (player.rollForEffect(paralyzeChance, 'Paralysis Grease Proc') && !attackTarget.statusEffects.paralyzed) {
+                    attackTarget.statusEffects.paralyzed = { duration: 2 };
+                    addToLog(`${attackTarget.name} is paralyzed by the grease!`); // Moved log here
+                }
+            }
+        }
+        // --- END Grease Effects ---
+
+        // Pocket Cragblade
+        if (player.statusEffects.buff_cragblade && attackEffects.element === 'earth' && !isSecondStrike && finalDamage > 0) {
+            // Note: Damage multiplier is handled pre-defense in takeDamage. Log confirms effect.
+            addToLog(`Pocket Cragblade empowers the strike!`);
+
+            // Guaranteed Paralyze (if not already paralyzed)
+            if (!attackTarget.statusEffects.paralyzed) {
+                attackTarget.statusEffects.paralyzed = { duration: 2 };
+                addToLog(`${attackTarget.name} is paralyzed by the Cragblade's force!`);
+            }
+            delete player.statusEffects.buff_cragblade; // Consume buff
+        }
+        // --- REMOVED: Artificial Light Stone Buff Check ---
+
+        // Lightning Rod Chain
+        if (player.statusEffects.buff_lightning_rod && !isSecondStrike && finalDamage > 0) {
+             const rodEffect = player.statusEffects.buff_lightning_rod;
+             const potentialTargets = currentEnemies.filter(e =>
+                 e.isAlive() &&
+                 e !== attackTarget &&
+                 (Math.abs(player.x - e.x) + Math.abs(player.y - e.y) <= weaponRange)
+             );
+
+             if (potentialTargets.length > 0) {
+                 const chainTarget = potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
+                 const chainDamage = Math.max(1, Math.floor(finalDamage * rodEffect.chainMultiplier));
+                 const finalChainDamage = chainTarget.takeDamage(chainDamage, { isMagic: true, element: 'lightning' });
+                 addToLog(`Lightning Rod arcs to ${chainTarget.name} for ${finalChainDamage}!`); // Moved log here
+                 // Check if chain killed immediately
+                  if (!chainTarget.isAlive()) {
+                        setTimeout(() => { if (!gameState.battleEnded) checkBattleStatus(true); }, 100);
+                  }
+             }
+        }
+        // --- END Lightning Rod Chain ---
+
+        // --- NEW: Apply Knockback if triggered by the attack itself ---
+        if (knockbackAmountFromAttack > 0 && attackTarget.isAlive()) {
+             await applyKnockback(attackTarget, player, knockbackAmountFromAttack); // Use await here
+             // Re-check target alive *after* knockback
+             if (!attackTarget.isAlive()) {
+                  if (!gameState.battleEnded) checkBattleStatus(true);
+                  return; // Stop if knockback caused death
+             }
+        }
+        // --- END Knockback Application ---
+
+
+        // Lifesteal
+        if (finalDamage > 0) { // Only apply lifesteal if damage was dealt
+            let lifestealAmount = 0;
+            if (weapon.class === 'Reaper') lifestealAmount += finalDamage * 0.1; // Reaper Perk
+            if (weapon.effect?.lifesteal) lifestealAmount += finalDamage * weapon.effect.lifesteal;
+
+            if (lifestealAmount > 0) {
+                if (attackTarget.speciesData.class !== 'Undead') {
+                    const healedAmount = Math.floor(lifestealAmount);
+                    if (healedAmount > 0) {
+                        player.hp = Math.min(player.maxHp, player.hp + healedAmount);
+                        addToLog(`You drain <span class="font-bold text-green-400">${healedAmount}</span> HP.`);
+                        updateStatsView();
+                    }
+                } else {
+                    addToLog(`You cannot drain life from the undead!`, 'text-gray-400');
+                }
             }
         }
 
+        // Hammer paralysis chance & Other on-hit effects (Toxic, Petrify, Cleanse)
+        // ... (Keep existing logic, ensure rollForEffect is used) ...
         // Hammer paralysis chance
         let paralyzeBaseChance = 0;
         if (weapon.class === 'Hammer') paralyzeBaseChance += 0.1;
         if (weapon.effect?.paralyzeChance) paralyzeBaseChance += weapon.effect.paralyzeChance;
-
-        // Use new rollForEffect function
-        if (player.rollForEffect(paralyzeBaseChance, 'Hammer Paralyze')) {
+        if (player.rollForEffect(paralyzeBaseChance, 'Hammer Paralyze') && finalDamage > 0 && !attackTarget.statusEffects.paralyzed) { // Check damage dealt and not already paralyzed
             attackTarget.statusEffects.paralyzed = { duration: 2 };
             addToLog(`${attackTarget.name} is stunned by the blow!`, 'text-yellow-500');
         }
 
-        // Other on-hit effects
-        const toxicChance = weapon.effect?.toxicChance || 0;
-        if (player.rollForEffect(toxicChance, 'Weapon Toxic')) {
-            attackTarget.statusEffects.toxic = { duration: 4 }; // Duration is 3 turns after this one
-            addToLog(`${attackTarget.name} is afflicted with a deadly toxin!`, 'text-green-700');
+        // Other on-hit effects (only if damage dealt)
+        if(finalDamage > 0){
+            const toxicChance = weapon.effect?.toxicChance || 0;
+            if (player.rollForEffect(toxicChance, 'Weapon Toxic')) {
+                attackTarget.statusEffects.toxic = { duration: 4 }; // Duration is 3 turns after this one
+                addToLog(`${attackTarget.name} is afflicted with a deadly toxin!`, 'text-green-700');
+            }
+
+            const petrifyChance = weapon.effect?.petrifyChance || 0;
+            if(player.rollForEffect(petrifyChance, 'Weapon Petrify') && !attackTarget.statusEffects.petrified) { // Check not already petrified
+                attackTarget.statusEffects.petrified = { duration: 2 };
+                addToLog(`${attackTarget.name} is petrified by the attack!`, 'text-gray-400');
+            }
+
+            const cleanseChance = weapon.effect?.cleanseChance || 0;
+            if (player.rollForEffect(cleanseChance, 'Weapon Cleanse')) {
+                 const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'toxic', 'paralyzed', 'petrified', 'drenched'].includes(key));
+                 if (debuffs.length > 0) {
+                     const effectToCleanse = debuffs[0];
+                     delete player.statusEffects[effectToCleanse];
+                     addToLog(`Your weapon's holy energy cleanses you of ${effectToCleanse}!`, 'text-yellow-200');
+                 }
+            }
         }
 
-        const petrifyChance = weapon.effect?.petrifyChance || 0;
-        if(player.rollForEffect(petrifyChance, 'Weapon Petrify')) {
-            attackTarget.statusEffects.petrified = { duration: 2 };
-            addToLog(`${attackTarget.name} is petrified by the attack!`, 'text-gray-400');
-        }
 
-        const cleanseChance = weapon.effect?.cleanseChance || 0;
-        if (player.rollForEffect(cleanseChance, 'Weapon Cleanse')) {
-             const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'toxic', 'paralyzed', 'petrified', 'drenched'].includes(key));
-             if (debuffs.length > 0) {
-                 const effectToCleanse = debuffs[0];
-                 delete player.statusEffects[effectToCleanse];
-                 addToLog(`Your weapon's holy energy cleanses you of ${effectToCleanse}!`, 'text-yellow-200');
+        // Check Battle Status only once after all effects of this single hit are resolved
+         if (!gameState.battleEnded) {
+             // Only call if knockback didn't already trigger a check or if knockback didn't happen
+             if (knockbackAmountFromAttack === 0 || attackTarget.isAlive()) {
+                 checkBattleStatus(isSecondStrike); // Pass isSecondStrike as isReaction
              }
-        }
-        // MODIFIED: Call checkBattleStatus immediately after damage/effects of THIS strike
-        // Use 'true' for isReaction only if it's the second strike or a follow-up
-        if (!gameState.battleEnded) { // Only check if battle not already ended by this strike
-             checkBattleStatus(isSecondStrike); // Pass isSecondStrike directly as isReaction flag
-        }
+         }
     };
     // --- End performSingleAttack function ---
 
 
-    // Perform the first attack
-    performSingleAttack(target, false); // isSecondStrike = false
+    // --- MODIFICATION: Make the attack sequence async ---
+    (async () => {
+        // Perform the first attack
+        await performSingleAttack(target, false); // Use await
 
-    // Check if the first attack ended the battle before proceeding
-    if (gameState.battleEnded) {
-        isProcessingAction = false; // Ensure actions are unlocked if battle ends here
-        return; // Stop processing further attacks/effects
-    }
+        // Check if the first attack ended the battle before proceeding
+        if (gameState.battleEnded) {
+            isProcessingAction = false;
+            return;
+        }
 
-    // --- Handle Follow-ups with Delays ---
-    // Use a flag to track if a follow-up action is pending, to prevent immediate turn end
-    let followUpPending = false;
-
-    // Shield Follow-up Check (Delayed)
-    if (player.equippedShield.effect?.attack_follow_up && target.isAlive()) {
-        followUpPending = true;
-        setTimeout(() => {
+        // --- MODIFIED: Handle Follow-ups with delays using async/await ---
+        const handleFollowUps = async () => {
             if (gameState.battleEnded || !target.isAlive()) {
-                 // If battle ended or target died before/during shield attack, finalize
                  finalizePlayerAction();
                  return;
             }
-            performShieldFollowUpAttack(target); // This function internally calls checkBattleStatus(true)
-             // After shield attack, check if second weapon strike is needed OR finalize
-             if (!gameState.battleEnded) {
-                 checkAndPerformSecondStrike(target);
-             } else {
-                  finalizePlayerAction(); // Finalize if shield attack ended battle
-             }
-        }, 250);
-    } else {
-        // If no shield follow-up, check directly for second weapon strike
-        checkAndPerformSecondStrike(target);
-    }
 
-    // Helper function to handle the second weapon strike logic
-    function checkAndPerformSecondStrike(strikeTarget) {
-         if (gameState.battleEnded || !strikeTarget.isAlive()) {
-             // If battle ended or target died before second strike check, finalize immediately
-             finalizePlayerAction();
-             return;
-         }
+            // Shield Follow-up Check
+            if (player.equippedShield.effect?.attack_follow_up) {
+                await new Promise(resolve => setTimeout(resolve, 250));
+                if (gameState.battleEnded || !target.isAlive()) { finalizePlayerAction(); return; }
+                performShieldFollowUpAttack(target); // This calls checkBattleStatus(true)
+                if (gameState.battleEnded || !target.isAlive()) { finalizePlayerAction(); return; }
+            }
 
-        const needsSecondAttack = (weapon.class === 'Hand-to-Hand' || weapon.effect?.doubleStrike);
-        const procSecondAttack = weapon.effect?.doubleStrikeChance && player.rollForEffect(weapon.effect.doubleStrikeChance, 'Weapon Double Strike');
-
-        if (needsSecondAttack || procSecondAttack) {
-            followUpPending = true; // Mark pending
-            setTimeout(() => {
-                if (gameState.battleEnded || !strikeTarget.isAlive()) {
-                     // If battle ended or target died before second strike executes, finalize
-                     finalizePlayerAction();
-                     return;
-                }
+            // Second Weapon Strike Check
+            const needsSecondAttack = (weapon.class === 'Hand-to-Hand' || weapon.effect?.doubleStrike);
+            const procSecondAttack = weapon.effect?.doubleStrikeChance && player.rollForEffect(weapon.effect.doubleStrikeChance, 'Weapon Double Strike');
+            if (needsSecondAttack || procSecondAttack) {
+                await new Promise(resolve => setTimeout(resolve, 250));
+                if (gameState.battleEnded || !target.isAlive()) { finalizePlayerAction(); return; }
                 addToLog("You strike again!", "text-yellow-300");
-                performSingleAttack(strikeTarget, true); // isSecondStrike = true
-                // performSingleAttack now calls checkBattleStatus(true) internally
+                await performSingleAttack(target, true); // This calls checkBattleStatus(true)
+            }
 
-                // Finalize after the second strike completes (regardless of battle end state)
-                finalizePlayerAction();
+            finalizePlayerAction(); // Finalize after all checks/attacks
+        };
 
-            }, 250); // Delay before second strike
-        } else if (!followUpPending) {
-             // If NO follow-ups were pending at all, finalize the player's action now
-             finalizePlayerAction();
-        }
-         // If only shield follow-up was pending, finalizePlayerAction is called within its timeout
-    }
+        await handleFollowUps(); // Execute the follow-up logic
 
-    // Note: finalizePlayerAction handles moving to the next phase if the battle hasn't ended.
+    })(); // Immediately invoke the async function
 
 } // End performAttack
 
-
-
-function castSpell(spellKey, targetIndex) {
+async function castSpell(spellKey, targetIndex) { // Make async
     const spellData = SPELLS[spellKey];
     const target = currentEnemies[targetIndex];
     if ((spellData.type === 'st' || spellData.type === 'aoe') && (!target || !target.isAlive())) {
@@ -1244,7 +1299,6 @@ function castSpell(spellKey, targetIndex) {
         return;
     }
 
-    // ... [rest of spell cost, range checks, MP deduction] ...
     // --- [Existing Spell Cost Calculation Logic Start] ---
     const playerSpell = player.spells[spellKey];
     const tierIndex = playerSpell.tier - 1;
@@ -1265,6 +1319,13 @@ function castSpell(spellKey, targetIndex) {
     }
     // --- End Pinionfolk Logic ---
     if (catalyst.effect?.spell_sniper) spellRange *= (1 + catalyst.effect.spell_sniper);
+
+    if (player.statusEffects.buff_magic_dust && player.statusEffects.buff_magic_dust.rangeIncrease) {
+        spellRange += player.statusEffects.buff_magic_dust.rangeIncrease;
+        addToLog("Magic Rock Dust extends your reach!", 'text-yellow-300');
+        // Buff will be removed after successful cast
+    }
+    // --- END ADDED ---
 
     if (spellData.type === 'st' || spellData.type === 'aoe') {
         const dx = Math.abs(player.x - target.x);
@@ -1309,6 +1370,7 @@ function castSpell(spellKey, targetIndex) {
     player.mp -= finalSpellCost;
     // --- [Existing Spell Cost Calculation Logic End] ---
 
+
     gameState.isPlayerTurn = false;
     gameState.lastSpellElement = spellData.element;
     updateStatsView();
@@ -1316,10 +1378,19 @@ function castSpell(spellKey, targetIndex) {
     addToLog(`You cast <span class="font-bold text-purple-300">${spell.name}</span>!`);
 
     let finalDamage = 0; // Initialize finalDamage
+    let primaryTargetKnockback = 0; // Initialize knockback for spell
+
+    // --- ADDED: Consume Magic Rock Dust *before* applying effects ---
+    let usedMagicDust = false;
+    if (player.statusEffects.buff_magic_dust) {
+        usedMagicDust = true; // Mark as used for this cast
+        delete player.statusEffects.buff_magic_dust; // Remove the buff
+    }
+    // --- END ADDED ---
 
     // Handle Healing and Support spells
     if (spellData.type === 'healing' || spellData.type === 'support') {
-        // ... [Existing healing/support logic - unchanged] ...
+        // ... [Existing healing/support logic - unchanged, including Fertilized Seed check] ...
          if (spellData.type === 'healing') {
             let diceCount = spell.damage[0];
             const spellAmp = catalyst.effect?.spell_amp || 0;
@@ -1327,6 +1398,11 @@ function castSpell(spellKey, targetIndex) {
 
             let healAmount = rollDice(diceCount, spell.damage[1], `Healing Spell: ${spell.name}`).total + player.magicalDamageBonus;
 
+            if (player.statusEffects.buff_fertilized && spellData.element === 'nature') {
+                const healMultiplier = player.statusEffects.buff_fertilized.healMultiplier;
+                healAmount = Math.floor(healAmount * healMultiplier);
+                addToLog("The Fertilized Seed enhances the healing!", "text-green-200");
+            }
             // --- ELEMENTAL: Innate Elementalist (Damage/Healing) ---
             if (player.race === 'Elementals' && spellData.element === player.elementalAffinity) {
                 const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
@@ -1376,59 +1452,69 @@ function castSpell(spellKey, targetIndex) {
     }
     // Handle Offensive spells
     else if (spellData.type === 'st' || spellData.type === 'aoe') {
-        // ... [Existing offensive spell damage calculation logic] ...
         let diceCount = spell.damage[0];
         const spellAmp = catalyst.effect?.spell_amp || 0;
         diceCount = Math.min(spell.cap, diceCount + spellAmp);
 
-        let damage = rollDice(diceCount, spell.damage[1], `Player Spell: ${spell.name}`).total + player.magicalDamageBonus;
+        // --- ADDED: Magic Rock Dust Dice Step Up ---
+        let spellDamageDice = [...spell.damage]; // [numDice, sides] - Copy original dice
+        if (usedMagicDust) { // Check if dust was consumed for this cast
+            const originalSides = spellDamageDice[1];
+             switch (originalSides) {
+                 case 2: spellDamageDice[1] = 4; break;
+                 case 3: spellDamageDice[1] = 4; break;
+                 case 4: spellDamageDice[1] = 6; break;
+                 case 6: spellDamageDice[1] = 8; break;
+                 case 8: spellDamageDice[1] = 10; break;
+                 case 10: spellDamageDice[1] = 12; break;
+                 // d12 stays d12
+             }
+             if (spellDamageDice[1] !== originalSides) {
+                 addToLog(`Magic Rock Dust sharpens the spell! (d${originalSides} -> d${spellDamageDice[1]})`);
+             }
+        }
+        // Use the potentially modified dice for the roll
+        let damage = rollDice(diceCount, spellDamageDice[1], `Player Spell: ${spell.name}`).total + player.magicalDamageBonus;
+        // --- END ADDED ---
 
-        // --- ELEMENTAL: Innate Elementalist (Damage) ---
+
+        // --- ELEMENTAL/DRAGONBORN DAMAGE BONUSES ---
         if (player.race === 'Elementals' && spellData.element === player.elementalAffinity) {
             const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
             damage = Math.floor(damage * damageBonus);
             if (player.level >= 20) {
-                let extraDieRoll = rollDice(1, spell.damage[1], 'Elemental Evo Die').total;
-                let cappedExtraDamage = Math.min( (spell.cap * spell.damage[1]) - damage, extraDieRoll); // Cap extra die damage
+                // Use the potentially modified dice size for the extra die too
+                let extraDieRoll = rollDice(1, spellDamageDice[1], 'Elemental Evo Die').total;
+                let cappedExtraDamage = Math.min( (spell.cap * spellDamageDice[1]) - damage, extraDieRoll); // Cap extra die damage based on modified dice
                 damage += cappedExtraDamage;
             }
-        }
-        // --- End Elemental Logic ---
-
-        // --- DRAGONBORN: Bloodline Attunement (Damage) ---
-        if (player.race === 'Dragonborn') {
+        } else if (player.race === 'Dragonborn') {
             const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
             damage = Math.floor(damage * damageBonus);
         }
-        // --- End Dragonborn Logic ---
 
-        // Check for spell crit
+        // --- SPELL CRIT ---
         let spellCritChance = player.critChance + (catalyst.effect?.spell_crit_chance || 0);
-         // Warlock Crit Bonus
-         if (player._classKey === 'warlock' && player.signatureAbilityToggleActive && catalyst.effect?.spell_crit_chance) {
-             spellCritChance += (catalyst.effect.spell_crit_chance * 0.5); // Relative 50% increase
-         }
+        if (player._classKey === 'warlock' && player.signatureAbilityToggleActive && catalyst.effect?.spell_crit_chance) {
+             spellCritChance += (catalyst.effect.spell_crit_chance * 0.5);
+        }
         if(player.statusEffects.bonus_crit) spellCritChance += player.statusEffects.bonus_crit.critChance;
         if (player.statusEffects.buff_shroud || player.statusEffects.buff_voidwalker) spellCritChance *= 1.5;
-
-        // Use new rollForEffect function
         if (player.rollForEffect(spellCritChance, 'Spell Crit')) {
             let critMultiplier = 1.5;
             if(catalyst.effect?.spell_crit_multiplier) critMultiplier = catalyst.effect.spell_crit_multiplier;
             if(player.statusEffects.buff_voidwalker) critMultiplier += 0.5;
-
             damage = Math.floor(damage * critMultiplier);
             addToLog(`A critical spell!`, 'text-yellow-300');
         }
 
-        // Overdrive Tome
+        // --- OVERDRIVE ---
         let overdriveChance = catalyst.effect?.overdrive?.chance || 0;
-         // Warlock Overdrive Bonus
-         if (player._classKey === 'warlock' && player.signatureAbilityToggleActive && overdriveChance > 0) {
-             overdriveChance *= 1.5; // Relative 50% increase
-         }
+        if (player._classKey === 'warlock' && player.signatureAbilityToggleActive && overdriveChance > 0) {
+             overdriveChance *= 1.5;
+        }
         const overdrive = catalyst.effect?.overdrive;
-        if (overdrive && player.rollForEffect(overdriveChance, 'Overdrive Tome')) { // Use potentially modified chance
+        if (overdrive && player.rollForEffect(overdriveChance, 'Overdrive Tome')) {
             damage = Math.floor(damage * overdrive.multiplier);
             const selfDamage = Math.floor(player.maxHp * overdrive.self_damage);
             player.hp -= selfDamage;
@@ -1436,18 +1522,15 @@ function castSpell(spellKey, targetIndex) {
             updateStatsView();
         }
 
-        // Spellweaver Catalyst
+        // --- SPELLWEAVER ---
          let spellweaverChance = catalyst.effect?.spell_weaver || 0;
-          // Warlock Spellweaver Bonus
-         if (player._classKey === 'warlock' && player.signatureAbilityToggleActive && spellweaverChance > 0) {
-             spellweaverChance *= 1.5; // Relative 50% increase
+          if (player._classKey === 'warlock' && player.signatureAbilityToggleActive && spellweaverChance > 0) {
+             spellweaverChance *= 1.5;
          }
-         if (catalyst.effect?.spell_weaver && player.rollForEffect(spellweaverChance, 'Spellweaver')) { // Use modified chance
+         if (catalyst.effect?.spell_weaver && player.rollForEffect(spellweaverChance, 'Spellweaver')) {
              const elements = ['fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'void'];
              const randomElement = elements[Math.floor(Math.random() * elements.length)];
              addToLog(`Spellweaver! The spell also carries the essence of ${randomElement}!`, 'text-cyan-300');
-             // Apply secondary element effect (simplified for now: just log)
-             // More complex logic could apply damage/status based on secondary element
          }
 
         const spellEffects = {
@@ -1457,175 +1540,302 @@ function castSpell(spellKey, targetIndex) {
         };
 
         // --- Apply Damage to Primary Target ---
-        finalDamage = target.takeDamage(damage, spellEffects); // Assign to finalDamage
+        // *** MODIFICATION: Store return value from takeDamage ***
+        console.log(`DEBUG: Casting ${spell.name} (Element: ${spellData.element}). Target: ${target.name}. Initial Damage (pre-defense): ${damage}`);
+        const damageResultPrimary = target.takeDamage(damage, spellEffects);
+        finalDamage = damageResultPrimary.damageDealt;
+        primaryTargetKnockback = damageResultPrimary.knockback;
         addToLog(`It hits ${target.name} for <span class="font-bold text-purple-400">${finalDamage}</span> ${spellData.element} damage.`);
+        console.log(`DEBUG: Final Damage Dealt to ${target.name}: ${finalDamage}. Target HP: ${target.hp}/${target.maxHp}`);
 
+        if (spellData.element === 'nature' && finalDamage > 0) { // Check damage was dealt
+            const lifestealAmount = Math.floor(finalDamage * (0.1 + (tierIndex * 0.05)));
+            console.log(`DEBUG: Applying Nature Lifesteal. Amount: ${lifestealAmount}`); // <-- DEBUG LOG
+            if (lifestealAmount > 0) {
+                player.hp = Math.min(player.maxHp, player.hp + lifestealAmount);
+                addToLog(`You drain <span class="font-bold text-green-400">${lifestealAmount}</span> HP.`, 'text-green-300');
+                updateStatsView(); // Update immediately after healing
+            }
+        }
         // --- Apply primary target elemental effects (Water Drench, Earth Paralyze, Nature Lifesteal, Light Cleanse) ---
         if (finalDamage > 0 && target.isAlive()) { // Check target alive before applying status
+             console.log(`DEBUG: Target ${target.name} is alive and took damage. Checking elemental effects...`);
              if (spellData.element === 'water') {
+                console.log("DEBUG: Applying Water Drench effect."); // <-- DEBUG LOG
                 addToLog(`The water from your spell drenches ${target.name}!`, 'text-blue-400');
                 applyStatusEffect(target, 'drenched', { duration: 2 + tierIndex, multiplier: 0.9 - (tierIndex * 0.05) }, player.name);
             }
 
             const earthParalyzeChance = 0.2 + (tierIndex * 0.1);
-            if (spellData.element === 'earth' && player.rollForEffect(earthParalyzeChance, 'Spell Earth Paralyze')) {
-                if (!target.statusEffects.paralyzed) {
-                    applyStatusEffect(target, 'paralyzed', { duration: 2 + tierIndex }, player.name);
-                }
-            }
-            if (spellData.element === 'nature') {
-                const lifestealAmount = Math.floor(finalDamage * (0.1 + (tierIndex * 0.05)));
-                if (lifestealAmount > 0) {
-                    player.hp = Math.min(player.maxHp, player.hp + lifestealAmount);
-                    addToLog(`You drain <span class="font-bold text-green-400">${lifestealAmount}</span> HP.`, 'text-green-300');
-                    updateStatsView();
+            if (spellData.element === 'earth') {
+                console.log(`DEBUG: Checking Earth Paralyze. Chance: ${earthParalyzeChance}`); // <-- DEBUG LOG
+                if(player.rollForEffect(earthParalyzeChance, 'Spell Earth Paralyze')) {
+                    console.log("DEBUG: Earth Paralyze Proc'd!"); // <-- DEBUG LOG
+                    if (!target.statusEffects.paralyzed) {
+                        applyStatusEffect(target, 'paralyzed', { duration: 2 + tierIndex }, player.name);
+                    } else {
+                         console.log("DEBUG: Target already paralyzed."); // <-- DEBUG LOG
+                    }
+                } else {
+                     console.log("DEBUG: Earth Paralyze Failed Roll."); // <-- DEBUG LOG
                 }
             }
 
             const lightCleanseChance = 0.2 + (tierIndex * 0.15);
-            if (spellData.element === 'light' && player.rollForEffect(lightCleanseChance, 'Spell Light Cleanse')) {
-                const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic'].includes(key));
-                if (debuffs.length > 0) {
-                    const effectToCleanse = debuffs[0];
-                    delete player.statusEffects[effectToCleanse];
-                    addToLog(`Your spell's light energy cleanses you of ${effectToCleanse}!`, 'text-yellow-200');
+            if (spellData.element === 'light') {
+                console.log(`DEBUG: Checking Light Cleanse. Chance: ${lightCleanseChance}`); // <-- DEBUG LOG
+                if(player.rollForEffect(lightCleanseChance, 'Spell Light Cleanse')) {
+                    console.log("DEBUG: Light Cleanse Proc'd!"); // <-- DEBUG LOG
+                    const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic'].includes(key));
+                    if (debuffs.length > 0) {
+                        const effectToCleanse = debuffs[0];
+                        delete player.statusEffects[effectToCleanse];
+                        addToLog(`Your spell's light energy cleanses you of ${effectToCleanse}!`, 'text-yellow-200');
+                         console.log(`DEBUG: Cleansed ${effectToCleanse}.`); // <-- DEBUG LOG
+                    } else {
+                         console.log("DEBUG: No debuffs to cleanse."); // <-- DEBUG LOG
+                    }
+                } else {
+                    console.log("DEBUG: Light Cleanse Failed Roll."); // <-- DEBUG LOG
                 }
             }
+        } else {
+            console.log(`DEBUG: Elemental effects skipped. finalDamage=${finalDamage}, target.isAlive()=${target.isAlive()}`);
         } // End primary target effects
 
+
         // --- Magus: Arcane Manipulation Logic ---
-        if (target.isAlive() && player._classKey === 'magus' && player.activeModeIndex > -1) { // Check target alive
-             // ... [Existing Magus Chain/Wide logic - apply damage to secondary targets] ...
-             const mode = player.signatureAbilityData.modes[player.activeModeIndex];
+        if (target.isAlive() && player._classKey === 'magus' && player.activeModeIndex > -1) {
+            const mode = player.signatureAbilityData.modes[player.activeModeIndex];
+            // Chain Magic (Mode 0) - ST Only
+            if (mode === "Chain Magic" && spellData.type === 'st') { // <-- ADDED ST CHECK
+                let closestEnemy = null;
+                let minDist = Infinity;
+                currentEnemies.forEach(enemy => {
+                    if (enemy.isAlive() && enemy !== target) {
+                        // Find distance from the ORIGINAL target, not the player
+                        const dist = Math.abs(target.x - enemy.x) + Math.abs(target.y - enemy.y);
+                        // Ensure the chained target is also within the spell's original range from the PLAYER
+                        const distFromPlayer = Math.abs(player.x - enemy.x) + Math.abs(player.y - enemy.y);
+                        if (distFromPlayer <= spellRange && dist < minDist) {
+                            minDist = dist;
+                            closestEnemy = enemy;
+                        }
+                    }
+                });
 
-             // Chain Magic (Mode 0)
-             if (mode === "Chain Magic" && spellData.type === 'st') {
-                 let closestEnemy = null;
-                 let minDist = Infinity;
-                 // Find the closest *other* living enemy
-                 currentEnemies.forEach(enemy => {
-                     if (enemy.isAlive() && enemy !== target) {
-                         const dist = Math.abs(target.x - enemy.x) + Math.abs(target.y - enemy.y);
-                         // Check if within half the original spell range
-                         if (dist <= Math.ceil(spellRange / 2) && dist < minDist) {
-                             minDist = dist;
-                             closestEnemy = enemy;
-                         }
-                     }
-                 });
-
-                 if (closestEnemy) {
-                     const chainDamage = Math.floor(finalDamage * 0.5); // Half damage
-                     if (chainDamage > 0) {
-                         const chainFinalDamage = closestEnemy.takeDamage(chainDamage, spellEffects);
-                         addToLog(`Chain Magic! The spell arcs to ${closestEnemy.name} for <span class="font-bold text-purple-400">${chainFinalDamage}</span> damage!`, 'text-cyan-300');
-                         if (!gameState.battleEnded && !closestEnemy.isAlive()) checkBattleStatus(true); // Check if chain killed
-                     }
-                 }
-             }
-             // Wide Magic (Mode 1)
-             else if (mode === "Wide Magic" && spellData.type === 'aoe') {
-                 addToLog("Wide Magic empowers the AOE!", 'text-cyan-300');
-                 const splashDamage = Math.floor(finalDamage * (spell.splash || 0.5)); // Use original splash factor
-                 if (splashDamage > 0) {
-                     // Iterate through all 8 adjacent cells (including diagonals)
-                     for (let dx = -1; dx <= 1; dx++) {
-                         for (let dy = -1; dy <= 1; dy++) {
-                             if (dx === 0 && dy === 0) continue; // Skip center cell
-                             const splashX = target.x + dx;
-                             const splashY = target.y + dy;
-                             const splashTarget = currentEnemies.find(e => e.isAlive() && e.x === splashX && e.y === splashY);
-                             if (splashTarget) {
-                                  const splashFinalDamage = splashTarget.takeDamage(splashDamage, spellEffects);
-                                  addToLog(`Wide Magic splash hits ${splashTarget.name} for <span class="font-bold text-purple-400">${splashFinalDamage}</span> damage.`);
-                                  if (!gameState.battleEnded && !splashTarget.isAlive()) checkBattleStatus(true); // Check if splash killed
+                if (closestEnemy) {
+                    const chainDamage = Math.floor(finalDamage * 0.5); // Use primary target's finalDamage as base
+                    if (chainDamage > 0) {
+                        const damageResultChain = closestEnemy.takeDamage(chainDamage, spellEffects); // Store result
+                        const chainFinalDamage = damageResultChain.damageDealt;
+                        const knockbackChain = damageResultChain.knockback; // Check knockback on chain target
+                        addToLog(`Chain Magic! The spell arcs from ${target.name} to ${closestEnemy.name} for <span class="font-bold text-purple-400">${chainFinalDamage}</span> damage!`, 'text-cyan-300'); // Clarified origin
+                        if (!gameState.battleEnded && !closestEnemy.isAlive()) checkBattleStatus(true);
+                        // Apply knockback to chain target if triggered
+                        if (!gameState.battleEnded && knockbackChain > 0 && closestEnemy.isAlive()) {
+                             await applyKnockback(closestEnemy, player, knockbackChain);
+                             if (!closestEnemy.isAlive()) { if (!gameState.battleEnded) checkBattleStatus(true); } // Re-check after knockback
+                        }
+                    }
+                }
+            }
+            // Wide Magic (Mode 1) - AOE Only
+            else if (mode === "Wide Magic" && spellData.type === 'aoe') { // <-- ADDED AOE CHECK
+                addToLog("Wide Magic empowers the AOE!", 'text-cyan-300');
+                // Use spell.splash or default to 0.5
+                const splashMultiplier = spell.splash !== undefined ? spell.splash : 0.5;
+                const splashDamage = Math.floor(finalDamage * splashMultiplier); // Base splash on primary target damage
+                if (splashDamage > 0) {
+                    // Hit ALL 8 surrounding tiles (dx/dy from -1 to 1, excluding 0,0)
+                    for (let dx = -1; dx <= 1; dx++) {
+                        for (let dy = -1; dy <= 1; dy++) {
+                            if (dx === 0 && dy === 0) continue; // Skip the primary target
+                            const splashX = target.x + dx;
+                            const splashY = target.y + dy;
+                            const splashTarget = currentEnemies.find(e => e.isAlive() && e.x === splashX && e.y === splashY);
+                            if (splashTarget) {
+                                const damageResultSplash = splashTarget.takeDamage(splashDamage, spellEffects); // Store result
+                                const splashFinalDamage = damageResultSplash.damageDealt;
+                                const knockbackSplash = damageResultSplash.knockback; // Check knockback
+                                addToLog(`Wide Magic splash hits ${splashTarget.name} for <span class="font-bold text-purple-400">${splashFinalDamage}</span> damage.`);
+                                if (!gameState.battleEnded && !splashTarget.isAlive()) checkBattleStatus(true);
+                                // Apply knockback to splash target
+                                if (!gameState.battleEnded && knockbackSplash > 0 && splashTarget.isAlive()) {
+                                    await applyKnockback(splashTarget, player, knockbackSplash);
+                                    if (!splashTarget.isAlive()) { if (!gameState.battleEnded) checkBattleStatus(true); } // Re-check
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+             // NOTE: No 'else' here, standard AOE/Lightning handled after Magus block
+        }
+        // --- Standard AOE Splash (if Wide Magic isn't active OR player isn't Magus) ---
+        // <-- MOVED OUTSIDE and MODIFIED Magus check
+        else if (spellData.type === 'aoe') { // Trigger if AOE and NOT Wide Magic
+             currentEnemies.forEach(async (enemy, index) => { // Make callback async
+                 if (index !== targetIndex && enemy.isAlive()) {
+                     // Standard AOE only hits ORTHOGONALLY adjacent (distance === 1)
+                     if (Math.abs(target.x - enemy.x) + Math.abs(target.y - enemy.y) === 1) {
+                        // Use spell.splash or default to 0.5
+                        const splashMultiplier = spell.splash !== undefined ? spell.splash : 0.5;
+                        const splashDamage = Math.floor(finalDamage * splashMultiplier); // Base splash on primary target damage
+                         if (splashDamage > 0) {
+                             const damageResultSplash = enemy.takeDamage(splashDamage, spellEffects); // Store result
+                             const splashFinalDamage = damageResultSplash.damageDealt;
+                             const knockbackSplash = damageResultSplash.knockback; // Check knockback
+                             addToLog(`The spell splashes onto ${enemy.name} for <span class="font-bold text-purple-400">${splashFinalDamage}</span> damage.`);
+                             if (!gameState.battleEnded && !enemy.isAlive()) checkBattleStatus(true);
+                             // Apply knockback to splash target
+                             if (!gameState.battleEnded && knockbackSplash > 0 && enemy.isAlive()) {
+                                 await applyKnockback(enemy, player, knockbackSplash);
+                                 if (!enemy.isAlive()) { if (!gameState.battleEnded) checkBattleStatus(true); } // Re-check
                              }
                          }
                      }
                  }
-             }
-        }
-        // --- Standard AOE Splash (if Wide Magic isn't active) ---
-        else if (spellData.type === 'aoe') {
-             currentEnemies.forEach((enemy, index) => {
-                 if (index !== targetIndex && enemy.isAlive()) { // Check splash target alive
-                     // Check adjacency (only orthogonal for standard splash)
-                     if (Math.abs(target.x - enemy.x) + Math.abs(target.y - enemy.y) === 1) {
-                         const splashDamage = Math.floor(finalDamage * (spell.splash || 0.5));
-                         if (splashDamage > 0) {
-                             const splashFinalDamage = enemy.takeDamage(splashDamage, spellEffects);
-                             addToLog(`The spell splashes onto ${enemy.name} for <span class="font-bold text-purple-400">${splashFinalDamage}</span> damage.`);
-                             if (!gameState.battleEnded && !enemy.isAlive()) checkBattleStatus(true); // Check if splash killed
-                         }
-                     }
-                 }
              });
-        } // End AOE/Splash
+        } // End Standard AOE/Splash
+
+
+
 
         // --- Handle Lightning Chaining ---
-        if (target.isAlive() && spellData.element === 'lightning') { // Check target alive
-            let chainTarget = target;
-            let chainDamage = Math.floor(finalDamage * 0.5);
+        const lightningChainChance = 0.3 + (tierIndex * 0.1); // Base 30% + 10% per tier
+        console.log(`DEBUG: Checking Lightning Chain. Chance: ${lightningChainChance}`); // <-- DEBUG LOG
+        if (!gameState.battleEnded && spellData.element === 'lightning' && player.rollForEffect(lightningChainChance, 'Spell Lightning Chain')) {
+            console.log("DEBUG: Lightning Chain Proc'd!"); // <-- DEBUG LOG
+            // --- MODIFIED: Start chain FROM the original target's position ---
+            let chainSourceX = target.x;
+            let chainSourceY = target.y;
+            let currentChainTargetObject = target; // Track the object of the last successful hit for logging
+            // --- END MODIFICATION ---
+            let chainDamage = Math.floor(finalDamage * 0.5); // Start chain damage based on primary hit
+            console.log(`DEBUG: Initial Chain Damage: ${chainDamage}`); // <-- DEBUG LOG
             for (let i = 0; i < tierIndex + 1; i++) { // Chains = tier number
-                const potentialTargets = currentEnemies.filter(e => e.isAlive() && e !== chainTarget);
+                // --- MODIFIED: Find targets near the LAST hit position ---
+                const potentialTargets = currentEnemies.filter(e => e.isAlive() && (e.x !== chainSourceX || e.y !== chainSourceY)); // Find LIVING targets NOT at the source pos
+                console.log(`DEBUG: Chain ${i+1}/${tierIndex+1}. Potential targets from (${chainSourceX},${chainSourceY}): ${potentialTargets.map(e=>e.name).join(', ')}`); // <-- DEBUG LOG
                 if (potentialTargets.length > 0) {
-                    const nextTarget = potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
-                    const chainFinalDamage = nextTarget.takeDamage(chainDamage, spellEffects);
-                    addToLog(`Lightning arcs from ${chainTarget.name} to ${nextTarget.name} for <span class="font-bold text-blue-400">${chainFinalDamage}</span> damage!`);
-                     if (!gameState.battleEnded && !nextTarget.isAlive()) checkBattleStatus(true); // Check if chain killed
-                    chainTarget = nextTarget;
+                    // Find the closest valid target to the last hit position
+                    let nextTarget = null;
+                    let minDist = Infinity;
+                    potentialTargets.forEach(pTarget => {
+                        const dist = Math.abs(chainSourceX - pTarget.x) + Math.abs(chainSourceY - pTarget.y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nextTarget = pTarget;
+                        }
+                    });
+
+                    if (!nextTarget) { // Should not happen if potentialTargets > 0, but safety check
+                         console.log("DEBUG: Chain stopped (Could not find closest target).");
+                         break;
+                    }
+                    // --- END MODIFICATION ---
+
+                    console.log(`DEBUG: Chaining to ${nextTarget.name}. Damage: ${chainDamage}`); // <-- DEBUG LOG
+                    const damageResultChain = nextTarget.takeDamage(chainDamage, spellEffects); // Store result
+                    const chainFinalDamage = damageResultChain.damageDealt;
+                    const knockbackChain = damageResultChain.knockback; // Check knockback
+                    // Log using the *previous* target's position as the source
+                    addToLog(`Lightning arcs from ${currentChainTargetObject.name}'s position to ${nextTarget.name} for <span class="font-bold text-blue-400">${chainFinalDamage}</span> damage!`);
+                    console.log(`DEBUG: Actual Chain Damage Dealt to ${nextTarget.name}: ${chainFinalDamage}`); // <-- DEBUG LOG
+                    if (!gameState.battleEnded && !nextTarget.isAlive()) {
+                        console.log(`DEBUG: Chain target ${nextTarget.name} died.`); // <-- DEBUG LOG
+                        checkBattleStatus(true); // Check if chain killed
+                    }
+                    // Apply knockback to chain target
+                    if (!gameState.battleEnded && knockbackChain > 0 && nextTarget.isAlive()) {
+                         await applyKnockback(nextTarget, player, knockbackChain);
+                         if (!nextTarget.isAlive()) {
+                             console.log(`DEBUG: Chain target ${nextTarget.name} died from knockback.`); // <-- DEBUG LOG
+                             if (!gameState.battleEnded) checkBattleStatus(true);
+                         } // Re-check
+                    }
+
+                    // Update source position for the next potential chain
+                    chainSourceX = nextTarget.x;
+                    chainSourceY = nextTarget.y;
+                    currentChainTargetObject = nextTarget; // Update the object reference
                     chainDamage = Math.floor(chainDamage * 0.5); // Damage halves each jump
-                    if (chainDamage < 1 || !chainTarget.isAlive()) break; // Stop if damage too low or target died
+                    console.log(`DEBUG: Next Chain Damage: ${chainDamage}`); // <-- DEBUG LOG
+                    if (chainDamage < 1 || !nextTarget.isAlive()) { // Use nextTarget here
+                        console.log("DEBUG: Chain stopped (Damage too low or target died)."); // <-- DEBUG LOG
+                        break; // Stop if damage too low or target died
+                    }
                 } else {
+                    console.log("DEBUG: Chain stopped (No more valid targets)."); // <-- DEBUG LOG
                     break; // No more targets
                 }
             }
+        } else if (!gameState.battleEnded && spellData.element === 'lightning') { // Added else if for logging failure
+            console.log("DEBUG: Lightning Chain Failed Roll or condition not met."); // <-- DEBUG LOG
         } // End Lightning Chaining
+
+        // --- NEW: Apply Knockback to Primary Target (AFTER AOE/Chains) ---
+        if (!gameState.battleEnded && primaryTargetKnockback > 0 && target.isAlive()) {
+            await applyKnockback(target, player, primaryTargetKnockback);
+            // Re-check target status after knockback
+            if (!target.isAlive()) { if (!gameState.battleEnded) checkBattleStatus(true); }
+        }
+        // --- END Primary Target Knockback ---
+
     } // End Offensive Spell Logic
 
-    // MODIFIED: Call checkBattleStatus immediately after all direct spell effects
-    let followUpActionPending = false; // Flag to track if follow-up might happen
+    // --- Status Check & Follow-ups ---
+    let followUpActionPending = false;
     if (!gameState.battleEnded) {
-         checkBattleStatus(false); // isReaction = false for the main spell cast
+         checkBattleStatus(false);
     }
 
-    // --- Handle Spell Follow-up and Wind Extra Turn AFTER immediate check ---
-    if (!gameState.battleEnded) { // Only proceed if battle didn't end from main spell
-        // Spell Follow-up (check if target is valid for follow-up)
-        let spellFollowUpChance = player.equippedWeapon.effect?.spellFollowUp ? 1 : 0; // Assuming it's guaranteed if effect exists
-        // Warlock Spell Follow-up Bonus
+    if (!gameState.battleEnded) {
+        // Spell Follow-up
+        let spellFollowUpChance = player.equippedWeapon.effect?.spellFollowUp ? 1 : 0;
         if (player._classKey === 'warlock' && player.signatureAbilityToggleActive && spellFollowUpChance > 0) {
-            spellFollowUpChance *= 1.5; // Relative 50% increase (won't affect guaranteed ones)
+             spellFollowUpChance *= 1.5;
         }
-        if (target && target.isAlive() && player.rollForEffect(spellFollowUpChance, 'Spell Follow-up')) { // Use roll function
+        // Find a VALID living target for follow-up (original target OR any living enemy)
+        const validFollowUpTarget = (target && target.isAlive()) ? target : currentEnemies.find(e => e.isAlive());
+
+        console.log(`DEBUG: Checking Spell Follow-up. Chance: ${spellFollowUpChance}, Target: ${validFollowUpTarget?.name}`);
+        if (validFollowUpTarget && player.rollForEffect(spellFollowUpChance, 'Spell Follow-up')) {
+             console.log("DEBUG: Spell Follow-up Proc'd!");
              followUpActionPending = true;
-            setTimeout(() => {
-                 if (gameState.battleEnded) { // Check again inside timeout
-                      finalizePlayerAction();
-                      return;
-                 }
-                 performSpellFollowUpAttack(target); // This now calls checkBattleStatus(true) internally
-                 finalizePlayerAction(); // Finalize after follow-up completes
+            setTimeout(async () => {
+                 if (gameState.battleEnded) { finalizePlayerAction(); return; }
+                 performSpellFollowUpAttack(validFollowUpTarget);
+                 await new Promise(resolve => setTimeout(resolve, 50));
+                 finalizePlayerAction();
             }, 250);
         } else {
             // Check for Wind Extra Turn ONLY if Spell Follow-up didn't proc
-            const windExtraTurnChance = 0.1 + (tierIndex * 0.05);
-            if (spellData.element === 'wind' && player.rollForEffect(windExtraTurnChance, 'Spell Wind Turn')) {
-                followUpActionPending = true; // Prevents immediate turn end
+            const windExtraTurnChance = (spellData && spellData.element === 'wind' && tierIndex >= 0) ? 0.1 + (tierIndex * 0.05) : 0;
+            console.log(`DEBUG: Checking Wind Extra Turn. Chance: ${windExtraTurnChance}`);
+            // --- MODIFIED CONDITION: Check if any enemies are alive ---
+            const anyEnemiesAlive = currentEnemies.some(e => e.isAlive());
+            if (windExtraTurnChance > 0 && anyEnemiesAlive && player.rollForEffect(windExtraTurnChance, 'Spell Wind Turn')) {
+                 console.log("DEBUG: Wind Extra Turn Proc'd!");
+                followUpActionPending = true;
                 addToLog("The swirling winds grant you another turn!", "text-cyan-300 font-bold");
-                setTimeout(beginPlayerTurn, 500); // Start another player turn
+                setTimeout(beginPlayerTurn, 150); // Start the next player turn
+            } else {
+                 console.log("DEBUG: No follow-up or extra turn proc'd.");
             }
         }
-    } else {
-        // If battle ended from main spell, finalize (which mainly unlocks actions now)
-         finalizePlayerAction();
+    } else { // Battle ended from the spell itself
+        finalizePlayerAction(); // Still need to finalize
     }
 
-    // If no follow-up actions are pending from this spell, finalize the action now
+    // Finalize if no follow-up action is pending
     if (!followUpActionPending) {
          finalizePlayerAction();
     }
 } // End castSpell
+
+
 
 function battleAction(type, actionData = null) {
     if (!player.isAlive()) {
@@ -2171,9 +2381,9 @@ function handlePlayerEndOfTurnEffects() {
 
      // If drone exists and is alive, it's the drone's turn next
     if (gameState.activeDrone && gameState.activeDrone.isAlive()) {
-        setTimeout(droneTurn, 400); // Add slight delay before drone turn
+        setTimeout(droneTurn, 100); // Add slight delay before drone turn
     } else {
-        setTimeout(enemyTurn, 400); // Otherwise, proceed to enemy turn after delay
+        setTimeout(enemyTurn, 100); // Otherwise, proceed to enemy turn after delay
     }
 }
 
@@ -2184,7 +2394,7 @@ const handlePlayerEndOfTurn = handlePlayerEndOfTurnEffects;
 // New function for Drone's turn
 async function droneTurn() { // Made async for movement delay
     if (gameState.battleEnded || !gameState.activeDrone || !gameState.activeDrone.isAlive()) {
-        setTimeout(enemyTurn, 400); // Drone died or doesn't exist, skip to enemy after delay
+        setTimeout(enemyTurn, 100); // Drone died or doesn't exist, skip to enemy after delay
         return;
     }
 
@@ -2251,7 +2461,7 @@ async function droneTurn() { // Made async for movement delay
 
     // Proceed to enemy turn AFTER drone acts (and after potential delay)
     if (!gameState.battleEnded) {
-         setTimeout(enemyTurn, 400);
+         setTimeout(enemyTurn, 200);
     }
 }
 
@@ -2268,11 +2478,16 @@ function handleEnemyEndOfTurn(enemy) {
             }
         }
 
+        // --- MODIFIED POISON LOGIC ---
         if (effectKey === 'poison' && effects[effectKey]) {
-            const poisonDmg = Math.floor(enemy.maxHp * 0.05);
+            // Check if damage value exists (from grease) otherwise use % based
+            const poisonDmg = effects[effectKey].damage
+                                ? effects[effectKey].damage
+                                : Math.floor(enemy.maxHp * 0.05); // Default 5% HP
             enemy.hp -= poisonDmg;
             addToLog(`${enemy.name} takes <span class="font-bold text-green-600">${poisonDmg}</span> poison damage.`, 'text-green-600');
         }
+        // --- END MODIFIED POISON LOGIC ---
         if (effectKey === 'toxic' && effects[effectKey]) {
             const toxicDmg = Math.floor(enemy.maxHp * 0.1);
             enemy.hp -= toxicDmg;
@@ -2319,7 +2534,7 @@ async function enemyTurn() {
 
             // Only add delay if battle isn't over
             if (!gameState.battleEnded) {
-                 await new Promise(resolve => setTimeout(resolve, 500)); // Delay between enemy actions
+                 await new Promise(resolve => setTimeout(resolve, 200)); // Delay between enemy actions
             }
         }
     }
@@ -2409,20 +2624,49 @@ async function checkPlayerDeath() {
                 }
             }
 
+            // --- MODIFIED EQUIPMENT DROPPING LOGIC ---
             ['weapons', 'armor', 'shields', 'catalysts'].forEach(category => {
                 const items = player.inventory[category];
-                if (!Array.isArray(items)) return; // Safety check
-                const amountToDrop = Math.floor(items.length / 2);
+                if (!Array.isArray(items) || items.length === 0) return; // Safety check
+
+                // Calculate how many to drop based on the *current* count in inventory
+                const initialCount = items.length;
+                const amountToDrop = Math.floor(initialCount / 2);
+
                 for (let i = 0; i < amountToDrop; i++) {
+                     // Ensure there are still items to potentially drop
+                     if (items.length === 0) break;
+
                     const randomIndex = Math.floor(Math.random() * items.length);
+                    const droppedItemKey = items[randomIndex]; // Get the key before removing
+                    const itemDetails = getItemDetails(droppedItemKey);
+
                     // Ensure we don't drop the default "None" items
-                    const itemDetails = getItemDetails(items[randomIndex]);
                     if (itemDetails && itemDetails.rarity !== 'Broken') {
-                        items.splice(randomIndex, 1);
+                        items.splice(randomIndex, 1); // Remove from inventory first
                         itemsDropped++;
+
+                        // --- ADDED: Check if the dropped item was equipped ---
+                        let itemTypeToCheck = null;
+                        let equippedItem = null;
+                        switch (category) {
+                            case 'weapons': itemTypeToCheck = 'weapon'; equippedItem = player.equippedWeapon; break;
+                            case 'armor': itemTypeToCheck = 'armor'; equippedItem = player.equippedArmor; break;
+                            case 'shields': itemTypeToCheck = 'shield'; equippedItem = player.equippedShield; break;
+                            case 'catalysts': itemTypeToCheck = 'catalyst'; equippedItem = player.equippedCatalyst; break;
+                        }
+
+                        // Check if an item type was identified and if the dropped item's name matches the equipped item's name
+                        if (itemTypeToCheck && equippedItem && equippedItem.name === itemDetails.name) {
+                            addToLog(`Your equipped ${itemDetails.name} was dropped!`, 'text-red-600');
+                            unequipItem(itemTypeToCheck, false); // Unequip the item, don't re-render yet
+                        }
+                        // --- END ADDED CHECK ---
                     }
                 }
             });
+            // --- END MODIFIED LOGIC ---
+
 
             if (itemsDropped > 0) {
                 addToLog('You lost some of your items and equipment in the fall.', 'text-red-500');
@@ -2432,6 +2676,7 @@ async function checkPlayerDeath() {
                 addToLog('You awaken at the inn, sore but alive.', 'text-yellow-300');
                 restAtInn(0); // Respawn by resting for free
                 gameState.playerIsDying = false;
+                // updateStatsView() will be called within restAtInn
             }, 3000);
             break;
 

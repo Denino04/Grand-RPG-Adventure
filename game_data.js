@@ -852,14 +852,20 @@ const ITEMS = {
     'mysterious_concoction_t3': { name: 'Mysterious Concoction (Tier 3)', type: 'experimental', tier: 3, price: 150, description: 'This barely-contained liquid chaos could change your fate... or just give you a stomach ache.' },
 
     // Tools And Consumables
-    'whetstone': { name: 'Whetstone', type: 'buff', price: 100, rarity: 'Common', description: "For the next 3 turns, increase your weapon's damage die by one step (max d12) and enables critical hits. For when you need your blade to be extra pointy.", effect: { type: 'buff_whetstone', duration: 4, critEnable: true, diceStepUp: true } }, // Added Whetstone item
-    'magic_rock_dust': { name: 'Magic Rock Dust', type: 'buff', price: 150, rarity: 'Uncommon', description: "Consume this suspiciously sparkly dust to briefly expand your consciousness. Your next spell will have its damage die increased by one step (max d12) and its range increased by 2.", effect: { type: 'buff_magic_dust', duration: 2, rangeIncrease: 2, diceStepUp: true } }, // Added Magic Rock Dust
-    'oil_bomb': { name: 'Oil Bomb', type: 'debuff_apply', price: 75, rarity: 'Common', range: 3, description: "Throws a bomb that deals 1 damage and covers the target in a flammable slick. The next Fire damage they receive is doubled.", effect: { type: 'debuff_oiled', duration: Infinity, damage: 1, element: 'none' } }, // Duration Infinity until triggered
-    'viscous_liquid': { name: 'Viscous Liquid', type: 'debuff_apply', price: 75, rarity: 'Common', range: 3, description: "Throws a vial that deals 1 damage. The next effect that applies the 'drenched' status is doubled in duration and magnitude.", effect: { type: 'debuff_viscous', duration: Infinity, damage: 1, element: 'none' } }, // Duration Infinity until triggered
-    'pocket_cragblade': { name: 'Pocket Cragblade', type: 'buff', price: 200, rarity: 'Uncommon', description: "Apply this chunky rock to a weapon. Your next attack that deals Earth damage will deal 1.5x damage and is guaranteed to paralyze.", effect: { type: 'buff_cragblade', duration: 2, damageMultiplier: 1.5, guaranteeParalyze: true } }, // Duration 2 (next attack)
-    'artificial_light_stone': { name: 'Artificial Light Stone', type: 'debuff_special', price: 200, rarity: 'Uncommon', range: 3, description: "Throws a stone that deals 1 damage. Your next attack that deals Wind damage will deal 1.5x damage and knock them back 2 tiles.", effect: { type: 'buff_lightstone', duration: 2, damageMultiplier: 1.5, knockback: 2, damage: 1, element: 'none' } }, // Duration 2 (next attack) - Also applies buff to player
-    'lightning_rod': { name: 'Lightning Rod', type: 'buff', price: 250, rarity: 'Rare', description: "Attach to a weapon. For the next 3 turns, attacks trigger a chain lightning strike (25% damage) to a random enemy.", effect: { type: 'buff_lightning_rod', duration: 4, chainChance: 1.0, chainMultiplier: 0.25 } }, // Duration 4 (activation + 3 turns)
-    'fertilized_seed': { name: 'Fertilized Seed', type: 'buff', price: 100, rarity: 'Uncommon', description: "Consume this energetic seed. For the next 3 turns, Nature healing you receive is increased by 50%.", effect: { type: 'buff_fertilized', duration: 4, healMultiplier: 1.5 } }, // Duration 4 (activation + 3 turns)
+    'whetstone': { name: 'Whetstone', type: 'buff', price: 100, rarity: 'Common', description: "For the next 3 turns, increase your weapon's damage die by one step (max d12) and enables critical hits. For when you need your blade to be extra pointy.", effect: { type: 'buff_whetstone', duration: 4, critEnable: true, diceStepUp: true } },
+    'magic_rock_dust': { name: 'Magic Rock Dust', type: 'buff', price: 150, rarity: 'Uncommon', description: "Consume this suspiciously sparkly dust to briefly expand your consciousness. Your next spell will have its damage die increased by one step (max d12) and its range increased by 2.", effect: { type: 'buff_magic_dust', duration: 2, rangeIncrease: 2, diceStepUp: true } },
+    'oil_bomb': { name: 'Oil Bomb', type: 'debuff_apply', price: 75, rarity: 'Common', range: 3, description: "Throws a bomb that deals 1 damage and covers the target in a flammable slick. The next Fire damage they receive is doubled. It's step one of a very bad day for them. Range: 3 tiles.", effect: { type: 'debuff_oiled', duration: Infinity, damage: 1, element: 'none' } },
+    'viscous_liquid': { name: 'Viscous Liquid', type: 'debuff_apply', price: 75, rarity: 'Common', range: 3, description: "Throws a vial that deals 1 damage. The next effect that applies the 'drenched' status to the target is doubled in both duration and magnitude, ensuring they aren't just soaked, but achieve a new state of sogginess. Range: 3 tiles.", effect: { type: 'debuff_viscous', duration: Infinity, damage: 1, element: 'none' } },
+    'pocket_cragblade': { name: 'Pocket Cragblade', type: 'buff', price: 200, rarity: 'Uncommon', description: "Apply this chunky rock to a weapon. Your next attack that deals Earth damage will deal 1.5x damage and is guaranteed to paralyze the target. A good way to hit someone so hard they forget how to move.", effect: { type: 'buff_cragblade', duration: 2, damageMultiplier: 1.5, guaranteeParalyze: true } },
+    'artificial_light_stone': { name: 'Artificial Light Stone', type: 'debuff_apply', price: 200, rarity: 'Uncommon', range: 3, description: "Throws a stone that deals 1 damage and primes the target. Your next attack that deals Wind damage to them will deal 1.5x damage and rudely violate their personal space by knocking them back 2 tiles. Range: 3 tiles.", effect: { type: 'debuff_lightstone_primed', duration: Infinity, damageMultiplier: 1.5, knockback: 2, damage: 1, element: 'none' } }, // <-- Single Line Change
+    'lightning_rod': { name: 'Lightning Rod', type: 'buff', price: 250, rarity: 'Rare', description: "Attach to a weapon. For the next 3 turns, your attacks are guaranteed to trigger a follow-up strike that deals an additional 25% of the initial damage as Lightning damage to a random enemy within range. Because why should only one person enjoy a sudden, unexpected electrocution?", effect: { type: 'buff_lightning_rod', duration: 4, chainChance: 1.0, chainMultiplier: 0.25 } },
+    'fertilized_seed': { name: 'Fertilized Seed', type: 'buff', price: 100, rarity: 'Uncommon', description: "Consume this suspiciously energetic seed. For the next 3 turns, any healing you receive from Nature-based effects is increased by 50%. Tastes like dirt, heals like a hyperactive forest spirit.", effect: { type: 'buff_fertilized', duration: 4, healMultiplier: 1.5 } },
+    'natural_antidote': { name: 'Natural Antidote', type: 'cleanse_specific', effects_to_cleanse: ['poison', 'toxic'], price: 120, rarity: 'Common', description: 'A simple herbal remedy that removes all types of poison effects. Tastes like bitter leaves and righteous indignation, but it gets the job done. Stop dying, you\'ve got things to do.' },
+    'anti_paralytic_needle': { name: 'Anti-Paralytic Needle', type: 'cleanse_specific', effects_to_cleanse: ['paralyzed', 'petrified'], price: 180, rarity: 'Uncommon', description: 'A sharp needle full of something stimulating. Immediately removes Paralysis and Petrify effects by giving your nervous system a very aggressive pep talk. The sudden jolt is better than coffee.' },
+    'poisonous_grease': { name: 'Poisonous Grease', type: 'buff', price: 200, rarity: 'Uncommon', description: 'Smear this foul-smelling gunk on your weapon. For 3 turns, your attacks have a chance to inflict a nasty poison that deals ¼ of your weapon’s average damage for 3 more turns. The gift that keeps on giving... sepsis. (Chance: 20%+Luck%/2)', effect: { type: 'buff_poison_grease', duration: 4, poisonChance: 0.20 } },
+    'paralysis_grease': { name: 'Paralysis Grease', type: 'buff', price: 250, rarity: 'Uncommon', description: 'A sticky paste that makes your weapon shockingly effective. For 3 turns, your attacks have a chance to inflict paralysis for 1 turn, causing enemies to suddenly stop and stare blankly into the middle distance. (Chance: 20%+Luck%/2. Stacks with Earth Element effects for extra stillness.)', effect: { type: 'buff_paralysis_grease', duration: 4, paralyzeChance: 0.20 } },
+
+
     // --- Ingredients & Materials ---
     // Junk (for selling)
     'goblin_ear': {name: 'Goblin Ear', type: 'junk', price: 5, description: "A grotesque trophy."},
@@ -867,7 +873,7 @@ const ITEMS = {
     'rat_tail': {name: 'Rat Tail', type: 'junk', price: 2, description: "It's... a rat tail."},
     'spider_venom': {name: 'Spider Venom', type: 'junk', price: 10, description: "A vial of potent venom."},
     'dragon_scale': {name: 'Dragon Scale', type: 'junk', price: 50, description: "A shimmering, nigh-indestructible scale."},
-    'rock': {name: 'Useless Rock', type: 'junk', price: 0, description: 'It... was probably something more interesting a moment ago.'},
+    'rock': {name: 'Useless Rock', type: 'junk', price: 0, description: 'It... was probably something more interesting a moment ago.'}, // <-- ADDED Useless Rock
 
     // Food Ingredients (Generic Types)
     'rabbit_meat': {name: 'Rabbit Meat', type: 'food_ingredient', price: 4, rarity: 'Common', description: "Could make a good stew.", cookingType: 'meat'},
@@ -914,15 +920,15 @@ const ITEMS = {
 
 
     // --- Special & Crafting Items ---
-    'undying_heart': { name: 'Undying Heart', type: 'special', price: 1000, rarity: 'Rare', description: 'A pulsating heart that refuses to stop beating. Used in powerful rituals.' }, // Rarity added, equip effect removed
-    'fire_essence': { name: 'Fire Essence', type: 'enchant', price: 100, rarity: 'Uncommon', description: 'The pure, searing essence of fire.', alchemyType: 'secondary_reagent' }, // Added rarity
-    'water_essence': { name: 'Water Essence', type: 'enchant', price: 100, rarity: 'Uncommon', description: 'The pure, flowing essence of water.', alchemyType: 'secondary_reagent' }, // Added rarity
-    'earth_essence': { name: 'Earth Essence', type: 'enchant', price: 100, rarity: 'Uncommon', description: 'The pure, stoic essence of earth.', alchemyType: 'secondary_reagent' }, // Added rarity
-    'wind_essence': { name: 'Wind Essence', type: 'enchant', price: 100, rarity: 'Uncommon', description: 'The pure, rushing essence of wind.', alchemyType: 'secondary_reagent' }, // Added rarity
-    'lightning_essence': { name: 'Lightning Essence', type: 'enchant', price: 100, rarity: 'Uncommon', description: 'The pure, crackling essence of lightning.', alchemyType: 'secondary_reagent' }, // Added rarity
-    'nature_essence': { name: 'Nature Essence', type: 'enchant', price: 100, rarity: 'Uncommon', description: 'The pure, vibrant essence of nature.', alchemyType: 'secondary_reagent' }, // Added rarity
-    'light_essence': { name: 'Light Essence', type: 'enchant', price: 100, rarity: 'Uncommon', description: 'The pure, radiant essence of light.', alchemyType: 'secondary_reagent' }, // Added rarity
-    'void_essence': { name: 'Void Essence', type: 'enchant', price: 100, rarity: 'Uncommon', description: 'The pure, silent essence of the void.', alchemyType: 'secondary_reagent' }, // Added rarity
+    'undying_heart': { name: 'Undying Heart', type: 'special', price: 1000, sellPrice: 100, rarity: 'Rare', description: 'A pulsating heart that refuses to stop beating. Used in powerful rituals.' }, // Added sellPrice
+    'fire_essence': { name: 'Fire Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, searing essence of fire.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'water_essence': { name: 'Water Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, flowing essence of water.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'earth_essence': { name: 'Earth Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, stoic essence of earth.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'wind_essence': { name: 'Wind Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, rushing essence of wind.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'lightning_essence': { name: 'Lightning Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, crackling essence of lightning.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'nature_essence': { name: 'Nature Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, vibrant essence of nature.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'light_essence': { name: 'Light Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, radiant essence of light.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'void_essence': { name: 'Void Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, silent essence of the void.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
 
     // --- Key Items ---
     'bestiary_notebook': {name: 'Bestiary Notebook', type: 'key', price: 0, description: "A leather-bound book from a nervous researcher named Betty. Used to catalogue monster observations."},
@@ -1353,7 +1359,11 @@ const RECIPE_DROPS_BY_TIER = {
 };
 
 const SHOP_INVENTORY = {
-    'Potions & Items': ['health_potion', 'mana_potion', 'condensed_health_potion', 'condensed_mana_potion'],
+    'Potions & Items': [
+        'health_potion', 'mana_potion',
+        'condensed_health_potion', 'condensed_mana_potion',
+        'natural_antidote', 'anti_paralytic_needle' // Added new items here
+        ],
     'Seeds': ['blackwheat_seed', 'cinnamonwood_seed', 'screaming_lotus_seed', 'beetsnip_seed'],
     'Recipes': [
         // Cooking Tier 1
@@ -1366,6 +1376,7 @@ const SHOP_INVENTORY = {
     'Weapons': ['rusty_sword', 'wooden_stick', 'soldiers_spear', 'farmers_glaive', 'parrying_dagger', 'light_scythe', 'flowing_blade'],
     'Gear': ['travelers_garb', 'leather_armor', 'padded_leather', 'wooden_shield']
 };
+
 
 const MAGIC_SHOP_INVENTORY = {
     'Catalysts': ['wooden_wand', 'cracked_orb', 'hardwood_staff', 'magical_orb', 'arcane_focus', 'cypresswood_staff'],
@@ -1400,9 +1411,13 @@ const BLACKSMITH_INVENTORY = {
     'Armor': ['chainmail_armor', 'half_plate_armor', 'steel_plate_armor'],
     'Shields': ['iron_kite_shield', 'iron_buckler', 'brass_shield', 'trollblood_shield', 'titanium_parrying_shield', 'maxwellian_dueling_shield', 'tower_greatshield'],
 };
+
 const BLACK_MARKET_INVENTORY = {
     'Weapons': ['assassins_claw', 'psychic_blade', 'bloody_butchering_knife', 'battlestaff'],
     'Armor': ['silenced_leather_armor', 'assassin_cloak_armor'],
+    // --- NEW CATEGORY FOR GREASES ---
+    'Enhancements': ['poisonous_grease', 'paralysis_grease'],
+    // --- END NEW CATEGORY ---
     'Lures': ['goblin_scent_gland', 'sweet_grass_scent', 'rotten_cheese', 'chemical_lure', 'bandit_coin', 'wolf_musk', 'war_horn_fragment', 'silken_cocoon', 'petrified_field_mouse', 'grave_dust']
 };
 

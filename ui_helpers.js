@@ -12,50 +12,39 @@ let mainView;
 let characterSheetOriginalStats = null;
 
 function getItemDetails(itemKey) {
-    // *** DEBUGGING LOGS START ***
-    console.log(`getItemDetails called with key: "${itemKey}"`);
-    console.log(`  - typeof WEAPONS: ${typeof WEAPONS}, typeof ARMOR: ${typeof ARMOR}, typeof SHIELDS: ${typeof SHIELDS}, typeof CATALYSTS: ${typeof CATALYSTS}, typeof ITEMS: ${typeof ITEMS}, typeof LURES: ${typeof LURES}, typeof SPELLS: ${typeof SPELLS}, typeof COOKING_RECIPES: ${typeof COOKING_RECIPES}`);
-    // *** DEBUGGING LOGS END ***
+    // --- REMOVED DEBUGGING LOGS ---
 
     // --- REWRITTEN LOGIC with IF statements ---
     if (typeof WEAPONS !== 'undefined' && WEAPONS && WEAPONS[itemKey]) {
-        console.log(`  - Found "${itemKey}" in WEAPONS.`);
         return WEAPONS[itemKey];
     }
     if (typeof ARMOR !== 'undefined' && ARMOR && ARMOR[itemKey]) {
-        console.log(`  - Found "${itemKey}" in ARMOR.`);
         return ARMOR[itemKey];
     }
     if (typeof SHIELDS !== 'undefined' && SHIELDS && SHIELDS[itemKey]) {
-        console.log(`  - Found "${itemKey}" in SHIELDS.`);
         return SHIELDS[itemKey];
     }
     if (typeof CATALYSTS !== 'undefined' && CATALYSTS && CATALYSTS[itemKey]) {
-        console.log(`  - Found "${itemKey}" in CATALYSTS.`);
         return CATALYSTS[itemKey];
     }
     if (typeof ITEMS !== 'undefined' && ITEMS && ITEMS[itemKey]) {
-        console.log(`  - Found "${itemKey}" in ITEMS.`);
         return ITEMS[itemKey];
     }
     if (typeof LURES !== 'undefined' && LURES && LURES[itemKey]) {
-        console.log(`  - Found "${itemKey}" in LURES.`);
         return LURES[itemKey];
     }
     if (typeof SPELLS !== 'undefined' && SPELLS && SPELLS[itemKey]) {
         // Spells might need different handling if structure varies,
         // but for tooltip purposes, returning the base object might be okay.
-        console.log(`  - Found "${itemKey}" in SPELLS.`);
         return SPELLS[itemKey];
     }
     if (typeof COOKING_RECIPES !== 'undefined' && COOKING_RECIPES && COOKING_RECIPES[itemKey]) {
-        console.log(`  - Found "${itemKey}" in COOKING_RECIPES.`);
         return COOKING_RECIPES[itemKey];
     }
     // Add checks for ALCHEMY_RECIPES if needed here
 
     // *** Fallback if not found anywhere ***
-    console.warn(`  - Item key "${itemKey}" NOT FOUND in any data object.`);
+    console.warn(`  - Item key "${itemKey}" NOT FOUND in any data object.`); // Keep the warning for actual errors
     return null; // Return null if not found
 }
 /**
@@ -213,9 +202,7 @@ function createItemList(config) {
 
     const itemsToSort = items.map(key => {
         const details = detailsFn(key);
-        // *** DEBUG: Log key and result of detailsFn ***
-        console.log(`createItemList: Rendering item with key "${key}"`);
-        console.log(`  - Details object found:`, details ? {...details} : details); // Log a copy or the null/undefined
+        // *** REMOVED DEBUG LOGS ***
         return { key, price: details ? (details.price || 0) : 0, details }; // Keep details for name access
     });
 
@@ -225,8 +212,7 @@ function createItemList(config) {
         const key = itemObj.key;
         const details = itemObj.details; // Use the details we already fetched
 
-        // *** DEBUG: Check details.name before rendering ***
-        console.log(`  - Accessing details.name: "${details?.name}" (Type: ${typeof details?.name})`);
+        // *** REMOVED DEBUG LOG ***
 
         // Handle case where details might be null or name missing AFTER fetching
         if (!details || !details.name) {
@@ -1182,4 +1168,3 @@ function applyTheme(themeName = 'default') {
         document.documentElement.style.setProperty(key, finalPalette[key]);
     }
 }
-

@@ -221,7 +221,7 @@ function _buildCharSheetAbilities() {
     // Class Ability
     const signatureAbilityData = player.signatureAbilityData;
     let classAbilityHtml = '';
-    console.log("DEBUG renderCharacterSheet: Checking player.signatureAbilityData just before rendering:", signatureAbilityData ? JSON.stringify(signatureAbilityData) : 'Signature Ability Data is null/undefined');
+    // --- REMOVED DEBUG LOG ---
     if (signatureAbilityData) {
         classAbilityHtml = `<p class="font-semibold text-cyan-300">${signatureAbilityData.name} <span class="text-gray-400 font-normal">(${capitalize(signatureAbilityData.type)})</span></p>
                             <p class="text-gray-400 mt-1">${signatureAbilityData.description}</p>`;
@@ -785,7 +785,12 @@ function returnFromInventory() {
          case 'alchemy_lab': renderAlchemyLab(); break;
          case 'training_grounds': renderTrainingGrounds(); break;
          case 'library': renderLibrary(); break; // Added library
-         case 'enchanter': renderEnchanter(); break; // Added enchanter
+         // --- MODIFIED: Adjust Enchanter returns ---
+         case 'enchanter': renderArcaneQuarter(); break; // Should not happen now, but keep fallback
+         case 'enchanter_menu': renderArcaneQuarter(); break; // Back from main enchanter menu
+         case 'enchanter_shop': renderEnchanterMenu(); break; // Back from shop goes to enchanter menu
+         case 'enchanter_enchant': renderEnchanterMenu(); break; // Back from enchant goes to enchanter menu
+         // --- END MODIFICATION ---
         default: renderTownSquare();
     }
 }
@@ -1371,36 +1376,6 @@ function renderCommercialDistrict() {
     render(container);
 }
 
-function renderArcaneQuarter() {
-    applyTheme('magic');
-    lastViewBeforeInventory = 'arcane_quarter';
-    gameState.currentView = 'arcane_quarter';
-
-    const container = document.createElement('div');
-    container.className = 'flex flex-col items-center justify-center w-full h-full';
-
-    const locations = [
-        { name: "Sage's Tower", action: "renderSageTowerMenu()" },
-        { name: 'Enchanter', action: "renderEnchanter()" },
-        { name: "Witch's Coven", action: "renderWitchsCoven()" }
-    ];
-
-    let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Arcane Quarter</h2>
-                <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
-
-    locations.forEach(loc => {
-        html += `<button onclick="${loc.action}" class="btn btn-magic">${loc.name}</button>`;
-    });
-
-    html += `</div>
-             <div class="mt-8">
-                <button onclick="renderTownSquare()" class="btn btn-action">Back to Town Square</button>
-             </div>`;
-
-    container.innerHTML = html;
-    render(container);
-}
-
 function renderHomeImprovements(activeCategoryKey = 'storage') {
     updateRealTimePalette();
     lastViewBeforeInventory = 'commercial_district';
@@ -1491,6 +1466,185 @@ function renderUpgradeCategory(categoryKey) {
 
 
     contentArea.innerHTML = html;
+}
+
+function renderArcaneQuarter() {
+    applyTheme('magic');
+    lastViewBeforeInventory = 'arcane_quarter';
+    gameState.currentView = 'arcane_quarter';
+
+    const container = document.createElement('div');
+    container.className = 'flex flex-col items-center justify-center w-full h-full';
+
+    const locations = [
+        { name: "Sage's Tower", action: "renderSageTowerMenu()" },
+        // --- MODIFIED: Single Enchanter Button points to the menu ---
+        { name: 'Enchanter', action: "renderEnchanterMenu()" },
+        // --- END MODIFICATION ---
+        { name: "Witch's Coven", action: "renderWitchsCoven()" }
+    ];
+
+    let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Arcane Quarter</h2>
+                <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
+
+    locations.forEach(loc => {
+        html += `<button onclick="${loc.action}" class="btn btn-magic">${loc.name}</button>`;
+    });
+
+    html += `</div>
+             <div class="mt-8">
+                <button onclick="renderTownSquare()" class="btn btn-action">Back to Town Square</button>
+             </div>`;
+
+    container.innerHTML = html;
+    render(container);
+}
+// --- END RESTORED FUNCTION ---
+
+// --- NEW FUNCTION: Renders the MAIN Enchanter menu ---
+function renderEnchanterShop() {
+    applyTheme('void'); // Use the Enchanter's theme
+    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
+    lastViewBeforeInventory = 'enchanter_shop'; // Use a specific view name
+    gameState.currentView = 'enchanter_shop';
+
+    let itemsHtml = '';
+    for (const category in ENCHANTER_INVENTORY) {
+        if (ENCHANTER_INVENTORY[category].length === 0) continue;
+        itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
+        itemsHtml += '<div class="space-y-2">';
+
+        itemsHtml += createItemList({
+            items: ENCHANTER_INVENTORY[category],
+            detailsFn: getItemDetails,
+            actionsHtmlFn: (key, details) => {
+                const price = details.price; // Enchanter prices are standard
+                return `
+                    <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
+                    <button onclick="buyItem('${key}', 'enchanter', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
+                `;
+            }
+        });
+
+        itemsHtml += '</div>';
+    }
+
+    let html = `<div class="w-full">
+                    <h2 class="font-medieval text-3xl mb-4 text-center">Enchanter's Wares</h2>
+                    <p class="text-center text-gray-400 mb-4">"Looking for reagents? Essences? Things to make your pointy bits... pointier?"</p>
+                    <div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div>
+                    <div class="flex justify-center gap-4 mt-4">
+                        <button onclick="renderEnchanterMenu()" class="btn btn-primary">Back</button>
+                    </div>
+                </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+
+    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
+}
+
+
+// --- Renders the ENCHANTING view ---
+function renderEnchanterEnchant(selectedElement = null) {
+    applyTheme('void');
+    lastViewBeforeInventory = 'enchanter_enchant'; // Keep specific view name for inventory return
+    gameState.currentView = 'enchanter_enchant'; // Keep specific view state
+
+    const container = document.createElement('div');
+    container.className = 'w-full';
+
+    let html = `<h2 class="font-medieval text-3xl mb-2 text-center">The Enchanter's Table</h2>
+                <p class="text-center text-gray-400 mb-6">"Bring your gear, bring the essence... let's make some magic happen."</p>`;
+
+    html += `<div class="mb-6 p-4 bg-slate-900/50 rounded-lg">
+                <h3 class="font-bold text-lg text-yellow-300 mb-3 text-center">1. Select an Element</h3>
+                <div class="flex flex-wrap justify-center gap-2">`;
+    const elements = Object.keys(ELEMENTS).filter(e => e !== 'none' && e !== 'healing');
+    elements.forEach(key => {
+        const isSelected = selectedElement === key;
+        html += `<button onclick="renderEnchanterEnchant('${key}')" class="btn ${isSelected ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-sm py-1 px-3">${capitalize(key)}</button>`;
+    });
+    html += `</div></div>`;
+
+    if (selectedElement) {
+        const essenceKey = `${selectedElement}_essence`;
+        const essenceDetails = getItemDetails(essenceKey);
+        if (!essenceDetails) {
+             html += `<p class="text-red-500 text-center">Error: Could not find details for ${selectedElement} essence.</p>`;
+        } else {
+            const playerEssence = player.inventory.items[essenceKey] || 0;
+
+            html += `<div class="mb-6 p-4 bg-slate-900/50 rounded-lg">
+                        <h3 class="font-bold text-lg text-yellow-300 mb-3 text-center">2. Choose Gear to Enchant</h3>
+                        <p class="text-center mb-4">You have <span class="font-bold text-cyan-300">${playerEssence}</span> ${essenceDetails.name}.</p>
+                        <div class="space-y-4">`;
+
+            const gearToDisplay = [
+                { type: 'weapon', item: player.equippedWeapon, currentElement: player.weaponElement },
+                { type: 'armor', item: player.equippedArmor, currentElement: player.armorElement },
+                { type: 'shield', item: player.equippedShield, currentElement: player.shieldElement }
+            ];
+
+            gearToDisplay.forEach(gear => {
+                if (!gear.item || !gear.item.name || gear.item.name === 'None' || !gear.item.rarity) return;
+
+                const costs = ENCHANTING_COSTS[gear.item.rarity];
+                const canAfford = costs && playerEssence >= costs.essence && player.gold >= costs.gold;
+                const isAlreadyEnchanted = gear.currentElement === selectedElement;
+                const canEnchant = gear.item.rarity !== 'Broken' && !isAlreadyEnchanted;
+
+                html += `<div class="flex flex-col sm:flex-row justify-between items-center p-3 bg-slate-800 rounded-lg">
+                            <div>
+                                <p class="font-bold">${gear.item.name} <span class="text-xs text-gray-400">(${gear.item.rarity})</span></p>
+                                <p class="text-sm">Current: <span class="font-semibold ${gear.currentElement === 'none' ? 'text-gray-500' : 'text-cyan-300'}">${capitalize(gear.currentElement)}</span></p>
+                            </div>
+                            <div class="text-right mt-2 sm:mt-0">`;
+                if (canEnchant && costs) {
+                     html += `<p class="text-xs">Cost: ${costs.essence} Essence, ${costs.gold} G</p>
+                                <button onclick="enchantItem('${gear.type}', '${selectedElement}')" class="btn btn-primary text-sm py-1 px-3 mt-1" ${!canAfford ? 'disabled' : ''}>Enchant</button>`;
+                } else if (isAlreadyEnchanted) {
+                    html += `<p class="text-green-400 font-bold">Already Enchanted</p>`
+                } else {
+                     html += `<p class="text-gray-500 text-xs">Cannot be enchanted</p>`;
+                }
+                html += `</div></div>`;
+            });
+            html += `</div></div>`;
+        }
+    }
+
+
+    html += `<div class="text-center mt-6"><button onclick="renderEnchanterMenu()" class="btn btn-primary">Back</button></div>`;
+    container.innerHTML = html;
+    render(container);
+}
+
+
+// --- Renders the MAIN Enchanter menu ---
+function renderEnchanterMenu() {
+    applyTheme('void'); // Use the Enchanter's theme
+    lastViewBeforeInventory = 'enchanter_menu'; // Specific view for returning from inventory/sheet
+    gameState.currentView = 'enchanter_menu';
+
+    let html = `
+        <div class="w-full text-center">
+            <h2 class="font-medieval text-3xl mb-4 text-center">The Enchanter</h2>
+            <p class="mb-6 text-gray-400">"Welcome, welcome! Need some... esoteric supplies? Or perhaps looking to imbue your gear with elemental power?"</p>
+            <div class="flex flex-col md:flex-row justify-center items-center gap-4">
+                <button onclick="renderEnchanterShop()" class="btn btn-primary w-full md:w-auto">Buy Wares</button>
+                <button onclick="renderEnchanterEnchant()" class="btn btn-primary w-full md:w-auto">Enchant Gear</button>
+            </div>
+             <div class="mt-8">
+                <button onclick="renderArcaneQuarter()" class="btn btn-action">Back to Arcane Quarter</button>
+            </div>
+        </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
 }
 
 function renderWitchsCoven(subView = 'main') {
@@ -1647,75 +1801,6 @@ function renderSageTowerMenu() {
             </div>
         </div>`;
     const container = document.createElement('div');
-    container.innerHTML = html;
-    render(container);
-}
-
-function renderEnchanter(selectedElement = null) {
-    applyTheme('void');
-    lastViewBeforeInventory = 'enchanter';
-    gameState.currentView = 'enchanter';
-
-    const container = document.createElement('div');
-    container.className = 'w-full';
-
-    let html = `<h2 class="font-medieval text-3xl mb-2 text-center">The Enchanter's Table</h2>
-                <p class="text-center text-gray-400 mb-6">Imbue your equipment with elemental power.</p>`;
-
-    html += `<div class="mb-6 p-4 bg-slate-900/50 rounded-lg">
-                <h3 class="font-bold text-lg text-yellow-300 mb-3 text-center">1. Select an Element</h3>
-                <div class="flex flex-wrap justify-center gap-2">`;
-    const elements = Object.keys(ELEMENTS).filter(e => e !== 'none' && e !== 'healing');
-    elements.forEach(key => {
-        const isSelected = selectedElement === key;
-        html += `<button onclick="renderEnchanter('${key}')" class="btn ${isSelected ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-sm py-1 px-3">${capitalize(key)}</button>`;
-    });
-    html += `</div></div>`;
-
-    if (selectedElement) {
-        const essenceKey = `${selectedElement}_essence`;
-        const essenceDetails = getItemDetails(essenceKey);
-        const playerEssence = player.inventory.items[essenceKey] || 0;
-
-        html += `<div class="mb-6 p-4 bg-slate-900/50 rounded-lg">
-                    <h3 class="font-bold text-lg text-yellow-300 mb-3 text-center">2. Choose Gear to Enchant</h3>
-                    <p class="text-center mb-4">You have <span class="font-bold text-cyan-300">${playerEssence}</span> ${essenceDetails.name}.</p>
-                    <div class="space-y-4">`;
-
-        const gearToDisplay = [
-            { type: 'weapon', item: player.equippedWeapon, currentElement: player.weaponElement },
-            { type: 'armor', item: player.equippedArmor, currentElement: player.armorElement },
-            { type: 'shield', item: player.equippedShield, currentElement: player.shieldElement }
-        ];
-
-        gearToDisplay.forEach(gear => {
-            if (!gear.item || !gear.item.name || gear.item.name === 'None') return;
-
-            const costs = ENCHANTING_COSTS[gear.item.rarity];
-            const canAfford = costs && playerEssence >= costs.essence && player.gold >= costs.gold;
-            const isAlreadyEnchanted = gear.currentElement === selectedElement;
-            const canEnchant = gear.item.rarity !== 'Broken' && !isAlreadyEnchanted;
-
-            html += `<div class="flex flex-col sm:flex-row justify-between items-center p-3 bg-slate-800 rounded-lg">
-                        <div>
-                            <p class="font-bold">${gear.item.name} <span class="text-xs text-gray-400">(${gear.item.rarity})</span></p>
-                            <p class="text-sm">Current: <span class="font-semibold ${gear.currentElement === 'none' ? 'text-gray-500' : 'text-cyan-300'}">${capitalize(gear.currentElement)}</span></p>
-                        </div>
-                        <div class="text-right mt-2 sm:mt-0">`;
-            if (canEnchant && costs) {
-                 html += `<p class="text-xs">Cost: ${costs.essence} Essence, ${costs.gold} G</p>
-                            <button onclick="enchantItem('${gear.type}', '${selectedElement}')" class="btn btn-primary text-sm py-1 px-3 mt-1" ${!canAfford ? 'disabled' : ''}>Enchant</button>`;
-            } else if (isAlreadyEnchanted) {
-                html += `<p class="text-green-400 font-bold">Already Enchanted</p>`
-            } else {
-                 html += `<p class="text-gray-500 text-xs">Cannot be enchanted</p>`;
-            }
-            html += `</div></div>`;
-        });
-        html += `</div></div>`;
-    }
-
-    html += `<div class="text-center mt-6"><button onclick="renderArcaneQuarter()" class="btn btn-primary">Back</button></div>`;
     container.innerHTML = html;
     render(container);
 }
@@ -2357,7 +2442,7 @@ function renderInventory() {
             const allConsumableKeys = Object.keys(player.inventory.items).filter(key => {
                 const details = getItemDetails(key);
                 // Ensure it's a consumable type we want to display here
-                return details && ['healing', 'mana_restore', 'buff', 'cleanse', 'experimental', 'enchant'].includes(details.type);
+                return details && ['healing', 'mana_restore', 'buff', 'cleanse', 'experimental', 'enchant', 'cleanse_specific', 'buff_apply'].includes(details.type); // Added new types
             });
 
              // Map to objects with details for sorting
@@ -2419,12 +2504,15 @@ function renderInventory() {
                  if (count > 1) countStr = `(x${count})`;
 
                  let buttonHtml = '';
+                 // Allow using items outside battle
                  let action = `useItem('${key}')`;
                  let buttonClass = 'btn-item';
                  let buttonText = 'Use';
-                 if (details.type === 'enchant') {
-                     action = '';
-                     buttonText = 'Enchant';
+
+                 // Disable 'Use' for Essences outside battle
+                 if (details.type === 'enchant' || details.type === 'debuff_apply' || details.type === 'debuff_special') {
+                     action = ''; // Cannot use essences/bombs outside battle
+                     buttonText = 'Use (Battle)'; // Change text maybe?
                  }
                  buttonHtml = `<button onclick="${action}" class="btn ${buttonClass} text-sm py-1 px-3" ${action === '' ? 'disabled' : ''}>${buttonText}</button>`;
 
@@ -2585,25 +2673,35 @@ function renderInventory() {
 function renderBattle(subView = 'main', actionData = null) {
      if (gameState.battleEnded) return;
      // Allow item use even if no enemies (e.g., healing potion)
-     if (currentEnemies.length === 0 && subView !== 'item') return;
+     // Modified: Allow buff items even if no enemies
+     if (currentEnemies.length === 0 && subView !== 'item' && subView !== 'buff') return; // Added buff check
+
 
      if (subView === 'main') {
         renderBattleGrid();
      } else if (subView === 'attack' || subView === 'magic_target' || subView === 'item_target') { // Combined target selection
         let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Choose a Target</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
-        let buttonAction, buttonClass;
+        let buttonAction, buttonClass, titleText, backFunction;
 
         if (subView === 'attack') {
              buttonAction = 'performAttack';
              buttonClass = 'btn-action';
-        } else if (subView === 'magic_target'){ // Fixed the space to underscore here
+             titleText = 'Attack';
+             backFunction = 'renderBattleGrid()'; // Back to main battle actions
+        } else if (subView === 'magic_target'){
             buttonAction = `castSpell('${actionData.spellKey}', index)`; // Need index placeholder
              buttonClass = 'btn-magic';
-        } else { // item_target
+             titleText = `Cast ${SPELLS[actionData.spellKey]?.tiers[player.spells[actionData.spellKey]?.tier -1]?.name || 'Spell'}`;
+             backFunction = `renderBattle('magic')`; // Back to magic selection
+        } else { // item_target (debuff_apply, debuff_special, enchant)
+             const itemDetails = getItemDetails(actionData.itemKey);
              buttonAction = `useItem('${actionData.itemKey}', true, index)`; // Need index placeholder
              buttonClass = 'btn-item';
+             titleText = `Use ${itemDetails?.name || 'Item'} On`;
+             backFunction = `renderBattle('item')`; // Back to item selection
         }
 
+        html = `<h2 class="font-medieval text-3xl mb-4 text-center">${titleText}</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
 
         currentEnemies.forEach((enemy, index) => {
             if (enemy.isAlive()) {
@@ -2611,7 +2709,7 @@ function renderBattle(subView = 'main', actionData = null) {
                  html += `<button onclick="${finalAction}" class="btn ${buttonClass}">${enemy.name}</button>`;
             }
         });
-        html += `</div><button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>`;
+        html += `</div><button onclick="${backFunction}" class="btn btn-primary">Back</button>`;
         const container = document.createElement('div');
         container.innerHTML = html;
         render(container);
@@ -2660,24 +2758,28 @@ function renderBattle(subView = 'main', actionData = null) {
         const usableItems = Object.keys(player.inventory.items)
             .filter(key => {
                 const item = ITEMS[key];
-                // Filter for usable types
-                return item && ['healing', 'mana_restore', 'buff', 'cleanse', 'enchant', 'experimental'].includes(item.type);
+                // Filter for usable types IN BATTLE
+                return item && ['healing', 'mana_restore', 'buff', 'cleanse', 'enchant', 'experimental', 'cleanse_specific', 'debuff_apply', 'debuff_special'].includes(item.type); // Added new types
             })
             .map(key => ({ key, details: ITEMS[key] })); // Map to include details
 
         // Define the order and headers for categories
-        const typeOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'enchant', 'experimental'];
+        const typeOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'debuff_apply', 'debuff_special', 'enchant', 'experimental'];
         const typeMap = {
             'healing': 'Healing Potions',
             'mana_restore': 'Mana Potions',
             'buff': 'Buff Items',
             'cleanse': 'Cleansing Items',
+            'cleanse_specific': 'Antidotes/Needles',
+            'debuff_apply': 'Throwables (Debuff)',
+            'debuff_special': 'Throwables (Special)',
             'enchant': 'Essences',
             'experimental': 'Mysterious Concoctions'
         };
 
         // Sort items: first by type order, then alphabetically by name
         usableItems.sort((a, b) => {
+            // ... (sorting logic remains the same) ...
             const typeAIndex = typeOrder.indexOf(a.details.type);
             const typeBIndex = typeOrder.indexOf(b.details.type);
             if (typeAIndex !== typeBIndex) {
@@ -2693,17 +2795,32 @@ function renderBattle(subView = 'main', actionData = null) {
             usableItems.forEach(itemObj => {
                 const key = itemObj.key;
                 const item = itemObj.details;
-                const count = player.inventory.items[key];
+                // *** MODIFIED COUNT FETCH AND CHECK ***
+                const count = player.inventory.items[key] || 0; // Default to 0 if undefined
+
+                // Skip rendering if count is zero or less
+                if (count <= 0) return;
+                // *** END MODIFICATION ***
+
 
                 // Add subheader if type changes
                 if (item.type !== currentType) {
+                    // ... (subheader logic remains the same) ...
                     currentType = item.type;
                     const header = typeMap[currentType] || capitalize(currentType);
-                    // Adjust grid column span based on number of columns later if needed
                     itemsHtml += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2 col-span-1 md:col-span-2">${header}</h4>`;
                 }
 
-                let action = `battleAction('item_select', {itemKey: '${key}'})`; // Use item_select action
+                // Determine action based on item type
+                let action;
+                if (['enchant', 'debuff_apply', 'debuff_special'].includes(item.type)) {
+                     // These require targeting
+                     action = `renderBattle('item_target', { itemKey: '${key}' })`;
+                } else {
+                    // Others are used immediately
+                    action = `battleAction('item_select', { itemKey: '${key}' })`;
+                }
+
 
                 itemsHtml += `<button onclick="${action}" class="btn btn-item w-full text-left" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"><div class="flex justify-between"><span>${item.name}</span><span>x${count}</span></div></button>`;
             });
@@ -2724,6 +2841,7 @@ function renderBattle(subView = 'main', actionData = null) {
         container.innerHTML = html;
         render(container);
      }
+
 }
 
 function renderPostBattleMenu() {
@@ -2864,6 +2982,16 @@ window.castHealingSpellOutsideCombat = function(spellKey) {
     diceCount = Math.min(spell.cap, diceCount + spellAmp);
 
     let healAmount = rollDice(diceCount, spell.damage[1], `Healing Spell: ${spell.name}`).total + player.magicalDamageBonus;
+
+    // --- Fertilized Seed Interaction (Out of Combat) ---
+    if (player.statusEffects.buff_fertilized && spellData.element === 'nature') { // Nature check might be redundant if only light heals
+        const healMultiplier = player.statusEffects.buff_fertilized.healMultiplier;
+        healAmount = Math.floor(healAmount * healMultiplier);
+        addToLog("The Fertilized Seed enhances the healing!", "text-green-200");
+        // Buff duration doesn't decrease outside combat
+    }
+    // --- End Fertilized Seed Interaction ---
+
 
     // --- ELEMENTAL: Innate Elementalist (Healing) ---
     if (player.race === 'Elementals' && player.elementalAffinity === 'healing') {
