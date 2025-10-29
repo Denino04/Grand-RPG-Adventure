@@ -2424,10 +2424,13 @@ function renderInventory() {
     gameState.currentView = 'inventory';
 
     // --- Tab Definitions ---
+    // MODIFICATION: Added 'Gardens' tab
     const tabs = [
         { key: 'spells', icon: '✨', title: 'Spells' },
         { key: 'key_items', icon: '🔑', title: 'Key Items' },
         { key: 'consumables', icon: '🧪', title: 'Consumables' },
+        { key: 'gardens', icon: '🌱', title: 'Gardens' },      // <-- New Tab
+        { key: 'materials', icon: '🧱', title: 'Materials' },
         { key: 'weapons', icon: '⚔️', title: 'Weapons' },
         { key: 'catalysts', icon: '🔮', title: 'Catalysts' },
         { key: 'armor', icon: '⛊', title: 'Armor' },
@@ -2435,108 +2438,198 @@ function renderInventory() {
         { key: 'lures', icon: '🎣', title: 'Lures' }
     ];
 
-    // --- Helper to Render Lists (Modified for Consumable Sorting) ---
+
+    // --- Helper to Render Lists (Modified for Consumable Sorting, Materials, and Gardens) ---
+    // MODIFICATION: Added 'gardens' category handling, removed seed/sapling from materials
     const renderList = (category, title) => {
         let list = [];
         let itemCounts = {};
         let html = ''; // Start empty
 
         // Define the desired order for consumable types
-        const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'enchant', 'experimental'];
-        const typeMap = {
+        const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'enchant', 'experimental'];
+        const typeMapConsumables = {
             'healing': 'Healing Potions',
             'mana_restore': 'Mana Potions',
-            'buff': 'Buff Potions',
+            'buff': 'Buff Items',
             'cleanse': 'Cleansing Items',
-            'enchant': 'Essences',
+            'cleanse_specific': 'Antidotes/Needles',
+            'buff_apply': 'Greases/Enhancements',
+            'debuff_apply': 'Throwables (Debuff)',
+            'debuff_special': 'Throwables (Special)',
+            'enchant': 'Essences (Combat Use)',
             'experimental': 'Mysterious Concoctions'
         };
 
+        // Define categories for the Materials tab (Removed seed/sapling)
+        const materialOrder = ['food_ingredient', 'alchemy', 'enchant', 'special', 'junk'];
+        const typeMapMaterials = {
+             'food_ingredient': 'Cooking Ingredients',
+             'alchemy': 'Alchemy Reagents',
+             'enchant': 'Essences (Crafting)',
+             'special': 'Special Items',
+             'junk': 'Junk & Trophies'
+        };
 
-        if (category === 'items') {
-            // Get all consumable keys first
+        // Define categories for the Gardens tab
+        const gardenOrder = ['seed', 'sapling'];
+        const typeMapGardens = {
+            'seed': 'Seeds',
+            'sapling': 'Saplings'
+        };
+
+
+        if (category === 'items') { // Handling 'Consumables' Tab
             const allConsumableKeys = Object.keys(player.inventory.items).filter(key => {
                 const details = getItemDetails(key);
-                // Ensure it's a consumable type we want to display here
-                return details && ['healing', 'mana_restore', 'buff', 'cleanse', 'experimental', 'enchant', 'cleanse_specific', 'buff_apply'].includes(details.type); // Added new types
+                return details && consumableOrder.includes(details.type);
             });
-
-             // Map to objects with details for sorting
              const itemsWithDetails = allConsumableKeys.map(key => ({ key, details: getItemDetails(key) }));
-
-             // Sort the items: first by type order, then alphabetically by name
              itemsWithDetails.sort((a, b) => {
                  const typeAIndex = consumableOrder.indexOf(a.details.type);
                  const typeBIndex = consumableOrder.indexOf(b.details.type);
                  if (typeAIndex !== typeBIndex) {
-                     // Handle cases where a type might not be in consumableOrder (shouldn't happen with filter)
                      const finalAIndex = typeAIndex === -1 ? consumableOrder.length : typeAIndex;
                      const finalBIndex = typeBIndex === -1 ? consumableOrder.length : typeBIndex;
                      return finalAIndex - finalBIndex;
                  }
                  return a.details.name.localeCompare(b.details.name);
              });
-
-             // The 'list' will now be the sorted array of {key, details} objects
              list = itemsWithDetails;
 
+        // --- NEW: Handling 'Gardens' Tab ---
+        } else if (category === 'gardens') {
+            const allGardenKeys = Object.keys(player.inventory.items).filter(key => {
+                const details = getItemDetails(key);
+                return details && gardenOrder.includes(details.type); // Filter for seed/sapling
+            });
+            const itemsWithDetails = allGardenKeys.map(key => ({ key, details: getItemDetails(key) }));
+            itemsWithDetails.sort((a, b) => { // Sort by type (seed vs sapling), then name
+                 const typeAIndex = gardenOrder.indexOf(a.details.type);
+                 const typeBIndex = gardenOrder.indexOf(b.details.type);
+                 if (typeAIndex !== typeBIndex) {
+                     return typeAIndex - typeBIndex;
+                 }
+                 return a.details.name.localeCompare(b.details.name);
+            });
+            list = itemsWithDetails;
+        // --- End Gardens Handling ---
+
+        } else if (category === 'materials') { // Handling 'Materials' Tab
+            const allMaterialKeys = Object.keys(player.inventory.items).filter(key => {
+                const details = getItemDetails(key);
+                // Filter for material types (excluding seed/sapling now)
+                return details && materialOrder.includes(details.type);
+            });
+
+            const itemsWithDetails = allMaterialKeys.map(key => ({ key, details: getItemDetails(key) }));
+
+            itemsWithDetails.sort((a, b) => {
+                 const typeAIndex = materialOrder.indexOf(a.details.type);
+                 const typeBIndex = materialOrder.indexOf(b.details.type);
+                 if (typeAIndex !== typeBIndex) {
+                     const finalAIndex = typeAIndex === -1 ? materialOrder.length : typeAIndex;
+                     const finalBIndex = typeBIndex === -1 ? materialOrder.length : typeBIndex;
+                     return finalAIndex - finalBIndex;
+                 }
+                 return a.details.name.localeCompare(b.details.name);
+            });
+            list = itemsWithDetails;
 
         } else if (category === 'lures') {
             list = Object.keys(player.inventory.lures).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name)); // Sort lures alphabetically
         } else { // Equipment
             if (!Array.isArray(player.inventory[category])) player.inventory[category] = [];
-            // Filter out invalid keys
-            player.inventory[category] = player.inventory[category].filter(key => getItemDetails(key));
-
+            player.inventory[category] = player.inventory[category].filter(key => getItemDetails(key)); // Filter invalid keys
             player.inventory[category].forEach(key => itemCounts[key] = (itemCounts[key] || 0) + 1);
             list = Object.keys(itemCounts).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name)); // Sort equipment alphabetically
         }
 
-        if ((category === 'items' && list.length === 0) || (category !== 'items' && (!list || list.length === 0))) {
+        // Updated check for empty lists
+        if (['items', 'materials', 'gardens'].includes(category) && list.length === 0) {
+            return `<p class="text-gray-400 text-center mt-4">No ${title.toLowerCase()} found.</p>`;
+        } else if (!['items', 'materials', 'gardens'].includes(category) && (!list || list.length === 0)) {
             return `<p class="text-gray-400 text-center mt-4">No ${title.toLowerCase()} found.</p>`;
         }
+
 
         html += `<div id="inventory-${category}-list" class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-2">`; // Added space-y-2
 
         // --- Render Consumables with Subheaders ---
         let currentSubType = ''; // Track the current sub-type for headers
         if (category === 'items') {
-            list.forEach(itemObj => { // list is now array of {key, details}
+            list.forEach(itemObj => {
                 const key = itemObj.key;
                 const details = itemObj.details;
-                 if (!details) return; // Should not happen with filtering
+                 if (!details) return;
 
-                 // Check if the sub-type changed to add a header
                  const subType = details.type;
                  if (subType !== currentSubType) {
                      currentSubType = subType;
-                     const subHeader = typeMap[subType] || capitalize(subType);
+                     const subHeader = typeMapConsumables[subType] || capitalize(subType);
                      html += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2">${subHeader}</h4>`;
                  }
-
 
                  let countStr = '';
                  let count = player.inventory.items[key] || 0;
                  if (count > 1) countStr = `(x${count})`;
 
                  let buttonHtml = '';
-                 // Allow using items outside battle
                  let action = `useItem('${key}')`;
                  let buttonClass = 'btn-item';
                  let buttonText = 'Use';
 
-                 // Disable 'Use' for Essences outside battle
-                 if (details.type === 'enchant' || details.type === 'debuff_apply' || details.type === 'debuff_special') {
-                     action = ''; // Cannot use essences/bombs outside battle
-                     buttonText = 'Use (Battle)'; // Change text maybe?
+                 if (['enchant', 'debuff_apply', 'debuff_special'].includes(details.type)) {
+                     action = '';
+                     buttonText = 'Use (Battle)';
                  }
                  buttonHtml = `<button onclick="${action}" class="btn ${buttonClass} text-sm py-1 px-3" ${action === '' ? 'disabled' : ''}>${buttonText}</button>`;
 
                  html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr}</span>${buttonHtml}</div>`;
             });
-        }
+        // --- Render Gardens with Subheaders ---
+        } else if (category === 'gardens') {
+            list.forEach(itemObj => {
+                const key = itemObj.key;
+                const details = itemObj.details;
+                if (!details) return;
+
+                const subType = details.type;
+                if (subType !== currentSubType) {
+                     currentSubType = subType;
+                     const subHeader = typeMapGardens[subType] || capitalize(subType); // Use Gardens map
+                     html += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2">${subHeader}</h4>`;
+                }
+
+                let countStr = '';
+                let count = player.inventory.items[key] || 0;
+                if (count > 1) countStr = `(x${count})`;
+
+                // Seeds/Saplings can't be "used" from inventory
+                html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr}</span></div>`;
+            });
+        // --- Render Materials with Subheaders ---
+        } else if (category === 'materials') {
+             list.forEach(itemObj => {
+                const key = itemObj.key;
+                const details = itemObj.details;
+                if (!details) return;
+
+                const subType = details.type;
+                if (subType !== currentSubType) {
+                     currentSubType = subType;
+                     const subHeader = typeMapMaterials[subType] || capitalize(subType); // Use Materials map
+                     html += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2">${subHeader}</h4>`;
+                }
+
+                let countStr = '';
+                let count = player.inventory.items[key] || 0;
+                if (count > 1) countStr = `(x${count})`;
+
+                html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr}</span></div>`;
+            });
         // --- Render Other Categories (Equipment, Lures) ---
-        else {
+        } else {
              list.forEach(key => {
                  const details = getItemDetails(key);
                  if (!details) return;
@@ -2557,7 +2650,7 @@ function renderInventory() {
                                   (category === 'armor' && ARMOR[key] === player.equippedArmor) ||
                                   (category === 'shields' && SHIELDS[key] === player.equippedShield) ||
                                   (category === 'lures' && key === player.equippedLure);
-                 const equippedText = isEquipped ? "<span class='text-green-400 font-bold ml-2'>[E]</span>" : ""; // Use double quotes outside, single inside
+                 const equippedText = isEquipped ? "<span class='text-green-400 font-bold ml-2'>[E]</span>" : "";
                  let buttonHtml = '';
 
                  if (isEquipped) {
@@ -2640,20 +2733,24 @@ function renderInventory() {
     };
 
     // --- Build Tab Buttons ---
-    let tabHtml = '<div class="flex flex-wrap gap-1 mb-2">';
+    // MODIFICATION: Changed to grid, added Gardens tab
+    let tabHtml = '<div class="grid grid-cols-5 gap-1 mb-2">'; // Use grid, 5 columns
     tabs.forEach(tab => {
         const isActive = inventoryActiveTab === tab.key;
         const bgColor = isActive ? 'bg-yellow-600 border-yellow-800' : 'bg-slate-700 hover:bg-slate-600 border-slate-900';
-        tabHtml += `<button onclick="setInventoryTab('${tab.key}')" class="btn ${bgColor} text-xs py-1 px-2 flex items-center gap-1"> ${tab.icon} ${tab.title}</button>`;
+        tabHtml += `<button onclick="setInventoryTab('${tab.key}')" class="btn ${bgColor} text-xs py-1 px-2 flex items-center justify-center gap-1 w-full">${tab.icon} ${tab.title}</button>`;
     });
     tabHtml += '</div>';
 
     // --- Determine Content for Right Pane ---
     let rightPaneContent = '';
+    // MODIFICATION: Added 'gardens' case
     switch (inventoryActiveTab) {
         case 'spells': rightPaneContent = renderSpellbook(); break;
         case 'key_items': rightPaneContent = renderKeyItemsList(); break;
         case 'consumables': rightPaneContent = renderList('items', 'Consumables'); break;
+        case 'gardens': rightPaneContent = renderList('gardens', 'Gardens'); break;         // <-- New Case
+        case 'materials': rightPaneContent = renderList('materials', 'Materials'); break;
         case 'weapons': rightPaneContent = renderList('weapons', 'Weapons'); break;
         case 'catalysts': rightPaneContent = renderList('catalysts', 'Catalysts'); break;
         case 'armor': rightPaneContent = renderList('armor', 'Armor'); break;
@@ -2685,6 +2782,7 @@ function renderInventory() {
         newActiveList.scrollTop = scrollPos;
     }
 }
+
 
 function renderBattle(subView = 'main', actionData = null) {
      if (gameState.battleEnded) return;
