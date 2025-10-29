@@ -13,8 +13,10 @@ function startBattle(biomeKey, trainingConfig = null) {
     gameState.isPlayerTurn = true;
     gameState.battleEnded = false;
     gameState.currentBiome = biomeKey;
-    $('#inventory-btn').disabled = true;
-    $('#character-sheet-btn').disabled = true;
+    // --- Disable buttons on battle start ---
+    $('#inventory-btn').disabled = false;
+    $('#character-sheet-btn').disabled = false;
+    // --- END MODIFICATION ---
     currentEnemies = [];
     player.clearBattleBuffs(); // Clear buffs from previous battle
     gameState.action = null;
@@ -38,6 +40,7 @@ function startBattle(biomeKey, trainingConfig = null) {
 
     if (isTutorialBattle) {
         // --- TUTORIAL BATTLE SETUP ---
+        // ... (rest of tutorial setup remains the same) ...
         const gridData = BATTLE_GRIDS['square_5x5'];
         gameState.gridWidth = gridData.width;
         gameState.gridHeight = gridData.height;
@@ -72,6 +75,7 @@ function startBattle(biomeKey, trainingConfig = null) {
 
     } else if (trainingConfig) {
         // --- TRAINING BATTLE SETUP ---
+        // ... (rest of training setup remains the same) ...
         const gridSize = trainingConfig.gridSize;
         const gridData = BATTLE_GRIDS[`square_${gridSize}x${gridSize}`] || BATTLE_GRIDS['square_5x5'];
         gameState.gridWidth = gridData.width;
@@ -102,6 +106,7 @@ function startBattle(biomeKey, trainingConfig = null) {
 
     } else {
         // --- STANDARD BATTLE SETUP ---
+        // ... (rest of standard setup remains the same) ...
         const gridKeys = Object.keys(BATTLE_GRIDS);
         const randomGridKey = gridKeys[Math.floor(Math.random() * gridKeys.length)];
         const gridData = BATTLE_GRIDS[randomGridKey];
@@ -246,7 +251,7 @@ function startBattle(biomeKey, trainingConfig = null) {
         applyTheme('town'); // Use a neutral theme for training
     }
 
-    lastViewBeforeInventory = 'battle';
+    lastViewBeforeInventory = 'battle'; // Set return view from inventory opened in battle
     gameState.currentView = 'battle';
     const enemyNames = currentEnemies.map(e => `<span class="font-bold text-red-400">${e.name}</span>`).join(', ');
 
@@ -259,6 +264,32 @@ function startBattle(biomeKey, trainingConfig = null) {
 
     if (isTutorialBattle) {
         advanceTutorial();
+    }
+}
+
+/**
+ * Handles returning to the battle screen after closing the inventory mid-battle.
+ * Does NOT advance the turn.
+ */
+function returnToBattleFromInventory() {
+    gameState.currentView = 'battle'; // Set view back to battle
+    const turnWasConsumed = !gameState.isPlayerTurn; // Check BEFORE resetting flags or rendering
+
+    // Always unlock actions when returning from inventory screen
+    isProcessingAction = false;
+
+    if (turnWasConsumed) {
+        console.log("Turn was consumed by equipping gear. Finalizing action.");
+        // Render the grid to show updated gear, potentially without player actions yet
+        renderBattleGrid();
+        // Crucially, call finalizePlayerAction AFTER rendering the grid update
+        // Use a small timeout to ensure the render completes before the enemy potentially acts instantly
+        setTimeout(finalizePlayerAction, 50); // Advance turn state (enemy turn, status effects etc.)
+    } else {
+        console.log("Returned from inventory without consuming turn.");
+        // If turn wasn't consumed, the player can still act.
+        gameState.action = null; // Reset any potential pending action from before inventory opened
+        renderBattleGrid(); // Re-render the battle grid WITH player action buttons
     }
 }
 
@@ -279,7 +310,15 @@ function renderBattleGrid(highlightTargets = false, highlightType = 'magic') { /
         spellRange = player.equippedCatalyst.range || 3;
         if (player.race === 'Pinionfolk' && player.level >= 20) spellRange += 2;
         if (player.equippedCatalyst.effect?.spell_sniper) spellRange *= (1 + player.equippedCatalyst.effect.spell_sniper);
+        // Apply Magic Rock Dust range bonus for highlighting
+        if (player.statusEffects.buff_magic_dust && player.statusEffects.buff_magic_dust.rangeIncrease) {
+             spellRange += player.statusEffects.buff_magic_dust.rangeIncrease;
+        }
     }
+
+    // --- NEW: Item details for highlighting ---
+    const itemData = gameState.itemToUse ? ITEMS[gameState.itemToUse] : null;
+    let itemRange = itemData?.range || 0; // Default to 0 range if not specified
 
     for (let y = 0; y < gameState.gridHeight; y++) {
         for (let x = 0; x < gameState.gridWidth; x++) {
@@ -344,23 +383,8 @@ function renderBattleGrid(highlightTargets = false, highlightType = 'magic') { /
                          if (dx + dy <= spellRange) {
                              if (enemy && enemy.isAlive()) { // Only highlight living enemies
                                  cell.classList.add('magic-attackable');
-                                 // Highlight splash targets if AOE
-                                 if (spellData.type === 'aoe') {
-                                     // Need to iterate through all potential cells AFTER they are added to DOM
-                                     // This logic will run for *each* potential target, highlighting its splash zone
-                                     const splashCells = gridContainer.querySelectorAll(`.grid-cell`); // Get cells within the container being built
-                                     splashCells.forEach(splashCell => {
-                                         if (splashCell.dataset.x === undefined) return;
-                                         const sx = parseInt(splashCell.dataset.x);
-                                         const sy = parseInt(splashCell.dataset.y);
-                                         if (Math.abs(x - sx) <= 1 && Math.abs(y - sy) <= 1) {
-                                              if (sx !== x || sy !== y) {
-                                                  splashCell.classList.add('splash-targetable');
-                                              }
-                                         }
-                                     });
-                                     cell.classList.add('magic-attackable'); // Re-apply main target highlight
-                                 }
+                                 // Highlight splash targets if AOE (handled later after all cells exist)
+                                 // We mark the primary targets now
                              }
                          }
                      }
@@ -370,6 +394,17 @@ function renderBattleGrid(highlightTargets = false, highlightType = 'magic') { /
                               cell.classList.add('attackable'); // Use attackable highlight for marking
                           }
                      }
+                     // --- NEW: Item Targeting ---
+                     else if (gameState.action === 'item_target' && highlightType === 'item' && itemData && itemRange > 0) {
+                         const dx = Math.abs(player.x - x);
+                         const dy = Math.abs(player.y - y);
+                         if (dx + dy <= itemRange) {
+                             if (enemy && enemy.isAlive()) { // Only highlight living enemies
+                                 cell.classList.add('item-attackable'); // Use the new class
+                             }
+                         }
+                     }
+                     // --- END NEW ---
                  }
                 // --- End Highlighting Logic ---
 
@@ -499,10 +534,14 @@ function handleCellClick(x, y) {
     const isFlying = (player.race === 'Pinionfolk');
 
     if (gameState.action === 'move') {
+        // ... existing move code ...
+        // This part remains unchanged.
         isProcessingAction = true; // Lock actions
-        cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable'));
+        cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable')); // Clear item highlight too
         movePlayer(x, y);
     } else if (gameState.action === 'attack') {
+        // ... existing attack code ...
+        // This part remains unchanged.
         isProcessingAction = true; // Lock actions
         if (clickedEnemy) {
             const targetIndex = currentEnemies.indexOf(clickedEnemy);
@@ -516,11 +555,13 @@ function handleCellClick(x, y) {
                  return; // Do nothing, keep action active
              }
              gameState.action = null; // Cancel action if clicking empty space
-             cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable'));
+             cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable')); // Clear item highlight too
              isProcessingAction = false; // Unlock actions
              renderBattleGrid(); // Re-render actions to show default buttons
         }
     } else if (gameState.action === 'magic_cast') {
+        // ... existing magic code ...
+        // This part remains unchanged.
         isProcessingAction = true; // Lock actions
         if (clickedEnemy && clickedEnemy.isAlive()) { // Ensure target is alive
             const targetIndex = currentEnemies.indexOf(clickedEnemy);
@@ -534,12 +575,45 @@ function handleCellClick(x, y) {
             // Cancel spell if clicking somewhere invalid
             gameState.action = null;
             gameState.spellToCast = null; // Also clear the selected spell
-            cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable'));
+            cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable')); // Clear item highlight too
             isProcessingAction = false; // Unlock actions
             // Re-render actions to show default buttons
             renderBattleGrid();
         }
+    // --- MODIFIED: Handle item targeting via grid click ---
+    } else if (gameState.action === 'item_target') {
+        isProcessingAction = true; // Lock actions
+        // Clear highlights immediately after click attempt
+        cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable'));
+        if (clickedEnemy && clickedEnemy.isAlive()) { // Ensure target is alive
+            const targetIndex = currentEnemies.indexOf(clickedEnemy);
+            const itemKey = gameState.itemToUse; // Store key before clearing state
+            gameState.action = null; // Clear action state
+            gameState.itemToUse = null; // Clear stored item key
+            // Call useItem with the stored item key and target index
+            useItem(itemKey, true, targetIndex);
+            // useItem should handle finalizing the action
+        } else {
+            // If we are flying, we can't click an empty ground/terrain cell to cancel
+            if (isFlying && gameState.gridObjects.some(o => o.x === x && o.y === y && o.type === 'terrain')) {
+                 isProcessingAction = false; // Keep action active
+                 // Re-highlight targets if cancellation failed due to flying over terrain
+                 renderBattleGrid(true, 'item');
+                 return;
+             }
+            // Cancel item use if clicking somewhere invalid (e.g., empty cell)
+            gameState.action = null;
+            gameState.itemToUse = null; // Clear selected item
+            isProcessingAction = false; // Unlock actions
+            renderBattleGrid(); // Re-render actions to show default buttons
+            addToLog("Item use cancelled.", "text-gray-400"); // Add feedback
+            // Turn does NOT end on cancellation, player can choose another action
+            gameState.isPlayerTurn = true;
+        }
+    // --- END MODIFICATION ---
     } else if (gameState.action === 'mark_target') { // Ranger Mark Target
+         // ... existing mark target code ...
+         // This part remains unchanged.
          isProcessingAction = true; // Lock actions
          if (clickedEnemy && clickedEnemy.isAlive()) {
              // Deduct cost and mark used now that target is confirmed
@@ -556,7 +630,7 @@ function handleCellClick(x, y) {
          } else {
              // Cancel mark if clicking somewhere invalid
              gameState.action = null;
-             cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable')); // Clear highlights
+             cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable')); // Clear highlights
              isProcessingAction = false; // Unlock
              // REFUND ability use since it failed
              player.signatureAbilityUsed = false;
@@ -572,6 +646,8 @@ function handleCellClick(x, y) {
          }
     }
 }
+
+
 
 function isCellBlocked(x, y, forEnemy = false, canFly = false) {
     // Check if the cell is part of the layout
@@ -1850,13 +1926,17 @@ function battleAction(type, actionData = null) {
         gameState.comboCount = 0;
     }
 
-    gameState.action = type;
+    gameState.action = type; // Set action state early
+    // Clear highlights BEFORE setting the new action state potentially adds highlights back
     const cells = document.querySelectorAll('.grid-cell');
-    cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable'));
+    cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable')); // Added 'item-attackable' clear
+
     const isFlying = (player.race === 'Pinionfolk');
 
     switch (type) {
         case 'move':
+            // ... existing move highlighting code ...
+            // This block remains unchanged.
             let moveDistance = 3;
             // --- ELF: Nature's Madness (Movement) ---
             if (player.race === 'Elf' && (!player.equippedArmor || !player.equippedArmor.metallic)) {
@@ -1875,6 +1955,8 @@ function battleAction(type, actionData = null) {
             });
             break;
         case 'attack':
+            // ... existing attack highlighting code ...
+            // This block remains unchanged.
             let weaponRange = player.equippedWeapon.range || 1;
             // --- PINIONFOLK: Flight (Range) ---
             if (isFlying && player.level >= 20) {
@@ -1902,6 +1984,8 @@ function battleAction(type, actionData = null) {
             renderBattle('magic');
             break;
         case 'magic_select':
+            // ... existing magic selection code ...
+            // This block remains unchanged.
             // actionData is now just the spellKey string
             const spellKey = actionData;
             const spellData = SPELLS[spellKey];
@@ -1926,15 +2010,34 @@ function battleAction(type, actionData = null) {
         case 'item':
             renderBattle('item');
             break;
+        // --- MODIFIED item_select ---
         case 'item_select':
-            if (ITEMS[actionData.itemKey].type === 'enchant') {
-                 gameState.action = 'item_target';
-                 renderBattle('item_target', actionData);
+            const itemKey = actionData.itemKey;
+            const itemDetails = ITEMS[itemKey];
+            if (!itemDetails) {
+                 console.error(`Invalid item key selected: ${itemKey}`);
+                 // Reset action state if item details invalid
+                 gameState.action = null;
+                 return;
+            }
+            // Check if item needs targeting based on its type
+            if (['debuff_apply', 'debuff_special', 'enchant'].includes(itemDetails.type)) {
+                gameState.action = 'item_target'; // Set action state specifically for item targeting
+                gameState.itemToUse = itemKey;   // Store the item key to be used
+                addToLog(`Select a target for ${itemDetails.name}.`, 'text-yellow-400'); // Prompt user
+                renderBattleGrid(true, 'item'); // Re-render grid with item highlights
             } else {
-                 useItem(actionData.itemKey, true);
+                 // Use item immediately if no targeting needed (healing, self-buffs, cleanse)
+                 useItem(itemKey, true); // useItem handles consuming and finalizing turn
+                 // Reset action state after immediate use
+                 gameState.action = null;
             }
             break;
+
+        // --- END NEW CASE ---
         case 'flee':
+            // ... existing flee code ...
+            // This block remains unchanged.
             gameState.isPlayerTurn = false;
             // Use new rollForEffect function, applying bonuses/penalties
             if (player.statusEffects.buff_voidwalker || player.rollForEffect(0.8, 'Flee')) { // Base 80% flee chance
@@ -1953,29 +2056,32 @@ function battleAction(type, actionData = null) {
                 finalizePlayerAction(); // Go to next phase
             }
             break;
-
-        // --- NEW CASE FOR SIGNATURE ABILITIES ---
         case 'signature_ability':
+            // ... existing signature ability code ...
+            // This block remains unchanged.
             const ability = player.signatureAbilityData;
             if (!ability) {
                 console.error("Attempted to use signature ability but none found for class.");
+                 gameState.action = null; // Reset action state on error
                 return;
             }
 
             if (ability.type === 'signature') {
                 if (player.signatureAbilityUsed) {
                     addToLog(`${ability.name} has already been used this encounter!`, 'text-red-400');
+                    gameState.action = null; // Reset action state
                     return;
                 }
                 if (player.mp < ability.cost) {
                     addToLog(`Not enough MP to use ${ability.name}! (${ability.cost} required)`, 'text-blue-400');
+                    gameState.action = null; // Reset action state
                     return;
                 }
 
                 // --- Ranger: Hunter's Mark Activation ---
                 if (player._classKey === 'ranger') {
                      addToLog("Select a target to mark.", 'text-yellow-400');
-                     gameState.action = 'mark_target';
+                     gameState.action = 'mark_target'; // Keep action state for targeting
                      renderBattleGrid(true, 'mark'); // Highlight enemies for marking
                      // Don't deduct cost/use yet, do it in handleCellClick on successful mark
                      return; // Wait for target selection
@@ -2025,6 +2131,7 @@ function battleAction(type, actionData = null) {
                         gameState.isPlayerTurn = true; // Give turn back
                         // setTimeout(beginPlayerTurn, 400); // Don't begin new turn, just allow action
                         isProcessingAction = false; // Unlock action
+                        gameState.action = null; // Reset action state
                         return; // Stop ability effect
                     }
                 }
@@ -2040,6 +2147,7 @@ function battleAction(type, actionData = null) {
                         gameState.isPlayerTurn = true;
                         // setTimeout(beginPlayerTurn, 400); // Re-start player turn quickly
                         isProcessingAction = false; // Unlock action
+                        gameState.action = null; // Reset action state
                         return; // Stop further execution for this ability
                     }
 
@@ -2065,6 +2173,7 @@ function battleAction(type, actionData = null) {
                     // Call the UI rendering function from rendering.js
                     renderOnFieldCookingUI();
                     // Don't end the turn here; it ends after selection or cancellation in the UI function's callbacks
+                    // Keep action state as 'signature_ability' while cooking UI is open
                     return; // Stop further execution in this switch case for Cook
                 }
                 // Add other signature ability effects here by checking player._classKey
@@ -2072,6 +2181,7 @@ function battleAction(type, actionData = null) {
                 // Signature abilities typically end the turn (unless refunded or special like Cook/Ranger targeting)
                 gameState.isPlayerTurn = false;
                 finalizePlayerAction(); // Go to next phase
+                gameState.action = null; // Reset action state after finalizing
 
             } else if (ability.type === 'toggle') {
                  // Magus Mode Cycling
@@ -2087,6 +2197,7 @@ function battleAction(type, actionData = null) {
                  else if (player._classKey === 'paladin') {
                      if (!player.signatureAbilityToggleActive && (!player.equippedCatalyst || player.equippedCatalyst.name === 'None')) {
                          addToLog("Divine Smite requires a catalyst equipped to activate!", 'text-red-400');
+                         gameState.action = null; // Reset action state
                          return; // Prevent activation without catalyst
                      }
                      player.signatureAbilityToggleActive = !player.signatureAbilityToggleActive; // Standard toggle
@@ -2100,11 +2211,15 @@ function battleAction(type, actionData = null) {
 
                 // Toggling usually doesn't cost a turn, just re-render actions
                 renderBattleGrid(); // Re-render to update the button state
+                gameState.action = null; // Reset action state after toggle
             }
             break;
         // --- END NEW CASE ---
+        default:
+            gameState.action = null; // Reset action if type is unknown
     }
 }
+
 
 
 function struggleSwallow() {
@@ -2363,7 +2478,8 @@ function finalizePlayerAction() {
         return;
     }
 
-
+    $('#inventory-btn').disabled = true;
+    $('#character-sheet-btn').disabled = true;
     // Now, determine the next step based on Haste/Wind effects or standard flow
     const spellData = gameState.spellToCast ? SPELLS[gameState.spellToCast] : null;
     const playerSpell = gameState.spellToCast ? player.spells[gameState.spellToCast] : null;
@@ -2568,6 +2684,9 @@ function handleEnemyEndOfTurn(enemy) {
 async function enemyTurn() {
     if (gameState.battleEnded) return;
 
+    $('#inventory-btn').disabled = true;
+    $('#character-sheet-btn').disabled = true;
+
     for (const enemy of currentEnemies) {
         if (enemy.isAlive() && !gameState.battleEnded) {
             // Check for paralysis/petrification
@@ -2619,6 +2738,9 @@ function beginPlayerTurn() {
 
     gameState.isPlayerTurn = true;
     isProcessingAction = false; // Unlock actions for the player
+
+    $('#inventory-btn').disabled = false;
+    $('#character-sheet-btn').disabled = false;
 
     // Clear Haste's "used" flag
     if (player.statusEffects.buff_haste?.turnUsed) player.statusEffects.buff_haste.turnUsed = false;

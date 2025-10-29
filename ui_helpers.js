@@ -274,6 +274,7 @@ let activeTooltipItem = null;
 
 /**
  * Shows a detailed tooltip for an item, spell, or enemy.
+ * MODIFIED: Added check for shield parry effect.
  * @param {string} itemKey The key of the item to display.
  * @param {Event} event The mouse event that triggered the tooltip.
  */
@@ -383,13 +384,18 @@ function showTooltip(itemKey, event) {
             if (effect.spell_crit_chance) content += `<li>Spell Crit: ${effect.spell_crit_chance * 100}% chance, x${effect.spell_crit_multiplier || 1.5} Dmg</li>`;
             if (effect.spell_vamp) content += `<li>Spell Vamp: Killing with a spell restores ${effect.spell_vamp * 100}% of enemy's max HP and MP.</li>`;
             if (effect.spell_penetration) content += `<li>Spell Pen: Spells ignore ${effect.spell_penetration * 100}% of enemy magic resist.</li>`;
-            if (effect.spell_sniper) content += `<li>Spell Sniper: Increases effective range by ${effect.spell_sniper * 100}%.</li>`;
+            // Removed sniper display
             if (effect.overdrive) content += `<li>Overdrive: ${effect.overdrive.chance * 100}% chance to deal x${effect.overdrive.multiplier} damage, but you take damage equal to ${effect.overdrive.self_damage * 100}% of your Max HP.</li>`;
-            if (effect.battlestaff) content += `<li>Battlestaff: Your melee attacks also scale with your Intelligence.</li>`;
+            // Removed battlestaff display (handled by intScaling)
             if (effect.spell_weaver) content += `<li>Spellweaver: ${effect.spell_weaver * 100}% chance to apply a random elemental effect.</li>`;
-            if (effect.ranged_chance) content += `<li>${effect.ranged_chance * 100}% chance to evade ranged attacks</li>`;
+            if (effect.ranged_chance) content += `<li>Ranged Advantage: ${effect.ranged_chance * 100}% chance for melee attackers to miss.</li>`; // Corrected description
             if (effect.hp_regen) content += `<li>Regen: +${effect.hp_regen} HP/turn</li>`;
-            if (effect.parry) content += `<li>Parry Chance: ${Math.round(effect.parry * 100)}%</li>`;
+            // --- MODIFIED: Check for shield parry effect ---
+            if (effect.parry || (effect.type === 'parry' && effect.chance)) {
+                const parryChance = effect.parry || effect.chance;
+                content += `<li>Parry Chance: ${Math.round(parryChance * 100)}%</li>`;
+            }
+            // --- END MODIFICATION ---
             if (effect.attack_follow_up) content += `<li>Retaliates for ${effect.attack_follow_up.damage.join('-')} damage</li>`;
             if (effect.type === 'debuff_resist') content += `<li>+${effect.chance * 100}% Debuff Resistance</li>`;
             if (effect.type === 'reflect') content += `<li>Reflects ${effect.amount * 100}% of damage taken</li>`;
@@ -421,6 +427,7 @@ function showTooltip(itemKey, event) {
     tooltipElement.style.top = `${y}px`;
 }
 
+
 /** Hides the main tooltip. */
 function hideTooltip() {
     $('#tooltip').style.display = 'none';
@@ -441,8 +448,48 @@ function showEnemyInfo(enemy, event) {
 
     if (!enemy) return;
 
+    // --- Build Tooltip Content ---
     let content = `<h4 class="font-bold text-red-400 mb-1">${enemy.name}</h4>`;
+    content += `<p class="text-xs text-gray-400 mb-2">Rarity: ${enemy.rarityData.name}</p>`; // Added Rarity
     content += `<p>HP: ${enemy.hp} / ${enemy.maxHp}</p>`;
+
+    // --- Display Status Effects ---
+    const statusEffects = enemy.statusEffects;
+    let effectList = '';
+    for (const key in statusEffects) {
+        if (statusEffects.hasOwnProperty(key)) {
+            const effect = statusEffects[key];
+            let durationText = effect.duration ? ` (${effect.duration} turns)` : '';
+            let effectName = capitalize(key.replace(/_/g, ' '));
+            let colorClass = 'text-gray-400'; // Default for neutral/unknown
+
+            // Basic color coding (can be expanded)
+            if (key.startsWith('buff_') || ['enrage', 'living_shield'].includes(key)) {
+                colorClass = 'text-green-400'; // Buffs
+            } else if (['poison', 'toxic', 'drenched', 'paralyzed', 'petrified', 'swallowed', 'debuff_oiled', 'debuff_viscous', 'debuff_lightstone_primed'].includes(key)) {
+                colorClass = 'text-red-400'; // Debuffs
+            }
+
+            effectList += `<li class="${colorClass}">${effectName}${durationText}</li>`;
+        }
+    }
+
+    if (effectList) {
+        content += '<div class="mt-2 pt-2 border-t border-gray-600 text-xs"><p class="font-semibold mb-1">Status:</p><ul class="list-disc list-inside space-y-1">' + effectList + '</ul></div>';
+    }
+
+    // --- Display Special Conditions ---
+    let conditionsList = '';
+    if (enemy.isMarked) {
+        conditionsList += `<li class="text-yellow-400">Marked</li>`;
+    }
+    // Add other conditions here if needed (e.g., 'Sleeping', 'Confused')
+
+    if (conditionsList) {
+        content += '<div class="mt-2 pt-2 border-t border-gray-600 text-xs"><p class="font-semibold mb-1">Conditions:</p><ul class="list-disc list-inside space-y-1">' + conditionsList + '</ul></div>';
+    }
+    // --- End Status/Conditions ---
+
 
     tooltipElement.innerHTML = content;
     tooltipElement.style.display = 'block';

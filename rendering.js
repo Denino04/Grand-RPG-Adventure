@@ -2412,24 +2412,33 @@ window.setInventoryTab = function(tabName) {
 }
 
 function renderInventory() {
-    if (gameState.currentView === 'battle') {
-        addToLog("You cannot access your full inventory during combat! Use the 'Item' command instead.", 'text-red-400');
-        return;
-    }
+    // Check if player can interact right now (added battle check)
+    const isInBattle = lastViewBeforeInventory === 'battle'; // Check based on where we came FROM
+    // Allow opening inventory even if not player's turn, but disable actions
+    const canTakeActionInBattle = isInBattle && gameState.isPlayerTurn && !isProcessingAction;
+
     // Store scroll position of the *active* list before re-rendering
     const activeList = mainView.querySelector(`#inventory-${inventoryActiveTab}-list`);
     const scrollPos = activeList ? activeList.scrollTop : 0;
 
-    lastViewBeforeInventory = gameState.currentView; // Store the actual previous view
-    gameState.currentView = 'inventory';
+    // Set correct return view: If opened from battle, store 'battle', otherwise store the actual previous view
+    // Keep lastViewBeforeInventory consistent until we explicitly leave battle view
+    if (gameState.currentView !== 'inventory') { // Only update if not already in inventory
+        if (gameState.currentView === 'battle') {
+            lastViewBeforeInventory = 'battle';
+        } else {
+            lastViewBeforeInventory = gameState.currentView; // Store actual previous view if not in battle
+        }
+    }
+    gameState.currentView = 'inventory'; // Set current view
 
     // --- Tab Definitions ---
-    // MODIFICATION: Added 'Gardens' tab
+    // (Tab definitions remain the same)
     const tabs = [
         { key: 'spells', icon: '✨', title: 'Spells' },
         { key: 'key_items', icon: '🔑', title: 'Key Items' },
         { key: 'consumables', icon: '🧪', title: 'Consumables' },
-        { key: 'gardens', icon: '🌱', title: 'Gardens' },      // <-- New Tab
+        { key: 'gardens', icon: '🌱', title: 'Gardens' },
         { key: 'materials', icon: '🧱', title: 'Materials' },
         { key: 'weapons', icon: '⚔️', title: 'Weapons' },
         { key: 'catalysts', icon: '🔮', title: 'Catalysts' },
@@ -2438,17 +2447,15 @@ function renderInventory() {
         { key: 'lures', icon: '🎣', title: 'Lures' }
     ];
 
-
-    // --- Helper to Render Lists (Modified for Consumable Sorting, Materials, and Gardens) ---
-    // MODIFICATION: Added 'gardens' category handling, removed seed/sapling from materials
+    // --- Helper to Render Lists (Modified for Battle Context) ---
     const renderList = (category, title) => {
         let list = [];
         let itemCounts = {};
         let html = ''; // Start empty
 
-        // Define the desired order for consumable types
+        // (Sorting/Type map logic remains the same)
         const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'enchant', 'experimental'];
-        const typeMapConsumables = {
+        const typeMapConsumables = { /* ... */
             'healing': 'Healing Potions',
             'mana_restore': 'Mana Potions',
             'buff': 'Buff Items',
@@ -2460,26 +2467,23 @@ function renderInventory() {
             'enchant': 'Essences (Combat Use)',
             'experimental': 'Mysterious Concoctions'
         };
-
-        // Define categories for the Materials tab (Removed seed/sapling)
         const materialOrder = ['food_ingredient', 'alchemy', 'enchant', 'special', 'junk'];
-        const typeMapMaterials = {
+        const typeMapMaterials = { /* ... */
              'food_ingredient': 'Cooking Ingredients',
              'alchemy': 'Alchemy Reagents',
              'enchant': 'Essences (Crafting)',
              'special': 'Special Items',
              'junk': 'Junk & Trophies'
         };
-
-        // Define categories for the Gardens tab
         const gardenOrder = ['seed', 'sapling'];
-        const typeMapGardens = {
+        const typeMapGardens = { /* ... */
             'seed': 'Seeds',
             'sapling': 'Saplings'
         };
 
-
-        if (category === 'items') { // Handling 'Consumables' Tab
+        // --- Populate 'list' based on category ---
+        // (This population logic remains the same)
+         if (category === 'items') { // Handling 'Consumables' Tab
             const allConsumableKeys = Object.keys(player.inventory.items).filter(key => {
                 const details = getItemDetails(key);
                 return details && consumableOrder.includes(details.type);
@@ -2496,9 +2500,7 @@ function renderInventory() {
                  return a.details.name.localeCompare(b.details.name);
              });
              list = itemsWithDetails;
-
-        // --- NEW: Handling 'Gardens' Tab ---
-        } else if (category === 'gardens') {
+        } else if (category === 'gardens') { // Handling 'Gardens' Tab
             const allGardenKeys = Object.keys(player.inventory.items).filter(key => {
                 const details = getItemDetails(key);
                 return details && gardenOrder.includes(details.type); // Filter for seed/sapling
@@ -2513,17 +2515,13 @@ function renderInventory() {
                  return a.details.name.localeCompare(b.details.name);
             });
             list = itemsWithDetails;
-        // --- End Gardens Handling ---
-
         } else if (category === 'materials') { // Handling 'Materials' Tab
             const allMaterialKeys = Object.keys(player.inventory.items).filter(key => {
                 const details = getItemDetails(key);
                 // Filter for material types (excluding seed/sapling now)
                 return details && materialOrder.includes(details.type);
             });
-
             const itemsWithDetails = allMaterialKeys.map(key => ({ key, details: getItemDetails(key) }));
-
             itemsWithDetails.sort((a, b) => {
                  const typeAIndex = materialOrder.indexOf(a.details.type);
                  const typeBIndex = materialOrder.indexOf(b.details.type);
@@ -2535,7 +2533,6 @@ function renderInventory() {
                  return a.details.name.localeCompare(b.details.name);
             });
             list = itemsWithDetails;
-
         } else if (category === 'lures') {
             list = Object.keys(player.inventory.lures).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name)); // Sort lures alphabetically
         } else { // Equipment
@@ -2545,19 +2542,21 @@ function renderInventory() {
             list = Object.keys(itemCounts).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name)); // Sort equipment alphabetically
         }
 
-        // Updated check for empty lists
-        if (['items', 'materials', 'gardens'].includes(category) && list.length === 0) {
+        // --- Render the List ---
+        // (Empty list check remains the same)
+         if (['items', 'materials', 'gardens'].includes(category) && list.length === 0) {
             return `<p class="text-gray-400 text-center mt-4">No ${title.toLowerCase()} found.</p>`;
         } else if (!['items', 'materials', 'gardens'].includes(category) && (!list || list.length === 0)) {
             return `<p class="text-gray-400 text-center mt-4">No ${title.toLowerCase()} found.</p>`;
         }
 
-
         html += `<div id="inventory-${category}-list" class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-2">`; // Added space-y-2
 
-        // --- Render Consumables with Subheaders ---
         let currentSubType = ''; // Track the current sub-type for headers
-        if (category === 'items') {
+        if (category === 'items' || category === 'materials' || category === 'gardens') {
+            // Use appropriate type map based on category
+            const typeMap = category === 'items' ? typeMapConsumables : (category === 'materials' ? typeMapMaterials : typeMapGardens);
+
             list.forEach(itemObj => {
                 const key = itemObj.key;
                 const details = itemObj.details;
@@ -2566,7 +2565,7 @@ function renderInventory() {
                  const subType = details.type;
                  if (subType !== currentSubType) {
                      currentSubType = subType;
-                     const subHeader = typeMapConsumables[subType] || capitalize(subType);
+                     const subHeader = typeMap[subType] || capitalize(subType);
                      html += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2">${subHeader}</h4>`;
                  }
 
@@ -2575,61 +2574,26 @@ function renderInventory() {
                  if (count > 1) countStr = `(x${count})`;
 
                  let buttonHtml = '';
-                 let action = `useItem('${key}')`;
-                 let buttonClass = 'btn-item';
-                 let buttonText = 'Use';
-
-                 if (['enchant', 'debuff_apply', 'debuff_special'].includes(details.type)) {
-                     action = '';
-                     buttonText = 'Use (Battle)';
+                 // --- BATTLE MODIFICATION: Disable 'Use' button in battle for items ---
+                 if (category === 'items' && !isInBattle) { // OUTSIDE BATTLE
+                     let action = `useItem('${key}')`;
+                     let buttonClass = 'btn-item';
+                     let buttonText = 'Use';
+                      // Disable 'Use' for battle-only items outside combat
+                     if (['enchant', 'debuff_apply', 'debuff_special'].includes(details.type)) {
+                         action = '';
+                         buttonText = 'Use (Battle)';
+                     }
+                     buttonHtml = `<button onclick="${action}" class="btn ${buttonClass} text-sm py-1 px-3" ${action === '' ? 'disabled' : ''}>${buttonText}</button>`;
+                 } else if (category === 'items' && isInBattle) { // INSIDE BATTLE
+                     // Show disabled 'Use' button in battle, prompt to use via action menu
+                     buttonHtml = `<button class="btn btn-item text-sm py-1 px-3" disabled title="Use via 'Item' action">Use</button>`;
                  }
-                 buttonHtml = `<button onclick="${action}" class="btn ${buttonClass} text-sm py-1 px-3" ${action === '' ? 'disabled' : ''}>${buttonText}</button>`;
+                 // --- END BATTLE MODIFICATION ---
 
                  html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr}</span>${buttonHtml}</div>`;
             });
-        // --- Render Gardens with Subheaders ---
-        } else if (category === 'gardens') {
-            list.forEach(itemObj => {
-                const key = itemObj.key;
-                const details = itemObj.details;
-                if (!details) return;
-
-                const subType = details.type;
-                if (subType !== currentSubType) {
-                     currentSubType = subType;
-                     const subHeader = typeMapGardens[subType] || capitalize(subType); // Use Gardens map
-                     html += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2">${subHeader}</h4>`;
-                }
-
-                let countStr = '';
-                let count = player.inventory.items[key] || 0;
-                if (count > 1) countStr = `(x${count})`;
-
-                // Seeds/Saplings can't be "used" from inventory
-                html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr}</span></div>`;
-            });
-        // --- Render Materials with Subheaders ---
-        } else if (category === 'materials') {
-             list.forEach(itemObj => {
-                const key = itemObj.key;
-                const details = itemObj.details;
-                if (!details) return;
-
-                const subType = details.type;
-                if (subType !== currentSubType) {
-                     currentSubType = subType;
-                     const subHeader = typeMapMaterials[subType] || capitalize(subType); // Use Materials map
-                     html += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2">${subHeader}</h4>`;
-                }
-
-                let countStr = '';
-                let count = player.inventory.items[key] || 0;
-                if (count > 1) countStr = `(x${count})`;
-
-                html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr}</span></div>`;
-            });
-        // --- Render Other Categories (Equipment, Lures) ---
-        } else {
+        } else { // Equipment or Lures
              list.forEach(key => {
                  const details = getItemDetails(key);
                  if (!details) return;
@@ -2645,14 +2609,17 @@ function renderInventory() {
                      if (count > 1) countStr = `(x${count})`;
                  }
 
-                 const isEquipped = (category === 'weapons' && WEAPONS[key] === player.equippedWeapon) ||
-                                  (category === 'catalysts' && CATALYSTS[key] === player.equippedCatalyst) ||
-                                  (category === 'armor' && ARMOR[key] === player.equippedArmor) ||
-                                  (category === 'shields' && SHIELDS[key] === player.equippedShield) ||
+                 // Determine if equipped
+                 const isEquipped = (category === 'weapons' && WEAPONS[key]?.name === player.equippedWeapon?.name) || // Added safety checks
+                                  (category === 'catalysts' && CATALYSTS[key]?.name === player.equippedCatalyst?.name) ||
+                                  (category === 'armor' && ARMOR[key]?.name === player.equippedArmor?.name) ||
+                                  (category === 'shields' && SHIELDS[key]?.name === player.equippedShield?.name) ||
                                   (category === 'lures' && key === player.equippedLure);
                  const equippedText = isEquipped ? "<span class='text-green-400 font-bold ml-2'>[E]</span>" : "";
                  let buttonHtml = '';
+                 const canInteract = !isInBattle || canTakeActionInBattle; // Can interact if outside battle OR if it's player's turn in battle
 
+                 // Equip/Unequip Buttons
                  if (isEquipped) {
                      let itemType = category.slice(0, -1);
                      if (category === 'armor') itemType = 'armor';
@@ -2662,23 +2629,29 @@ function renderInventory() {
                                            (itemType === 'armor' && details.name === ARMOR['travelers_garb'].name) ||
                                            (itemType === 'shield' && details.name === SHIELDS['no_shield'].name) ||
                                            (itemType === 'lure' && key === 'no_lure');
-                     if (!isDefaultItem) {
-                         buttonHtml = `<button onclick="unequipItem('${itemType}')" class="btn btn-action text-sm py-1 px-3">Unequip</button>`;
+                     // --- BATTLE MODIFICATION: Allow unequip in battle (except lures), check if can interact ---
+                     if (!isDefaultItem && !(isInBattle && itemType === 'lure')) {
+                         buttonHtml = `<button onclick="unequipItem('${itemType}', true, ${isInBattle})" class="btn btn-action text-sm py-1 px-3" ${!canInteract ? 'disabled title="Cannot change gear now"' : ''}>Unequip</button>`;
                      }
+                     // --- END BATTLE MODIFICATION ---
                  } else if (['weapons', 'catalysts', 'armor', 'shields', 'lures'].includes(category)) {
-                     buttonHtml = `<button onclick="equipItem('${key}')" class="btn btn-primary text-sm py-1 px-3">Equip</button>`;
+                     // --- BATTLE MODIFICATION: Allow equip in battle (except lures), check if can interact ---
+                     if (!(isInBattle && category === 'lures')) {
+                        buttonHtml = `<button onclick="equipItem('${key}', ${isInBattle})" class="btn btn-primary text-sm py-1 px-3" ${!canInteract ? 'disabled title="Cannot change gear now"' : ''}>Equip</button>`;
+                     } else { // Lures cannot be equipped in battle
+                         buttonHtml = `<button class="btn btn-primary text-sm py-1 px-3" disabled title="Cannot equip lures in battle">Equip</button>`;
+                     }
+                     // --- END BATTLE MODIFICATION ---
                  }
                  html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr} ${equippedText}</span>${buttonHtml}</div>`;
             });
         }
-
-
         html += `</div>`; // Close scrollable div
         return html;
     };
 
     // --- Helper to Render Spellbook ---
-    const renderSpellbook = () => {
+     const renderSpellbook = () => { /* ... existing code ... */
         let html = '';
         const knownSpells = Object.keys(player.spells);
         if (knownSpells.length === 0) {
@@ -2691,8 +2664,11 @@ function renderInventory() {
                 const playerSpell = player.spells[key];
                 const details = spellTree.tiers[playerSpell.tier - 1];
                 let buttonHtml = '';
-                if (spellTree.element === 'healing') {
+                // Disable healing cast if in battle (must use Magic action)
+                if (spellTree.element === 'healing' && !isInBattle) { // OUTSIDE BATTLE
                     buttonHtml = `<button onclick="castHealingSpellOutsideCombat('${key}')" class="btn btn-item text-sm py-1 px-3" ${player.hp >= player.maxHp ? 'disabled' : ''}>Cast</button>`;
+                } else if (spellTree.element === 'healing' && isInBattle) { // INSIDE BATTLE
+                     buttonHtml = `<button class="btn btn-item text-sm py-1 px-3" disabled title="Use via 'Magic' action">Cast</button>`;
                 }
 
                 html += `<div class="p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)">
@@ -2708,10 +2684,11 @@ function renderInventory() {
              html += `</div>`;
         }
         return html;
-    };
+     };
 
-    // --- Helper to Render Key Items ---
-    const renderKeyItemsList = () => {
+    // --- Helper to Render Key Items (No changes needed for battle) ---
+    // (renderKeyItemsList function remains the same)
+     const renderKeyItemsList = () => { /* ... existing code ... */
         const keyItems = Object.keys(player.inventory.items).filter(key => getItemDetails(key)?.type === 'key');
         let html = '';
         if (keyItems.length === 0) {
@@ -2723,6 +2700,7 @@ function renderInventory() {
                 if (!details) return '';
                 let buttonHtml = '';
                 if (key === 'bestiary_notebook') {
+                    // Disable bestiary button in battle? Might be okay to view. Keep enabled for now.
                     buttonHtml = `<button onclick="event.stopPropagation(); renderBestiaryMenu('inventory')" class="btn btn-primary text-sm py-1 px-3">Open</button>`;
                 }
                 return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span>${buttonHtml}</div>`;
@@ -2730,10 +2708,10 @@ function renderInventory() {
              html += `</div>`;
         }
         return html;
-    };
+     };
 
-    // --- Build Tab Buttons ---
-    // MODIFICATION: Changed to grid, added Gardens tab
+    // --- Build Tab Buttons (remains the same) ---
+    // (Tab button HTML generation remains the same)
     let tabHtml = '<div class="grid grid-cols-5 gap-1 mb-2">'; // Use grid, 5 columns
     tabs.forEach(tab => {
         const isActive = inventoryActiveTab === tab.key;
@@ -2742,14 +2720,15 @@ function renderInventory() {
     });
     tabHtml += '</div>';
 
-    // --- Determine Content for Right Pane ---
+
+    // --- Determine Content for Right Pane (remains the same) ---
+    // (Switch statement for rightPaneContent remains the same)
     let rightPaneContent = '';
-    // MODIFICATION: Added 'gardens' case
     switch (inventoryActiveTab) {
         case 'spells': rightPaneContent = renderSpellbook(); break;
         case 'key_items': rightPaneContent = renderKeyItemsList(); break;
         case 'consumables': rightPaneContent = renderList('items', 'Consumables'); break;
-        case 'gardens': rightPaneContent = renderList('gardens', 'Gardens'); break;         // <-- New Case
+        case 'gardens': rightPaneContent = renderList('gardens', 'Gardens'); break;
         case 'materials': rightPaneContent = renderList('materials', 'Materials'); break;
         case 'weapons': rightPaneContent = renderList('weapons', 'Weapons'); break;
         case 'catalysts': rightPaneContent = renderList('catalysts', 'Catalysts'); break;
@@ -2759,29 +2738,35 @@ function renderInventory() {
         default: rightPaneContent = renderList('items', 'Consumables'); // Default to consumables
     }
 
-
     // --- Assemble Final HTML ---
+    // Added battle warning message
+    let battleWarning = isInBattle ? '<p class="text-center text-yellow-400 text-sm mb-2">Equipping gear consumes your turn! Use items via the Item action.</p>' : ''; // Updated warning
+    // Modified Back button action
+    const backAction = isInBattle ? 'returnToBattleFromInventory()' : 'returnFromInventory()';
+
     let html = `
         <div class="w-full text-left h-full flex flex-col">
             <h2 class="font-medieval text-3xl mb-2 text-center">Inventory</h2>
+            ${battleWarning}
             ${tabHtml}
             <div class="flex-grow overflow-hidden h-72">
                 ${rightPaneContent}
             </div>
             <div class="text-center mt-3">
-                <button onclick="returnFromInventory()" class="btn btn-primary">Back</button>
+                <button onclick="${backAction}" class="btn btn-primary">Back</button>
             </div>
         </div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
 
-    // Restore scroll position for the active list
+    // Restore scroll position
     const newActiveList = mainView.querySelector(`#inventory-${inventoryActiveTab}-list`);
     if (newActiveList) {
         newActiveList.scrollTop = scrollPos;
     }
 }
+
 
 
 function renderBattle(subView = 'main', actionData = null) {
@@ -2793,7 +2778,12 @@ function renderBattle(subView = 'main', actionData = null) {
 
      if (subView === 'main') {
         renderBattleGrid();
-     } else if (subView === 'attack' || subView === 'magic_target' || subView === 'item_target') { // Combined target selection
+     // REMOVED 'item_target' from this condition. Grid highlighting handles it now.
+     } else if (subView === 'attack' || subView === 'magic_target') {
+        // ... existing code for attack/magic target selection (button list) ...
+        // This block remains unchanged as it's only for the old attack/magic button lists,
+        // which might still be used if we revert or for a different UI later.
+        // However, the item targeting logic that *was* here is now gone.
         let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Choose a Target</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
         let buttonAction, buttonClass, titleText, backFunction;
 
@@ -2802,17 +2792,11 @@ function renderBattle(subView = 'main', actionData = null) {
              buttonClass = 'btn-action';
              titleText = 'Attack';
              backFunction = 'renderBattleGrid()'; // Back to main battle actions
-        } else if (subView === 'magic_target'){
+        } else { // magic_target
             buttonAction = `castSpell('${actionData.spellKey}', index)`; // Need index placeholder
              buttonClass = 'btn-magic';
              titleText = `Cast ${SPELLS[actionData.spellKey]?.tiers[player.spells[actionData.spellKey]?.tier -1]?.name || 'Spell'}`;
              backFunction = `renderBattle('magic')`; // Back to magic selection
-        } else { // item_target (debuff_apply, debuff_special, enchant)
-             const itemDetails = getItemDetails(actionData.itemKey);
-             buttonAction = `useItem('${actionData.itemKey}', true, index)`; // Need index placeholder
-             buttonClass = 'btn-item';
-             titleText = `Use ${itemDetails?.name || 'Item'} On`;
-             backFunction = `renderBattle('item')`; // Back to item selection
         }
 
         html = `<h2 class="font-medieval text-3xl mb-4 text-center">${titleText}</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
@@ -2827,7 +2811,10 @@ function renderBattle(subView = 'main', actionData = null) {
         const container = document.createElement('div');
         container.innerHTML = html;
         render(container);
+
      } else if (subView === 'magic') {
+        // ... existing code for magic selection ...
+        // This block remains unchanged.
         let spellsHtml = Object.keys(player.spells).map(key => {
             const spellTree = SPELLS[key];
             if (!spellTree) {
@@ -2867,19 +2854,21 @@ function renderBattle(subView = 'main', actionData = null) {
         container.innerHTML = html;
         render(container);
      } else if (subView === 'item') {
-        // --- MODIFICATION START: Organize items by type ---
+        // --- MODIFICATION START: Remove Weapons section ---
         let itemsHtml = '';
+        // Removed: let weaponsHtml = ''; // New variable for weapons
+
+        // --- Process Usable Items ---
         const usableItems = Object.keys(player.inventory.items)
             .filter(key => {
                 const item = ITEMS[key];
                 // Filter for usable types IN BATTLE
-                return item && ['healing', 'mana_restore', 'buff', 'cleanse', 'enchant', 'experimental', 'cleanse_specific', 'debuff_apply', 'debuff_special'].includes(item.type); // Added new types
+                return item && ['healing', 'mana_restore', 'buff', 'cleanse', 'enchant', 'experimental', 'cleanse_specific', 'debuff_apply', 'debuff_special'].includes(item.type);
             })
-            .map(key => ({ key, details: ITEMS[key] })); // Map to include details
+            .map(key => ({ key, details: ITEMS[key] }));
 
-        // Define the order and headers for categories
         const typeOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'debuff_apply', 'debuff_special', 'enchant', 'experimental'];
-        const typeMap = {
+        const typeMap = { /* ... existing typeMap ... */
             'healing': 'Healing Potions',
             'mana_restore': 'Mana Potions',
             'buff': 'Buff Items',
@@ -2891,9 +2880,8 @@ function renderBattle(subView = 'main', actionData = null) {
             'experimental': 'Mysterious Concoctions'
         };
 
-        // Sort items: first by type order, then alphabetically by name
-        usableItems.sort((a, b) => {
-            // ... (sorting logic remains the same) ...
+        // Sort items
+        usableItems.sort((a, b) => { /* ... existing sorting logic ... */
             const typeAIndex = typeOrder.indexOf(a.details.type);
             const typeBIndex = typeOrder.indexOf(b.details.type);
             if (typeAIndex !== typeBIndex) {
@@ -2902,54 +2890,43 @@ function renderBattle(subView = 'main', actionData = null) {
                 return finalAIndex - finalBIndex;
             }
             return a.details.name.localeCompare(b.details.name);
-        });
+         });
 
         let currentType = '';
         if (usableItems.length > 0) {
             usableItems.forEach(itemObj => {
                 const key = itemObj.key;
                 const item = itemObj.details;
-                // *** MODIFIED COUNT FETCH AND CHECK ***
-                const count = player.inventory.items[key] || 0; // Default to 0 if undefined
-
-                // Skip rendering if count is zero or less
+                const count = player.inventory.items[key] || 0;
                 if (count <= 0) return;
-                // *** END MODIFICATION ***
 
-
-                // Add subheader if type changes
                 if (item.type !== currentType) {
-                    // ... (subheader logic remains the same) ...
                     currentType = item.type;
                     const header = typeMap[currentType] || capitalize(currentType);
                     itemsHtml += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2 col-span-1 md:col-span-2">${header}</h4>`;
                 }
 
-                // Determine action based on item type
-                let action;
-                if (['enchant', 'debuff_apply', 'debuff_special'].includes(item.type)) {
-                     // These require targeting
-                     action = `renderBattle('item_target', { itemKey: '${key}' })`;
-                } else {
-                    // Others are used immediately
-                    action = `battleAction('item_select', { itemKey: '${key}' })`;
-                }
-
-
+                let action = `battleAction('item_select', { itemKey: '${key}' })`;
+                // Removed targeting logic for 'enchant', 'debuff_apply', 'debuff_special' here, handled in item_select case now
                 itemsHtml += `<button onclick="${action}" class="btn btn-item w-full text-left" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"><div class="flex justify-between"><span>${item.name}</span><span>x${count}</span></div></button>`;
             });
         } else {
             itemsHtml = `<p class="text-gray-400 text-center col-span-1 md:col-span-2">You have no usable items.</p>`;
         }
-        // --- MODIFICATION END ---
 
+        // --- REMOVED Weapons Processing Section ---
+
+        // --- Combine HTML ---
         let html = `<div class="w-full text-center">
-                        <h2 class="font-medieval text-3xl mb-4">Use an Item</h2>
+                        <h2 class="font-medieval text-3xl mb-4">Use Item</h2> {/* Updated Title */}
                         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 mb-4">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">${itemsHtml}</div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                ${itemsHtml} {/* Only items are shown now */}
+                            </div>
                         </div>
                         <button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>
                     </div>`;
+        // --- END MODIFICATION ---
 
         const container = document.createElement('div');
         container.innerHTML = html;
@@ -2957,6 +2934,8 @@ function renderBattle(subView = 'main', actionData = null) {
      }
 
 }
+
+
 
 function renderPostBattleMenu() {
     $('#inventory-btn').disabled = false;

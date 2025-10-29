@@ -1008,7 +1008,6 @@ class Player extends Entity {
         return { dodge: dodgeChance, parry: parryChance, block: blockChance };
     }
 
-    /** Attempts Parry, then Dodge, then Block. Returns true if any succeed. */
     _attemptAvoidance(avoidanceChances, attacker) {
         // --- Parry Check ---
         if (attacker && this.rollForEffect(avoidanceChances.parry, 'Parry') && attacker.isAlive()) {
@@ -1042,7 +1041,10 @@ class Player extends Entity {
             addToLog(`You launch a swift counter-attack!`, 'text-yellow-300');
             const weapon = this.equippedWeapon;
             let counterDamage = rollDice(...weapon.damage, 'Player Parry').total + this.physicalDamageBonus;
-            const finalDamage = attacker.takeDamage(counterDamage, { element: this.weaponElement });
+            // --- MODIFICATION: Use damageDealt from the return object ---
+            const damageResult = attacker.takeDamage(counterDamage, { element: this.weaponElement });
+            const finalDamage = damageResult.damageDealt; // Get the actual damage number
+            // --- END MODIFICATION ---
             addToLog(`Your riposte hits ${attacker.name} for <span class="font-bold text-yellow-300">${finalDamage}</span> damage.`);
             if (!gameState.battleEnded) {
                 checkBattleStatus(true); // Check if counter killed the enemy
@@ -1199,7 +1201,10 @@ class Player extends Entity {
         }
 
         if (reflectedDamage > 0) {
-            const finalReflected = attacker.takeDamage(reflectedDamage, { element: reflectElement });
+            // --- MODIFICATION: Use damageDealt from return value ---
+            const damageResult = attacker.takeDamage(reflectedDamage, { element: reflectElement });
+            const finalReflected = damageResult.damageDealt;
+            // --- END MODIFICATION ---
             addToLog(`Your ${reflectSource} reflects <span class="font-bold text-orange-400">${finalReflected}</span> damage back at ${attacker.name}!`, 'text-orange-300');
             if (!gameState.battleEnded) checkBattleStatus(true);
             if (!attacker.isAlive()) return; // Stop if non-racial reflect killed attacker
@@ -1212,7 +1217,10 @@ class Player extends Entity {
                 if (reflectionCost > 0) this.mp -= reflectionCost;
                 reflectedDamage = Math.floor(finalDamageDealt * 0.10);
                 if (reflectedDamage > 0) {
-                    const finalReflected = attacker.takeDamage(reflectedDamage, { isMagic: true, element: 'fire', ignore_defense: 1.0 });
+                    // --- MODIFICATION: Use damageDealt from return value ---
+                    const damageResult = attacker.takeDamage(reflectedDamage, { isMagic: true, element: 'fire', ignore_defense: 1.0 });
+                    const finalReflected = damageResult.damageDealt;
+                    // --- END MODIFICATION ---
                     addToLog(`Your infernal blood rebukes ${attacker.name} for <span class="font-bold text-red-500">${finalReflected}</span> fire damage!`, 'text-orange-400');
                      if (!gameState.battleEnded) checkBattleStatus(true);
                 }
@@ -1229,7 +1237,7 @@ class Player extends Entity {
         // 2. Attempt Avoidance (Parry > Dodge > Block)
         if (this._attemptAvoidance(avoidanceChances, attacker)) {
             updateStatsView(); // Update if HP/MP changed from parry counter etc.
-            return 0; // Damage fully avoided
+            return { damageDealt: 0, knockback: 0 }; // Return object on avoidance
         }
 
         // --- Damage Continues ---
@@ -1239,7 +1247,7 @@ class Player extends Entity {
         damage = this._applyAlchemicalBarrier(damage);
         if (damage <= 0) {
             updateStatsView(); // Update if barrier absorbed all
-            return 0; // Damage fully absorbed
+            return { damageDealt: 0, knockback: 0 }; // Return object
         }
 
         // 4. Determine Attack Type & Apply Vulnerabilities
@@ -1258,11 +1266,13 @@ class Player extends Entity {
 
         // 8. Final UI Update (potentially redundant if reflection already updated)
         updateStatsView();
-        return finalDamageDealt;
+
+        // --- MODIFICATION: Return object with damageDealt ---
+        return { damageDealt: finalDamageDealt, knockback: 0 }; // Default knockback 0
+        // --- END MODIFICATION ---
     }
     // --- END takeDamage refactoring ---
 }
-
 // --- NEW Drone Class ---
 class Drone extends Entity {
     constructor(playerRef) {
@@ -2511,178 +2521,359 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
 }
 
 
-function equipItem(itemKey) {
+function equipItem(itemKey, inBattle = false) {
+    // Basic validation
     const details = getItemDetails(itemKey);
-    if (!details) return;
+    if (!details || !player) {
+        console.error("equipItem failed: Invalid details or player object.");
+        if (inBattle && gameState.isPlayerTurn === false) { gameState.isPlayerTurn = true; isProcessingAction = false;} // Refund turn if possible
+        return;
+    }
+
+    // --- BATTLE-SPECIFIC CHECKS ---
+    let turnConsumed = false;
+    if (inBattle) {
+        if (!gameState.isPlayerTurn || isProcessingAction) {
+            addToLog("Cannot change gear right now.", 'text-red-400');
+            return;
+        }
+        isProcessingAction = true;
+        gameState.isPlayerTurn = false; // Assume turn consumed
+        turnConsumed = true;
+    }
+    // --- END BATTLE CHECKS ---
+
 
     let itemType = null;
-    if (WEAPONS[itemKey]) { itemType = 'weapon'; }
-    else if (CATALYSTS[itemKey]) { itemType = 'catalyst'; }
-    else if (SHIELDS[itemKey]) { itemType = 'shield'; }
-    else if (ARMOR[itemKey]) { itemType = 'armor'; }
-    else if (LURES[itemKey]) { itemType = 'lure'; }
+    let categoryName = ''; // e.g., 'weapons'
+    if (WEAPONS[itemKey]) { itemType = 'weapon'; categoryName = 'weapons'; }
+    else if (CATALYSTS[itemKey]) { itemType = 'catalyst'; categoryName = 'catalysts'; }
+    else if (SHIELDS[itemKey]) { itemType = 'shield'; categoryName = 'shields'; }
+    else if (ARMOR[itemKey]) { itemType = 'armor'; categoryName = 'armor'; }
+    else if (LURES[itemKey]) { itemType = 'lure'; categoryName = 'lures'; }
 
-    // Armor and Lure equipping (simpler logic)
-    if (itemType === 'armor') {
-        if (player.equippedArmor === details) return; // Already equipped
-        player.equippedArmor = details;
-        player.armorElement = 'none'; // Reset element on equip
-    } else if (itemType === 'lure') {
-        if (player.equippedLure === itemKey) return; // Already equipped
-        player.equippedLure = itemKey;
+    // --- Check if item exists in inventory BEFORE proceeding ---
+    let itemFoundInInventory = false;
+    if (itemType !== 'lure') {
+        if (!player.inventory[categoryName]) player.inventory[categoryName] = []; // Ensure array exists
+        itemFoundInInventory = player.inventory[categoryName].includes(itemKey);
+
+        if (!itemFoundInInventory) {
+            console.warn(`Attempted to equip ${itemKey} (${categoryName}), but not found in inventory array:`, player.inventory[categoryName]);
+            addToLog(`Cannot find ${details.name} in your inventory.`, 'text-red-400');
+            if (turnConsumed) { isProcessingAction = false; gameState.isPlayerTurn = true; } // Refund turn
+            return;
+        }
+    } else { // Lure check (uses object)
+         if (!player.inventory.lures || !(itemKey in player.inventory.lures) || player.inventory.lures[itemKey] <= 0) {
+              console.warn(`Attempted to equip lure ${itemKey}, but not found or uses depleted.`);
+              addToLog(`Cannot find ${details.name} in your inventory.`, 'text-red-400');
+               if (turnConsumed) { isProcessingAction = false; gameState.isPlayerTurn = true; } // Refund turn
+              return;
+         }
+         itemFoundInInventory = true; // Mark as found for lures if check passes
     }
-    // Weapon, Catalyst, Shield equipping (off-hand logic)
+    // --- END INVENTORY CHECK ---
+
+    let equipSuccessful = false; // Flag to track success
+    let oldItemKey = null; // Key of the item being replaced
+    let oldCategoryName = ''; // Category of the item being replaced
+
+    // Armor equipping
+    if (itemType === 'armor') {
+        if (player.equippedArmor.name === details.name) {
+             if (turnConsumed) { addToLog("Already equipped.", 'text-yellow-400'); isProcessingAction = false; gameState.isPlayerTurn = true; } // Refund
+             return;
+        }
+        oldCategoryName = 'armor';
+        if (player.equippedArmor.name !== ARMOR['travelers_garb'].name) {
+            oldItemKey = findKeyByInstance(ARMOR, player.equippedArmor);
+            if (!oldItemKey) console.error(`Could not find key for old armor: ${player.equippedArmor.name}`);
+        }
+        player.equippedArmor = details; // Equip new armor OBJECT
+        player.armorElement = 'none';
+        equipSuccessful = true;
+        // NO LONGER REMOVE new armor KEY from inventory array
+
+    }
+    // Lure equipping (prevented in battle)
+    else if (itemType === 'lure') {
+        if (inBattle) {
+             addToLog("Cannot change lures during battle.", 'text-red-400');
+             isProcessingAction = false; gameState.isPlayerTurn = true; // Refund
+             return;
+         }
+        if (player.equippedLure === itemKey) return;
+        // No old key to add back for lures
+        player.equippedLure = itemKey; // Equip new lure KEY
+        equipSuccessful = true;
+        // Lures are not in arrays, no removal needed
+
+    }
+    // Weapon, Catalyst, Shield equipping
     else if (itemType) {
         const isCurrentlyEquipped =
-            (itemType === 'weapon' && player.equippedWeapon === details) ||
-            (itemType === 'catalyst' && player.equippedCatalyst === details) ||
-            (itemType === 'shield' && player.equippedShield === details);
-
-        if (isCurrentlyEquipped) return; // Already equipped
-
-        // --- Two-Handed Weapon Check ---
-        let isTwoHanded = false;
-        if (itemType === 'weapon') {
-            isTwoHanded = details.class === 'Hand-to-Hand' || details.effect?.dualWield;
-            // --- BEASTKIN: Bestial Instinct (Equip) ---
-            if (isTwoHanded && details.class === 'Hand-to-Hand' && player.race === 'Beastkin' && player.level >= 20) {
-                isTwoHanded = false; // Beastkin (20+) ignores Hand-to-Hand two-handed restriction
-                addToLog("Your bestial nature allows you to wield your claws alongside an off-hand item.", "text-green-300");
-            }
-            // --- End Beastkin Logic ---
-
-            if (isTwoHanded) {
-                // Unequip shield and catalyst if equipping a two-handed weapon
-                if (player.equippedShield.name !== 'None') {
-                    addToLog(`You unequip your ${player.equippedShield.name} to wield your ${details.name}.`, 'text-yellow-500');
-                    unequipItem('shield', false); // Don't re-render yet
-                }
-                if (player.equippedCatalyst.name !== 'None') {
-                    addToLog(`You unequip your ${player.equippedCatalyst.name} to wield your ${details.name}.`, 'text-yellow-500');
-                    unequipItem('catalyst', false); // Don't re-render yet
-                }
-            }
-        }
-
-        // --- Check if trying to equip shield/catalyst with two-handed ---
-        let isEquippedWeaponTwoHanded = player.equippedWeapon.class === 'Hand-to-Hand' || player.equippedWeapon.effect?.dualWield;
-        // --- BEASTKIN: Bestial Instinct (Equip) ---
-        if (isEquippedWeaponTwoHanded && player.equippedWeapon.class === 'Hand-to-Hand' && player.race === 'Beastkin' && player.level >= 20) {
-            isEquippedWeaponTwoHanded = false; // Ignore restriction if it's Hand-to-Hand
-        }
-        // --- End Beastkin Logic ---
-
-        if ((itemType === 'shield' || itemType === 'catalyst') && isEquippedWeaponTwoHanded) {
-            addToLog(`You cannot use a ${itemType} while using a two-handed weapon (${player.equippedWeapon.name}).`, 'text-red-400');
+            (itemType === 'weapon' && player.equippedWeapon?.name === details.name) ||
+            (itemType === 'catalyst' && player.equippedCatalyst?.name === details.name) ||
+            (itemType === 'shield' && player.equippedShield?.name === details.name);
+        if (isCurrentlyEquipped) {
+            if (turnConsumed) { addToLog("Already equipped.", 'text-yellow-400'); isProcessingAction = false; gameState.isPlayerTurn = true; } // Refund
             return;
         }
 
-        // --- Off-hand Slot Logic (Max 2 of Weapon, Catalyst, Shield) ---
+        // --- Two-Handed Check & Forced Unequips ---
+        let isTwoHanded = false;
+        if (itemType === 'weapon') {
+            isTwoHanded = details.class === 'Hand-to-Hand' || details.effect?.dualWield;
+            if (isTwoHanded && details.class === 'Hand-to-Hand' && player.race === 'Beastkin' && player.level >= 20) isTwoHanded = false;
+            if (isTwoHanded) {
+                // unequipItem internally adds old item key back to inventory
+                if (player.equippedShield?.name !== SHIELDS['no_shield'].name) unequipItem('shield', false, false);
+                if (player.equippedCatalyst?.name !== CATALYSTS['no_catalyst'].name) unequipItem('catalyst', false, false);
+            }
+        }
+        // Check equipping shield/catalyst with two-handed
+        let isEquippedWeaponTwoHanded = player.equippedWeapon?.class === 'Hand-to-Hand' || player.equippedWeapon?.effect?.dualWield;
+        if (isEquippedWeaponTwoHanded && player.equippedWeapon?.class === 'Hand-to-Hand' && player.race === 'Beastkin' && player.level >= 20) isEquippedWeaponTwoHanded = false;
+        if ((itemType === 'shield' || itemType === 'catalyst') && isEquippedWeaponTwoHanded) {
+            addToLog(`Cannot use a ${itemType} while using ${player.equippedWeapon.name}.`, 'text-red-400');
+            if (turnConsumed) { isProcessingAction = false; gameState.isPlayerTurn = true; } // Refund
+            return;
+        }
+
+        // --- Off-hand Slot Logic & Forced Unequips ---
+        if (!Array.isArray(player.equipmentOrder)) player.equipmentOrder = [];
         const typeIndex = player.equipmentOrder.indexOf(itemType);
-        if (typeIndex > -1) {
-             // If equipping the same type again (e.g., swapping swords), remove old entry
-             player.equipmentOrder.splice(typeIndex, 1);
-        }
-
-         // If already holding 2 different off-hand types, unequip the oldest one
+        if (typeIndex > -1) player.equipmentOrder.splice(typeIndex, 1); // Remove old entry if same type
         if (player.equipmentOrder.length >= 2) {
-            const typeToUnequip = player.equipmentOrder.shift(); // Remove the first (oldest) entry
-            let unequippedItemName = '';
-            if (typeToUnequip === 'weapon') {
-                unequippedItemName = player.equippedWeapon.name;
-                player.equippedWeapon = WEAPONS['fists']; player.weaponElement = 'none';
-            } else if (typeToUnequip === 'catalyst') {
-                unequippedItemName = player.equippedCatalyst.name;
-                player.equippedCatalyst = CATALYSTS['no_catalyst'];
-            } else if (typeToUnequip === 'shield') {
-                unequippedItemName = player.equippedShield.name;
-                player.equippedShield = SHIELDS['no_shield']; player.shieldElement = 'none';
-            }
-             if (unequippedItemName) {
-                addToLog(`You unequipped ${unequippedItemName} to make room for the ${details.name}.`, 'text-yellow-500');
+            const typeToUnequip = player.equipmentOrder.shift(); // Get oldest type
+            if (typeToUnequip !== itemType) { // Only unequip if different type
+                 // unequipItem internally adds old item key back to inventory
+                 let unequippedItemName = '';
+                 if (typeToUnequip === 'weapon') { unequippedItemName = player.equippedWeapon.name; unequipItem('weapon', false, false); }
+                 else if (typeToUnequip === 'catalyst') { unequippedItemName = player.equippedCatalyst.name; unequipItem('catalyst', false, false); }
+                 else if (typeToUnequip === 'shield') { unequippedItemName = player.equippedShield.name; unequipItem('shield', false, false); }
+                 if (unequippedItemName && !['None', 'Fists', "Traveler's Garb"].includes(unequippedItemName)) {
+                     addToLog(`Unequipped ${unequippedItemName} for the ${details.name}.`, 'text-yellow-500');
+                 }
             }
         }
+        player.equipmentOrder.push(itemType); // Add new type to end
 
-        // Add the newly equipped item type to the end of the order
-        player.equipmentOrder.push(itemType);
+        // --- Store Key of Old Item BEFORE assigning new one ---
+        oldCategoryName = categoryName; // Category is the same for old/new here
+        if (itemType === 'weapon' && player.equippedWeapon?.name !== WEAPONS['fists'].name) oldItemKey = findKeyByInstance(WEAPONS, player.equippedWeapon);
+        else if (itemType === 'catalyst' && player.equippedCatalyst?.name !== CATALYSTS['no_catalyst'].name) oldItemKey = findKeyByInstance(CATALYSTS, player.equippedCatalyst);
+        else if (itemType === 'shield' && player.equippedShield?.name !== SHIELDS['no_shield'].name) oldItemKey = findKeyByInstance(SHIELDS, player.equippedShield);
 
-        // Assign the actual equipment
+        // Assign the new equipment OBJECT
         if (itemType === 'weapon') { player.equippedWeapon = details; player.weaponElement = 'none'; }
         else if (itemType === 'catalyst') { player.equippedCatalyst = details; }
         else if (itemType === 'shield') { player.equippedShield = details; player.shieldElement = 'none'; }
-    } else {
+
+        equipSuccessful = true; // Mark as successful for inventory adjustment below
+
+    } else { // Should not be reachable
         console.error("Unknown item type for equip:", itemKey);
-        return; // Don't proceed if type is unknown
+        if (turnConsumed) { isProcessingAction = false; gameState.isPlayerTurn = true; } // Refund
+        return;
     }
 
+    // --- Inventory Adjustments (AFTER potential unequips and successful new equip assignment) ---
+    if (equipSuccessful) {
+        // Add the old item KEY back to its inventory array (if one was replaced and not default)
+        if (oldItemKey && oldCategoryName) {
+            if (!player.inventory[oldCategoryName]) player.inventory[oldCategoryName] = []; // Ensure array exists
+            // --- Check if old item is already in inventory before adding ---
+            if (!player.inventory[oldCategoryName].includes(oldItemKey)) {
+                player.inventory[oldCategoryName].push(oldItemKey);
+                console.log(`Added old ${oldCategoryName.slice(0,-1)} key ${oldItemKey} back to inventory.${oldCategoryName}.`);
+            } else {
+                 console.log(`Old ${oldCategoryName.slice(0,-1)} key ${oldItemKey} was already in inventory.`);
+            }
+        }
 
-    addToLog(`You equipped the <span class="font-bold text-cyan-300">${details.name}</span>.`);
-    updateStatsView();
-    if (gameState.currentView === 'inventory') {
-        renderInventory(); // Re-render inventory to show changes
+        // --- DO NOT REMOVE the newly equipped item KEY from its inventory array ---
+        // if (itemType !== 'lure') { ... removal logic removed ... }
+        console.log(`Equipped ${itemType} key ${itemKey} - Item remains in inventory list.`);
+    }
+    // --- End Inventory Adjustments ---
+
+
+    // --- Final Steps ---
+    if (equipSuccessful) {
+        if (turnConsumed) {
+            addToLog(`You spend your turn equipping the ${details.name}.`, 'text-yellow-300');
+        }
+        addToLog(`Equipped: <span class="font-bold text-cyan-300">${details.name}</span>.`);
+        updateStatsView();
+
+        if (inBattle) {
+            console.log("Equip successful in battle, calling returnToBattleFromInventory...");
+            // returnToBattleFromInventory handles grid render & turn finalization & isProcessingAction reset
+            returnToBattleFromInventory();
+        } else if (gameState.currentView === 'inventory') {
+            renderInventory(); // Only re-render inventory if OUTSIDE battle
+        }
+    } else if (turnConsumed) {
+        // If equip failed after setting flags, refund turn
+         isProcessingAction = false;
+         gameState.isPlayerTurn = true;
+         // Render inventory again to show the failed state clearly
+         if(inBattle) renderInventory();
     }
 }
 
-function unequipItem(itemType, shouldRender = true) {
+/**
+ * Unequips an item of the specified type, returning it to inventory.
+ * MODIFIED: Stops adding the item key back if it's already present. Ensures immediate return in battle.
+ * @param {string} itemType - The type of item to unequip ('weapon', 'catalyst', 'armor', 'shield', 'lure').
+ * @param {boolean} [shouldRender=true] - Whether to re-render the inventory (if open).
+ * @param {boolean} [inBattle=false] - Whether this action happens during battle.
+ */
+function unequipItem(itemType, shouldRender = true, inBattle = false) {
     if (!player) return;
 
     let unequippedItemName = '';
     let changed = false;
+    let turnConsumed = false;
+
+    // --- BATTLE-SPECIFIC CHECKS (only if called directly from inventory) ---
+    if (inBattle) {
+        if (!gameState.isPlayerTurn || isProcessingAction) {
+            addToLog("Cannot change gear right now.", 'text-red-400');
+            return;
+        }
+        isProcessingAction = true;
+        gameState.isPlayerTurn = false; // Assume turn consumed
+        turnConsumed = true;
+    }
+    // --- END BATTLE CHECKS ---
+
+    let itemKeyToAdd = null; // Key of the item being unequipped
+    let defaultItem = null; // Store the default item object
+    let categoryName = ''; // e.g., 'weapons'
 
     switch (itemType) {
         case 'weapon':
-            if (player.equippedWeapon.name === WEAPONS['fists'].name) return; // Already default
+            defaultItem = WEAPONS['fists'];
+            categoryName = 'weapons';
+            if (player.equippedWeapon.name === defaultItem.name) {
+                if(turnConsumed) { addToLog("Fists already equipped.", 'text-yellow-400'); isProcessingAction = false; gameState.isPlayerTurn = true; } return; // Refund if trying to unequip default
+            }
             unequippedItemName = player.equippedWeapon.name;
-            player.equippedWeapon = WEAPONS['fists'];
-            player.weaponElement = 'none'; // Reset element
+            itemKeyToAdd = findKeyByInstance(WEAPONS, player.equippedWeapon);
+            player.equippedWeapon = defaultItem;
+            player.weaponElement = 'none';
             changed = true;
             break;
         case 'catalyst':
-            if (player.equippedCatalyst.name === CATALYSTS['no_catalyst'].name) return;
+            defaultItem = CATALYSTS['no_catalyst'];
+            categoryName = 'catalysts';
+            if (player.equippedCatalyst.name === defaultItem.name) {
+                 if(turnConsumed) { addToLog("No catalyst already equipped.", 'text-yellow-400'); isProcessingAction = false; gameState.isPlayerTurn = true; } return;
+            }
             unequippedItemName = player.equippedCatalyst.name;
-            player.equippedCatalyst = CATALYSTS['no_catalyst'];
+            itemKeyToAdd = findKeyByInstance(CATALYSTS, player.equippedCatalyst);
+            player.equippedCatalyst = defaultItem;
             changed = true;
             break;
         case 'armor':
-            if (player.equippedArmor.name === ARMOR['travelers_garb'].name) return;
+            defaultItem = ARMOR['travelers_garb'];
+            categoryName = 'armor';
+            if (player.equippedArmor.name === defaultItem.name) {
+                 if(turnConsumed) { addToLog("Traveler's Garb already equipped.", 'text-yellow-400'); isProcessingAction = false; gameState.isPlayerTurn = true; } return;
+            }
             unequippedItemName = player.equippedArmor.name;
-            player.equippedArmor = ARMOR['travelers_garb'];
-            player.armorElement = 'none'; // Reset element
+            itemKeyToAdd = findKeyByInstance(ARMOR, player.equippedArmor);
+            player.equippedArmor = defaultItem;
+            player.armorElement = 'none';
             changed = true;
             break;
         case 'shield':
-            if (player.equippedShield.name === SHIELDS['no_shield'].name) return;
+            defaultItem = SHIELDS['no_shield'];
+            categoryName = 'shields';
+            if (player.equippedShield.name === defaultItem.name) {
+                 if(turnConsumed) { addToLog("No shield already equipped.", 'text-yellow-400'); isProcessingAction = false; gameState.isPlayerTurn = true; } return;
+            }
             unequippedItemName = player.equippedShield.name;
-            player.equippedShield = SHIELDS['no_shield'];
-            player.shieldElement = 'none'; // Reset element
+            itemKeyToAdd = findKeyByInstance(SHIELDS, player.equippedShield);
+            player.equippedShield = defaultItem;
+            player.shieldElement = 'none';
             changed = true;
             break;
         case 'lure':
-            if (player.equippedLure === 'no_lure') return;
+             if (inBattle) {
+                 addToLog("Cannot change lures during battle.", 'text-red-400');
+                 isProcessingAction = false; gameState.isPlayerTurn = true; // Refund
+                 return;
+             }
+            categoryName = 'lures'; // Set category just for consistency
+            if (player.equippedLure === 'no_lure') return; // Already default
             unequippedItemName = LURES[player.equippedLure].name;
+            // No key to add back for lures
             player.equippedLure = 'no_lure';
             changed = true;
             break;
         default:
-            return; // Invalid type
+             if (turnConsumed) { isProcessingAction = false; gameState.isPlayerTurn = true; } // Refund if invalid type called in battle
+            return;
     }
 
     // Update equipment order if weapon/catalyst/shield was unequipped
     if (changed && ['weapon', 'catalyst', 'shield'].includes(itemType)) {
+        if (!Array.isArray(player.equipmentOrder)) player.equipmentOrder = [];
         const typeIndex = player.equipmentOrder.indexOf(itemType);
         if (typeIndex > -1) {
             player.equipmentOrder.splice(typeIndex, 1);
         }
     }
 
+    // --- DO NOT Add the unequipped item KEY back to inventory array ---
+    // The key should already be there since we stopped removing it on equip.
+    if (changed && itemKeyToAdd && categoryName && itemType !== 'lure') {
+        // We can add a check here just to be SUPER sure it exists
+         if (!player.inventory[categoryName]) player.inventory[categoryName] = [];
+         if (!player.inventory[categoryName].includes(itemKeyToAdd)) {
+             // This case means something went very wrong earlier (like the item *was* removed on equip)
+             console.warn(`Attempted to unequip ${itemKeyToAdd}, but it wasn't found in inventory.${categoryName}. Adding it back now.`);
+             player.inventory[categoryName].push(itemKeyToAdd);
+         } else {
+             console.log(`Unequipped ${itemType} key ${itemKeyToAdd}. Key remains in inventory list.`);
+         }
+    } else if (changed && itemType !== 'lure' && !itemKeyToAdd) {
+        // Critical error finding the key
+        console.error(`CRITICAL ERROR: Could not find key for unequipped item: ${unequippedItemName} of type ${itemType}.`);
+        addToLog(`Critical Error: Could not properly track ${unequippedItemName} during unequip.`, 'text-red-600 font-bold');
+        changed = false; // Mark as failed
+        if (turnConsumed) { isProcessingAction = false; gameState.isPlayerTurn = true; } // Refund turn
+    }
+    // --- END Inventory Adjustment Change ---
+
+    // --- Final Steps ---
     if (changed) {
-        addToLog(`You unequipped the <span class="font-bold text-cyan-300">${unequippedItemName}</span>.`);
-        updateStatsView();
-        if (shouldRender && gameState.currentView === 'inventory') {
-            renderInventory(); // Re-render if called directly from inventory
+        if (turnConsumed) {
+            addToLog(`You spend your turn unequipping the ${unequippedItemName}.`, 'text-yellow-300');
         }
+        addToLog(`Unequipped: <span class="font-bold text-cyan-300">${unequippedItemName}</span>.`);
+        updateStatsView();
+
+        if (inBattle) {
+            console.log("Unequip successful in battle, calling returnToBattleFromInventory...");
+            returnToBattleFromInventory(); // Handles grid render & turn finalization & isProcessingAction reset
+        } else if (shouldRender && gameState.currentView === 'inventory') {
+            renderInventory(); // Only re-render inventory if OUTSIDE battle and requested
+        }
+    } else if (turnConsumed) {
+        // If unequip failed, refund turn
+        isProcessingAction = false;
+        gameState.isPlayerTurn = true;
+        if(inBattle) renderInventory(); // Show failed state
     }
 }
+
+
+
 
 
 function brewWitchPotion(recipeKey) {
