@@ -651,22 +651,60 @@ window.setStatAllocationAmount = function(amount) {
 window.allocatePoint = function(stat, amount) {
      const currentStatPoints = player.statPoints || 0;
     if (currentStatPoints >= amount) {
+        // --- Store current and max values BEFORE changes ---
+        const oldHp = player.hp;
+        const oldMp = player.mp;
+        const oldMaxHp = player.maxHp;
+        const oldMaxMp = player.maxMp;
+
         player[stat]+= amount;
         const bonusStatKey = 'bonus' + capitalize(stat);
          // Ensure bonus stat exists before adding
          player[bonusStatKey] = (player[bonusStatKey] || 0) + amount;
 
 
-        player.recalculateGrowthBonuses(); // Recalculate derived stats
+        player.recalculateGrowthBonuses(); // Recalculate derived stats (updates maxHp/maxMp)
 
         player.statPoints = currentStatPoints - amount; // Update points
-        // Refresh HP/MP fully when allocating points
-        player.hp = player.maxHp;
-        player.mp = player.maxMp;
+
+        // --- Restore HP/MP and add specific bonus ---
+        player.hp = oldHp; // Restore old HP first
+        player.mp = oldMp; // Restore old MP first
+
+        // Calculate and add only the *direct* HP/MP gain from Vigor/Focus
+        let hpGain = 0;
+        let mpGain = 0;
+
+        if (stat === 'vigor') {
+            // HP gain is 5 per point of Vigor spent
+            hpGain = amount * 5;
+            // Add the gain, but don't exceed the NEW max HP
+            player.hp = Math.min(player.maxHp, player.hp + hpGain);
+        } else {
+            // If Vigor didn't change, still need to clamp HP to the potentially changed max HP
+            // (e.g., if a background bonus calculation changed slightly)
+            player.hp = Math.min(player.maxHp, player.hp);
+        }
+
+        if (stat === 'focus') {
+            // MP gain is 5 per point of Focus spent
+            mpGain = amount * 5;
+            // Add the gain, but don't exceed the NEW max MP
+            player.mp = Math.min(player.maxMp, player.mp + mpGain);
+        } else {
+            // Clamp MP similar to HP
+            player.mp = Math.min(player.maxMp, player.mp);
+        }
+
+        // --- REMOVED full HP/MP refill lines ---
+        // player.hp = player.maxHp;
+        // player.mp = player.maxMp;
+
         updateStatsView(); // Update main UI
         renderCharacterSheet(gameState.currentView === 'character_sheet_levelup'); // Re-render sheet
     }
 }
+
 
 window.deallocatePoint = function(stat, amount) {
     const bonusStatKey = 'bonus' + capitalize(stat);
@@ -678,16 +716,25 @@ window.deallocatePoint = function(stat, amount) {
 
     // Check if we can actually decrease by the desired amount
     if (pointsSpentThisSession >= amount) {
+        // --- Store current HP/MP BEFORE changes ---
+        const oldHp = player.hp;
+        const oldMp = player.mp;
+
         player[stat] -= amount; // Decrease base stat
         player[bonusStatKey] = currentBonusStat - amount; // Decrease bonus stat
 
 
-        player.recalculateGrowthBonuses(); // Recalculate derived
+        player.recalculateGrowthBonuses(); // Recalculate derived (updates maxHp/maxMp)
 
         player.statPoints = (player.statPoints || 0) + amount; // Refund points
-        // Refresh HP/MP fully
-        player.hp = player.maxHp;
-        player.mp = player.maxMp;
+
+        // --- Restore old HP/MP and clamp to NEW max values ---
+        player.hp = Math.min(player.maxHp, oldHp);
+        player.mp = Math.min(player.maxMp, oldMp);
+        // --- REMOVED full HP/MP refill lines ---
+        // player.hp = player.maxHp;
+        // player.mp = player.maxMp;
+
         updateStatsView(); // Update main UI
         renderCharacterSheet(gameState.currentView === 'character_sheet_levelup'); // Re-render sheet
     }
@@ -696,6 +743,10 @@ window.deallocatePoint = function(stat, amount) {
 
 function resetStatAllocation() {
     if (!characterSheetOriginalStats) return;
+
+    // --- Store current HP/MP BEFORE changes ---
+    const oldHp = player.hp;
+    const oldMp = player.mp;
 
     // Reset base stats by subtracting the difference added this session
     player.vigor -= ((player.bonusVigor || 0) - (characterSheetOriginalStats.bonusVigor || 0));
@@ -718,17 +769,20 @@ function resetStatAllocation() {
     player.statPoints = characterSheetOriginalStats.statPoints || 0;
 
 
-    player.recalculateGrowthBonuses(); // Recalculate derived stats
-    // Refresh HP/MP
-    player.hp = player.maxHp;
-    player.mp = player.maxMp;
+    player.recalculateGrowthBonuses(); // Recalculate derived stats (updates maxHp/maxMp)
+
+    // --- Restore old HP/MP and clamp to NEW max values ---
+    player.hp = Math.min(player.maxHp, oldHp);
+    player.mp = Math.min(player.maxMp, oldMp);
+    // --- REMOVED full HP/MP refill lines ---
+    // player.hp = player.maxHp;
+    // player.mp = player.maxMp;
 
 
     addToLog("Stat allocation has been reset.", "text-yellow-400");
     updateStatsView(); // Update main UI
     renderCharacterSheet(gameState.currentView === 'character_sheet_levelup'); // Re-render sheet
 }
-
 function confirmStatAllocation() {
     if (!player) return;
     characterSheetOriginalStats = null; // Clear the original stats snapshot
