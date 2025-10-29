@@ -971,6 +971,22 @@ function calculateElementalModifier(attackerElement, defenderElement) {
 // SECTION 7: DEBUG PANEL FUNCTIONS
 // =================================================================================
 
+let logChanceCalculations = false;
+
+// --- ADDED: Function to toggle chance calculation logging ---
+function toggleLogChanceCalculations() {
+    logChanceCalculations = !logChanceCalculations;
+    addToLog(`DEBUG: Detailed chance calculation logging ${logChanceCalculations ? 'ENABLED' : 'DISABLED'}.`, 'text-gray-500');
+    // Update button text/style if needed (optional)
+    const toggleBtn = document.getElementById('debug-log-chance-toggle');
+    if (toggleBtn) {
+        toggleBtn.textContent = `Log Chance Calcs: ${logChanceCalculations ? 'ON' : 'OFF'}`;
+        toggleBtn.classList.toggle('bg-green-600', logChanceCalculations);
+        toggleBtn.classList.toggle('btn-primary', !logChanceCalculations);
+    }
+}
+
+
 function toggleDebug() {
     isDebugVisible = !isDebugVisible;
     const panel = $('#debug-panel');
@@ -979,8 +995,17 @@ function toggleDebug() {
         updateDebugView();
         updateDebugAddItemOptions();
         populateDebugStatInputs();
+        // --- ADDED: Update toggle button state when opening debug panel ---
+        const toggleBtn = document.getElementById('debug-log-chance-toggle');
+        if (toggleBtn) {
+            toggleBtn.textContent = `Log Chance Calcs: ${logChanceCalculations ? 'ON' : 'OFF'}`;
+            toggleBtn.classList.toggle('bg-green-600', logChanceCalculations);
+            toggleBtn.classList.toggle('btn-primary', !logChanceCalculations);
+        }
+        // --- END ADDED ---
     }
 }
+
 
 function updateDebugView() {
     if (!isDebugVisible || !player) return;

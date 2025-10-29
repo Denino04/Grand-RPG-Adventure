@@ -1741,7 +1741,6 @@ function renderWitchsCoven(subView = 'main') {
                 <select id="race-change-select" class="flex-grow bg-gray-800 text-white border border-gray-600 rounded px-2 py-1" onchange="toggleAffinitySelect(this.value, 'race-change-select-affinity-container')">
                     ${raceOptions}
                 </select>
-                {/* NEW: Elemental Affinity Dropdown for Race Change */}
                 <div id="race-change-select-affinity-container" class="${player.race === 'Elementals' ? '' : 'hidden'} flex-grow">
                     <select id="race-change-select-affinity" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">
                         ${elementOptions}

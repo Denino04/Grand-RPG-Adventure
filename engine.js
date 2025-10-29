@@ -470,47 +470,107 @@ class Player extends Entity {
      * @returns {boolean} True if the effect triggered, false otherwise.
      */
     rollForEffect(baseChance, debugPurpose = "Unknown Effect") {
-        if (baseChance <= 0) return false;
-        if (baseChance >= 1) return true;
+        // --- CHANCE LOGGING: Log initial state ---
+        if (logChanceCalculations) { // Check the new global flag
+            addToLog(`DEBUG (Chance) [${debugPurpose}]: Base Chance = ${(baseChance * 100).toFixed(1)}%`, 'text-gray-500');
+        }
+
+        if (baseChance <= 0) {
+             // --- CHANCE LOGGING: Log failure due to 0% ---
+             if (logChanceCalculations) addToLog(`DEBUG (Chance) [${debugPurpose}]: Result = FAIL (Base chance <= 0)`, 'text-gray-500');
+             return false;
+        }
+        if (baseChance >= 1) {
+             // --- CHANCE LOGGING: Log success due to 100% ---
+             if (logChanceCalculations) addToLog(`DEBUG (Chance) [${debugPurpose}]: Result = SUCCESS (Base chance >= 1)`, 'text-gray-500');
+            return true;
+        }
+
 
         let modifiedChance = baseChance;
+        let logSteps = []; // Keep track of modifications for logging
 
         // 1. Apply Dragonborn penalty first
         if (this.race === 'Dragonborn') {
             const penalty = (this.level >= 20) ? 0.25 : 0.5; // 75% reduction or 50% reduction
+            const oldChance = modifiedChance;
             modifiedChance *= penalty;
+            logSteps.push(`Dragonborn Penalty x${penalty.toFixed(2)} -> ${(modifiedChance * 100).toFixed(1)}%`);
         }
 
         // 2. Apply Human bonus
-        // Note: applyRacialPassive already checks if the player is Human
-        modifiedChance = this.applyRacialPassive(modifiedChance);
+        const humanBonusApplied = this.race === 'Human' && typeof this.racialPassive === 'function';
+        if (humanBonusApplied) {
+            const oldChance = modifiedChance;
+            modifiedChance = this.applyRacialPassive(modifiedChance); // Call the specific function from RACES data
+            logSteps.push(`Human Bonus -> ${(modifiedChance * 100).toFixed(1)}%`);
+        }
+
+        // --- CHANCE LOGGING: Log final chance before roll ---
+        if (logChanceCalculations && logSteps.length > 0) {
+             addToLog(`DEBUG (Chance) [${debugPurpose}]: Modifications => ${logSteps.join(' | ')}`, 'text-gray-500');
+        } else if (logChanceCalculations) {
+            addToLog(`DEBUG (Chance) [${debugPurpose}]: Final Chance = ${(modifiedChance * 100).toFixed(1)}% (No mods applied)`, 'text-gray-500');
+        }
+
 
         // 3. Make the initial roll
         let roll = Math.random();
+        // --- CHANCE LOGGING: Log the roll ---
+        if (logChanceCalculations) {
+            addToLog(`DEBUG (Chance) [${debugPurpose}]: Rolled ${roll.toFixed(3)} vs Chance ${(modifiedChance * 100).toFixed(1)}%`, 'text-gray-500');
+        }
+
         if (roll < modifiedChance) {
-            if (isDebugVisible) console.log(`Racial Roll [${debugPurpose}]: SUCCESS (Base: ${baseChance.toFixed(2)}, Mod: ${modifiedChance.toFixed(2)}, Roll: ${roll.toFixed(2)})`);
+            // --- CHANCE LOGGING: Log success ---
+            if (logChanceCalculations) addToLog(`DEBUG (Chance) [${debugPurpose}]: Result = SUCCESS`, 'text-green-400');
+            if (isDebugVisible && !logChanceCalculations) console.log(`Racial Roll [${debugPurpose}]: SUCCESS (Base: ${baseChance.toFixed(2)}, Mod: ${modifiedChance.toFixed(2)}, Roll: ${roll.toFixed(2)})`);
             return true; // Success!
         }
 
         // 4. Handle Halfling reroll on failure
         if (this.race === 'Halfling') {
             const rerollChance = (this.level >= 20) ? (1/6) : 0.10; // 10% or 1-in-6
-            if (Math.random() < rerollChance) {
+             // --- CHANCE LOGGING: Log Halfling attempt ---
+             if (logChanceCalculations) {
+                 addToLog(`DEBUG (Chance) [${debugPurpose}]: Halfling Reroll Check (${(rerollChance * 100).toFixed(1)}% chance)`, 'text-gray-500');
+             }
+
+            let rerollLuckRoll = Math.random(); // Roll for the *chance* to reroll
+            if (rerollLuckRoll < rerollChance) {
+                 // --- CHANCE LOGGING: Log Halfling reroll triggered ---
+                 if (logChanceCalculations) addToLog(`DEBUG (Chance) [${debugPurpose}]: Halfling Reroll Triggered! Rerolling...`, 'text-yellow-300');
+
                 // Halfling luck triggers a *recalculation* against the modified chance, not a guaranteed success
                 let reroll = Math.random();
+                 // --- CHANCE LOGGING: Log the actual reroll value ---
+                 if (logChanceCalculations) {
+                    addToLog(`DEBUG (Chance) [${debugPurpose}]: Rerolled ${reroll.toFixed(3)} vs Chance ${(modifiedChance * 100).toFixed(1)}%`, 'text-yellow-300');
+                 }
+
                 if (reroll < modifiedChance) {
                     addToLog("Your uncanny luck grants you a second chance... and it succeeds!", "text-green-300");
-                    if (isDebugVisible) console.log(`Racial Roll [${debugPurpose}]: HALFLING SUCCESS (Base: ${baseChance.toFixed(2)}, Mod: ${modifiedChance.toFixed(2)}, Reroll: ${reroll.toFixed(2)})`);
+                    // --- CHANCE LOGGING: Log Halfling success ---
+                    if (logChanceCalculations) addToLog(`DEBUG (Chance) [${debugPurpose}]: Result = HALFLING SUCCESS`, 'text-green-400');
+                    if (isDebugVisible && !logChanceCalculations) console.log(`Racial Roll [${debugPurpose}]: HALFLING SUCCESS (Base: ${baseChance.toFixed(2)}, Mod: ${modifiedChance.toFixed(2)}, Reroll: ${reroll.toFixed(2)})`);
                     return true; // Reroll succeeded!
+                } else {
+                     // --- CHANCE LOGGING: Log Halfling reroll failure ---
+                     if (logChanceCalculations) addToLog(`DEBUG (Chance) [${debugPurpose}]: Reroll Failed. Result = FAIL`, 'text-red-400');
                 }
+            } else {
+                // --- CHANCE LOGGING: Log Halfling luck didn't trigger ---
+                if (logChanceCalculations) addToLog(`DEBUG (Chance) [${debugPurpose}]: Halfling Reroll Not Triggered. Result = FAIL`, 'text-red-400');
             }
-            // If Halfling luck didn't trigger, or the reroll also failed
-            if (isDebugVisible) console.log(`Racial Roll [${debugPurpose}]: FAIL (Base: ${baseChance.toFixed(2)}, Mod: ${modifiedChance.toFixed(2)}, Roll: ${roll.toFixed(2)})`);
-            return false;
+             // Fall through to standard failure logging if reroll wasn't attempted or failed
         }
 
-        // 5. Standard failure for all other races
-        if (isDebugVisible) console.log(`Racial Roll [${debugPurpose}]: FAIL (Base: ${baseChance.toFixed(2)}, Mod: ${modifiedChance.toFixed(2)}, Roll: ${roll.toFixed(2)})`);
+        // 5. Standard failure for all other races (or Halfling fail)
+        // --- CHANCE LOGGING: Log final failure ---
+        if (logChanceCalculations && this.race !== 'Halfling') { // Avoid double logging Halfling fail
+             addToLog(`DEBUG (Chance) [${debugPurpose}]: Result = FAIL`, 'text-red-400');
+        }
+        if (isDebugVisible && !logChanceCalculations) console.log(`Racial Roll [${debugPurpose}]: FAIL (Base: ${baseChance.toFixed(2)}, Mod: ${modifiedChance.toFixed(2)}, Roll: ${roll.toFixed(2)})`);
         return false;
     }
 

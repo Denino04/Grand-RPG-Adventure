@@ -2235,25 +2235,94 @@ function checkBattleStatus(isReaction = false) {
 
                 // Loot Drop Logic
                 for (const item in enemy.lootTable) {
-                    let dropChance = enemy.lootTable[item];
-                    if (player.foodBuffs.loot_chance) dropChance *= player.foodBuffs.loot_chance.value;
+                    let baseDropChance = enemy.lootTable[item];
                     const itemDetails = getItemDetails(item);
+
+                    // --- ADDED: Luck Bonus ---
+                    const playerLuckBonus = Math.min(0.25, (player.luck * 0.5) / 100); // Max +25% absolute from Luck
+                    let finalDropChance = baseDropChance + playerLuckBonus;
+                    // --- END ADDED ---
+
+                    if (player.foodBuffs.loot_chance) finalDropChance *= player.foodBuffs.loot_chance.value;
 
                     // --- DWARF: Craftsmen's Intuition (Loot) ---
                     if (player.race === 'Dwarf' && itemDetails && (WEAPONS[item] || ARMOR[item] || SHIELDS[item] || CATALYSTS[item])) {
-                        dropChance *= 1.25; // 25% relative boost
+                        finalDropChance *= 1.25; // 25% relative boost
                     }
                     // --- End Dwarf Logic ---
 
                     if (player.equippedWeapon.effect?.lootBonus && itemDetails && (itemDetails.class || ['Armor', 'Weapon'].includes(itemDetails.type))) {
-                        dropChance *= 2;
+                        finalDropChance *= 2;
                     }
 
-                    // Use new rollForEffect function
-                    if (player.rollForEffect(dropChance, 'Loot Drop')) {
+                    // --- ADDED: Debug Logging ---
+                    if (logChanceCalculations) {
+                        addToLog(`DEBUG: Loot Chance (${itemDetails.name}): Base = ${(baseDropChance * 100).toFixed(1)}%, Luck = +${(playerLuckBonus * 100).toFixed(1)}%, Mods = x${(player.foodBuffs.loot_chance?.value || 1).toFixed(1)} x${(player.race === 'Dwarf' && itemDetails && (WEAPONS[item] || ARMOR[item] || SHIELDS[item] || CATALYSTS[item])) ? 1.25 : 1} x${(player.equippedWeapon.effect?.lootBonus && itemDetails && (itemDetails.class || ['Armor', 'Weapon'].includes(itemDetails.type))) ? 2 : 1} => Final = ${(finalDropChance * 100).toFixed(1)}%`, 'text-gray-500');
+                    }
+                    // --- END ADDED ---
+
+                    // Use new rollForEffect function with the FINAL calculated chance
+                    if (player.rollForEffect(finalDropChance, 'Loot Drop')) {
                         player.addToInventory(item, 1, true);
                     }
                 }
+
+                // --- Recipe Drop Logic ---
+                const enemyTier = enemy.speciesData.tier;
+                // Base 5% chance, scaling slightly with enemy rarity
+                const baseRecipeDropChance = 0.05 + (enemy.rarityData.rarityIndex * 0.005);
+                // --- ADDED: Luck Bonus ---
+                const recipeLuckBonus = Math.min(0.10, (player.luck * 0.5) / 100); // Max +10% absolute from Luck for recipes
+                const finalRecipeDropChance = baseRecipeDropChance + recipeLuckBonus;
+                // --- END ADDED ---
+
+                // --- ADDED: Debug Logging ---
+                if (logChanceCalculations) {
+                    addToLog(`DEBUG: Recipe Roll Chance: Base = ${(baseRecipeDropChance * 100).toFixed(1)}%, Luck = +${(recipeLuckBonus * 100).toFixed(1)}% => Final = ${(finalRecipeDropChance * 100).toFixed(1)}%`, 'text-gray-500');
+                }
+                // --- END ADDED ---
+
+                // Use new rollForEffect function with the FINAL calculated chance
+                if (preTrainingState === null && player.rollForEffect(finalRecipeDropChance, 'Recipe Drop')) {
+                    const recipeType = Math.random() < 0.5 ? 'cooking' : 'alchemy'; // 50/50 chance
+                    const allPossibleRecipes = RECIPE_DROPS_BY_TIER[recipeType]?.[enemyTier] || [];
+                    const availableRecipesForTier = allPossibleRecipes.filter(recipeKey => {
+                            // Check if player *already knows* the recipe
+                            const actualRecipeKey = ITEMS[recipeKey]?.recipeKey;
+                            if (!actualRecipeKey) return false; // Skip invalid recipe items
+                            if (recipeType === 'cooking') {
+                                return !player.knownCookingRecipes.includes(actualRecipeKey);
+                            } else { // alchemy
+                                return !player.knownAlchemyRecipes.includes(actualRecipeKey);
+                            }
+                        });
+
+                    // --- ADDED: Detailed Debug Logging ---
+                    if (logChanceCalculations) {
+                        addToLog(`DEBUG: Rolled for ${recipeType} (Tier ${enemyTier}). All Possible: [${allPossibleRecipes.map(k => ITEMS[k]?.name || k).join(', ')}]`, 'text-gray-500');
+                        if (availableRecipesForTier.length > 0) {
+                             addToLog(`DEBUG: Unknown Available: [${availableRecipesForTier.map(k => ITEMS[k]?.name || k).join(', ')}]`, 'text-gray-500');
+                        } else {
+                             addToLog(`DEBUG: No unknown recipes available for this type/tier.`, 'text-gray-500');
+                        }
+                    }
+                    // --- END ADDED ---
+
+                    if (availableRecipesForTier.length > 0) {
+                        const droppedRecipeItemKey = availableRecipesForTier[Math.floor(Math.random() * availableRecipesForTier.length)];
+                        // --- ADDED: Debug Log Chosen Recipe ---
+                        if (logChanceCalculations) {
+                            addToLog(`DEBUG: Dropping Recipe: ${ITEMS[droppedRecipeItemKey]?.name || droppedRecipeItemKey}`, 'text-gray-500');
+                        }
+                        // --- END ADDED ---
+                        // Add the recipe *item* to inventory, learnRecipe handles the logic
+                        player.addToInventory(droppedRecipeItemKey, 1, true);
+                    } else {
+                        // Log message moved to detailed debug logging above
+                    }
+                }
+                // --- End Recipe Drop Logic ---
+
 
                 if (player.activeQuest && player.activeQuest.category === 'extermination') {
                     const quest = getQuestDetails(player.activeQuest);

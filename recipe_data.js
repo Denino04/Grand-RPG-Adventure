@@ -5,6 +5,7 @@ const BLACKSMITH_RECIPES = {
     'craft_soul_steel': { output: 'soul_steel_armor', ingredients: { 'soul_armor_shard': 5, 'adamantine_armor': 1 }, cost: 5000},
     'craft_vacuum_encaser': { output: 'vacuum_encaser', ingredients: { 'vacuum_lining': 3 }, cost: 3000},
     'craft_claw_of_chimera': { output: 'claw_of_chimera', ingredients: { 'chimera_claw': 2 }, cost: 1000 },
+    'craft_eye_of_medua': {output: 'eye_of_medusa', ingredients: {'cockatrice_venom_gland': 3, 'spider_venom': 2}, cost: 1500},
     'craft_holy_beast_halberd': { output: 'holy_beast_halberd', ingredients: { 'unicorn_horn_fragment': 5 }, cost: 2500 },
     'craft_livyatans_scaleclaw': { output: 'livyatans_scaleclaw', ingredients: { 'soul_armor_shard': 3, 'vacuum_lining': 2 }, cost: 8000 },
     'craft_the_black_knife': { output: 'the_black_knife', ingredients: { 'void_heart': 1, 'vacuum_lining': 4 }, cost: 9000 },

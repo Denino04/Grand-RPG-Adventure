@@ -552,17 +552,17 @@
     </div> <!-- End Game Wrapper -->
 
     <!-- Fixed Overlays (Tooltips, Popups, Debug) -->
-    <div id="tooltip" class="hidden fixed p-3 rounded-lg text-sm shadow-xl w-64 z-50 pointer-events-none"></div>
+    <div id="tooltip" class="hidden fixed p-3 rounded-lg text-sm shadow-xl w-64 z-50 pointer-events-none bg-slate-900 border border-slate-700"></div> <!-- Added background/border -->
     <div id="enemy-info-display" class="hidden fixed bg-slate-800/80 p-2 rounded-lg text-sm border border-slate-600 z-10"></div>
     <div id="betty-encounter-popup" class="hidden fixed bottom-5 right-5 bg-slate-800 border-2 border-purple-400 p-4 rounded-lg shadow-2xl max-w-sm cursor-pointer z-20">
         <!-- Betty popup content -->
     </div>
-    <div id="tutorial-box" class="hidden fixed bg-slate-800 border-2 border-yellow-400 p-4 rounded-lg shadow-2xl max-w-xs z-50 transition-all duration-300">
-        <p id="tutorial-text" class="text-gray-300"></p>
-        <button id="tutorial-next-btn" class="btn btn-primary mt-4 w-full">Next</button>
+    <div id="tutorial-box" class="hidden fixed bg-yellow-400 text-slate-900 p-4 rounded-lg shadow-2xl max-w-xs z-50 transition-all duration-300 border-4 border-yellow-600"> <!-- Changed background/text/border -->
+        <p id="tutorial-text" class="font-semibold"></p> <!-- Added font-semibold -->
+        <button id="tutorial-next-btn" class="btn btn-primary mt-4 w-full bg-slate-700 hover:bg-slate-600 border-slate-900">Next</button> <!-- Adjusted button style -->
         <div id="tutorial-choice-buttons" class="mt-4 flex gap-2"></div>
     </div>
-    <div id="debug-panel" class="hidden fixed bottom-4 right-4 bg-gray-900 border border-gray-700 p-4 rounded-lg shadow-lg w-96 h-1/2 flex flex-col">
+    <div id="debug-panel" class="hidden fixed bottom-4 right-4 bg-gray-900 border border-gray-700 p-4 rounded-lg shadow-lg w-96 h-1/2 flex flex-col z-[150]"> <!-- Increased z-index -->
         <h3 class="text-lg font-bold mb-2 text-center">Debug Panel</h3>
         <div class="flex-grow overflow-y-auto text-xs pr-2 inventory-scrollbar">
             <div class="mb-2">
@@ -573,68 +573,69 @@
                         <h5 class="font-semibold text-white mb-1">General</h5>
                         <div class="grid grid-cols-2 gap-x-2 gap-y-1 items-center">
                             <label for="debug-level" class="text-white text-right text-xs">Level:</label>
-                            <input type="number" id="debug-level" class="text-black rounded px-1">
+                            <input type="number" id="debug-level" class="text-black rounded px-1 w-full"> <!-- Added w-full -->
                             <label for="debug-xp" class="text-white text-right text-xs">XP:</label>
-                            <input type="number" id="debug-xp" class="text-black rounded px-1">
+                            <input type="number" id="debug-xp" class="text-black rounded px-1 w-full">
                             <label for="debug-gold" class="text-white text-right text-xs">Gold:</label>
-                            <input type="number" id="debug-gold" class="text-black rounded px-1">
+                            <input type="number" id="debug-gold" class="text-black rounded px-1 w-full">
                             <label for="debug-statPoints" class="text-white text-right text-xs">Stat Points:</label>
-                            <input type="number" id="debug-statPoints" class="text-black rounded px-1">
+                            <input type="number" id="debug-statPoints" class="text-black rounded px-1 w-full">
                             <label for="debug-xpMultiplier" class="text-white text-right text-xs">XP Multiplier:</label>
-                            <input type="number" id="debug-xpMultiplier" step="0.1" class="text-black rounded px-1">
+                            <input type="number" id="debug-xpMultiplier" step="0.1" class="text-black rounded px-1 w-full">
                         </div>
                     </div>
                      <div>
                         <h5 class="font-semibold text-white mb-1">Vitals</h5>
                         <div class="grid grid-cols-2 gap-x-2 gap-y-1 items-center">
                             <label for="debug-hp" class="text-white text-right text-xs">Current HP:</label>
-                            <input type="number" id="debug-hp" class="text-black rounded px-1">
+                            <input type="number" id="debug-hp" class="text-black rounded px-1 w-full">
                             <label for="debug-mp" class="text-white text-right text-xs">Current MP:</label>
-                            <input type="number" id="debug-mp" class="text-black rounded px-1">
+                            <input type="number" id="debug-mp" class="text-black rounded px-1 w-full">
                              <label for="debug-bonusHp" class="text-white text-right text-xs">Bonus HP:</label>
-                            <input type="number" id="debug-bonusHp" class="text-black rounded px-1">
+                            <input type="number" id="debug-bonusHp" class="text-black rounded px-1 w-full">
                             <label for="debug-bonusMp" class="text-white text-right text-xs">Bonus MP:</label>
-                            <input type="number" id="debug-bonusMp" class="text-black rounded px-1">
+                            <input type="number" id="debug-bonusMp" class="text-black rounded px-1 w-full">
                         </div>
                     </div>
                      <div>
                         <h5 class="font-semibold text-white mb-1">Base Attributes</h5>
                         <div class="grid grid-cols-2 gap-x-2 gap-y-1 items-center">
                             <label for="debug-vigor" class="text-white text-right text-xs">Vigor:</label>
-                            <input type="number" id="debug-vigor" class="text-black rounded px-1">
+                            <input type="number" id="debug-vigor" class="text-black rounded px-1 w-full">
                             <label for="debug-focus" class="text-white text-right text-xs">Focus:</label>
-                            <input type="number" id="debug-focus" class="text-black rounded px-1">
+                            <input type="number" id="debug-focus" class="text-black rounded px-1 w-full">
                             <label for="debug-stamina" class="text-white text-right text-xs">Stamina:</label>
-                            <input type="number" id="debug-stamina" class="text-black rounded px-1">
+                            <input type="number" id="debug-stamina" class="text-black rounded px-1 w-full">
                             <label for="debug-strength" class="text-white text-right text-xs">Strength:</label>
-                            <input type="number" id="debug-strength" class="text-black rounded px-1">
+                            <input type="number" id="debug-strength" class="text-black rounded px-1 w-full">
                             <label for="debug-intelligence" class="text-white text-right text-xs">Intelligence:</label>
-                            <input type="number" id="debug-intelligence" class="text-black rounded px-1">
+                            <input type="number" id="debug-intelligence" class="text-black rounded px-1 w-full">
                             <label for="debug-luck" class="text-white text-right text-xs">Luck:</label>
-                            <input type="number" id="debug-luck" class="text-black rounded px-1">
+                            <input type="number" id="debug-luck" class="text-black rounded px-1 w-full">
                         </div>
                     </div>
                      <div>
                         <h5 class="font-semibold text-white mb-1">Derived Bonuses</h5>
                         <div class="grid grid-cols-2 gap-x-2 gap-y-1 items-center">
                             <label for="debug-bonusPhysicalDamage" class="text-white text-right text-xs">Bonus Phys Dmg:</label>
-                            <input type="number" id="debug-bonusPhysicalDamage" class="text-black rounded px-1">
+                            <input type="number" id="debug-bonusPhysicalDamage" class="text-black rounded px-1 w-full">
                             <label for="debug-bonusMagicalDamage" class="text-white text-right text-xs">Bonus Mag Dmg:</label>
-                            <input type="number" id="debug-bonusMagicalDamage" class="text-black rounded px-1">
+                            <input type="number" id="debug-bonusMagicalDamage" class="text-black rounded px-1 w-full">
                             <label for="debug-bonusPhysicalDefense" class="text-white text-right text-xs">Bonus Phys Def:</label>
-                            <input type="number" id="debug-bonusPhysicalDefense" class="text-black rounded px-1">
+                            <input type="number" id="debug-bonusPhysicalDefense" class="text-black rounded px-1 w-full">
                             <label for="debug-bonusMagicalDefense" class="text-white text-right text-xs">Bonus Mag Def:</label>
-                            <input type="number" id="debug-bonusMagicalDefense" class="text-black rounded px-1">
+                            <input type="number" id="debug-bonusMagicalDefense" class="text-black rounded px-1 w-full">
                             <label for="debug-bonusCritChance" class="text-white text-right text-xs">Bonus Crit %:</label>
-                            <input type="number" id="debug-bonusCritChance" step="0.01" class="text-black rounded px-1">
+                            <input type="number" id="debug-bonusCritChance" step="0.01" class="text-black rounded px-1 w-full">
                             <label for="debug-bonusEvasion" class="text-white text-right text-xs">Bonus Evade %:</label>
-                            <input type="number" id="debug-bonusEvasion" step="0.01" class="text-black rounded px-1">
+                            <input type="number" id="debug-bonusEvasion" step="0.01" class="text-black rounded px-1 w-full">
                         </div>
                     </div>
                 </div>
-                <button onclick="debugUpdateVariables()" class="btn btn-primary w-full mt-2 text-sm">Update</button>
+                <button onclick="debugUpdateVariables()" class="btn btn-primary w-full mt-2 text-sm">Update Stats</button> <!-- Changed Text -->
             </div>
             <div class="mb-2">
+                 <button id="debug-log-chance-toggle" onclick="toggleLogChanceCalculations()" class="btn btn-primary w-full text-sm mb-2">Log Chance Calcs: OFF</button> <!-- Added Toggle Button -->
                 <h4 class="font-bold mb-1">Add Item</h4>
                 <div class="flex gap-2">
                     <select id="debug-item-select" class="flex-grow bg-gray-800 text-white border border-gray-600 rounded px-2 py-1"></select>
@@ -675,3 +676,4 @@
     <script src="main.js"></script>
 </body>
 </html>
+
