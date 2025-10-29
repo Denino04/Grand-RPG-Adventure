@@ -1661,17 +1661,23 @@ function renderWitchsCoven(subView = 'main') {
         html += `<p class="mb-6">The air is thick with incense and unspoken power. The witch offers her services... for a price.</p>
             <div class="flex flex-col md:flex-row justify-center items-center gap-4">
                 <button onclick="renderWitchsCoven('transmute')" class="btn btn-magic w-full md:w-auto">Transmute Items</button>
-                <button onclick="renderWitchsCoven('brew')" class="btn btn-magic w-full md:w-auto">Brew Potions</button>
+                <button onclick="renderWitchsCoven('brew')" class="btn btn-magic w-full md:w-auto">Brew Concoctions</button>
                 <button onclick="renderWitchsCoven('reset')" class="btn btn-magic w-full md:w-auto">Reset Fate</button>
                 <button onclick="renderWitchsCoven('rebirth')" class="btn btn-magic w-full md:w-auto">Rebirth</button>
             </div>`;
     } else if (subView === 'transmute') {
          html += `<h3 class="font-bold text-xl text-yellow-300 mb-4">Transmute Items</h3>
             <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3 text-left">`;
-        Object.keys(WITCH_COVEN_RECIPES).filter(k => !WITCH_COVEN_RECIPES[k].hearts).forEach(key => {
+        // *** MODIFIED FILTER: Check if hearts property is UNDEFINED ***
+        Object.keys(WITCH_COVEN_RECIPES).filter(k => WITCH_COVEN_RECIPES[k].hearts === undefined).forEach(key => {
             const recipe = WITCH_COVEN_RECIPES[key];
             const product = getItemDetails(recipe.output);
-            const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => `${val}x ${getItemDetails(key).name}`).join(', ');
+            // Check if product exists before trying to access name
+            if (!product) {
+                console.warn(`Missing item details for Witch Coven Transmute output: ${recipe.output}`);
+                return; // Skip rendering this recipe if output item is invalid
+            }
+            const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => `${val}x ${getItemDetails(key)?.name || key}`).join(', '); // Added fallback name
             const canAfford = player.gold >= recipe.cost && Object.entries(recipe.ingredients).every(([key, val]) => (player.inventory.items[key] || 0) >= val);
             html += `<div class="p-3 bg-slate-800 rounded-lg">
                 <div class="flex justify-between items-center">
@@ -1686,18 +1692,26 @@ function renderWitchsCoven(subView = 'main') {
     } else if (subView === 'brew') {
         html += `<h3 class="font-bold text-xl text-yellow-300 mb-4">Brew Concoctions</h3>
             <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3 text-left">`;
-        Object.keys(WITCH_COVEN_RECIPES).filter(k => WITCH_COVEN_RECIPES[k].hearts).forEach(key => {
+        // *** MODIFIED FILTER: Check if hearts property EXISTS (is not undefined) ***
+        Object.keys(WITCH_COVEN_RECIPES).filter(k => WITCH_COVEN_RECIPES[k].hearts !== undefined).forEach(key => {
             const recipe = WITCH_COVEN_RECIPES[key];
             const product = getItemDetails(recipe.output);
-            const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => `${val}x ${getItemDetails(key).name}`).join(', ');
+            // Check if product exists before trying to access name
+             if (!product) {
+                console.warn(`Missing item details for Witch Coven Brew output: ${recipe.output}`);
+                return; // Skip rendering this recipe if output item is invalid
+            }
+            const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => `${val}x ${getItemDetails(key)?.name || key}`).join(', '); // Added fallback name
+            // Use recipe.hearts (which could be 0) for the check
             const canAfford = player.gold >= recipe.cost && hearts >= recipe.hearts && Object.entries(recipe.ingredients).every(([key, val]) => (player.inventory.items[key] || 0) >= val);
+            const heartCostText = recipe.hearts > 0 ? `, ${recipe.hearts} Undying Hearts` : ''; // Only show heart cost if > 0
             html += `<div class="p-3 bg-slate-800 rounded-lg">
                 <div class="flex justify-between items-center">
                     <h4 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${recipe.output}', event)" onmouseout="hideTooltip()">${product.name}</h4>
                     <button onclick="brewWitchPotion('${key}')" class="btn btn-primary" ${!canAfford ? 'disabled' : ''}>Brew</button>
                 </div>
                 <p class="text-sm text-gray-400">Requires: ${ingredients}</p>
-                <p class="text-sm text-gray-400">Cost: ${recipe.cost} G, ${recipe.hearts} Undying Hearts</p>
+                <p class="text-sm text-gray-400">Cost: ${recipe.cost} G${heartCostText}</p>
             </div>`;
         });
         html += `</div>`;
@@ -1727,7 +1741,7 @@ function renderWitchsCoven(subView = 'main') {
                 <select id="race-change-select" class="flex-grow bg-gray-800 text-white border border-gray-600 rounded px-2 py-1" onchange="toggleAffinitySelect(this.value, 'race-change-select-affinity-container')">
                     ${raceOptions}
                 </select>
-                <!-- NEW: Elemental Affinity Dropdown for Race Change -->
+                {/* NEW: Elemental Affinity Dropdown for Race Change */}
                 <div id="race-change-select-affinity-container" class="${player.race === 'Elementals' ? '' : 'hidden'} flex-grow">
                     <select id="race-change-select-affinity" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">
                         ${elementOptions}
@@ -1771,6 +1785,9 @@ function renderWitchsCoven(subView = 'main') {
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
+
+    // Also need to adjust the function call in the 'Brew' section to use brewWitchPotion
+    // (This was already done in the code block above)
 }
 
 // Helper function for Witch's Coven

@@ -30,20 +30,23 @@ const ENCHANTING_COSTS = {
 };
 
 const WITCH_COVEN_RECIPES = {
+    // Essence Transmutations (No hearts property - will show under Transmute)
     'transmute_fire_essence': { output: 'fire_essence', ingredients: { 'slime_glob': 5, 'goblin_ear': 2 }, cost: 100 },
     'transmute_water_essence': { output: 'water_essence', ingredients: { 'slime_glob': 5, 'rat_tail': 2 }, cost: 100 },
     'transmute_earth_essence': { output: 'earth_essence', ingredients: { 'slime_glob': 5, 'rabbit_meat': 2 }, cost: 100 },
     'transmute_wind_essence': { output: 'wind_essence', ingredients: { 'slime_glob': 5, 'wolf_pelt': 2 }, cost: 100 },
-    'potion_giant_strength': { output: 'potion_of_giant_strength', ingredients: { 'orc_liver': 5 }, cost: 250, hearts: 1 },
-    'potion_fortitude': { output: 'potion_of_fortitude', ingredients: { 'cockatrice_venom_gland': 5 }, cost: 250, hearts: 1 },
-    'potion_brilliance': { output: 'potion_of_brilliance', ingredients: { 'spider_venom': 5 }, cost: 250, hearts: 1 },
-    'potion_clarity': { output: 'potion_of_clarity', ingredients: { 'unicorn_horn_fragment': 2 }, cost: 250, hearts: 1 },
-    'brew_health': { output: 'health_potion', ingredients: { 'slime_glob': 2 }, cost: 10 },
-    'brew_mana': { output: 'mana_potion', ingredients: { 'slime_glob': 2 }, cost: 15 },
-    'brew_condensed_health': { output: 'condensed_health_potion', ingredients: { 'slime_glob': 10 }, cost: 50 },
-    'brew_condensed_mana': { output: 'condensed_mana_potion', ingredients: { 'slime_glob': 10 }, cost: 60 },
-    'brew_super_health': { output: 'superior_health_potion', ingredients: { 'slime_glob': 20, 'orc_liver' : 2 }, cost: 100 },
-    'brew_super_mana': { output: 'superior_mana_potion', ingredients: { 'slime_glob': 20, 'cockatrice_venom_gland': 2 }, cost: 120 },
+    'transmute_lightning_essence': { output: 'lightning_essence', ingredients: { 'slime_glob': 5, 'rat_tail': 3 }, cost: 100 },
+    'transmute_nature_essence': { output: 'nature_essence', ingredients: { 'slime_glob': 5, 'wolf_pelt': 3 }, cost: 100 },
+    'transmute_light_essence': { output: 'light_essence', ingredients: { 'slime_glob': 5, 'goblin_ear': 3 }, cost: 100 },
+    'transmute_void_essence': { output: 'void_essence', ingredients: { 'slime_glob': 5, 'spider_venom': 2 }, cost: 100 },
+
+    // Basic Potion Brewing (Added hearts: 0 - will show under Brew)
+    'brew_health': { output: 'health_potion', ingredients: { 'slime_glob': 2 }, cost: 10, hearts: 0 }, // Added hearts: 0
+    'brew_mana': { output: 'mana_potion', ingredients: { 'slime_glob': 2 }, cost: 15, hearts: 0 }, // Added hearts: 0
+    'brew_condensed_health': { output: 'condensed_health_potion', ingredients: { 'slime_glob': 10 }, cost: 50, hearts: 0 }, // Added hearts: 0
+    'brew_condensed_mana': { output: 'condensed_mana_potion', ingredients: { 'slime_glob': 10 }, cost: 60, hearts: 0 }, // Added hearts: 0
+    'brew_super_health': { output: 'superior_health_potion', ingredients: { 'slime_glob': 20, 'orc_liver' : 2 }, cost: 100, hearts: 0 }, // Added hearts: 0
+    'brew_super_mana': { output: 'superior_mana_potion', ingredients: { 'slime_glob': 20, 'cockatrice_venom_gland': 2 }, cost: 120, hearts: 0 }, // Added hearts: 0
 };
 
 const ALCHEMY_RECIPES = {

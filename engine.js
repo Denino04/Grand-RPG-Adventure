@@ -1287,9 +1287,13 @@ class Enemy extends Entity {
         const finalStrength = Math.floor((speciesData.base_strength + Math.floor(playerLevel / 2)) * statMultiplier);
         const finalDefense = Math.floor(((speciesData.base_defense || 0) + Math.floor(playerLevel / 3)) * statMultiplier);
 
+        const rarityName = speciesData.rarityNames?.[rarityData.key] || speciesData.name; // Use rarityData.key ('common', 'uncommon', etc.)
+
         const name = elementData.key !== 'none'
-            ? `${rarityData.name} ${elementData.adjective} ${speciesData.name}`
-            : `${rarityData.name} ${speciesData.name}`;
+            ? `${elementData.adjective} ${rarityName}` // Apply adjective to the specific rarity name
+            : rarityName; // Use the specific rarity name directly
+        // --- END NEW NAME LOGIC ---
+
 
         super(name);
         this.x = 0;
