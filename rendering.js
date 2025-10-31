@@ -948,11 +948,13 @@ function renderTownSquare() {
             name: 'Arcane Quarter',
             action: "renderArcaneQuarter()",
             class: 'btn-primary',
-            unlocked: player.unlocks.sageTower || player.unlocks.enchanter || player.unlocks.witchCoven // Show if ANY arcane building is unlocked
+            // --- THIS IS THE FIX: Added a check for hasTowerKey ---
+            unlocked: player.unlocks.sageTower || player.unlocks.enchanter || player.unlocks.witchCoven || player.unlocks.hasTowerKey
         },
         // --- END MODIFICATION ---
         { name: 'Residential Area', action: "renderResidentialDistrict()", class: 'btn-primary', unlocked: true } // Always show district access
     ];
+
 
     // House Button Logic (remains the same)
     if (player.house.owned) {
