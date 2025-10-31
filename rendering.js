@@ -1279,6 +1279,14 @@ function renderResidentialDistrict() {
     lastViewBeforeInventory = 'residential_district';
     gameState.currentView = 'residential_district';
 
+    if (player.level >= 8 && !player.unlocks.barracks) {
+        player.unlocks.barracks = true;
+        // You only need the log once, but we include it if the flag was just flipped.
+        addToLog("A new military advisor has arrived in the Residential District!", "text-yellow-400 font-bold");
+        saveGame(); // Save the new flag state immediately
+    }
+    // --- END FIX ---
+
     const container = document.createElement('div');
     container.className = 'flex flex-col items-center justify-center w-full h-full';
 
