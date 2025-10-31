@@ -234,9 +234,14 @@ function findPath(start, end, isFlying = false) {
             // Check grid layout validity first
             if (!gameState.gridLayout || gameState.gridLayout[neighbor.y * gameState.gridWidth + neighbor.x] !== 1) continue;
 
-            // Check for blocking entities (player or other enemies)
-            const isOccupiedByEntity = (currentEnemies.some(e => e.isAlive() && e.x === neighbor.x && e.y === neighbor.y) || (player.x === neighbor.x && player.y === neighbor.y));
+            // --- THIS IS THE FIX ---
+            // The old logic only checked for 'currentEnemies' and 'player'.
+            // We must add the check for the NpcAlly here.
+            const ally = player.npcAlly;
+            const allyIsAliveAndAtNeighbor = (ally && ally.hp > 0 && !ally.isFled && ally.x === neighbor.x && ally.y === neighbor.y);
+            const isOccupiedByEntity = (currentEnemies.some(e => e.isAlive() && e.x === neighbor.x && e.y === neighbor.y) || (player.x === neighbor.x && player.y === neighbor.y) || allyIsAliveAndAtNeighbor);
             if (isOccupiedByEntity && !(neighbor.x === end.x && neighbor.y === end.y)) continue;
+            // --- END FIX ---
 
             // Check for blocking objects (obstacles/terrain) if not flying
             // MODIFIED: Pinionfolk (isFlying) ignores obstacles and terrain
@@ -264,7 +269,6 @@ function findPath(start, end, isFlying = false) {
     }
     return null; // No path found
 }
-
 
 function findReachableCells(start, maxDistance) {
     const reachable = [];
@@ -338,6 +342,8 @@ class Player extends Entity {
         this.backgroundKey = '';
         this.difficulty = 'hardcore';
         this.elementalAffinity = null; // For Elementals
+        this.npcAlly = null; // <<< NEW
+        this.encountersSinceLastPay = 0; // <<< NEW
         this.house = {
             owned: false,
             storage: { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} },
@@ -353,6 +359,22 @@ class Player extends Entity {
         this.bettyQuestState = 'not_started'; // not_started, declined, accepted
         this.knownCookingRecipes = [];
         this.knownAlchemyRecipes = [];
+        this.barracksRoster = [];
+        this.killsSinceLevel4 = 0;
+        this.killsSinceLevel7 = 0;
+        this.unlocks = {
+            blacksmith: false,
+            sageTower: false,
+            houseAvailable: false,
+            blackMarket: false,
+            enchanter: false,
+            witchCoven: false,
+            barracks: false, // <<< NEW
+            hasBlacksmithKey: false,
+            hasTowerKey: false
+        };
+        // --- End Added ---
+
 
         // Main Stats from Race
         const raceStats = RACES[this.race] || RACES['Human'];
@@ -846,6 +868,37 @@ class Player extends Entity {
     addToInventory(itemKey, quantity = 1, verbose = true) {
         const details = getItemDetails(itemKey); if (!details) return;
 
+        // --- Added Item-Based Unlocks ---
+        const isEssence = itemKey.endsWith('_essence');
+        const isUndyingHeart = itemKey === 'undying_heart';
+
+        if (isEssence && this.level >= 7 && !this.unlocks.enchanter) {
+            this.unlocks.enchanter = true;
+            // Use setTimeout to ensure the "item received" log appears first
+            setTimeout(() => {
+                addToLog("The essence you picked up starts to pulsate warmly, seemingly drawn towards a specific building in the Arcane Quarter. You might want to check it out!", 'text-purple-300');
+            }, 100);
+            saveGame(); // Save unlock flag immediately
+        }
+        if (isUndyingHeart && this.level >= 10 && !this.unlocks.witchCoven) {
+            this.unlocks.witchCoven = true;
+             setTimeout(() => {
+                addToLog("The still beating Undying Heart thrums in your hand, attracting unseen attention. It feels like the Witch in the Arcane Quarter wants to meet you.", 'text-purple-300');
+            }, 100);
+            saveGame(); // Save unlock flag immediately
+        }
+         // Handle Key Item Pickups for unlock flags
+        if (itemKey === 'blacksmith_key') {
+            this.unlocks.hasBlacksmithKey = true;
+            saveGame(); // Save key acquisition
+        }
+        if (itemKey === 'tower_key') {
+            this.unlocks.hasTowerKey = true;
+            saveGame(); // Save key acquisition
+        }
+        // --- End Added ---
+
+
         if(details.type === 'recipe') {
             for(let i = 0; i < quantity; i++) {
                 this.learnRecipe(itemKey, verbose);
@@ -853,7 +906,12 @@ class Player extends Entity {
             return;
         }
 
-        if (verbose) addToLog(`You received: <span class="font-bold" style="color: var(--text-accent);">${details.name}</span>!`, 'text-green-400');
+        // --- Added verbose check for keys ---
+        if (verbose || details.type !== 'key') { // Only log normal items, or keys if verbose is true
+            addToLog(`You received: <span class="font-bold" style="color: var(--text-accent);">${details.name}</span>!`, 'text-green-400');
+        }
+        // --- End Added ---
+
 
         const category = itemKey in WEAPONS ? 'weapons' :
                          (itemKey in CATALYSTS ? 'catalysts' :
@@ -880,6 +938,7 @@ class Player extends Entity {
             }
         }
     }
+
 
     learnRecipe(itemKey, verbose = true) {
         const details = ITEMS[itemKey];
@@ -914,6 +973,7 @@ class Player extends Entity {
              if (verbose && recipeList && recipeList[actualRecipeKey]) { // Only log if recipe was valid
                 addToLog(`You already know this recipe. You sell the spare for a small profit.`);
                 this.gold += Math.floor(details.price / 4);
+                updateStatsView(); // <-- ADDED: Immediately update UI after gaining gold
             } else if (verbose) {
                  addToLog(`This recipe scroll seems incomplete or damaged.`); // Log if recipeKey wasn't found
             }
@@ -952,6 +1012,19 @@ class Player extends Entity {
         addToLog(`You have <span class="font-bold text-green-400">5</span> stat points to allocate!`, 'text-green-300');
         updatePlayerTier(); // Update tier based on new level
         characterSheetOriginalStats = null; // Reset temp stats on level up
+
+        // --- Added Level-Based Unlocks ---
+        if (this.level === 5 && !this.unlocks.houseAvailable) {
+            this.unlocks.houseAvailable = true;
+            addToLog("A 'For Sale' sign has appeared on that empty plot at the edge of town. Looks like you could build your own house there!");
+        }
+        if (this.level === 5 && !this.unlocks.blackMarket) {
+            this.unlocks.blackMarket = true;
+            addToLog("The whispers of shady dealings start to fly around. It looks like the black market has reached this frontier town.");
+        }
+        // --- End Added ---
+
+
         // Trigger level up screen display AFTER current action completes, if not in battle
         if (gameState.currentView !== 'battle' && gameState.currentView !== 'character_sheet_levelup') {
             setTimeout(() => {
@@ -962,8 +1035,6 @@ class Player extends Entity {
             }, 1000);
         }
     }
-
-    // --- NEW: Helper methods for takeDamage refactoring ---
 
     /** Calculates final dodge, parry, and block chances including all modifiers. */
     _calculateAvoidanceChances() {
@@ -1036,18 +1107,249 @@ class Player extends Entity {
 
     /** Handles the counter-attack logic after a successful parry. */
     _handleParryCounterAttack(attacker) {
+        // Note: This function runs in a setTimeout, so we skip async actions like knockback
         setTimeout(() => {
-            if (gameState.battleEnded || !attacker || !attacker.isAlive()) return; // Check attacker still exists
+            if (gameState.battleEnded || !attacker || !attacker.isAlive()) return;
             addToLog(`You launch a swift counter-attack!`, 'text-yellow-300');
-            const weapon = this.equippedWeapon;
-            let counterDamage = rollDice(...weapon.damage, 'Player Parry').total + this.physicalDamageBonus;
-            // --- MODIFICATION: Use damageDealt from the return object ---
-            const damageResult = attacker.takeDamage(counterDamage, { element: this.weaponElement });
-            const finalDamage = damageResult.damageDealt; // Get the actual damage number
-            // --- END MODIFICATION ---
-            addToLog(`Your riposte hits ${attacker.name} for <span class="font-bold text-yellow-300">${finalDamage}</span> damage.`);
+
+            const weapon = this.equippedWeapon; // 'this' is the Player
+            const calcLog = {
+                source: `Player Parry`,
+                targetName: attacker.name,
+                steps: []
+            };
+            let messageLog = [];
+
+            // --- Start of calculation logic (Copied from performSingleAttack) ---
+
+            // 1. Dice & Whetstone (Dwarf logic is here too)
+            let attackDamageDice = [...weapon.damage]; // [numDice, sides]
+            if (this.race === 'Dwarf' && this.level >= 20) {
+                if (attackDamageDice[1] === 6) { attackDamageDice[1] = 8; calcLog.steps.push({ description: "Craftsmen's Intuition", value: "d6 -> d8", result: "" }); }
+                else if (attackDamageDice[1] === 8) { attackDamageDice[1] = 10; calcLog.steps.push({ description: "Craftsmen's Intuition", value: "d8 -> d10", result: "" }); }
+            }
+
+            let allowCrit = false;
+            if (this.statusEffects.buff_whetstone) {
+                // Whetstone buff applies to *all* attacks, including parries
+                if (this.statusEffects.buff_whetstone.diceStepUp) {
+                    const originalSides = attackDamageDice[1];
+                    switch (originalSides) {
+                        case 2: attackDamageDice[1] = 4; break;
+                        case 3: attackDamageDice[1] = 4; break;
+                        case 4: attackDamageDice[1] = 6; break;
+                        case 6: attackDamageDice[1] = 8; break;
+                        case 8: attackDamageDice[1] = 10; break;
+                        case 10: attackDamageDice[1] = 12; break;
+                    }
+                    if (attackDamageDice[1] !== originalSides) {
+                        messageLog.push(`Whetstone sharpens the blow! (d${originalSides} -> d${attackDamageDice[1]})`);
+                        calcLog.steps.push({ description: "Whetstone Buff", value: `d${originalSides} -> d${attackDamageDice[1]}`, result: "" });
+                    }
+                }
+                if (this.statusEffects.buff_whetstone.critEnable) {
+                    allowCrit = true;
+                    messageLog.push(`Whetstone finds a weak spot!`);
+                    calcLog.steps.push({ description: "Whetstone Crit Enable", value: `Crit Possible`, result: "" });
+                }
+            }
+
+            let rollResult = rollDice(attackDamageDice[0], attackDamageDice[1], `Player Parry`);
+            let baseWeaponDamage = rollResult.total;
+            calcLog.baseDamage = baseWeaponDamage;
+
+            // OMIT Fighter Reroll (it's a toggle ability for a main attack action)
+
+            let statBonus = this.physicalDamageBonus;
+
+            // OMIT Combo (parry isn't part of a combo chain)
+
+            let damage = baseWeaponDamage;
+            const statMultiplier = 1 + statBonus / 20;
+            damage = Math.floor(damage * statMultiplier);
+            calcLog.steps.push({ description: `Stat Multiplier (1 + ${statBonus}/20)`, value: `x${statMultiplier.toFixed(2)}`, result: damage });
+
+            const strengthFlatBonus = Math.floor(this.strength / 5);
+            damage += strengthFlatBonus;
+            calcLog.steps.push({ description: "Strength Flat Bonus (Str/5)", value: `+${strengthFlatBonus}`, result: damage });
+
+            // Add Ranger Mark bonus (a parry should benefit from this)
+            if (attacker.isMarked && attacker === gameState.markedTarget) {
+                 const markBonusDamage = rollDice(1, 8, 'Hunters Mark Bonus').total;
+                 damage += markBonusDamage;
+                 messageLog.push(`Hunter's Mark adds ${markBonusDamage} damage!`);
+                 calcLog.steps.push({ description: "Hunter's Mark", value: "+1d8", result: damage });
+                 allowCrit = true; // Marked targets can be crit
+            }
+
+            let attackEffects = { element: this.weaponElement };
+
+            // Special Weapon Logic (copied)
+            if (weapon.name === 'Elemental Sword') {
+                const chosenElement = this.weaponElement !== 'none' ? this.weaponElement : gameState.lastSpellElement;
+                if (chosenElement !== 'none') {
+                    attackEffects.element = chosenElement;
+                }
+                const intBonus = this.intelligence;
+                damage += intBonus; // Add int scaling
+                calcLog.steps.push({ description: "Elemental Sword Bonus", value: `+${intBonus} (INT)`, result: damage });
+            }
+            if (weapon.effect?.intScaling) {
+                const intBonus = Math.floor(this.intelligence * weapon.effect.intScaling);
+                damage += intBonus;
+                calcLog.steps.push({ description: `${weapon.name} Bonus`, value: `+${intBonus} (INT Scale)`, result: damage });
+            }
+
+            // Status Effect Modifiers (copied)
+            if (this.statusEffects.drenched) {
+                const multiplier = this.statusEffects.drenched.multiplier;
+                damage = Math.floor(damage * multiplier);
+                messageLog.push(`Your attack is weakened!`);
+                calcLog.steps.push({ description: "Drenched Debuff", value: `x${multiplier}`, result: damage });
+            }
+            if(this.statusEffects.buff_strength) {
+                const multiplier = this.statusEffects.buff_strength.multiplier;
+                damage = Math.floor(damage * multiplier);
+                messageLog.push(`Your strength is augmented!`);
+                calcLog.steps.push({ description: "Strength Buff", value: `x${multiplier}`, result: damage });
+            }
+            if (this.statusEffects.buff_enrage) {
+                 damage = Math.floor(damage * 1.5);
+                 messageLog.push(`Your rage empowers the blow!`);
+                 calcLog.steps.push({ description: "Enrage Buff", value: `x1.5`, result: damage });
+            }
+
+            // Racial Bonuses (copied)
+            if (this.race === 'Elementals' && attackEffects.element === this.elementalAffinity) {
+                const damageBonus = (this.level >= 20) ? 1.20 : 1.10;
+                damage = Math.floor(damage * damageBonus);
+                calcLog.steps.push({ description: "Innate Elementalist", value: `x${damageBonus.toFixed(2)}`, result: damage });
+                if (this.level >= 20) {
+                     const extraDieRoll = rollDice(1, attackDamageDice[1], 'Elemental Evo Die').total;
+                     damage += extraDieRoll;
+                     calcLog.steps.push({ description: "Innate Elementalist (Evo)", value: `+1d${attackDamageDice[1]}`, result: damage });
+                }
+            }
+            if (this.race === 'Dragonborn') {
+                const damageBonus = (this.level >= 20) ? 1.20 : 1.10;
+                damage = Math.floor(damage * damageBonus);
+                calcLog.steps.push({ description: "Bloodline Attunement", value: `x${damageBonus.toFixed(2)}`, result: damage });
+            }
+
+            // OMIT Assassinate (parry is a reaction, not an opener)
+
+            // Critical Hit Calculation (copied)
+            let critChance = this.critChance;
+            if(this.statusEffects.bonus_crit) critChance += this.statusEffects.bonus_crit.critChance;
+            const canWeaponCrit = weapon.class === 'Dagger' || weapon.effect?.critChance || allowCrit;
+
+            if (canWeaponCrit) {
+                if (weapon.class === 'Dagger') critChance += 0.1;
+                if (weapon.effect?.critChance) critChance += weapon.effect.critChance;
+                if (allowCrit && !weapon.effect?.critChance && weapon.class !== 'Dagger') critChance += 0.10; // For marked target
+
+                if (this.rollForEffect(critChance, 'Parry Crit')) {
+                    let critMultiplier = 1.5;
+                    if (weapon.class === 'Dagger') critMultiplier = 1.5;
+                    if (weapon.effect?.critMultiplier) critMultiplier = weapon.effect.critMultiplier;
+
+                    damage = Math.floor(damage * critMultiplier);
+                    messageLog.push(`CRITICAL HIT!`);
+                    calcLog.steps.push({ description: "Critical Hit", value: `x${critMultiplier}`, result: damage });
+                }
+            }
+
+            // Armor Pierce & Other Effects (copied)
+            if (weapon.class === 'Thrusting Sword') attackEffects.armorPierce = 0.2;
+            if (weapon.effect?.armorPierce) attackEffects.armorPierce = (attackEffects.armorPierce || 0) + weapon.effect.armorPierce;
+            if (weapon.effect?.bonusVsDragon && attacker.speciesData.name === 'Dragon') {
+                const multiplier = weapon.effect.bonusVsDragon;
+                damage = Math.floor(damage * multiplier);
+                messageLog.push(`Your weapon glows with power against the dragon!`);
+                calcLog.steps.push({ description: "Bonus vs. Dragon", value: `x${multiplier}`, result: damage });
+            }
+            if (weapon.effect?.bonusVsLegendary && attacker.rarityData.name === 'Legendary') {
+                const multiplier = weapon.effect.bonusVsLegendary;
+                damage = Math.floor(damage * multiplier);
+                messageLog.push(`Your weapon feels destined to slay this foe!`);
+                calcLog.steps.push({ description: "Bonus vs. Legendary", value: `x${multiplier}`, result: damage });
+            }
+
+            // --- End of calculation logic ---
+
+            const damageResult = attacker.takeDamage(damage, attackEffects);
+            const finalDamage = damageResult.damageDealt;
+            // const knockbackAmountFromAttack = damageResult.knockback; // Can't handle async knockback in a sync setTimeout
+
+            calcLog.finalDamage = finalDamage;
+            logDamageCalculation(calcLog); // Log the calculation
+
+            let damageType = weapon.damageType || 'physical';
+            if (attackEffects.element && attackEffects.element !== 'none') {
+                damageType = ELEMENTS[attackEffects.element].name;
+            }
+            let logMessagesCombined = messageLog.join(' ');
+            addToLog(`Your riposte hits ${attacker.name} for <span class="font-bold text-yellow-300">${finalDamage}</span> ${damageType} damage. ${logMessagesCombined}`);
+
+            // --- Apply On-Hit Effects (Lifesteal, Paralyze, etc.) ---
+            // OMIT Paladin Smite, Greases, Pocket Cragblade, Lightning Rod (these are for main actions, not reactions)
+            // OMIT Knockback (can't be awaited here)
+
+            // Lifesteal (copied)
+            if (finalDamage > 0) {
+                let lifestealAmount = 0;
+                if (weapon.class === 'Reaper') lifestealAmount += finalDamage * 0.1;
+                if (weapon.effect?.lifesteal) lifestealAmount += finalDamage * weapon.effect.lifesteal;
+
+                if (lifestealAmount > 0) {
+                    if (attacker.speciesData.class !== 'Undead') {
+                        const healedAmount = Math.floor(lifestealAmount);
+                        if (healedAmount > 0) {
+                            this.hp = Math.min(this.maxHp, this.hp + healedAmount);
+                            addToLog(`You drain <span class="font-bold text-green-400">${healedAmount}</span> HP.`);
+                            updateStatsView(); // Update UI
+                        }
+                    } else {
+                        addToLog(`You cannot drain life from the undead!`, 'text-gray-400');
+                    }
+                }
+            }
+
+            // Hammer paralysis & Other on-hit effects (copied)
+            let paralyzeBaseChance = 0;
+            if (weapon.class === 'Hammer') paralyzeBaseChance += 0.1;
+            if (weapon.effect?.paralyzeChance) paralyzeBaseChance += weapon.effect.paralyzeChance;
+            if (this.rollForEffect(paralyzeBaseChance, 'Hammer Paralyze') && finalDamage > 0 && !attacker.statusEffects.paralyzed) {
+                attacker.statusEffects.paralyzed = { duration: 2 };
+                addToLog(`${attacker.name} is stunned by the blow!`, 'text-yellow-500');
+            }
+
+            if(finalDamage > 0){
+                const toxicChance = weapon.effect?.toxicChance || 0;
+                if (this.rollForEffect(toxicChance, 'Weapon Toxic')) {
+                    attacker.statusEffects.toxic = { duration: 4 };
+                    addToLog(`${attacker.name} is afflicted with a deadly toxin!`, 'text-green-700');
+                }
+                const petrifyChance = weapon.effect?.petrifyChance || 0;
+                if(this.rollForEffect(petrifyChance, 'Weapon Petrify') && !attacker.statusEffects.petrified) {
+                    attacker.statusEffects.petrified = { duration: 2 };
+                    addToLog(`${attacker.name} is petrified by the attack!`, 'text-gray-400');
+                }
+                const cleanseChance = weapon.effect?.cleanseChance || 0;
+                if (this.rollForEffect(cleanseChance, 'Weapon Cleanse')) {
+                     const debuffs = Object.keys(this.statusEffects).filter(key => ['poison', 'toxic', 'paralyzed', 'petrified', 'drenched'].includes(key));
+                     if (debuffs.length > 0) {
+                         const effectToCleanse = debuffs[0];
+                         delete this.statusEffects[effectToCleanse];
+                         addToLog(`Your weapon's holy energy cleanses you of ${effectToCleanse}!`, 'text-yellow-200');
+                     }
+                }
+            }
+
+            // OMIT Second Strike / Shield Follow-up (this *is* the follow-up)
+
             if (!gameState.battleEnded) {
-                checkBattleStatus(true); // Check if counter killed the enemy
+                checkBattleStatus(true); // Check if the counter-attack was fatal
             }
         }, 300);
     }
@@ -1347,6 +1649,507 @@ class Drone extends Entity {
     }
 }
 // --- END Drone Class ---
+class NpcAlly extends Entity {
+    // --- CONSTRUCTOR MODIFIED to accept raceKey ---
+    constructor(name, classKey, raceKey, playerLevel) {
+        super(name);
+        this.x = -1;
+        this.y = -1;
+        this.isFled = false;
+        
+        // --- Base Stats & Class ---
+        this._classKey = classKey; // Store the key, even if it's undefined
+        const classData = CLASSES[classKey]; // Get classData *once*
+        this.raceKey = raceKey || 'Human'; // Store the race key
+
+        if (classData) {
+            this.class = classData.name;
+        } else {
+            this.class = "Unknown Ally"; // Assign a default name
+            console.warn(`NpcAlly loaded with invalid classKey: ${classKey}. Defaulting gear.`);
+        }
+
+        // --- THIS IS THE FIX ---
+        // playerLevel is now the 4th argument, not the 3rd
+        this.level = Math.max(1, Math.floor(playerLevel * 0.95)); // 95% of player level
+        if (playerLevel > 1 && this.level === playerLevel) {
+             this.level--; // Ensure at least 1 level discrepancy
+        }
+
+        // Base stats now come from the provided raceKey
+        const raceStats = RACES[this.raceKey] || RACES['Human'];
+        this.vigor = raceStats.Vigor;
+        this.focus = raceStats.Focus;
+        this.stamina = raceStats.Stamina;
+        this.strength = raceStats.Strength;
+        this.intelligence = raceStats.Intelligence;
+        this.luck = raceStats.Luck;
+        // --- END FIX ---
+
+        // Bonus points from leveling
+        this.bonusVigor = 0;
+        this.bonusFocus = 0;
+        this.bonusStamina = 0;
+        this.bonusStrength = 0;
+        this.bonusIntelligence = 0;
+        this.bonusLuck = 0;
+        
+        // --- Stat Allocation ---
+        this.calculateStats(playerLevel); // This will set the level and distribute points
+
+        // --- NEW Equipment & Inventory ---
+        this.equippedWeapon = WEAPONS['fists'];
+        this.equippedCatalyst = CATALYSTS['no_catalyst'];
+        this.equippedArmor = ARMOR['travelers_garb'];
+        this.equippedShield = SHIELDS['no_shield'];
+        this.weaponElement = 'none';
+        this.armorElement = 'none';
+        this.shieldElement = 'none';
+        
+        // Inventory for items given by player (10 unique, 10 stack)
+        this.inventory = {
+            items: {}, 
+            size: 10,
+            stack: 10
+        };
+        
+        // --- NEW: Spells Property ---
+        this.spells = {};
+        
+        // Tracks [weapon, catalyst, shield] for 2-of-3 rule
+        this.equipmentOrder = []; 
+        // --- END NEW ---
+        
+        if (classData && classData.startingEquipment) {
+            // Use the new equipItem logic to apply starting gear
+            Object.values(classData.startingEquipment).forEach(itemKey => {
+                if(itemKey) this.equipItem(itemKey, true); // Equip silently
+            });
+        }
+        
+        // --- NEW: Learn Starting Spells ---
+        if (classData && classData.startingSpells) {
+            for (const spellKey in classData.startingSpells) {
+                this.spells[spellKey] = { tier: classData.startingSpells[spellKey] };
+            }
+        }
+        // --- END NEW ---
+
+        // Final HP/MP calculation
+        this.hp = this.maxHp;
+        this.mp = this.maxMp;
+    }
+
+    // --- Stat Calculation Method ---
+    calculateStats(playerLevel) {
+        this.level = Math.max(1, Math.floor(playerLevel * 0.95)); // 95%
+        if (playerLevel > 1 && this.level === playerLevel) {
+             this.level--; // Ensure at least 1 level discrepancy
+        }
+
+        const totalPoints = (this.level - 1) * 5;
+        const allocation = NPC_STAT_ALLOCATIONS[this._classKey];
+        if (!allocation || totalPoints <= 0) return;
+
+        // Distribute points based on percentages
+        this.bonusVigor = Math.floor(totalPoints * allocation.Vigor);
+        this.bonusFocus = Math.floor(totalPoints * allocation.Focus);
+        this.bonusStamina = Math.floor(totalPoints * allocation.Stamina);
+        this.bonusStrength = Math.floor(totalPoints * allocation.Strength);
+        this.bonusIntelligence = Math.floor(totalPoints * allocation.Intelligence);
+        this.bonusLuck = Math.floor(totalPoints * allocation.Luck);
+        
+        // Distribute any remaining points (due to flooring)
+        let remainingPoints = totalPoints - (this.bonusVigor + this.bonusFocus + this.bonusStamina + this.bonusStrength + this.bonusIntelligence + this.bonusLuck);
+        
+        if (allocation.Vigor > 0.3) this.bonusVigor += remainingPoints;
+        else if (allocation.Strength > 0.3) this.bonusStrength += remainingPoints;
+        else if (allocation.Intelligence > 0.3) this.bonusIntelligence += remainingPoints;
+        else if (allocation.Stamina > 0.2) this.bonusStamina += remainingPoints;
+        else if (allocation.Focus > 0.2) this.bonusFocus += remainingPoints;
+        else this.bonusLuck += remainingPoints;
+    }
+
+    // --- Derived Stat Getters (Copied from Player) ---
+    get maxHp() { return Math.floor((this.vigor + this.bonusVigor) * 5); }
+    get maxMp() { return Math.floor((this.focus + this.bonusFocus) * 5); }
+    get physicalDefense() { return Math.floor((this.stamina + this.bonusStamina + this.vigor + this.bonusVigor) / 2); }
+    get magicalDefense() { return Math.floor((this.stamina + this.bonusStamina + this.focus + this.bonusFocus) / 2); }
+    get physicalDamageBonus() { return (this.strength + this.bonusStrength); }
+    get magicalDamageBonus() { return (this.intelligence + this.bonusIntelligence); }
+    get critChance() { return Math.min(0.3, (((this.luck + this.bonusLuck) * 0.5) / 100)); }
+    get evasionChance() { return Math.min(0.2, (((this.luck + this.bonusLuck) * 0.5) / 100)); }
+    get resistanceChance() { return Math.min(0.5, ((this.luck + this.bonusLuck) / 100)); }
+
+    // --- Simplified TakeDamage (No complex avoidance/reflection) ---
+    takeDamage(damage, options = {}) {
+        const isMagicAttack = options.isMagic || (options.element && options.element !== 'none');
+        let effectiveDefense = isMagicAttack ? this.magicalDefense : this.physicalDefense;
+        
+        // Add gear defense
+        effectiveDefense += (this.equippedArmor?.defense || 0);
+        effectiveDefense += (this.equippedShield?.defense || 0);
+        
+        if (options.ignore_defense) {
+             effectiveDefense *= (1 - (options.ignore_defense || 0));
+        }
+        if (options.armorPierce) {
+             effectiveDefense *= (1 - (options.armorPierce || 0));
+        }
+
+        const finalDamage = Math.max(0, Math.floor(damage - effectiveDefense));
+        this.hp -= finalDamage;
+        this.hp = Math.max(0, this.hp);
+
+        if (this.hp <= 0 && !this.isFled) {
+            this.isFled = true;
+            addToLog(`<span class="font-bold text-red-500">${this.name} has been defeated and fled the battle!</span>`, "text-red-500");
+        }
+        
+        if (gameState.currentView === 'battle') {
+            renderBattleGrid();
+        }
+        return { damageDealt: finalDamage, knockback: 0 }; // Ally doesn't handle knockback
+    }
+
+    // --- Battle AI ---
+    async attack(target) {
+        if (!target || !target.isAlive()) return;
+
+        const weapon = this.equippedWeapon;
+        let weaponRange = weapon.range || 1;
+        
+        let distance = Math.abs(this.x - target.x) + Math.abs(this.y - target.y);
+
+        if (distance > weaponRange) {
+            await this.moveTowards(target);
+            distance = Math.abs(this.x - target.x) + Math.abs(this.y - target.y);
+        }
+
+        if (distance <= weaponRange) {
+            this._performAttack(target);
+        } else {
+            addToLog(`${this.name} cannot reach ${target.name}.`);
+        }
+    }
+
+    _performAttack(target) {
+        if (!target || !target.isAlive()) return;
+        
+        const weapon = this.equippedWeapon;
+        let rollResult = rollDice(weapon.damage[0], weapon.damage[1], `${this.name} Attack`);
+        let baseDamage = rollResult.total;
+        
+        let damage = baseDamage + this.physicalDamageBonus;
+        
+        if (Math.random() < this.critChance) {
+            const critMultiplier = weapon.effect?.critMultiplier || 1.5;
+            damage = Math.floor(damage * critMultiplier);
+            addToLog(`${this.name} lands a CRITICAL HIT!`);
+        }
+        
+        let attackEffects = { element: this.weaponElement };
+        if (weapon.class === 'Thrusting Sword') attackEffects.armorPierce = 0.2;
+        if (weapon.effect?.armorPierce) attackEffects.armorPierce = (attackEffects.armorPierce || 0) + weapon.effect.armorPierce;
+
+        const { damageDealt } = target.takeDamage(damage, attackEffects);
+        
+        addToLog(`${this.name} attacks ${target.name} with ${weapon.name} for <span class="font-bold text-yellow-300">${damageDealt}</span> damage.`);
+    }
+
+    async moveTowards(target) {
+        const path = findPath({x: this.x, y: this.y}, {x: target.x, y: target.y}, false); // Allies can't fly
+
+        if (path && path.length > 1) {
+            addToLog(`${this.name} moves towards ${target.name}!`);
+            const stepsToTake = Math.min(path.length - 1, 2); // Hardcoded move speed of 2
+
+            for (let i = 1; i <= stepsToTake; i++) {
+                const nextStep = path[i];
+                // --- OVERLAP FIX: Call isCellBlocked for the ally's move ---
+                if (isCellBlocked(nextStep.x, nextStep.y, false, false, true)) { // Check for player/obstacles/enemies, isAllyMoving = true
+                    addToLog(`${this.name} encounters an obstacle and stops.`);
+                    break; // Path blocked
+                }
+                this.x = nextStep.x;
+                this.y = nextStep.y;
+                renderBattleGrid();
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                const distanceAfterMove = Math.abs(this.x - target.x) + Math.abs(this.y - target.y);
+                if (distanceAfterMove <= (this.equippedWeapon.range || 1)) {
+                    break; // In range
+                }
+            }
+        }
+    }
+    
+    clearBattleBuffs() {
+        const buffsToClear = [
+            'buff_strength', 'buff_chaos_strength', 'buff_titan',
+            'buff_defense', 'stonehide', 'buff_shroud', 'buff_voidwalker',
+            'buff_haste', 'buff_hermes', 'buff_ion_self', 'buff_ion_other',
+            'buff_magic_defense', 'buff_divine', 'buff_enrage',
+             'resist_fire', 'resist_water', 'resist_earth', 'resist_wind',
+             'resist_lightning', 'resist_nature', 'resist_light', 'resist_void',
+             'drenched', 'paralyzed', 'petrified', 'toxic', 'poison', 'swallowed',
+             'bonus_crit', 'bonus_speed', 'bonus_range', 'alchemical_barrier',
+             'magic_dampen', 'elemental_vuln', 'slowed', 'inaccurate',
+             'clumsy', 'fumble',
+             'buff_whetstone', 'buff_magic_dust'
+        ];
+
+        let cleared = false;
+        if (!this.statusEffects) this.statusEffects = {}; 
+        for (const buffKey of buffsToClear) {
+            if (this.statusEffects[buffKey]) {
+                delete this.statusEffects[buffKey];
+                cleared = true;
+            }
+        }
+        
+        if (cleared && !this.isFled) { 
+            addToLog(`Temporary effects on ${this.name} wear off.`, "text-gray-400");
+        }
+    }
+    
+    // --- 2-of-3 RULE FIX ---
+    
+    /**
+     * Equips an item to the ally, handling 2-of-3 rule.
+     * Returns the item key that was unequipped, if any.
+     * @param {string} itemKey - The key of the item to equip.
+     * @param {boolean} [silent=false] - If true, won't log messages (for init).
+     * @returns {string|null} The key of the item that was auto-unequipped.
+     */
+    equipItem(itemKey, silent = false) {
+        const details = getItemDetails(itemKey);
+        if (!details) return null;
+
+        let itemType = null;
+        if (WEAPONS[itemKey]) itemType = 'weapon';
+        else if (CATALYSTS[itemKey]) itemType = 'catalyst';
+        else if (SHIELDS[itemKey]) itemType = 'shield';
+        else if (ARMOR[itemKey]) itemType = 'armor';
+
+        if (itemType === 'armor') {
+            // Simple armor equip
+            const oldItemKey = this.equippedArmor.name !== ARMOR['travelers_garb'].name ? findKeyByInstance(ARMOR, this.equippedArmor) : null;
+            this.equippedArmor = details;
+            this.armorElement = 'none'; // Reset element on equip
+            if (!silent) addToLog(`${this.name} equipped ${details.name}.`);
+            return oldItemKey;
+        }
+
+        if (itemType === 'weapon' || itemType === 'catalyst' || itemType === 'shield') {
+            // 2-of-3 rule logic
+            const isTwoHanded = details.class === 'Hand-to-Hand' || details.effect?.dualWield;
+            let unequippedItemKey = null;
+
+            if (isTwoHanded) {
+                // Unequip both shield and catalyst
+                if (this.equippedShield.name !== SHIELDS['no_shield'].name) {
+                    unequippedItemKey = this.unequipItem('shield', silent); // Store first unequipped
+                }
+                if (this.equippedCatalyst.name !== CATALYSTS['no_catalyst'].name) {
+                    const unequippedKey2 = this.unequipItem('catalyst', silent);
+                    if (!unequippedItemKey) unequippedItemKey = unequippedKey2; // Store second if first was null
+                }
+            } else {
+                // Check if 2-of-3 rule is violated
+                const typeIndex = this.equipmentOrder.indexOf(itemType);
+                if (typeIndex > -1) this.equipmentOrder.splice(typeIndex, 1); // Remove old entry if same type
+                
+                if (this.equipmentOrder.length >= 2) {
+                    const typeToUnequip = this.equipmentOrder.shift(); // Get oldest
+                    if (typeToUnequip) { // Ensure it's not undefined
+                        unequippedItemKey = this.unequipItem(typeToUnequip, silent);
+                    }
+                }
+                this.equipmentOrder.push(itemType); // Add new type
+            }
+
+            // Now, equip the new item
+            if (itemType === 'weapon') {
+                this.equippedWeapon = details;
+                this.weaponElement = 'none';
+            } else if (itemType === 'catalyst') {
+                this.equippedCatalyst = details;
+            } else if (itemType === 'shield') {
+                this.equippedShield = details;
+                this.shieldElement = 'none';
+            }
+            
+            if (!silent) addToLog(`${this.name} equipped ${details.name}.`);
+            return unequippedItemKey;
+        }
+        return null;
+    }
+
+    /**
+     * Unequips an item from a specific slot.
+     * Returns the key of the item that was unequipped.
+     * @param {string} itemType - 'weapon', 'catalyst', 'armor', or 'shield'.
+     * @param {boolean} [silent=false] - If true, won't log messages.
+     * @returns {string|null} The key of the item that was unequipped.
+     */
+    unequipItem(itemType, silent = false) {
+        let oldItemKey = null;
+        let defaultItem = null;
+        
+        switch (itemType) {
+            case 'weapon':
+                if (this.equippedWeapon.name === WEAPONS['fists'].name) return null;
+                oldItemKey = findKeyByInstance(WEAPONS, this.equippedWeapon);
+                defaultItem = WEAPONS['fists'];
+                if (!silent) addToLog(`${this.name} unequipped ${this.equippedWeapon.name}.`);
+                this.equippedWeapon = defaultItem;
+                this.weaponElement = 'none';
+                break;
+            case 'catalyst':
+                if (this.equippedCatalyst.name === CATALYSTS['no_catalyst'].name) return null;
+                oldItemKey = findKeyByInstance(CATALYSTS, this.equippedCatalyst);
+                defaultItem = CATALYSTS['no_catalyst'];
+                 if (!silent) addToLog(`${this.name} unequipped ${this.equippedCatalyst.name}.`);
+                this.equippedCatalyst = defaultItem;
+                break;
+            case 'armor':
+                if (this.equippedArmor.name === ARMOR['travelers_garb'].name) return null;
+                oldItemKey = findKeyByInstance(ARMOR, this.equippedArmor);
+                defaultItem = ARMOR['travelers_garb'];
+                 if (!silent) addToLog(`${this.name} unequipped ${this.equippedArmor.name}.`);
+                this.equippedArmor = defaultItem;
+                this.armorElement = 'none';
+                break;
+            case 'shield':
+                if (this.equippedShield.name === SHIELDS['no_shield'].name) return null;
+                oldItemKey = findKeyByInstance(SHIELDS, this.equippedShield);
+                defaultItem = SHIELDS['no_shield'];
+                 if (!silent) addToLog(`${this.name} unequipped ${this.equippedShield.name}.`);
+                this.equippedShield = defaultItem;
+                this.shieldElement = 'none';
+                break;
+            default:
+                return null;
+        }
+
+        // Update equipment order
+        const typeIndex = this.equipmentOrder.indexOf(itemType);
+        if (typeIndex > -1) {
+            this.equipmentOrder.splice(typeIndex, 1);
+        }
+        
+        return oldItemKey;
+    }
+    
+    // --- NEW AI ABILITY METHODS ---
+    
+    /**
+     * Ally uses an item from their own inventory. (Simplified)
+     * @param {string} itemKey - The key of the item to use.
+     * @returns {boolean} True if the item was successfully used.
+     */
+    useItem(itemKey) {
+        const details = getItemDetails(itemKey);
+        if (!details || !this.inventory.items[itemKey] || this.inventory.items[itemKey] <= 0) {
+            addToLog(`${this.name} tried to use ${itemKey}, but had none!`, 'text-red-400');
+            return false;
+        }
+
+        // Consume item
+        this.inventory.items[itemKey]--;
+        if (this.inventory.items[itemKey] <= 0) {
+            delete this.inventory.items[itemKey];
+        }
+
+        addToLog(`${this.name} used a <span class="font-bold text-green-300">${details.name}</span>!`);
+
+        // Apply effect (self-target only for now)
+        if (details.type === 'healing') {
+            const healAmount = details.amount;
+            this.hp = Math.min(this.maxHp, this.hp + healAmount);
+            addToLog(`${this.name} recovers <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-green-300');
+        } else if (details.type === 'mana_restore') {
+            const restoreAmount = details.amount;
+            this.mp = Math.min(this.maxMp, this.mp + restoreAmount);
+            addToLog(`${this.name} restores <span class="font-bold text-blue-400">${restoreAmount}</span> MP.`, 'text-blue-300');
+        } else if (details.type === 'buff' && details.effect) {
+             this.statusEffects[details.effect.type] = { ...details.effect };
+             addToLog(`${this.name} feels the effects of the ${details.name}!`, 'text-yellow-300');
+        }
+        // ... (can add cleanse logic later if needed)
+        
+        renderBattleGrid(); // Update HP/MP bars
+        return true;
+    }
+    
+    /**
+     * Ally casts a spell. (Simplified, offensive only)
+     * @param {string} spellKey - The key of the spell to cast.
+     * @param {Enemy} target - The enemy to target.
+     * @returns {boolean} True if the spell was successfully cast.
+     */
+    castSpell(spellKey, target) {
+        if (!target || !target.isAlive()) return false;
+        
+        const spellData = SPELLS[spellKey];
+        const allySpell = this.spells[spellKey];
+        if (!spellData || !allySpell) return false;
+        
+        const tierIndex = allySpell.tier - 1;
+        const spell = spellData.tiers[tierIndex];
+        
+        const catalyst = this.equippedCatalyst;
+        if (!catalyst || catalyst.name === 'None') {
+            addToLog(`${this.name} needs a catalyst to cast spells.`, 'text-red-400');
+            return false;
+        }
+        
+        // Cost calculation (simplified, no player gear)
+        let finalSpellCost = spell.cost;
+        if (catalyst.effect?.mana_discount) {
+            finalSpellCost = Math.max(1, finalSpellCost - catalyst.effect.mana_discount);
+        }
+        
+        if (this.mp < finalSpellCost) {
+            addToLog(`${this.name} tried to cast ${spell.name}, but lacked MP!`, 'text-blue-400');
+            return false;
+        }
+        
+        this.mp -= finalSpellCost;
+        addToLog(`${this.name} casts <span class="font-bold text-purple-300">${spell.name}</span>!`);
+        
+        // Damage calculation (simplified)
+        let diceCount = spell.damage[0];
+        const spellAmp = catalyst.effect?.spell_amp || 0;
+        diceCount = Math.min(spell.cap, diceCount + spellAmp);
+        
+        let damage = rollDice(diceCount, spell.damage[1], `${this.name} Spell`).total + this.magicalDamageBonus;
+        
+        // Simplified crit
+        const spellCritChance = this.critChance + (catalyst.effect?.spell_crit_chance || 0);
+        if (Math.random() < spellCritChance) {
+            const critMultiplier = catalyst.effect?.spell_crit_multiplier || 1.5;
+            damage = Math.floor(damage * critMultiplier);
+            addToLog(`A critical spell!`, 'text-yellow-300');
+        }
+        
+        const spellEffects = {
+            isMagic: true,
+            element: spellData.element,
+            spell_penetration: catalyst.effect?.spell_penetration || 0
+        };
+        
+        // Apply damage
+        const { damageDealt } = target.takeDamage(damage, spellEffects);
+        addToLog(`It hits ${target.name} for <span class="font-bold text-purple-400">${damageDealt}</span> ${spellData.element} damage.`);
+        
+        renderBattleGrid(); // Update MP bar
+        return true;
+    }
+    // --- END NEW AI METHODS ---
+}
+
 
 class Enemy extends Entity {
     constructor(speciesData, rarityData, playerLevel, elementData = { key: 'none', adjective: '' }) {
@@ -1429,63 +2232,110 @@ class Enemy extends Entity {
             this.reviveChance = 1.0;
         }
     }
-    async attack(target) {
+    async attack() {
         this.attackParried = false; // Reset parry flag for this attack sequence
-        const isFlying = this.movement.type === 'flying';
         this.hasDealtDamageThisEncounter = true;
 
-        let distance = Math.abs(this.x - target.x) + Math.abs(this.y - target.y);
+        const ally = player.npcAlly;
+        const allyIsValid = ally && ally.hp > 0 && !ally.isFled && ally.x !== -1; // Check if ally is alive and spawned
 
-        // If not in range, try to move closer first.
-        if (distance > this.range) {
-            await this.moveTowards(target); // moveTowards is async now
-            // After moving, update the distance to see if an attack is now possible.
-            distance = Math.abs(this.x - target.x) + Math.abs(this.y - target.y);
+        // 1. Get ranges
+        const weaponRange = this.range || 1;
+
+        // 2. Get target distances
+        const playerDist = Math.abs(this.x - player.x) + Math.abs(this.y - player.y);
+        const allyDist = allyIsValid ? (Math.abs(this.x - ally.x) + Math.abs(this.y - ally.y)) : Infinity;
+
+        // 3. Check who is in range
+        const playerInRange = playerDist <= weaponRange;
+        const allyInRange = allyIsValid && (allyDist <= weaponRange);
+
+        let target = null;
+        let moveTarget = null; // Who to move towards if no one is in range
+
+        // 4. --- AI TARGETING LOGIC ---
+        if (playerInRange && allyInRange) {
+            // --- Priority 1: Both are in range ---
+            addToLog(`${this.name} scans its targets...`, 'text-gray-400');
+            
+            // a. Check HP %
+            const playerHP_Percent = player.hp / player.maxHp;
+            const allyHP_Percent = ally.hp / ally.maxHp;
+
+            if (playerHP_Percent < allyHP_Percent) {
+                target = player;
+                addToLog(`${this.name} targets the weakened ${target.name}!`, 'text-red-400');
+            } else if (allyHP_Percent < playerHP_Percent) {
+                target = ally;
+                addToLog(`${this.name} targets the weakened ${target.name}!`, 'text-red-400');
+            } else {
+                // b. HP is tied, check defense
+                const isMagic = this.speciesData.damage_type === 'magical' || (this.speciesData.damage_type === 'hybrid' && player.magicalDefense < player.physicalDefense);
+                const playerDef = isMagic ? player.magicalDefense : player.physicalDefense;
+                const allyDef = isMagic ? ally.magicalDefense : ally.physicalDefense;
+
+                if (allyDef < playerDef) {
+                    target = ally;
+                    addToLog(`${this.name} targets ${target.name}'s weaker defenses!`, 'text-red-400');
+                } else if (playerDef < allyDef) {
+                    target = player;
+                    addToLog(`${this.name} targets ${target.name}'s weaker defenses!`, 'text-red-400');
+                } else {
+                    // c. Defenses are tied, check distance
+                    target = (allyDist < playerDist) ? ally : player;
+                    addToLog(`${this.name} targets the closer ${target.name}!`, 'text-red-400');
+                }
+            }
+        } else if (playerInRange) {
+            // --- Priority 2: Only Player is in range ---
+            target = player;
+        } else if (allyInRange) {
+            // --- Priority 3: Only Ally is in range ---
+            target = ally;
+        } else {
+            // --- Priority 4: Nobody is in range ---
+            target = null;
+            // Find the closest valid target to move towards
+            moveTarget = (allyDist < playerDist) ? ally : player;
         }
-
-        // Only proceed with the attack if the target is now in range.
-        if (distance <= this.range) {
+        // --- END AI LOGIC ---
+        
+        // 5. Execute Action
+        if (target) {
+            // --- Perform Attack ---
             addToLog(`${this.name} attacks ${target.name}!`);
             this._performAttack(target); // Perform the main attack
 
-            // Check if attack was parried/dodged/blocked before proceeding with multi-attacks/effects
             if (this.attackParried) {
-                console.log("Attack parried/dodged/blocked, skipping follow-ups.");
-                 return; // Stop the attack sequence
+                 return; // Stop if attack was parried/dodged
             }
 
-
+            // Handle follow-up effects (Double Strike, Wind)
             const rarityIndex = this.rarityData.rarityIndex;
-            // Wind Element Multi-attack
-            if (this.element === 'wind' && Math.random() < (rarityIndex * 0.05)) { // Chance based on rarity
+            if (this.element === 'wind' && Math.random() < (rarityIndex * 0.05)) {
                 addToLog(`The swirling winds grant ${this.name} another strike!`, 'text-gray-300');
                 setTimeout(() => {
-                    // Check if target and this enemy are still valid inside the timeout
                     if (gameState.battleEnded || !target.isAlive() || !this.isAlive()) return;
-                    // Perform a second, weaker attack
                     let followUpDamageRoll = rollDice(Math.max(1, this.damage[0] - 1), this.damage[1], `${this.name} Wind Follow-up`);
-                    let followUpDamage = followUpDamageRoll.total + Math.floor(this.strength / 2); // Reduced scaling
-                    if (this.element === 'fire') { // Synergy bonus
-                        followUpDamage = Math.floor(followUpDamage * (1 + Math.random() * 0.2));
-                    }
-                     target.takeDamage(followUpDamage, !!this.statusEffects.ultra_focus, this); // Apply damage
-                     // Check status immediately after follow-up attack
+                    let followUpDamage = followUpDamageRoll.total + Math.floor(this.strength / 2);
+                    target.takeDamage(followUpDamage, !!this.statusEffects.ultra_focus, this);
                      if (!gameState.battleEnded) checkBattleStatus(true);
-                }, 500); // Delay for readability
+                }, 500); 
             }
-            // Double Strike Ability
             else if (this.ability === 'double_strike' && Math.random() < 0.33) {
                 addToLog(`${this.name}'s fury lets it attack again!`, 'text-red-500 font-bold');
                 setTimeout(() => {
-                     // Check if target and this enemy are still valid inside the timeout
-                    if (gameState.battleEnded || !target.isAlive() || !this.isAlive()) return;
+                     if (gameState.battleEnded || !target.isAlive() || !this.isAlive()) return;
                     this._performAttack(target); // Perform a full second attack
-                    // Check status immediately after second strike
                     if (!gameState.battleEnded) checkBattleStatus(true);
-                }, 500); // Perform a full second attack
+                }, 500);
             }
+        } else if (moveTarget) {
+            // --- Perform Move ---
+            await this.moveTowards(moveTarget);
         } else {
-             addToLog(`${this.name} is too far away to attack.`); // Log if still out of range after moving
+            // No targets on the field at all
+            addToLog(`${this.name} looks around confused.`);
         }
     }
     _performAttack(target) {
@@ -1728,25 +2578,48 @@ class Enemy extends Entity {
     }
 
     async moveTowards(target) {
+        // --- NEW MOVE LOGIC ---
+        // If a specific target is provided (e.g., by the attack logic), move to it.
+        // If not, find the closest target (player or ally).
+        let finalTarget = target;
+        
+        if (!finalTarget) {
+            const ally = player.npcAlly;
+            const allyIsValid = ally && ally.hp > 0 && !ally.isFled && ally.x !== -1;
+            
+            const playerDist = Math.abs(this.x - player.x) + Math.abs(this.y - player.y);
+            const allyDist = allyIsValid ? (Math.abs(this.x - ally.x) + Math.abs(this.y - ally.y)) : Infinity;
+            
+            finalTarget = (allyDist < playerDist) ? ally : player;
+        }
+
+        if (!finalTarget) {
+             addToLog(`${this.name} has no one to move towards!`);
+             return; // No valid target to move to
+        }
+        // --- END NEW MOVE LOGIC ---
+        
         const isFlying = this.movement.type === 'flying';
-        const path = findPath({x: this.x, y: this.y}, {x: target.x, y: target.y}, isFlying);
+        const path = findPath({x: this.x, y: this.y}, {x: finalTarget.x, y: finalTarget.y}, isFlying);
 
         if (path && path.length > 1) {
-            addToLog(`${this.name} moves closer!`);
+            addToLog(`${this.name} moves towards ${finalTarget.name}!`);
             const stepsToTake = Math.min(path.length - 1, this.movement.speed);
 
             for (let i = 1; i <= stepsToTake; i++) {
                 const nextStep = path[i];
 
                 // Check if the next step is valid before moving
-                if (!this.isValidMove(nextStep.x, nextStep.y)) {
+                // THIS IS THE FIX: Added 'forEnemy = true'
+                if (isCellBlocked(nextStep.x, nextStep.y, true, isFlying)) {
                      addToLog(`${this.name} encounters an obstacle and stops.`);
                     break; // Stop if the path becomes blocked
                 }
+                // --- END FIX ---
 
 
                 // Check if moving into this cell would put it in range
-                const distanceAfterMove = Math.abs(nextStep.x - target.x) + Math.abs(nextStep.y - target.y);
+                const distanceAfterMove = Math.abs(nextStep.x - finalTarget.x) + Math.abs(nextStep.y - finalTarget.y);
 
                 this.x = nextStep.x;
                 this.y = nextStep.y;
@@ -1973,6 +2846,37 @@ function generateEnemy(biomeKey) {
     return new Enemy(speciesData, rarityData, player.level, elementData);
 }
 
+function generateBarracksRoster() {
+    if (!player) return;
+
+    // Ensure seed is valid
+    if (player.seed === null || player.seed === undefined || isNaN(Number(player.seed))) {
+         console.warn("Player seed invalid for Barracks roster. Using temporary random.");
+         player.seed = Math.floor(Math.random() * 1000000);
+    }
+    const rng = seededRandom(player.seed); // Use the player's daily seed
+    
+    const availableRaces = Object.keys(RACES);
+    const availableClasses = Object.keys(CLASSES);
+    const availableNames = NPC_RANDOM_NAMES; // From game_data.js
+    
+    player.barracksRoster = []; // Clear the old roster
+    
+    for (let i = 0; i < 5; i++) {
+        const raceKey = availableRaces[Math.floor(rng() * availableRaces.length)];
+        const classKey = availableClasses[Math.floor(rng() * availableClasses.length)];
+        const name = availableNames[Math.floor(rng() * availableNames.length)];
+        
+        player.barracksRoster.push({
+            name: name,
+            raceKey: raceKey,
+            classKey: classKey
+        });
+    }
+    
+    console.log("New Barracks roster generated:", player.barracksRoster);
+}
+
 function generateBlackMarketStock() {
     // List of powerful/unique items restricted from random stock
     const restrictedItems = [
@@ -2113,13 +3017,13 @@ function restAtInn(cost) {
         player.questsTakenToday = []; // Reset daily quest limit
         player.seed = Math.floor(Math.random() * 1000000); // Generate new seed for the 'day'
         generateBlackMarketStock(); // Refresh black market stock
+        generateBarracksRoster(); // --- NEW: Refresh Barracks roster ---
         player.clearFoodBuffs(); // Food buffs wear off after resting
         addToLog(`You wake up feeling refreshed. The quest board and black market have new offerings.`, 'text-green-400 font-bold');
         updateStatsView(); // Update UI after resting
         setTimeout(renderTown, 2000); // Go back to town square
     }
 }
-
 
 function upgradeSpell(spellKey) {
     const spellData = SPELLS[spellKey];
@@ -2275,25 +3179,51 @@ function sellItem(category, itemKey, baseSellPrice) { // Renamed price -> baseSe
 
 // *** CORRECTED useItem function definition ***
 function useItem(itemKey, inBattle = false, targetIndex = null) {
+    // --- NPC ALLY: Determine Target ---
+    let target = player; // Default to player
+    if (inBattle && targetIndex === -1) { // -1 is the flag for targeting the ally
+        if (player.npcAlly && player.npcAlly.hp > 0 && !player.npcAlly.isFled) {
+            target = player.npcAlly;
+        } else {
+            addToLog("Your ally is not a valid target.", 'text-red-400');
+            if (inBattle) gameState.isPlayerTurn = true; // Give turn back
+            isProcessingAction = false; // Unlock
+            return false; // Failure
+        }
+    } else if (inBattle && targetIndex !== null) {
+        // This block handles offensive items, target will be set later
+    }
+    // For out-of-battle use, target remains player
+    // --- END NPC ALLY ---
+
+
     // Check if player has the item (explicitly check count is >= 1)
     const initialCount = Number(player.inventory.items[itemKey]) || 0; // Get count as number
     if (initialCount < 1) { // Check if count is less than 1
         addToLog("You don't have that item!", 'text-red-400');
         if (inBattle) renderBattle('item'); // Go back to item selection if in battle
         else renderInventory(); // Go back to inventory if out of battle
+        if (inBattle) gameState.isPlayerTurn = true; // Give turn back if failed early
+        isProcessingAction = false; // Unlock
         return false; // Indicate failure
     }
 
     const details = ITEMS[itemKey];
     if (!details) {
         console.error("Could not find details for item:", itemKey);
+        if (inBattle) gameState.isPlayerTurn = true; // Give turn back
+        isProcessingAction = false; // Unlock
         return false; // Indicate failure if item details don't exist
     }
 
     // --- Defer Consumption until *after* targeting checks (if applicable) ---
     let itemConsumed = false; // Flag to track consumption
 
-    addToLog(`You used a <span class="font-bold text-green-300">${details.name}</span>.`);
+    // --- NPC ALLY: Modified log message ---
+    const targetName = (target === player) ? "You" : target.name;
+    const verb = (target === player) ? "use" : "use on";
+    addToLog(`${targetName} ${verb} a <span class="font-bold text-green-300">${details.name}</span>.`);
+    // --- END NPC ALLY ---
 
     if (inBattle) gameState.isPlayerTurn = false; // Using an item costs the turn in battle
 
@@ -2346,8 +3276,10 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
 
     // --- Targeting Items (Bombs, Stones, Essences in battle) ---
     if ( (details.type === 'debuff_apply' || details.type === 'debuff_special' || (details.type === 'enchant' && inBattle)) && inBattle) {
-        const target = currentEnemies[targetIndex];
-        if (targetIndex === null || !target || !target.isAlive()) {
+        // --- NPC ALLY: Target is already set for offensive items from castSpell/handleCellClick ---
+        const enemyTarget = currentEnemies[targetIndex]; // Re-get enemy target
+        if (targetIndex === null || !enemyTarget || !enemyTarget.isAlive()) {
+        // --- END NPC ALLY ---
             addToLog("You must select a valid target.", 'text-red-400');
              if(inBattle) renderBattle('item'); // Go back to item select
              gameState.isPlayerTurn = true; // Give turn back if targeting failed
@@ -2376,14 +3308,14 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
 
         // Apply minimal damage if specified (bombs/stones)
         if ((details.type === 'debuff_apply' || details.type === 'debuff_special') && details.effect.damage) {
-            target.takeDamage(details.effect.damage, {element: details.effect.element || 'none'});
-            addToLog(`The ${details.name} hits ${target.name} for minor damage.`);
+            enemyTarget.takeDamage(details.effect.damage, {element: details.effect.element || 'none'});
+            addToLog(`The ${details.name} hits ${enemyTarget.name} for minor damage.`);
         }
 
         // Apply debuff to target or buff to player (bombs/stones)
         if (details.type === 'debuff_apply') {
-            target.statusEffects[details.effect.type] = { ...details.effect }; // Apply debuff to enemy
-            addToLog(`${target.name} is affected by the ${details.name}!`);
+            enemyTarget.statusEffects[details.effect.type] = { ...details.effect }; // Apply debuff to enemy
+            addToLog(`${enemyTarget.name} is affected by the ${details.name}!`);
         } else if (details.type === 'debuff_special') { // Currently only Artificial Light Stone
             player.statusEffects[details.effect.type] = { ...details.effect }; // Apply buff to player
             addToLog(`You feel the power of the ${details.name} coursing through you!`);
@@ -2415,8 +3347,8 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
 
 
             addToLog(`You channel the ${details.name}, unleashing a blast of ${element} energy!`, 'text-yellow-300');
-             const finalDamage = target.takeDamage(damage, { isMagic: true, element: element }); // Apply as magic damage
-             addToLog(`It hits ${target.name} for <span class="font-bold text-purple-400">${finalDamage}</span> ${element} damage.`);
+             const finalDamage = enemyTarget.takeDamage(damage, { isMagic: true, element: element }); // Apply as magic damage
+             addToLog(`It hits ${enemyTarget.name} for <span class="font-bold text-purple-400">${finalDamage}</span> ${element} damage.`);
         }
 
         updateStatsView(); // Update inventory count
@@ -2453,60 +3385,67 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
         }
         // --- End Consume ---
 
+        // --- NPC ALLY: Apply effects to 'target' (player OR ally) ---
         if (details.type === 'healing') {
             const healAmount = details.amount;
-            player.hp = Math.min(player.maxHp, player.hp + healAmount);
-             addToLog(`You recover <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-green-300'); // Specific log for healing
+            target.hp = Math.min(target.maxHp, target.hp + healAmount);
+             addToLog(`${targetName} recover${(target === player) ? '' : 's'} <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-green-300'); // Specific log for healing
         } else if (details.type === 'mana_restore') {
             const restoreAmount = details.amount;
-            let currentMp = Number(player.mp) || 0;
-            let maxMp = Number(player.maxMp) || 1; // Default maxMP to 1 to avoid division by zero later
-            player.mp = Math.min(maxMp, currentMp + restoreAmount); // Use validated numbers
-            addToLog(`You restore <span class="font-bold text-blue-400">${restoreAmount}</span> MP.`, 'text-blue-300'); // Specific log for mana
+            let currentMp = Number(target.mp) || 0;
+            let maxMp = Number(target.maxMp) || 1; // Default maxMP to 1 to avoid division by zero later
+            target.mp = Math.min(maxMp, currentMp + restoreAmount); // Use validated numbers
+            addToLog(`${targetName} restore${(target === player) ? '' : 's'} <span class="font-bold text-blue-400">${restoreAmount}</span> MP.`, 'text-blue-300'); // Specific log for mana
         } else if (details.type === 'buff' && details.effect) { // Added check for details.effect
              // Apply buff effect from item data
              // Note: These are temporary battle buffs, not food buffs
-             player.statusEffects[details.effect.type] = { ...details.effect }; // Copy effect data
-             addToLog(`You feel the effects of the ${details.name}!`, 'text-yellow-300');
+             target.statusEffects[details.effect.type] = { ...details.effect }; // Copy effect data
+             addToLog(`${targetName} feel${(target === player) ? '' : 's'} the effects of the ${details.name}!`, 'text-yellow-300');
         } else if (details.type === 'cleanse') {
             // --- General Cleanse ---
             const badEffects = ['poison', 'petrified', 'paralyzed', 'swallowed', 'toxic', 'drenched']; // Added toxic, drenched
             let cleansed = false;
             for (const effect of badEffects) {
-                if (player.statusEffects[effect]) {
-                    delete player.statusEffects[effect];
+                if (target.statusEffects[effect]) {
+                    delete target.statusEffects[effect];
                     cleansed = true;
                 }
             }
-             if (cleansed) addToLog(`You drink the ${details.name} and feel purified.`, 'text-cyan-300');
-             else addToLog(`You drink the ${details.name}, but there were no effects to cleanse.`, 'text-gray-400');
+             if (cleansed) addToLog(`${targetName} drink${(target === player) ? '' : 's'} the ${details.name} and feel${(target === player) ? '' : 's'} purified.`, 'text-cyan-300');
+             else addToLog(`${targetName} drink${(target === player) ? '' : 's'} the ${details.name}, but there were no effects to cleanse.`, 'text-gray-400');
         } else if (details.type === 'cleanse_specific') {
             // --- Specific Cleanse (New Items) ---
             const effectsToCleanse = details.effects_to_cleanse || [];
             let specificCleansed = false;
             for (const effect of effectsToCleanse) {
-                if (player.statusEffects[effect]) {
-                    delete player.statusEffects[effect];
+                if (target.statusEffects[effect]) {
+                    delete target.statusEffects[effect];
                     specificCleansed = true;
                 }
             }
             if (specificCleansed) {
                  if (itemKey === 'natural_antidote') {
-                    addToLog(`The antidote courses through you, neutralizing the poison!`, 'text-green-400');
+                    addToLog(`The antidote courses through ${targetName}, neutralizing the poison!`, 'text-green-400');
                  } else if (itemKey === 'anti_paralytic_needle') {
-                    addToLog(`The needle jolts your nerves, freeing you from paralysis!`, 'text-yellow-300');
+                    addToLog(`The needle jolts ${targetName}'s nerves, freeing them from paralysis!`, 'text-yellow-300');
                  } else {
-                    addToLog(`The ${details.name} cleanses specific ailments.`, 'text-cyan-300'); // Generic fallback
+                    addToLog(`The ${details.name} cleanses specific ailments from ${targetName}.`, 'text-cyan-300'); // Generic fallback
                  }
             } else {
-                 addToLog(`You use the ${details.name}, but there were no relevant effects to cleanse.`, 'text-gray-400');
+                 addToLog(`${targetName} use${(target === player) ? '' : 's'} the ${details.name}, but there were no relevant effects to cleanse.`, 'text-gray-400');
             }
         }
+        // --- END NPC ALLY ---
     }
     // --- End Standard Consumable Effects ---
 
 
     updateStatsView(); // Update UI after applying effects
+    // --- NPC ALLY: Update grid if ally was target ---
+    if (inBattle && target !== player) {
+        renderBattleGrid(); // Re-render grid to show ally's new HP/etc
+    }
+    // --- END NPC ALLY ---
 
     // Transition after effects
     if (!inBattle) {
@@ -2519,6 +3458,8 @@ function useItem(itemKey, inBattle = false, targetIndex = null) {
     }
     return true; // Indicate success
 }
+
+
 
 
 function equipItem(itemKey, inBattle = false) {
@@ -3446,12 +4387,14 @@ function restAtHouse() {
      player.questsTakenToday = []; // Reset daily quest limit
      player.seed = Math.floor(Math.random() * 1000000); // Generate new seed for the 'day'
      generateBlackMarketStock(); // Refresh black market stock
+     generateBarracksRoster(); // --- NEW: Refresh Barracks roster ---
      player.clearFoodBuffs(); // Food buffs wear off after resting
     addToLog("You rest in the comfort of your own bed and feel fully restored. Shops and quests have refreshed.", "text-green-400"); // Updated log
     updateStatsView(); // Update HP/MP display
     saveGame(); // Save rested state
     renderHouse(); // Stay in the house view
 }
+
 
 function placeAllInStorage() {
     const storage = player.house.storage;

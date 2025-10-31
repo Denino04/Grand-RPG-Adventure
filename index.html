@@ -178,6 +178,14 @@
         .grid-cell.terrain { background-color: #4a5568; opacity: 0.8; cursor: not-allowed; border: 1px solid #2d3748; }
         .grid-cell.item-attackable { background-color: #16a34a; opacity: 0.7; } /* Item highlight */
 
+        /* --- NPC Ally Styles --- */
+        /* --- NPC Ally Styles --- */
+        .grid-cell.ally { background-color: #0e7490; /* A distinct teal/cyan */ border-color: #155e75; }
+        .ally-emoji { font-size: 1.5rem; line-height: 1; }
+        .ally-hp-bar-bg { position: absolute; bottom: 4px; left: 10%; width: 80%; height: 5px; background-color: rgba(0,0,0,0.7); border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.2); }
+        .ally-hp-bar { height: 100%; background-color: #22c55e; /* Green HP bar for ally */ border-radius: 2px; transition: width 0.3s ease-out; }
+        .grid-cell.magic-targetable-ally { background-color: #059669; opacity: 0.8; } /* Green for healing magic */
+        .grid-cell.item-targetable-ally { background-color: #059669; opacity: 0.8; } /* Green for healing items */
 
         /* --- Garden Styles --- */
         .garden-plot { aspect-ratio: 1 / 1; width: auto; height: auto; min-width: 40px; min-height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 0.5rem; border: 2px solid; cursor: pointer; font-size: 2rem; transition: all 0.2s; position: relative; }
@@ -468,15 +476,7 @@
     <!-- Game Wrapper -->
     <div id="game-wrapper">
         <div id="game-container" class="relative w-full max-w-6xl md:h-screen md:max-h-[900px] flex flex-col md:flex-row border-2 rounded-lg shadow-2xl">
-            <!-- Persistent Buttons (Settings/Exit) -->
-            <div id="persistent-buttons" class="absolute top-16 right-16 flex gap-4 z-20">
-                <button onclick="renderSettingsMenu(gameState.currentView)" class="btn btn-primary !p-2 !rounded-full w-10 h-10 flex items-center justify-center" aria-label="Settings" title="Settings">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-                </button>
-                <button onclick="exitGame()" class="btn btn-action !p-2 !rounded-full w-10 h-10 text-xl leading-none flex items-center justify-center" aria-label="Leave Game" title="Leave Game">
-                    &times;
-                </button>
-            </div>
+            <!-- Persistent Buttons (Settings/Exit) - MOVED FROM HERE -->
             <button id="skip-tutorial-btn" class="hidden absolute top-2 right-2 btn btn-action z-30">Skip Tutorial</button>
             <!-- Stats Sidebar -->
             <aside class="w-full md:w-1/4 bg-slate-800 rounded-l-lg flex flex-col">
@@ -542,6 +542,16 @@
             </aside>
             <!-- Main View & Game Log -->
             <main class="w-full md:w-3/4 flex flex-col p-4">
+                <!-- Persistent Buttons (Settings/Exit) - MOVED HERE -->
+                <div id="persistent-buttons" class="flex justify-end gap-4 z-20 mb-2"> <!-- REMOVED absolute/positioning, ADDED margin -->
+                    <button onclick="renderSettingsMenu(gameState.currentView)" class="btn btn-primary !p-2 !rounded-full w-10 h-10 flex items-center justify-center" aria-label="Settings" title="Settings">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                    <button onclick="exitGame()" class="btn btn-action !p-2 !rounded-full w-10 h-10 text-xl leading-none flex items-center justify-center" aria-label="Leave Game" title="Leave Game">
+                        &times;
+                    </button>
+                </div>
+                
                 <div id="main-view" class="bg-slate-900/50 rounded-lg flex-grow flex items-center justify-center p-6 min-h-[300px] md:min-h-0 overflow-y-auto inventory-scrollbar">
                     <!-- Main game content (town, battle, etc.) -->
                 </div>
@@ -631,6 +641,7 @@
                             <label for="debug-bonusCritChance" class="text-white text-right text-xs">Bonus Crit %:</label>
                             <input type="number" id="debug-bonusCritChance" step="0.01" class="text-black rounded px-1 w-full">
                             <label for="debug-bonusEvasion" class="text-white text-right text-xs">Bonus Evade %:</label>
+            
                             <input type="number" id="debug-bonusEvasion" step="0.01" class="text-black rounded px-1 w-full">
                         </div>
                     </div>
@@ -679,4 +690,3 @@
     <script src="main.js"></script>
 </body>
 </html>
-

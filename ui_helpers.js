@@ -510,6 +510,69 @@ function hideEnemyInfo() {
     activeTooltipItem = null;
 }
 
+function showAllyInfo(ally, event, forceShow = false) {
+    const tooltipElement = $('#tooltip');
+    if (event.type === 'click' && tooltipElement.style.display === 'block' && activeTooltipItem === `ally-${ally.name}` && !forceShow) {
+        hideTooltip(); // Use the generic hideTooltip
+        return;
+    }
+
+    if (!ally) return;
+
+    // --- Build Tooltip Content ---
+    let content = `<h4 class="font-bold text-blue-400 mb-1">${ally.name} (Lvl ${ally.level})</h4>`;
+    content += `<p class="text-xs text-gray-400 mb-2">${ally.class}</p>`;
+    content += `<p>HP: ${ally.hp} / ${ally.maxHp}</p>`;
+    content += `<p>MP: ${ally.mp} / ${ally.maxMp}</p>`;
+
+    // --- Display Status Effects ---
+    const statusEffects = ally.statusEffects;
+    let effectList = '';
+    if (statusEffects) { // Add safety check
+        for (const key in statusEffects) {
+            if (statusEffects.hasOwnProperty(key)) {
+                const effect = statusEffects[key];
+                let durationText = (effect.duration && effect.duration !== Infinity) ? ` (${effect.duration} turns)` : '';
+                let effectName = capitalize(key.replace(/buff_|debuff_/g, '').replace(/_/g, ' '));
+                let colorClass = 'text-gray-400'; // Default
+
+                if (key.startsWith('buff_') || ['enrage', 'living_shield'].includes(key)) {
+                    colorClass = 'text-green-400'; // Buffs
+                } else if (['poison', 'toxic', 'drenched', 'paralyzed', 'petrified', 'swallowed'].includes(key)) {
+                    colorClass = 'text-red-400'; // Debuffs
+                }
+
+                effectList += `<li class="${colorClass}">${effectName}${durationText}</li>`;
+            }
+        }
+    }
+
+    if (effectList) {
+        content += '<div class="mt-2 pt-2 border-t border-gray-600 text-xs"><p class="font-semibold mb-1">Status:</p><ul class="list-disc list-inside space-y-1">' + effectList + '</ul></div>';
+    }
+    
+    // --- Display Gear ---
+    content += '<div class="mt-2 pt-2 border-t border-gray-600 text-xs"><p class="font-semibold mb-1">Equipment:</p><ul class="list-none space-y-1">';
+    content += `<li><strong>Weapon:</strong> ${ally.equippedWeapon.name}</li>`;
+    content += `<li><strong>Armor:</strong> ${ally.equippedArmor.name}</li>`;
+    content += `<li><strong>Shield:</strong> ${ally.equippedShield.name}</li>`;
+    content += `<li><strong>Catalyst:</strong> ${ally.equippedCatalyst.name}</li>`;
+    content += '</ul></div>';
+
+
+    tooltipElement.innerHTML = content;
+    tooltipElement.style.display = 'block';
+    activeTooltipItem = `ally-${ally.name}`;
+
+    let x = event.clientX + 15;
+    let y = event.clientY + 15;
+    if (x + tooltipElement.offsetWidth > window.innerWidth) x = event.clientX - tooltipElement.offsetWidth - 15;
+    if (y + tooltipElement.offsetHeight > window.innerHeight) y = event.clientY - tooltipElement.offsetHeight - 15;
+
+    tooltipElement.style.left = `${x}px`;
+    tooltipElement.style.top = `${y}px`;
+}
+// --- END NEW FUNCTION ---
 // --- NEW MODAL FUNCTION ---
 /**
  * Displays a simple modal popup.

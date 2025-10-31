@@ -182,6 +182,8 @@ const ITEMS = {
 
     // --- Key Items ---
     'bestiary_notebook': {name: 'Bestiary Notebook', type: 'key', price: 0, description: "A leather-bound book from a nervous researcher named Betty. Used to catalogue monster observations."},
+    'blacksmith_key': {name: 'Blacksmith\'s Key', type: 'key', price: 0, description: "A sturdy iron key, smelling faintly of soot and metal. Looks like it unlocks something important in the Commercial District."},
+    'tower_key': {name: 'Tower Key', type: 'key', price: 0, description: "An ornate key humming with faint magical energy. Seems attuned to the Arcane Quarter."},
 
     // --- Gardening Items ---
     // Seeds

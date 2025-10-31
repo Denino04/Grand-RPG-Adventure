@@ -314,6 +314,24 @@ const CLASSES = {
     }
 };
 
+// --- Added Class Categorization ---
+const MARTIAL_CLASSES = ['fighter', 'barbarian', 'rogue', 'ranger', 'paladin'];
+const MAGIC_CLASSES = ['magus', 'warlock', 'cleric', 'artificer', 'cook'];
+// --- End Added ---
+
+const NPC_STAT_ALLOCATIONS = {
+    'artificer': { Vigor: 0.20, Focus: 0.20, Stamina: 0.15, Strength: 0.05, Intelligence: 0.25, Luck: 0.15 },
+    'barbarian': { Vigor: 0.25, Focus: 0.05, Stamina: 0.20, Strength: 0.40, Intelligence: 0.05, Luck: 0.05 },
+    'cleric': { Vigor: 0.20, Focus: 0.20, Stamina: 0.25, Strength: 0.10, Intelligence: 0.20, Luck: 0.05 },
+    'cook': { Vigor: 0.20, Focus: 0.20, Stamina: 0.15, Strength: 0.20, Intelligence: 0.20, Luck: 0.05 },
+    'fighter': { Vigor: 0.20, Focus: 0.05, Stamina: 0.30, Strength: 0.30, Intelligence: 0.05, Luck: 0.10 },
+    'paladin': { Vigor: 0.15, Focus: 0.15, Stamina: 0.30, Strength: 0.25, Intelligence: 0.10, Luck: 0.05 },
+    'ranger': { Vigor: 0.15, Focus: 0.15, Stamina: 0.20, Strength: 0.20, Intelligence: 0.20, Luck: 0.10 },
+    'rogue': { Vigor: 0.20, Focus: 0.15, Stamina: 0.10, Strength: 0.20, Intelligence: 0.05, Luck: 0.30 },
+    'magus': { Vigor: 0.10, Focus: 0.30, Stamina: 0.10, Strength: 0.05, Intelligence: 0.40, Luck: 0.05 },
+    'warlock': { Vigor: 0.15, Focus: 0.20, Stamina: 0.10, Strength: 0.05, Intelligence: 0.30, Luck: 0.20 }
+};
+
 const BACKGROUNDS = {
     'wretch': {
         name: 'Wretch',

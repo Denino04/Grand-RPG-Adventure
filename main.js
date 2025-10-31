@@ -164,22 +164,40 @@ function handleRouteChange() {
 
 async function initGame(playerName, gender, raceKey, classKey, backgroundKey, difficulty, elementalAffinity = null) {
     console.log("initGame started...");
-    // MODIFIED: Pass classKey to constructor
     player = new Player(playerName, raceKey, classKey);
     Object.assign(player, {
         gender,
-        class: CLASSES[classKey].name, // Assigns the proper display name
+        class: CLASSES[classKey].name,
         background: BACKGROUNDS[backgroundKey].name,
         backgroundKey,
         difficulty,
-        elementalAffinity: elementalAffinity, // Assign the chosen affinity
+        elementalAffinity: elementalAffinity,
         totalXp: 0,
         inventory: { items: {}, weapons: [], catalysts: [], armor: [], shields: [], lures: {} },
         spells: {},
         dialogueFlags: {},
         knownCookingRecipes: [],
         knownAlchemyRecipes: [],
-        seed: Math.floor(Math.random() * 1000000)
+        seed: Math.floor(Math.random() * 1000000),
+        // --- Initialize Progression Properties ---
+        killsSinceLevel4: 0,
+        killsSinceLevel7: 0,
+        unlocks: {
+            blacksmith: false,
+            sageTower: false,
+            houseAvailable: false, // Starts locked
+            blackMarket: false,    // Starts locked
+            enchanter: false,
+            witchCoven: false,
+            hasBlacksmithKey: false,
+            hasTowerKey: false,
+            barracks: false // Barracks unlock
+        },
+        // --- End Initialization ---
+        
+        // --- NEW: Roster for Barracks ---
+        barracksRoster: [],
+        // --- END NEW ---
     });
      console.log("Player object base created:", player);
 
@@ -269,6 +287,7 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey, di
     gameState.playerIsDying = false;
     generateRandomizedBiomeOrder();
     generateBlackMarketStock();
+    generateBarracksRoster(); // --- NEW: Generate initial roster ---
     updatePlayerTier();
 
     sessionStorage.setItem('isNewGame', 'true');
@@ -282,6 +301,7 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey, di
     window.location.hash = 'game'; // This should trigger handleRouteChange
      console.log("initGame finished.");
 }
+    
 
 
 function generateRandomizedBiomeOrder() {
@@ -372,6 +392,20 @@ async function saveGame(manual = false) {
     saveData.equippedArmorKey = findKeyByInstance(ARMOR, player.equippedArmor);
     saveData.equippedShieldKey = findKeyByInstance(SHIELDS, player.equippedShield);
     // Lure is already stored by key (player.equippedLure)
+    
+    // --- NPC ALLY: Serialize ally equipment ---
+    if (saveData.npcAlly) {
+        // Clean up non-serializable data for ally
+        delete saveData.npcAlly.racialPassive;
+        delete saveData.npcAlly.signatureAbilityData;
+        
+        // Add keys for ally's equipped items
+        saveData.npcAlly.equippedWeaponKey = findKeyByInstance(WEAPONS, player.npcAlly.equippedWeapon);
+        saveData.npcAlly.equippedCatalystKey = findKeyByInstance(CATALYSTS, player.npcAlly.equippedCatalyst);
+        saveData.npcAlly.equippedArmorKey = findKeyByInstance(ARMOR, player.npcAlly.equippedArmor);
+        saveData.npcAlly.equippedShieldKey = findKeyByInstance(SHIELDS, player.npcAlly.equippedShield);
+    }
+    // --- END NPC ALLY ---
 
      console.log("Preparing save data (includes equipment keys):", saveData);
 
@@ -529,6 +563,38 @@ async function loadGameFromKey(docId, isImport = false) {
         console.log("Parsed data exists, creating player object...");
         // MODIFIED: Constructor now only needs raceKey initially
         player = new Player("Loading...", parsedData.race || "Human");
+        
+        // --- NPC ALLY: Re-instantiate ally object BEFORE assigning player data ---
+        // This is crucial. We must rebuild the NpcAlly object from its saved data
+        // because the saved data is just a plain object, not a class instance.
+        if (parsedData.npcAlly) {
+            console.log("Re-instantiating NpcAlly...");
+            const allyData = parsedData.npcAlly;
+            
+            // --- THIS IS THE FIX ---
+            // Pass the raceKey from the saved data, not the level
+            const newAlly = new NpcAlly(allyData.name, allyData._classKey, allyData.raceKey, allyData.level);
+            // --- END FIX ---
+            
+            // Now, copy all saved properties *back* onto the new instance
+            Object.assign(newAlly, allyData);
+            
+            // --- MIGRATION (for ally) ---
+            if (!newAlly.inventory) newAlly.inventory = { items: {}, size: 10, stack: 10 };
+            if (!newAlly.equipmentOrder) newAlly.equipmentOrder = [];
+            // --- END MIGRATION ---
+            
+            // Re-link equipment details from keys
+            newAlly.equippedWeapon = WEAPONS[allyData.equippedWeaponKey] || WEAPONS[findKeyByName(allyData.equippedWeapon?.name, WEAPONS)] || WEAPONS['fists'];
+            newAlly.equippedCatalyst = CATALYSTS[allyData.equippedCatalystKey] || CATALYSTS[findKeyByName(allyData.equippedCatalyst?.name, CATALYSTS)] || CATALYSTS['no_catalyst'];
+            newAlly.equippedArmor = ARMOR[allyData.equippedArmorKey] || ARMOR[findKeyByName(allyData.equippedArmor?.name, ARMOR)] || ARMOR['travelers_garb'];
+            newAlly.equippedShield = SHIELDS[allyData.equippedShieldKey] || SHIELDS[findKeyByName(allyData.equippedShield?.name, SHIELDS)] || SHIELDS['no_shield'];
+
+            parsedData.npcAlly = newAlly; // Replace plain object with class instance
+            console.log("NpcAlly re-instantiated.", parsedData.npcAlly);
+        }
+        // --- END NPC ALLY ---
+        
         Object.assign(player, parsedData); // Load all saved data
 
         // Set firestoreId if loaded from cloud
@@ -539,6 +605,9 @@ async function loadGameFromKey(docId, isImport = false) {
 
         // --- DATA MIGRATION & DEFAULTS ---
          console.log("Applying data migrations and defaults...");
+         
+         const inv = player.inventory;
+         
         if (!player.house) player.house = { owned: false, storage: { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} }, garden: [] }; // Added empty arrays
         ['storageTier', 'gardenTier', 'kitchenTier', 'alchemyTier', 'trainingTier'].forEach(tier => {
             if (player.house[tier] === undefined) player.house[tier] = 0;
@@ -549,8 +618,43 @@ async function loadGameFromKey(docId, isImport = false) {
         if (!player.knownAlchemyRecipes) player.knownAlchemyRecipes = [];
         if (!player.seed) player.seed = Math.floor(Math.random() * 1000000);
         if (player.elementalAffinity === undefined) player.elementalAffinity = null; // Add default for old saves
+        // --- NPC ALLY: Migration for Player ---
+        if (player.npcAlly === undefined) player.npcAlly = null;
+        if (player.encountersSinceLastPay === undefined) player.encountersSinceLastPay = 0;
+        // --- NEW: Barracks Roster Migration ---
+        if (player.barracksRoster === undefined) player.barracksRoster = [];
+        // --- END NEW ---
+        // --- END NPC ALLY ---
+
         // Ensure inventory structure is correct
-        const inv = player.inventory;
+        // --- Added Defaults for Progression ---
+        if (player.killsSinceLevel4 === undefined) player.killsSinceLevel4 = 0;
+        if (player.killsSinceLevel7 === undefined) player.killsSinceLevel7 = 0;
+        if (!player.unlocks) { // If unlocks object doesn't exist at all
+            player.unlocks = {
+                blacksmith: false, sageTower: false, houseAvailable: false,
+                blackMarket: false, enchanter: false, witchCoven: false,
+                hasBlacksmithKey: false, hasTowerKey: false,
+                barracks: false // --- NPC ALLY ---
+            };
+        } else { // Check individual flags if object exists
+            if (player.unlocks.blacksmith === undefined) player.unlocks.blacksmith = false;
+            if (player.unlocks.sageTower === undefined) player.unlocks.sageTower = false;
+            // Check house based on level for older saves
+            if (player.unlocks.houseAvailable === undefined) player.unlocks.houseAvailable = player.level >= 5;
+            // Check black market based on level for older saves
+            if (player.unlocks.blackMarket === undefined) player.unlocks.blackMarket = player.level >= 5;
+            if (player.unlocks.enchanter === undefined) player.unlocks.enchanter = false;
+            if (player.unlocks.witchCoven === undefined) player.unlocks.witchCoven = false;
+            // Infer key possession from inventory for older saves
+            if (player.unlocks.hasBlacksmithKey === undefined) player.unlocks.hasBlacksmithKey = !!player.inventory?.items?.['blacksmith_key'];
+            if (player.unlocks.hasTowerKey === undefined) player.unlocks.hasTowerKey = !!player.inventory?.items?.['tower_key'];
+            // --- NPC ALLY: Barracks migration ---
+            if (player.unlocks.barracks === undefined) player.unlocks.barracks = (player.level >= 8);
+            // --- END NPC ALLY ---
+        }
+        // --- End Added ---
+        
         if (!inv.items) inv.items = {};
         if (!inv.weapons) inv.weapons = [];
         if (!inv.catalysts) inv.catalysts = [];
@@ -619,37 +723,12 @@ async function loadGameFromKey(docId, isImport = false) {
         // --- EQUIPMENT RE-ASSIGNMENT (Prioritize Key, Fallback to Name) ---
         console.log("Re-assigning equipment (using keys first)...");
 
-        // Weapon
-        if (parsedData.equippedWeaponKey && WEAPONS[parsedData.equippedWeaponKey]) {
-            player.equippedWeapon = WEAPONS[parsedData.equippedWeaponKey];
-        } else {
-            console.log("Weapon key not found or invalid, falling back to name lookup for:", parsedData.equippedWeapon?.name);
-            player.equippedWeapon = WEAPONS[findKeyByName(parsedData.equippedWeapon?.name, WEAPONS)] || WEAPONS['fists'];
-        }
-
-        // Catalyst
-        if (parsedData.equippedCatalystKey && CATALYSTS[parsedData.equippedCatalystKey]) {
-            player.equippedCatalyst = CATALYSTS[parsedData.equippedCatalystKey];
-        } else {
-            console.log("Catalyst key not found or invalid, falling back to name lookup for:", parsedData.equippedCatalyst?.name);
-            player.equippedCatalyst = CATALYSTS[findKeyByName(parsedData.equippedCatalyst?.name, CATALYSTS)] || CATALYSTS['no_catalyst'];
-        }
-
-        // Armor
-        if (parsedData.equippedArmorKey && ARMOR[parsedData.equippedArmorKey]) {
-            player.equippedArmor = ARMOR[parsedData.equippedArmorKey];
-        } else {
-            console.log("Armor key not found or invalid, falling back to name lookup for:", parsedData.equippedArmor?.name);
-            player.equippedArmor = ARMOR[findKeyByName(parsedData.equippedArmor?.name, ARMOR)] || ARMOR['travelers_garb'];
-        }
-
-        // Shield
-        if (parsedData.equippedShieldKey && SHIELDS[parsedData.equippedShieldKey]) {
-            player.equippedShield = SHIELDS[parsedData.equippedShieldKey];
-        } else {
-            console.log("Shield key not found or invalid, falling back to name lookup for:", parsedData.equippedShield?.name);
-            player.equippedShield = SHIELDS[findKeyByName(parsedData.equippedShield?.name, SHIELDS)] || SHIELDS['no_shield'];
-        }
+        // --- THIS IS THE FIX (FOR PLAYER) ---
+        player.equippedWeapon = WEAPONS[parsedData.equippedWeaponKey] || WEAPONS[findKeyByName(parsedData.equippedWeapon?.name, WEAPONS)] || WEAPONS['fists'];
+        player.equippedCatalyst = CATALYSTS[parsedData.equippedCatalystKey] || CATALYSTS[findKeyByName(parsedData.equippedCatalyst?.name, CATALYSTS)] || CATALYSTS['no_catalyst'];
+        player.equippedArmor = ARMOR[parsedData.equippedArmorKey] || ARMOR[findKeyByName(parsedData.equippedArmor?.name, ARMOR)] || ARMOR['travelers_garb'];
+        player.equippedShield = SHIELDS[parsedData.equippedShieldKey] || SHIELDS[findKeyByName(parsedData.equippedShield?.name, SHIELDS)] || SHIELDS['no_shield'];
+        // --- END FIX ---
 
         // Lure (already stored by key)
         player.equippedLure = parsedData.equippedLure || 'no_lure';
@@ -694,6 +773,7 @@ async function loadGameFromKey(docId, isImport = false) {
         window.location.hash = 'menu';
     }
 }
+
 
 async function exportSave() {
     if (!player) return;

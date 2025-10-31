@@ -910,58 +910,78 @@ function renderTownSquare() {
     gameState.currentView = 'town';
     $('#inventory-btn').disabled = false;
     $('#character-sheet-btn').disabled = false;
-    saveGame();
+    saveGame(); // Save on entering town square
 
+    // Betty Popup Logic
     const bettyPopup = $('#betty-encounter-popup');
     bettyPopup.classList.add('hidden');
     bettyPopup.onclick = null;
-
-    if (player.level >= 10 && player.bettyQuestState === 'not_started' && !player.dialogueFlags.bettyEncounterReady) {
-        if (Math.random() < 0.05) {
+    // Betty appears at level 4 now
+    if (player.level >= 4 && player.bettyQuestState === 'not_started' && !player.dialogueFlags.bettyEncounterReady && !player.dialogueFlags.bettyMet) {
+        if (Math.random() < 0.05) { // Initial chance to be ready
             player.dialogueFlags.bettyEncounterReady = true;
         }
     }
-
-    if (player.dialogueFlags.bettyEncounterReady && player.bettyQuestState === 'not_started') {
+    // Show popup if ready or if declined previously
+    if ((player.dialogueFlags.bettyEncounterReady && player.bettyQuestState === 'not_started') || player.bettyQuestState === 'declined') {
         bettyPopup.classList.remove('hidden');
-        bettyPopup.innerHTML = `<p class="font-bold text-purple-200">A nervous woman whispers...</p><p class="text-gray-300">"Psst... Adventurer... Over here..."</p>`;
+        if (player.bettyQuestState === 'declined') {
+            bettyPopup.innerHTML = `<p class="font-bold text-purple-200">Betty is waiting...</p><p class="text-gray-300">She seems to want to talk to you again.</p>`;
+        } else {
+            bettyPopup.innerHTML = `<p class="font-bold text-purple-200">A nervous woman whispers...</p><p class="text-gray-300">"Psst... Adventurer... Over here..."</p>`;
+        }
         bettyPopup.onclick = () => {
-            player.dialogueFlags.bettyEncounterReady = false;
+            player.dialogueFlags.bettyEncounterReady = false; // Mark as encountered
             startBettyDialogue();
         };
-    } else if (player.bettyQuestState === 'declined') {
-        bettyPopup.classList.remove('hidden');
-        bettyPopup.innerHTML = `<p class="font-bold text-purple-200">Betty is waiting...</p><p class="text-gray-300">She seems to want to talk to you again.</p>`;
-        bettyPopup.onclick = startBettyDialogue;
     }
 
     const container = document.createElement('div');
     container.className = 'relative flex flex-col items-center justify-center w-full h-full';
 
+    // --- Button Array with Updated Arcane Quarter Unlock Logic ---
     const buttons = [
-        { name: 'Explore Wilderness', action: "renderWildernessMenu()", class: 'btn-action' },
-        { name: 'Commercial District', action: "renderCommercialDistrict()", class: 'btn-primary' },
-        { name: 'Arcane Quarter', action: "renderArcaneQuarter()", class: 'btn-primary' },
-        { name: 'Residential Area', action: "renderResidentialDistrict()", class: 'btn-primary' },
+        { name: 'Explore Wilderness', action: "renderWildernessMenu()", class: 'btn-action', unlocked: true },
+        { name: 'Commercial District', action: "renderCommercialDistrict()", class: 'btn-primary', unlocked: true }, // Always show district access
+        // --- MODIFIED Arcane Quarter Condition ---
+        {
+            name: 'Arcane Quarter',
+            action: "renderArcaneQuarter()",
+            class: 'btn-primary',
+            unlocked: player.unlocks.sageTower || player.unlocks.enchanter || player.unlocks.witchCoven // Show if ANY arcane building is unlocked
+        },
+        // --- END MODIFICATION ---
+        { name: 'Residential Area', action: "renderResidentialDistrict()", class: 'btn-primary', unlocked: true } // Always show district access
     ];
 
+    // House Button Logic (remains the same)
     if (player.house.owned) {
-        buttons.push({ name: 'Your House', action: "renderHouse()", class: 'btn-primary' });
-    } else if (player.level >= 4) {
-        buttons.push({ name: 'Build House (1000 G)', action: "buildHouse()", class: 'btn-primary' });
+        buttons.push({ name: 'Your House', action: "renderHouse()", class: 'btn-primary', unlocked: true });
+    } else if (player.level >= 5 && player.unlocks.houseAvailable) {
+        buttons.push({ name: 'Build House (1000 G)', action: "buildHouse()", class: 'btn-primary', unlocked: true });
     } else {
-        buttons.push({ name: 'Your House (Lvl 4)', action: "", class: 'btn-primary', disabled: true });
+        buttons.push({ name: '???', action: "", class: 'btn-primary', disabled: true, title: "Reach Level 5 to unlock", unlocked: true }); // Always show placeholder/build button
     }
 
-     if (player.bettyQuestState === 'accepted') {
-        buttons.push({ name: 'Betty\'s Corner', action: "startBettyDialogue()", class: 'btn-primary' });
+    // Betty Button Logic (remains the same)
+    if (player.bettyQuestState === 'accepted') {
+        buttons.push({ name: 'Betty\'s Corner', action: "startBettyDialogue()", class: 'btn-primary', unlocked: true });
     }
+    // --- End Button Array ---
+
 
     let html = `
         <h2 class="font-medieval text-3xl mb-8 text-center">Town Square</h2>
-        <div class="grid grid-cols-2 gap-4 w-full max-w-md">
-            ${buttons.map(btn => `<button onclick="${btn.action}" class="btn ${btn.class}" ${btn.disabled ? 'disabled' : ''}>${btn.name}</button>`).join('')}
-        </div>`;
+        <div class="grid grid-cols-2 gap-4 w-full max-w-md">`;
+
+    // Render only unlocked buttons (except house placeholder)
+    buttons.forEach(btn => {
+        if (btn.unlocked) {
+             html += `<button onclick="${btn.action}" class="btn ${btn.class}" ${btn.disabled ? 'disabled' : ''} ${btn.title ? `title="${btn.title}"` : ''}>${btn.name}</button>`;
+        }
+    });
+
+    html += `</div>`;
 
     container.innerHTML = html;
     render(container);
@@ -1239,6 +1259,20 @@ function renderSettingsMenu(originView = 'town') {
 }
 
 function renderResidentialDistrict() {
+    // --- NPC ALLY: Check for non-payment when leaving Barracks ---
+    if (gameState.currentView === 'barracks' && player.npcAlly && player.encountersSinceLastPay >= 5) {
+        const salary = player.npcAlly.level * 10;
+        if (player.gold < salary) {
+            addToLog(`You couldn't afford to pay ${player.npcAlly.name}. They have left your service in disgust.`, 'text-red-500 font-bold');
+        } else {
+            addToLog(`You left the Barracks without paying ${player.npcAlly.name}. They have left your service in disgust.`, 'text-red-500 font-bold');
+        }
+        player.npcAlly = null;
+        player.encountersSinceLastPay = 0;
+        // Ally is now null, proceed to render residential district
+    }
+    // --- END NPC ALLY ---
+
     updateRealTimePalette();
     lastViewBeforeInventory = 'residential_district';
     gameState.currentView = 'residential_district';
@@ -1248,16 +1282,29 @@ function renderResidentialDistrict() {
 
     const locations = [
         { name: 'The Inn', action: "renderInn()" },
-        { name: 'Quest Board', action: "renderQuestBoard()" },
-        { name: 'Library', action: "renderLibrary()" },
+        { name: 'Quest Board', action: "renderQuestBoard()" }, // Always available from level 1
+        { name: 'Library', action: "renderLibrary()" }, // Always available from level 1
     ];
+    
+    // --- NPC ALLY: Add Barracks Button ---
+    if (player.unlocks.barracks) {
+        locations.push({ name: 'Barracks', action: "renderBarracks()" });
+    }
+    // --- END NPC ALLY ---
 
     let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Residential District</h2>
                 <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
 
-    locations.forEach(loc => {
-        html += `<button onclick="${loc.action}" class="btn btn-primary">${loc.name}</button>`;
-    });
+    // --- Level 1 Gating Logic ---
+    if (player.level >= 1) {
+        locations.forEach(loc => {
+            html += `<button onclick="${loc.action}" class="btn btn-primary">${loc.name}</button>`;
+        });
+    } else { // Should technically not happen if player starts at level 1
+         html += `<p class="text-center text-gray-400">Seems quiet for now...</p>`;
+    }
+    // --- End Level 1 Gating ---
+
 
     html += `</div>
              <div class="mt-8">
@@ -1267,6 +1314,753 @@ function renderResidentialDistrict() {
     container.innerHTML = html;
     render(container);
 }
+
+function hireNpc(recruitIndex) {
+    if (!player || !player.barracksRoster || !player.barracksRoster[recruitIndex]) {
+        console.error("Invalid recruit index.");
+        return;
+    }
+    
+    if (player.npcAlly) {
+        addToLog("You already have an ally. Dismiss them first.", "text-red-400");
+        return;
+    }
+    
+    const recruit = player.barracksRoster[recruitIndex];
+    const cost = 100 + (player.level * 25);
+
+    if (player.gold < cost) {
+        addToLog("You cannot afford to hire them.", "text-red-400");
+        return;
+    }
+
+    player.gold -= cost;
+    
+    // --- THIS IS THE FIX ---
+    // Create the new ally using all the recruit's data
+    player.npcAlly = new NpcAlly(recruit.name, recruit.classKey, recruit.raceKey, player.level);
+    // --- END FIX ---
+    player.encountersSinceLastPay = 0; // Reset pay counter
+
+    // Remove the recruit from the roster
+    player.barracksRoster.splice(recruitIndex, 1);
+
+    addToLog(`You hired ${recruit.name}, the ${capitalize(recruit.raceKey)} ${CLASSES[recruit.classKey].name}, for ${cost} G!`, "text-green-400");
+    updateStatsView();
+    renderBarracks(); // Re-render to show the manage screen
+    saveGame();
+}
+
+/**
+ * Fires the current NPC ally. This is permanent.
+ */
+// --- Updated Function: dismissNpc ---
+function dismissNpc(wasFired = false) {
+    if (!player.npcAlly) return;
+
+    const allyName = player.npcAlly.name;
+    const ally = player.npcAlly; // Get ally object
+    
+    if (wasFired) {
+        addToLog(`You refused to pay ${allyName}, and they left your service in disgust.`, 'text-red-500 font-bold');
+        // No items are returned
+    } else {
+        addToLog(`You have dismissed ${allyName}. They return their equipment and depart.`, 'text-yellow-400');
+        
+        // --- UPDATED: Return ally's equipped items to player inventory ---
+        const itemsToReturn = [
+            ally.equippedWeapon.name !== 'Fists' ? findKeyByInstance(WEAPONS, ally.equippedWeapon) : null,
+            ally.equippedCatalyst.name !== 'None' ? findKeyByInstance(CATALYSTS, ally.equippedCatalyst) : null,
+            ally.equippedArmor.name !== "Traveler's Garb" ? findKeyByInstance(ARMOR, ally.equippedArmor) : null,
+            ally.equippedShield.name !== 'None' ? findKeyByInstance(SHIELDS, ally.equippedShield) : null
+        ].filter(Boolean); // Filter out nulls (default items)
+
+        itemsToReturn.forEach(key => {
+            if (key) player.addToInventory(key, 1, true); // Log each returned item
+        });
+        // --- END UPDATE ---
+        
+        // --- NEW: Return all items from their 10-slot pocket ---
+        if (ally.inventory && ally.inventory.items) {
+            let returnedItemCount = 0;
+            for (const itemKey in ally.inventory.items) {
+                const count = ally.inventory.items[itemKey];
+                if (count > 0) {
+                    player.addToInventory(itemKey, count, false); // Add silently
+                    returnedItemCount += count;
+                }
+            }
+            if (returnedItemCount > 0) {
+                addToLog(`Their bag contained ${returnedItemCount} items, which have been added to your inventory.`, "text-gray-400");
+            }
+        }
+        // --- END NEW ---
+    }
+    
+    player.npcAlly = null;
+    player.encountersSinceLastPay = 0;
+    
+    renderBarracks(); // Refresh to show the recruiting screen
+}
+
+function renderNpcSpellTraining() {
+    if (!player.npcAlly) {
+        renderBarracks();
+        return;
+    }
+    
+    gameState.currentView = 'npc_spell_training';
+    lastViewBeforeInventory = 'barracks';
+    const ally = player.npcAlly;
+
+    const spellsByElement = {};
+    for (const spellKey in SPELLS) {
+        const spell = SPELLS[spellKey];
+        if (!spellsByElement[spell.element]) {
+            spellsByElement[spell.element] = [];
+        }
+        spellsByElement[spell.element].push(spellKey);
+    }
+    const elementOrder = ['none', 'fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'void', 'healing'];
+
+    let html = `<div class="w-full max-w-4xl mx-auto">
+        <h2 class="font-medieval text-3xl mb-2 text-center">Spell Training for ${ally.name}</h2>
+        <p class="text-center text-gray-400 mb-6">Purchase spell training for your ally. Essences are not required, but you must pay the gold cost for each tier.</p>
+        
+        <div class="h-96 overflow-y-auto inventory-scrollbar pr-2 space-y-4">`;
+
+    elementOrder.forEach(element => {
+        if (spellsByElement[element]) {
+            html += `<div class="space-y-3">
+                        <h3 class="font-medieval text-xl text-yellow-300 border-b-2 border-yellow-300/30 pb-1">${capitalize(element)} Spells</h3>`;
+
+            spellsByElement[element].forEach(spellKey => {
+                const spellTree = SPELLS[spellKey];
+                const allySpell = ally.spells[spellKey];
+                const currentTier = allySpell ? allySpell.tier : 0;
+                const spellDetails = spellTree.tiers[currentTier - 1] || spellTree.tiers[0];
+
+                html += `<div class="p-3 bg-slate-800 rounded-lg text-left">`;
+
+                if (currentTier === 0) {
+                    const cost = spellTree.learnCost;
+                    const canAfford = player.gold >= cost;
+                    html += `<div class="flex justify-between items-center">
+                                <h3 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellTree.tiers[0].name} (Tier 1)</h3>
+                                <button onclick="learnNpcSpell('${spellKey}')" class="btn btn-primary" ${!canAfford ? 'disabled' : ''}>Learn (${cost} G)</button>
+                            </div>
+                            <p class="text-sm text-gray-400">${spellDetails.description}</p>`;
+                } else if (currentTier < spellTree.tiers.length) {
+                    const upgradeData = spellTree.tiers[currentTier - 1]; // Cost is on the *current* tier
+                    const cost = upgradeData.upgradeCost;
+                    const canAfford = player.gold >= cost;
+                    const nextTierData = spellTree.tiers[currentTier];
+
+                    html += `<div class="flex justify-between items-center">
+                                <h3 class="font-bold text-lg text-green-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name} (Tier ${currentTier})</h3>
+                                <button onclick="learnNpcSpell('${spellKey}')" class="btn btn-primary" ${!canAfford ? 'disabled' : ''}>Upgrade to T${currentTier + 1} (${cost} G)</button>
+                            </div>
+                             <p class="text-sm text-gray-400">Next: ${nextTierData.name}</p>`;
+                } else {
+                     html += `<div class="flex justify-between items-center">
+                                <h3 class="font-bold text-lg text-cyan-300" onmouseover="showTooltip('${spellKey}', event)" onmouseout="hideTooltip()">${spellDetails.name} (Max Tier)</h3>
+                                <span class="text-gray-500">Mastered</span>
+                              </div>`;
+                }
+                html += `</div>`;
+            });
+            html += `</div>`;
+        }
+    });
+
+    html += `</div>
+        <div class="text-center mt-6">
+            <button onclick="renderBarracks()" class="btn btn-primary">Back to Barracks</button>
+        </div>
+    </div>`;
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+// --- NEW FUNCTION: learnNpcSpell ---
+function learnNpcSpell(spellKey) {
+    if (!player.npcAlly) return;
+    
+    const ally = player.npcAlly;
+    const spellTree = SPELLS[spellKey];
+    const allySpell = ally.spells[spellKey];
+    const currentTier = allySpell ? allySpell.tier : 0;
+    
+    let cost = 0;
+    
+    if (currentTier === 0) {
+        cost = spellTree.learnCost;
+    } else if (currentTier < spellTree.tiers.length) {
+        cost = spellTree.tiers[currentTier - 1].upgradeCost;
+    } else {
+        addToLog("Ally has already mastered this spell.", "text-yellow-400");
+        return;
+    }
+    
+    if (player.gold < cost) {
+        addToLog(`You need ${cost} G to pay for this training.`, "text-red-400");
+        return;
+    }
+    
+    player.gold -= cost;
+    
+    if (currentTier === 0) {
+        ally.spells[spellKey] = { tier: 1 };
+        addToLog(`You paid ${cost} G. ${ally.name} learned ${spellTree.tiers[0].name}!`, "text-green-400");
+    } else {
+        ally.spells[spellKey].tier++;
+        const newTier = ally.spells[spellKey].tier;
+        addToLog(`You paid ${cost} G. ${ally.name} upgraded to ${spellTree.tiers[newTier - 1].name}!`, "text-green-400");
+    }
+    
+    updateStatsView(); // Update gold
+    renderNpcSpellTraining(); // Refresh the spell list
+}
+/**
+ * Pays the NPC ally's salary.
+ */
+function payNpcSalary(salary) {
+    if (!player || !player.npcAlly) return;
+
+    if (player.gold < salary) {
+        addToLog(`You don't have enough gold to pay ${player.npcAlly.name}!`, "text-red-400");
+        return; // Should be disabled, but double-check
+    }
+
+    player.gold -= salary;
+    player.encountersSinceLastPay = 0;
+    
+    addToLog(`You paid ${player.npcAlly.name} ${salary} G for their services.`, "text-green-400");
+    
+    updateStatsView();
+    renderBarracks(); // Refresh the barracks UI
+}
+
+/**
+ * Renders the main Barracks screen.
+ * Shows either the recruitment list or the ally management panel.
+ */
+function renderBarracks() {
+    updateRealTimePalette();
+    lastViewBeforeInventory = 'residential_district';
+    gameState.currentView = 'barracks';
+
+    let html = `<div class="w-full max-w-3xl mx-auto text-left">
+        <h2 class="font-medieval text-3xl mb-4 text-center">Barracks</h2>`;
+
+    if (player.npcAlly) {
+        // --- NPC ALLY: MANAGE ALLY & SALARY UI ---
+        const ally = player.npcAlly;
+        const salary = ally.level * 10;
+        const encountersLeft = Math.max(0, 5 - player.encountersSinceLastPay);
+
+        html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Ally Stats Panel -->
+                    <div class="bg-slate-800 p-4 rounded-lg">
+                        <h3 class="font-bold text-2xl text-yellow-300 mb-2">${ally.name}</h3>
+                        
+                        <!-- THIS IS THE FIX -->
+                        <!-- The old code only showed ally.class and ally.level -->
+                        <p class="text-lg text-gray-400 mb-4">${ally.raceKey ? capitalize(ally.raceKey) : 'Unknown Race'} ${ally.class} (Level ${ally.level})</p>
+                        <!-- END FIX -->
+                        
+                        <div class="space-y-1 text-sm mb-4">
+                            <p class="flex justify-between"><strong>HP:</strong> <span>${ally.hp} / ${ally.maxHp}</span></p>
+                            <p class="flex justify-between"><strong>MP:</strong> <span>${ally.mp} / ${ally.maxMp}</span></p>
+                        </div>
+                        
+                        <h4 class="font-semibold text-gray-200 mb-2">Attributes</h4>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                            <p><strong>Vigor:</strong> ${ally.vigor + ally.bonusVigor}</p>
+                            <p><strong>Focus:</strong> ${ally.focus + ally.bonusFocus}</p>
+                            <p><strong>Stamina:</strong> ${ally.stamina + ally.bonusStamina}</p>
+                            <p><strong>Strength:</strong> ${ally.strength + ally.bonusStrength}</p>
+                            <p><strong>Intelligence:</strong> ${ally.intelligence + ally.bonusIntelligence}</p>
+                            <p><strong>Luck:</strong> ${ally.luck + ally.bonusLuck}</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Management Panel -->
+                    <div class="bg-slate-800 p-4 rounded-lg flex flex-col justify-between">`;
+        
+        if (player.encountersSinceLastPay >= 5) {
+            // --- SALARY DUE ---
+            html += `<div>
+                        <h3 class="font-bold text-xl text-red-400 mb-2">Salary Due</h3>
+                        <p class="text-gray-300 mb-4">Your ally expects payment for their services. If you leave without paying, they will depart.</p>
+                        <p class="text-2xl font-bold text-yellow-300 mb-6">Cost: ${salary} G</p>
+                     </div>
+                     <div class="space-y-3">`;
+            
+            if (player.gold >= salary) {
+                html += `<button onclick="payNpcSalary(${salary})" class="btn btn-primary w-full">Pay Salary (${salary} G)</button>`;
+            } else {
+                html += `<p class="text-center text-red-500 font-bold">You cannot afford their salary!</p>`;
+                html += `<button onclick="dismissNpc(true)" class="btn btn-action w-full">Dismiss Ally</button>`;
+            }
+            html += `</div>`;
+
+        } else {
+            // --- STANDARD MANAGEMENT ---
+            html += `<div>
+                        <h3 class="font-bold text-xl text-yellow-300 mb-2">Manage Ally</h3>
+                        <p class="text-gray-300 mb-4">Encounters until next payment: <span class="font-bold text-lg">${encountersLeft}</span></p>
+                        <p class="text-gray-400 text-sm">Remember: Your ally does not heal automatically. Use items on them in battle or manage their inventory here.</p>
+                     </div>
+                     <div class="space-y-3 mt-4">
+                        <button onclick="renderNpcInventory()" class="btn btn-primary w-full">Manage Equipment & Items</button>
+                        <!-- NEW SPELL BUTTON -->
+                        <button onclick="renderNpcSpellTraining()" class="btn btn-primary w-full">Manage Spells</button>
+                        <button onclick="dismissNpc(false)" class="btn btn-action w-full">Dismiss Ally</button>
+                     </div>`;
+        }
+        
+        html += `   </div>
+                </div>`;
+
+    } else {
+        // --- NPC ALLY: RECRUIT UI (NOW USES ROSTER) ---
+        html += `<p class="text-center text-gray-400 mb-6">The Barracks master presents the day's available roster. You may hire one companion at a time. A new roster will be available tomorrow.</p>
+                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 h-80 overflow-y-auto inventory-scrollbar pr-2">`;
+        
+        if (player.barracksRoster.length === 0) {
+             // This happens on first load before resting
+             generateBarracksRoster();
+        }
+
+        player.barracksRoster.forEach((recruit, index) => {
+            const classData = CLASSES[recruit.classKey];
+            const raceData = RACES[recruit.raceKey];
+            const cost = 100 + (player.level * 25);
+            
+            // --- FIX for undefined raceData ---
+            const raceName = recruit.raceKey ? capitalize(recruit.raceKey) : "Unknown Race"; // The key *is* the name
+            const className = classData ? classData.name : "Unknown Class";
+            // const classRole = ... // REMOVED THIS LINE, 'role' does not exist in NPC_STAT_ALLOCATIONS
+            // --- END FIX ---
+            
+            html += `<div class="p-4 bg-slate-800 rounded-lg flex flex-col justify-between">
+                        <div>
+                            <h4 class="font-bold text-lg text-yellow-300">${recruit.name}</h4>
+                            <p class="text-sm text-gray-400 mb-2">${raceName} ${className}</p>
+                            <p class="text-xs text-gray-400 italic">"${classData ? classData.description : 'No description.'}"</p>
+                        </div>
+                        <button onclick="hireNpc(${index})" class="btn btn-primary w-full mt-4" ${player.gold < cost ? 'disabled' : ''}>
+                            Hire (${cost} G)
+                        </button>
+                     </div>`;
+        });
+        
+        html += `</div>`; // Close grid
+    }
+
+    html += `<div class="text-center mt-8">
+                <button onclick="renderResidentialDistrict()" class="btn btn-primary">Back to Residential Area</button>
+            </div>
+        </div>`; // Close wrapper
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+// --- New Function: payNpcSalary ---
+function payNpcSalary(salary) {
+    if (!player || !player.npcAlly) return;
+
+    if (player.gold < salary) {
+        addToLog(`You don't have enough gold to pay ${player.npcAlly.name}!`, "text-red-400");
+        return; // Should be disabled, but double-check
+    }
+
+    player.gold -= salary;
+    player.encountersSinceLastPay = 0;
+    
+    addToLog(`You paid ${player.npcAlly.name} ${salary} G for their services.`, "text-green-400");
+    
+    updateStatsView();
+    renderBarracks(); // Refresh the barracks UI
+}
+/**
+ * Shows the details of a recruit on hover.
+ */
+function showRecruitDetails(classKey) {
+    const detailsView = $('#recruit-details-view');
+    const classData = CLASSES[classKey];
+    const alloc = NPC_STAT_ALLOCATIONS[classKey];
+    if (!detailsView || !classData || !alloc) {
+        if (detailsView) detailsView.innerHTML = '<p class="text-red-400">Error loading recruit data.</p>';
+        return;
+    }
+
+    let statsHtml = '<h5 class="font-bold mt-3 mb-1 text-cyan-300">Stat Allocation</h5><div class="grid grid-cols-2 gap-x-4">';
+    statsHtml += Object.entries(alloc).map(([stat, perc]) => {
+        return `<span>${capitalize(stat)}</span><span class="font-semibold text-right">${perc * 100}%</span>`;
+    }).join('');
+    statsHtml += '</div>';
+
+    let gearHtml = '<h5 class="font-bold mt-3 mb-1 text-yellow-300">Starting Gear</h5>';
+    const gear = Object.values(classData.startingEquipment)
+                      .map(key => getItemDetails(key)?.name)
+                      .filter(Boolean).join(', ') || 'None';
+    gearHtml += `<p class="text-xs text-gray-400">${gear}</p>`;
+
+    detailsView.innerHTML = `
+        <h4 class="font-bold text-xl text-yellow-300 mb-2">${classData.name}</h4>
+        <p class="text-sm text-gray-400 mb-4">${classData.description}</p>
+        <div class="text-sm space-y-1">${statsHtml}</div>
+        <div class="text-sm space-y-1 mt-2">${gearHtml}</div>
+    `;
+    
+    // Also hide the main tooltip if it's open
+    hideTooltip();
+}
+
+/**
+ * Renders the NPC Ally's inventory management screen.
+ * This is a placeholder and will be fully implemented in a later phase.
+ */
+let npcInventoryActiveTab = 'equipment'; // State for NPC inventory tabs
+
+function renderNpcInventory() {
+    if (!player.npcAlly) {
+        renderBarracks(); // Should not happen, but safety check
+        return;
+    }
+    
+    gameState.currentView = 'npc_inventory';
+    lastViewBeforeInventory = 'barracks'; // Go back to barracks
+    
+    const ally = player.npcAlly;
+    const playerItems = player.inventory;
+    
+    let html = `<div class="w-full max-w-5xl mx-auto flex flex-col h-full">
+        <h2 class="font-medieval text-3xl mb-2 text-center">Manage ${ally.name}'s Inventory</h2>
+        <p class="text-center text-sm text-gray-400 mb-4">Left-click an item in your inventory to give it to your ally. Left-click an item in their inventory to take it back.</p>
+        
+        <div class="flex-grow grid grid-cols-2 gap-4 overflow-hidden">
+            <!-- Left Panel: Player Inventory -->
+            <div class="flex flex-col bg-slate-800 rounded-lg overflow-hidden p-4">
+                <h3 class="font-bold text-xl text-yellow-300 mb-3 text-center">Your Inventory (Unequipped)</h3>
+                <div id="npc-inv-player-list" class="overflow-y-auto inventory-scrollbar pr-2 space-y-3">
+                    ${generateNpcInventoryPlayerList()}
+                </div>
+            </div>
+
+            
+            <!-- Right Panel: Ally Inventory -->
+            <div class="flex flex-col bg-slate-800 rounded-lg overflow-hidden p-4">
+                <h3 class="font-bold text-xl text-yellow-300 mb-3 text-center">${ally.name}'s Gear & Pocket</h3>
+                
+                <!-- Ally Tabs -->
+                <div class="flex-shrink-0 flex gap-1 mb-3">
+                    <button onclick="setNpcInvTab('equipment')" class="btn ${npcInventoryActiveTab === 'equipment' ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-sm py-1 px-3 flex-1">Equipment</button>
+                    <button onclick="setNpcInvTab('pocket')" class="btn ${npcInventoryActiveTab === 'pocket' ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-sm py-1 px-3 flex-1">Pocket (Items)</button>
+                </div>
+                
+                <!-- Ally Content -->
+                <div id="npc-inv-ally-list" class="flex-grow overflow-y-auto inventory-scrollbar pr-2">
+                    ${npcInventoryActiveTab === 'equipment' ? generateNpcInventoryAllyEquipment(ally) : generateNpcInventoryAllyPocket(ally)}
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-4 flex-shrink-0">
+            <button onclick="renderBarracks()" class="btn btn-primary">Back to Barracks</button>
+        </div>
+    </div>`;
+    
+    const container = document.createElement('div');
+    container.className = 'w-full h-full';
+    container.innerHTML = html;
+
+    render(container);
+    
+    // Custom adjustments for this full-screen-like view
+    mainView.classList.remove('items-center', 'p-6');
+    mainView.classList.add('p-2');
+}
+
+function setNpcInvTab(tabName) {
+    npcInventoryActiveTab = tabName;
+    renderNpcInventory();
+}
+
+// --- NEW HELPER: Generates the Player's item list for the ally screen ---
+function generateNpcInventoryPlayerList() {
+    let html = "";
+    const categories = {
+        'Weapons': 'weapons', 
+        'Catalysts': 'catalysts', 
+        'Armor': 'armor', 
+        'Shields': 'shields', 
+        'Consumables': 'items'
+    };
+    
+    let hasItems = false;
+
+    for (const catName in categories) {
+        const catKey = categories[catName];
+        let itemsHtml = "";
+        
+        if (catKey === 'items') {
+            // Consumables (only show usable types)
+            const consumableTypes = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'debuff_apply', 'debuff_special', 'enchant', 'experimental'];
+            const items = Object.keys(player.inventory.items)
+                .filter(key => {
+                    const d = getItemDetails(key);
+                    return d && consumableTypes.includes(d.type);
+                })
+                .sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name));
+            
+            items.forEach(key => {
+                const details = getItemDetails(key);
+                const count = player.inventory.items[key] || 0;
+                if (count > 0) {
+                    itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-900/50 rounded text-sm" 
+                                       onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"
+                                       onclick="moveItemToNpc('${catKey}', '${key}')">
+                                      <span>${details.name} (x${count})</span>
+                                      <span class="text-lg font-bold text-green-400">→</span>
+                                  </div>`;
+                }
+            });
+        } else {
+            // Equipment
+            if (!player.inventory[catKey]) continue;
+            const itemCounts = {};
+            player.inventory[catKey].forEach(key => itemCounts[key] = (itemCounts[key] || 0) + 1);
+            
+            const sortedKeys = Object.keys(itemCounts).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name));
+
+            sortedKeys.forEach(key => {
+                const details = getItemDetails(key);
+                if (!details || details.rarity === 'Broken') return;
+                
+                // Check if *any* instance is equipped by the PLAYER
+                const isEquippedByPlayer = (catKey === 'weapons' && player.equippedWeapon.name === details.name) ||
+                                           (catKey === 'catalysts' && player.equippedCatalyst.name === details.name) ||
+                                           (catKey === 'armor' && player.equippedArmor.name === details.name) ||
+                                           (catKey === 'shields' && player.equippedShield.name === details.name);
+                
+                const count = itemCounts[key];
+                // Can only move if not equipped, OR if count > 1 (meaning an unequipped one exists)
+                if (!isEquippedByPlayer || count > 1) {
+                    itemsHtml += `<div class="flex justify-between items-center p-2 bg-slate-900/50 rounded text-sm" 
+                                       onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"
+                                       onclick="moveItemToNpc('${catKey}', '${key}')">
+                                      <span>${details.name} (x${count})</span>
+                                      <span class="text-lg font-bold text-green-400">→</span>
+                                  </div>`;
+                }
+            });
+        }
+        
+        if (itemsHtml) {
+            hasItems = true;
+            html += `<h4 class="font-bold text-yellow-300 mt-2 mb-1 text-sm uppercase tracking-wider">${catName}</h4>
+                     <div class="space-y-1">${itemsHtml}</div>`;
+        }
+    }
+    
+    if (!hasItems) {
+        html = `<p class="text-sm text-gray-500 text-center mt-4">You have no unequipped items to give.</p>`;
+    }
+    return html;
+}
+
+// --- NEW HELPER: Generates the Ally's Equipment slots ---
+function generateNpcInventoryAllyEquipment(ally) {
+    let html = `<div class="space-y-3">`;
+    
+    const slots = [
+        { type: 'armor', item: ally.equippedArmor, default: ARMOR['travelers_garb'], dataObject: ARMOR },
+        { type: 'weapon', item: ally.equippedWeapon, default: WEAPONS['fists'], dataObject: WEAPONS },
+        { type: 'catalyst', item: ally.equippedCatalyst, default: CATALYSTS['no_catalyst'], dataObject: CATALYSTS },
+        { type: 'shield', item: ally.equippedShield, default: SHIELDS['no_shield'], dataObject: SHIELDS }
+    ];
+
+    slots.forEach(slot => {
+        // --- THIS IS THE FIX ---
+        // I am now correctly finding the item key by searching the correct dataObject (e.g., WEAPONS)
+        // for the item instance (slot.item).
+        const itemKey = findKeyByInstance(slot.dataObject, slot.item);
+        // --- END FIX ---
+
+        const isDefault = slot.item.name === slot.default.name;
+        // Pass the *correct* itemKey (e.g., 'battleaxe') instead of 'null'
+        const action = isDefault ? '' : `onclick="moveItemFromNpc('${slot.type}', '${itemKey}')"`;
+        const cursor = isDefault ? 'cursor-default' : 'cursor-pointer';
+        
+        html += `<div class="p-3 bg-slate-900/50 rounded-lg">
+                    <p class="text-xs text-gray-400 uppercase">${capitalize(slot.type)}</p>
+                    <div class="flex justify-between items-center mt-1 ${cursor}" 
+                         ${action} 
+                         onmouseover="showTooltip('${itemKey}', event)" 
+                         onmouseout="hideTooltip()">
+                        <span class="font-semibold ${isDefault ? 'text-gray-500' : 'text-white'}">${slot.item.name}</span>
+                        ${!isDefault ? '<span class="text-lg font-bold text-red-400">←</span>' : ''}
+                    </div>
+                 </div>`;
+    });
+    
+    html += `</div>`;
+    return html;
+}
+
+
+
+// --- NEW HELPER: Generates the Ally's 10-slot Pocket ---
+function generateNpcInventoryAllyPocket(ally) {
+    let html = `<div class="space-y-2">`;
+    const pocket = ally.inventory.items || {};
+    const pocketSize = ally.inventory.size || 10;
+    const stackSize = ally.inventory.stack || 10;
+    
+    const itemKeys = Object.keys(pocket);
+    let hasItems = false;
+    
+    itemKeys.forEach(key => {
+        const count = pocket[key];
+        if (count > 0) {
+            hasItems = true;
+            const details = getItemDetails(key);
+            html += `<div class="flex justify-between items-center p-2 bg-slate-900/50 rounded text-sm" 
+                           onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"
+                           onclick="moveItemFromNpc('items', '${key}')">
+                          <span>${details.name} (x${count})</span>
+                          <span class="text-lg font-bold text-red-400">←</span>
+                      </div>`;
+        }
+    });
+    
+    if (!hasItems) {
+        html = `<p class="text-sm text-gray-500 text-center mt-4">Ally's pocket is empty.</p>`;
+    }
+    
+    html += `<p class="text-xs text-gray-500 text-center mt-4">Slots used: ${itemKeys.length} / ${pocketSize}</p>`;
+    
+    return html;
+}
+
+// --- NEW HELPER: Logic to move item from Player to Ally ---
+function moveItemToNpc(category, itemKey) {
+    if (!player.npcAlly) return;
+    const ally = player.npcAlly;
+    const details = getItemDetails(itemKey);
+    
+    const playerList = document.getElementById('npc-inv-player-list');
+    const allyList = document.getElementById('npc-inv-ally-list');
+    const playerScrollPos = playerList ? playerList.scrollTop : 0;
+    const allyScrollPos = allyList ? allyList.scrollTop : 0;
+
+    
+    if (category === 'items') {
+        // --- Handle Consumables ---
+        const allyPocket = ally.inventory.items;
+        const currentAllyCount = allyPocket[itemKey] || 0;
+        const maxStack = ally.inventory.stack || 10;
+        const maxSlots = ally.inventory.size || 10;
+
+        if (currentAllyCount >= maxStack) {
+            addToLog(`Ally's stack of ${details.name} is full.`, 'text-red-400');
+            return;
+        }
+        
+        if (!allyPocket[itemKey] && Object.keys(allyPocket).length >= maxSlots) {
+            addToLog(`Ally's pocket is full (10 unique items max).`, 'text-red-400');
+            return;
+        }
+
+        // Move one item
+        player.inventory.items[itemKey]--;
+        if (player.inventory.items[itemKey] <= 0) delete player.inventory.items[itemKey];
+        allyPocket[itemKey] = (allyPocket[itemKey] || 0) + 1;
+        
+    } else {
+        // --- Handle Equipment ---
+        const itemIndex = player.inventory[category].indexOf(itemKey);
+        if (itemIndex === -1) {
+             addToLog("Item not found in your inventory.", "text-red-400"); // Should not happen
+             return;
+        }
+        
+        // Remove from player first
+        player.inventory[category].splice(itemIndex, 1);
+        
+        // Equip to ally (this handles the 2-of-3 rule)
+        const unequippedItemKey = ally.equipItem(itemKey);
+        
+        // Add the returned item (if any) back to player inventory
+        if (unequippedItemKey) {
+            player.addToInventory(unequippedItemKey, 1, false); // Add silently
+        }
+    }
+    
+    // Refresh the UI
+    renderNpcInventory();
+
+    const newPlayerList = document.getElementById('npc-inv-player-list');
+    const newAllyList = document.getElementById('npc-inv-ally-list');
+    if (newPlayerList) newPlayerList.scrollTop = playerScrollPos;
+    if (newAllyList) newAllyList.scrollTop = allyScrollPos;
+
+}
+
+// --- NEW HELPER: Logic to move item from Ally to Player ---
+function moveItemFromNpc(category, itemKey) {
+    if (!player.npcAlly) return;
+    const ally = player.npcAlly;
+
+    const playerList = document.getElementById('npc-inv-player-list');
+    const allyList = document.getElementById('npc-inv-ally-list');
+    const playerScrollPos = playerList ? playerList.scrollTop : 0;
+    const allyScrollPos = allyList ? allyList.scrollTop : 0;
+    
+    if (category === 'items') {
+        // --- Handle Consumables ---
+        const allyPocket = ally.inventory.items;
+        if (!allyPocket[itemKey] || allyPocket[itemKey] <= 0) {
+            addToLog("Item not found in ally's pocket.", "text-red-400"); // Should not happen
+            return;
+        }
+        
+        // Move one item
+        allyPocket[itemKey]--;
+        if (allyPocket[itemKey] <= 0) delete allyPocket[itemKey];
+        player.addToInventory(itemKey, 1, false); // Add silently
+        
+    } else {
+        // --- Handle Equipment ---
+        // Unequip from ally (this returns the key and sets slot to default)
+        const unequippedItemKey = ally.unequipItem(category);
+        
+        if (unequippedItemKey !== itemKey) {
+             // This should *never* happen if the UI is correct
+             console.error(`Item mismatch! Tried to remove ${itemKey}, but unequipped ${unequippedItemKey}`);
+             // Still, add the item we *actually* unequipped
+             if (unequippedItemKey) player.addToInventory(unequippedItemKey, 1, false);
+        } else if (unequippedItemKey) {
+            // Success, add the item back to player
+            player.addToInventory(unequippedItemKey, 1, false);
+        }
+    }
+    
+    // Refresh the UI
+    renderNpcInventory();
+
+    const newPlayerList = document.getElementById('npc-inv-player-list');
+    const newAllyList = document.getElementById('npc-inv-ally-list');
+    if (newPlayerList) newPlayerList.scrollTop = playerScrollPos;
+    if (newAllyList) newAllyList.scrollTop = allyScrollPos;
+}
+
 
 function renderLibrary() {
     updateRealTimePalette();
@@ -1401,25 +2195,40 @@ function renderCommercialDistrict() {
     lastViewBeforeInventory = 'commercial_district';
     gameState.currentView = 'commercial_district';
 
+    // --- Added Unlock Checks & Messages ---
+    let blacksmithJustUnlocked = false;
+    if (player.unlocks.hasBlacksmithKey && !player.unlocks.blacksmith) {
+        player.unlocks.blacksmith = true;
+        blacksmithJustUnlocked = true;
+        saveGame(); // Save unlock immediately
+    }
+    // --- End Added ---
+
+
     const container = document.createElement('div');
     container.className = 'flex flex-col items-center justify-center w-full h-full';
 
     const locations = [
-        { name: 'General Store', action: "renderShop('store')" },
-        { name: 'Blacksmith', action: "renderBlacksmithMenu()" },
-        { name: 'Black Market', action: "renderShop('black_market')" }
+        { name: 'General Store', action: "renderShop('store')", unlocked: true }, // Always unlocked
+        { name: 'Blacksmith', action: "renderBlacksmithMenu()", unlocked: player.unlocks.blacksmith },
+        { name: 'Black Market', action: "renderShop('black_market')", unlocked: player.level >= 5 && player.unlocks.blackMarket } // Check level AND flag
     ];
 
     if (player.house.owned) {
-        locations.push({ name: "Foundation & Fortune", action: "renderHomeImprovements()" });
+        locations.push({ name: "Foundation & Fortune", action: "renderHomeImprovements()", unlocked: true });
     }
 
     let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Commercial District</h2>
                 <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
 
+    // --- Modified Button Rendering ---
     locations.forEach(loc => {
-        html += `<button onclick="${loc.action}" class="btn btn-primary">${loc.name}</button>`;
+        if (loc.unlocked) { // Only show button if unlocked
+            html += `<button onclick="${loc.action}" class="btn btn-primary">${loc.name}</button>`;
+        }
+        // No 'else' block needed, button is simply not added if locked
     });
+    // --- End Modification ---
 
     html += `</div>
              <div class="mt-8">
@@ -1428,6 +2237,13 @@ function renderCommercialDistrict() {
 
     container.innerHTML = html;
     render(container);
+
+    // --- Added Unlock Message Display ---
+    if (blacksmithJustUnlocked) {
+        setTimeout(() => addToLog("The blacksmith's chimney is smoking. He must have started working again!", 'text-yellow-300'), 100);
+    }
+    // --- End Added ---
+
 }
 
 function renderHomeImprovements(activeCategoryKey = 'storage') {
@@ -1527,23 +2343,39 @@ function renderArcaneQuarter() {
     lastViewBeforeInventory = 'arcane_quarter';
     gameState.currentView = 'arcane_quarter';
 
+    // --- Added Unlock Checks & Messages ---
+    let sageTowerJustUnlocked = false;
+    // Message trigger flags reset on load/new game
+    if (gameState.enchanterUnlockMsgShown === undefined) gameState.enchanterUnlockMsgShown = false;
+    if (gameState.witchUnlockMsgShown === undefined) gameState.witchUnlockMsgShown = false;
+
+
+    if (player.unlocks.hasTowerKey && !player.unlocks.sageTower) {
+        player.unlocks.sageTower = true;
+        sageTowerJustUnlocked = true;
+        saveGame(); // Save unlock immediately
+    }
+
     const container = document.createElement('div');
     container.className = 'flex flex-col items-center justify-center w-full h-full';
 
     const locations = [
-        { name: "Sage's Tower", action: "renderSageTowerMenu()" },
-        // --- MODIFIED: Single Enchanter Button points to the menu ---
-        { name: 'Enchanter', action: "renderEnchanterMenu()" },
-        // --- END MODIFICATION ---
-        { name: "Witch's Coven", action: "renderWitchsCoven()" }
+        { name: "Sage's Tower", action: "renderSageTowerMenu()", unlocked: player.unlocks.sageTower },
+        { name: 'Enchanter', action: "renderEnchanterMenu()", unlocked: player.unlocks.enchanter },
+        { name: "Witch's Coven", action: "renderWitchsCoven()", unlocked: player.unlocks.witchCoven }
     ];
 
     let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Arcane Quarter</h2>
                 <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
 
+    // --- Modified Button Rendering ---
     locations.forEach(loc => {
-        html += `<button onclick="${loc.action}" class="btn btn-magic">${loc.name}</button>`;
+        if (loc.unlocked) { // Only show button if unlocked
+            html += `<button onclick="${loc.action}" class="btn btn-magic">${loc.name}</button>`;
+        }
+        // No 'else' block needed
     });
+    // --- End Modification ---
 
     html += `</div>
              <div class="mt-8">
@@ -1552,8 +2384,14 @@ function renderArcaneQuarter() {
 
     container.innerHTML = html;
     render(container);
+
+     // --- Added Unlock Message Display ---
+    if (sageTowerJustUnlocked) {
+        setTimeout(() => addToLog("The tower's magical energy is starting to fluctuate. The sage must have started experimenting again!", 'text-yellow-300'), 100);
+    }
+    // Enchanter/Witch messages are displayed when the item is picked up via addToInventory
+    // --- End Added ---
 }
-// --- END RESTORED FUNCTION ---
 
 // --- NEW FUNCTION: Renders the MAIN Enchanter menu ---
 function renderEnchanterShop() {
@@ -2996,6 +3834,21 @@ function renderPostBattleMenu() {
     $('#character-sheet-btn').disabled = false;
     player.clearEncounterBuffs();
     gameState.activeDrone = null; // Clear drone
+    
+    // --- NPC ALLY: Handle post-battle ---
+    if (player.npcAlly) {
+        player.npcAlly.clearBattleBuffs(); // Clear ally buffs
+        if (player.npcAlly.isFled) {
+            addToLog(`<span class="font-bold text-red-700">${player.npcAlly.name} has fled and is gone for good, taking all their equipment...</span>`, "text-red-700");
+            player.npcAlly = null; // Ally is permanently gone
+            player.encountersSinceLastPay = 0; // Reset counter
+        } else if (preTrainingState === null) { // Don't increment salary for training
+            player.encountersSinceLastPay++;
+            addToLog(`${player.npcAlly.name} looks weary, but stands ready. (HP: ${player.npcAlly.hp}/${player.npcAlly.maxHp})`, "text-blue-200");
+            // HP/MP are *not* restored
+        }
+    }
+    // --- END NPC ALLY ---
 
     // If it was a training battle, restore state and go back to training grounds
     if (preTrainingState !== null) {

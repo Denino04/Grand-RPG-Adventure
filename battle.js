@@ -29,6 +29,18 @@ function startBattle(biomeKey, trainingConfig = null) {
     gameState.activeDrone = null;
     // Reset mark state at start of battle
     gameState.markedTarget = null;
+    // --- NPC ALLY: Clear Fled Status ---
+    if (player.npcAlly) {
+        player.npcAlly.isFled = false;
+        player.npcAlly.clearBattleBuffs(); // Also clear their buffs
+        // Ensure HP/MP are clamped (they don't auto-heal)
+        player.npcAlly.hp = Math.min(player.npcAlly.maxHp, player.npcAlly.hp);
+        player.npcAlly.mp = Math.min(player.npcAlly.maxMp, player.npcAlly.mp);
+        // Reset position, will be set during spawn
+        player.npcAlly.x = -1;
+        player.npcAlly.y = -1;
+    }
+    // --- END NPC ALLY ---
 
 
     // Reset signature ability states for the new battle
@@ -65,11 +77,26 @@ function startBattle(biomeKey, trainingConfig = null) {
         let playerCell = validCells.splice(playerCellIndex, 1)[0];
         player.x = playerCell.x;
         player.y = playerCell.y;
+        occupiedCells.add(`${player.x},${player.y}`); // Add player pos to occupied
+
+        // --- NPC ALLY: Spawn Ally in Tutorial ---
+        if (player.npcAlly && player.npcAlly.hp > 0) {
+            let allyCell = validCells.find(c => c.x === player.x + 1 && c.y === player.y) || validCells.find(c => c.x === player.x - 1 && c.y === player.y) || validCells.find(c => c.x === player.x && c.y === player.y + 1);
+            if (allyCell && validCells.includes(allyCell)) {
+                player.npcAlly.x = allyCell.x;
+                player.npcAlly.y = allyCell.y;
+                occupiedCells.add(`${allyCell.x},${allyCell.y}`);
+                validCells.splice(validCells.indexOf(allyCell), 1); // Remove from valid
+            }
+            // If no adjacent cell, ally won't spawn in tutorial
+        }
+        // --- END NPC ALLY ---
 
         let enemyCellIndex = Math.floor(Math.random() * validCells.length);
         let enemyCell = validCells.splice(enemyCellIndex, 1)[0];
         enemy.x = enemyCell.x;
         enemy.y = enemyCell.y;
+        occupiedCells.add(`${enemy.x},${enemy.y}`); // Add enemy pos
 
         currentEnemies.push(enemy);
 
@@ -86,6 +113,22 @@ function startBattle(biomeKey, trainingConfig = null) {
         player.y = gridSize - 1;
 
         const occupiedCells = new Set([`${player.x},${player.y}`]);
+        
+        // --- NPC ALLY: Spawn Ally in Training ---
+        if (player.npcAlly && player.npcAlly.hp > 0) {
+            // Try to spawn to the right, fallback to left
+            let allyX = player.x + 1;
+            let allyY = player.y;
+            if (allyX >= gridSize || isCellBlocked(allyX, allyY, false, false)) { // Check if blocked or OOB
+                allyX = player.x - 1;
+            }
+            if (allyX >= 0 && !isCellBlocked(allyX, allyY, false, false)) { // Check left side
+                player.npcAlly.x = allyX;
+                player.npcAlly.y = allyY;
+                occupiedCells.add(`${allyX},${allyY}`);
+            } // If both blocked, ally doesn't spawn
+        }
+        // --- END NPC ALLY ---
 
         trainingConfig.enemies.forEach((enemyConfig, index) => {
             const species = MONSTER_SPECIES[enemyConfig.key];
@@ -149,6 +192,31 @@ function startBattle(biomeKey, trainingConfig = null) {
                 return;
             }
         }
+
+        // --- NPC ALLY: Spawn Ally in Standard Battle ---
+        if (player.npcAlly && player.npcAlly.hp > 0) {
+            // Find adjacent, valid, unoccupied cell
+            const potentialSpawns = [
+                {x: player.x + 1, y: player.y}, {x: player.x - 1, y: player.y},
+                {x: player.x, y: player.y + 1}, {x: player.x, y: player.y - 1}
+            ].filter(c => 
+                c.x >= 0 && c.x < gameState.gridWidth &&
+                c.y >= 0 && c.y < gameState.gridHeight &&
+                gameState.gridLayout[c.y * gameState.gridWidth + c.x] === 1 &&
+                !occupiedCells.has(`${c.x},${c.y}`)
+            );
+
+            if (potentialSpawns.length > 0) {
+                const allyCell = potentialSpawns[Math.floor(Math.random() * potentialSpawns.length)]; // Pick a random adjacent spot
+                player.npcAlly.x = allyCell.x;
+                player.npcAlly.y = allyCell.y;
+                occupiedCells.add(`${allyCell.x},${allyCell.y}`);
+            } else {
+                addToLog("There was no room for your ally to join the fight!", "text-yellow-400");
+                // Ally just doesn't spawn this fight
+            }
+        }
+        // --- END NPC ALLY ---
 
         const enemySpawnArea = validCells.filter(c => c.y < Math.floor(gameState.gridHeight / 2));
         let numEnemies = 1;
@@ -254,11 +322,18 @@ function startBattle(biomeKey, trainingConfig = null) {
     lastViewBeforeInventory = 'battle'; // Set return view from inventory opened in battle
     gameState.currentView = 'battle';
     const enemyNames = currentEnemies.map(e => `<span class="font-bold text-red-400">${e.name}</span>`).join(', ');
+    
+    // --- NPC ALLY: Add ally to encounter log ---
+    let allyMessage = "";
+    if (player.npcAlly && player.npcAlly.hp > 0 && player.npcAlly.x !== -1) { // Check they spawned
+        allyMessage = ` with your ally, <span class="font-bold text-blue-400">${player.npcAlly.name}</span>,`;
+    }
+    // --- END NPC ALLY ---
 
     if (trainingConfig) {
         addToLog(`You begin a training session against: ${enemyNames}!`, 'text-yellow-300');
     } else {
-        addToLog(`You encounter: ${enemyNames} in the ${BIOMES[biomeKey].name}!`);
+        addToLog(`You encounter: ${enemyNames}${allyMessage} in the ${BIOMES[biomeKey].name}!`);
     }
     renderBattleGrid();
 
@@ -266,7 +341,6 @@ function startBattle(biomeKey, trainingConfig = null) {
         advanceTutorial();
     }
 }
-
 /**
  * Handles returning to the battle screen after closing the inventory mid-battle.
  * Does NOT advance the turn.
@@ -319,6 +393,10 @@ function renderBattleGrid(highlightTargets = false, highlightType = 'magic') { /
     // --- NEW: Item details for highlighting ---
     const itemData = gameState.itemToUse ? ITEMS[gameState.itemToUse] : null;
     let itemRange = itemData?.range || 0; // Default to 0 range if not specified
+    // --- NPC ALLY: Get ally details ---
+    const ally = player.npcAlly;
+    const allyIsAlive = ally && ally.hp > 0 && !ally.isFled;
+    // --- END NPC ALLY ---
 
     for (let y = 0; y < gameState.gridHeight; y++) {
         for (let x = 0; x < gameState.gridWidth; x++) {
@@ -341,6 +419,25 @@ function renderBattleGrid(highlightTargets = false, highlightType = 'magic') { /
                     cell.textContent = '🤖'; // Drone emoji
                     // Add tooltip or click info for drone stats later if needed
                 }
+                
+                // --- NPC ALLY: Render Ally ---
+                if (allyIsAlive && ally.x === x && ally.y === y) {
+                    cell.classList.add('ally'); // Use new 'ally' CSS class
+                    cell.innerHTML = `
+                        <div class="ally-emoji">🛡️</div> <!-- Placeholder emoji -->
+                        <div class="ally-hp-bar-bg">
+                            <div class="ally-hp-bar" style="width: ${ (ally.hp / ally.maxHp) * 100}%"></div>
+                        </div>
+                    `;
+                    cell.addEventListener('mouseover', (event) => showAllyInfo(ally, event)); // New info function
+                    cell.addEventListener('mouseout', hideTooltip); // Use hideTooltip, not hideEnemyInfo
+                    cell.addEventListener('click', (event) => {
+                        if (gameState.action === null) {
+                            showAllyInfo(ally, event, true); // Force show on click
+                        }
+                    });
+                }
+                // --- END NPC ALLY ---
 
 
                 const enemy = currentEnemies.find(e => e.x === x && e.y === y);
@@ -386,6 +483,11 @@ function renderBattleGrid(highlightTargets = false, highlightType = 'magic') { /
                                  // Highlight splash targets if AOE (handled later after all cells exist)
                                  // We mark the primary targets now
                              }
+                             // --- NPC ALLY: Highlight Ally for Healing Spells ---
+                             if (allyIsAlive && ally.x === x && ally.y === y && spellData.element === 'healing') {
+                                 cell.classList.add('magic-targetable-ally'); // New class for healing
+                             }
+                             // --- END NPC ALLY ---
                          }
                      }
                      // Mark Targeting (Ranger)
@@ -395,12 +497,28 @@ function renderBattleGrid(highlightTargets = false, highlightType = 'magic') { /
                           }
                      }
                      // --- NEW: Item Targeting ---
-                     else if (gameState.action === 'item_target' && highlightType === 'item' && itemData && itemRange > 0) {
-                         const dx = Math.abs(player.x - x);
-                         const dy = Math.abs(player.y - y);
-                         if (dx + dy <= itemRange) {
-                             if (enemy && enemy.isAlive()) { // Only highlight living enemies
-                                 cell.classList.add('item-attackable'); // Use the new class
+                     else if (gameState.action === 'item_target' && highlightType === 'item' && itemData) {
+                         // --- NPC ALLY: Handle friendly items ---
+                         const itemType = itemData.type;
+                         if (itemType === 'healing' || itemType === 'mana_restore' || itemType === 'buff' || itemType === 'cleanse' || itemType === 'cleanse_specific') {
+                            if (allyIsAlive && ally.x === x && ally.y === y) {
+                                // For now, assume all friendly items are touch range
+                                const dx = Math.abs(player.x - x);
+                                const dy = Math.abs(player.y - y);
+                                if (dx + dy <= 1) { // Touch range
+                                     cell.classList.add('item-targetable-ally'); // New class for friendly items
+                                }
+                            }
+                         }
+                         // --- END NPC ALLY ---
+                         // --- Handle offensive items ---
+                         else if (itemRange > 0 && (itemType === 'debuff_apply' || itemType === 'debuff_special' || itemType === 'enchant')) {
+                             const dx = Math.abs(player.x - x);
+                             const dy = Math.abs(player.y - y);
+                             if (dx + dy <= itemRange) {
+                                 if (enemy && enemy.isAlive()) { // Only highlight living enemies
+                                     cell.classList.add('item-attackable'); // Use the new class
+                                 }
                              }
                          }
                      }
@@ -531,6 +649,8 @@ function handleCellClick(x, y) {
 
     const clickedEnemy = currentEnemies.find(e => e.x === x && e.y === y);
     const clickedObstacle = gameState.gridObjects.find(o => o.x === x && o.y === y && o.type === 'obstacle');
+        const clickedAlly = (player.npcAlly && player.npcAlly.hp > 0 && !player.npcAlly.isFled && player.npcAlly.x === x && player.npcAlly.y === y) ? player.npcAlly : null;
+
     const isFlying = (player.race === 'Pinionfolk');
 
     if (gameState.action === 'move') {
@@ -566,6 +686,18 @@ function handleCellClick(x, y) {
         if (clickedEnemy && clickedEnemy.isAlive()) { // Ensure target is alive
             const targetIndex = currentEnemies.indexOf(clickedEnemy);
             castSpell(gameState.spellToCast, targetIndex);
+                    // --- NPC ALLY: Handle healing ally ---
+        } else if (clickedAlly) {
+            const spellData = SPELLS[gameState.spellToCast];
+            if (spellData.element === 'healing') {
+                castSpell(gameState.spellToCast, -1); // Use -1 to indicate targeting ally
+            } else {
+                // Invalid: Trying to cast offensive spell on ally
+                isProcessingAction = false; // Unlock
+                addToLog("You can't cast that on your ally!", "text-red-400");
+                // Don't cancel, let them pick another target
+            }
+        // --- END NPC ALLY ---
         } else {
              // If we are flying, we can't click an empty ground/terrain cell to cancel
              if (isFlying && gameState.gridObjects.some(o => o.x === x && o.y === y && o.type === 'terrain')) {
@@ -584,15 +716,37 @@ function handleCellClick(x, y) {
     } else if (gameState.action === 'item_target') {
         isProcessingAction = true; // Lock actions
         // Clear highlights immediately after click attempt
-        cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable'));
+        cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable', 'magic-targetable-ally', 'item-targetable-ally'));
+        const itemKey = gameState.itemToUse; // Store key before clearing state
+        const itemDetails = ITEMS[itemKey];
+
         if (clickedEnemy && clickedEnemy.isAlive()) { // Ensure target is alive
-            const targetIndex = currentEnemies.indexOf(clickedEnemy);
-            const itemKey = gameState.itemToUse; // Store key before clearing state
-            gameState.action = null; // Clear action state
-            gameState.itemToUse = null; // Clear stored item key
-            // Call useItem with the stored item key and target index
-            useItem(itemKey, true, targetIndex);
-            // useItem should handle finalizing the action
+            // Check if item is offensive
+            if (['debuff_apply', 'debuff_special', 'enchant'].includes(itemDetails.type)) {
+                const targetIndex = currentEnemies.indexOf(clickedEnemy);
+                gameState.action = null; // Clear action state
+                gameState.itemToUse = null; // Clear stored item key
+                useItem(itemKey, true, targetIndex); // Call useItem with enemy target index
+            } else {
+                // Invalid: Trying to use friendly item on enemy
+                isProcessingAction = false; // Unlock
+                addToLog("You can't use that item on an enemy!", "text-red-400");
+                renderBattleGrid(true, 'item'); // Re-highlight targets
+            }
+        // --- NPC ALLY: Handle using item on ally ---
+        } else if (clickedAlly) {
+            // Check if item is friendly
+            if (['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific'].includes(itemDetails.type)) {
+                gameState.action = null; // Clear action state
+                gameState.itemToUse = null; // Clear stored item key
+                useItem(itemKey, true, -1); // Call useItem with -1 to target ally
+            } else {
+                // Invalid: Trying to use offensive item on ally
+                isProcessingAction = false; // Unlock
+                addToLog("You can't use that item on your ally!", "text-red-400");
+                renderBattleGrid(true, 'item'); // Re-highlight targets
+            }
+        // --- END NPC ALLY ---
         } else {
             // If we are flying, we can't click an empty ground/terrain cell to cancel
             if (isFlying && gameState.gridObjects.some(o => o.x === x && o.y === y && o.type === 'terrain')) {
@@ -611,6 +765,7 @@ function handleCellClick(x, y) {
             gameState.isPlayerTurn = true;
         }
     // --- END MODIFICATION ---
+
     } else if (gameState.action === 'mark_target') { // Ranger Mark Target
          // ... existing mark target code ...
          // This part remains unchanged.
@@ -630,7 +785,7 @@ function handleCellClick(x, y) {
          } else {
              // Cancel mark if clicking somewhere invalid
              gameState.action = null;
-             cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable')); // Clear highlights
+             cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable', 'magic-targetable-ally', 'item-targetable-ally')); // Clear highlights
              isProcessingAction = false; // Unlock
              // REFUND ability use since it failed
              player.signatureAbilityUsed = false;
@@ -649,24 +804,38 @@ function handleCellClick(x, y) {
 
 
 
-function isCellBlocked(x, y, forEnemy = false, canFly = false) {
+function isCellBlocked(x, y, forEnemy = false, canFly = false, isAllyMoving = false) {
     // Check if the cell is part of the layout
     if (x < 0 || x >= gameState.gridWidth || y < 0 || y >= gameState.gridHeight || !gameState.gridLayout || gameState.gridLayout[y * gameState.gridWidth + x] !== 1) {
         return true;
     }
+    
+    // --- OVERLAP FIX: Check for all living entities ---
+    const ally = player.npcAlly;
+    const allyIsAlive = ally && ally.hp > 0 && !ally.isFled;
 
     if (forEnemy) {
+        // An enemy is checking. It's blocked by the Player and a living Ally.
         if (player.x === x && player.y === y) return true;
-        // Check for drone
-        if (gameState.activeDrone && gameState.activeDrone.isAlive() && gameState.activeDrone.x === x && gameState.activeDrone.y === y) return true; // Added isAlive
-    } else { // Player movement OR Drone movement
-        const isOccupiedByEnemy = currentEnemies.some(e => e.isAlive() && e.x === x && e.y === y); // Only check living enemies
-        if (isOccupiedByEnemy) return true;
-        // Check for drone (if player is moving)
-        if (!forEnemy && gameState.activeDrone && gameState.activeDrone.isAlive() && gameState.activeDrone.x === x && gameState.activeDrone.y === y) return true; // Added isAlive
-        // Check for player (if drone is moving - this case might need refinement if drone moves independently)
-        if (forEnemy && player.x === x && player.y === y) return true; // Assuming drone is 'forEnemy=true' when checking its own movement - needs review
+        if (allyIsAlive && ally.x === x && ally.y === y) return true;
+        // Also blocked by drone
+        if (gameState.activeDrone && gameState.activeDrone.isAlive() && gameState.activeDrone.x === x && gameState.activeDrone.y === y) return true;
+    
+    } else if (isAllyMoving) {
+        // The ally is checking. It's blocked by the Player and living Enemies.
+        if (player.x === x && player.y === y) return true;
+        if (currentEnemies.some(e => e.isAlive() && e.x === x && e.y === y)) return true;
+        // Also blocked by drone
+        if (gameState.activeDrone && gameState.activeDrone.isAlive() && gameState.activeDrone.x === x && gameState.activeDrone.y === y) return true;
+
+    } else { 
+        // The player is checking. It's blocked by living Enemies and a living Ally.
+        if (currentEnemies.some(e => e.isAlive() && e.x === x && e.y === y)) return true;
+        if (allyIsAlive && ally.x === x && ally.y === y) return true;
+        // Also blocked by drone
+        if (gameState.activeDrone && gameState.activeDrone.isAlive() && gameState.activeDrone.x === x && gameState.activeDrone.y === y) return true;
     }
+    // --- END OVERLAP FIX ---
 
 
     const gridObject = gameState.gridObjects.find(o => o.x === x && o.y === y);
@@ -683,6 +852,7 @@ function isCellBlocked(x, y, forEnemy = false, canFly = false) {
 
     return false;
 }
+
 
 
 async function movePlayer(x, y) {
@@ -1368,7 +1538,20 @@ function performAttack(targetIndex) {
 
 async function castSpell(spellKey, targetIndex) { // Make async
     const spellData = SPELLS[spellKey];
-    const target = currentEnemies[targetIndex];
+    
+    // --- NPC ALLY: Determine Target ---
+    let target;
+    if (targetIndex === -1) { // -1 is the flag for targeting the ally
+        target = player.npcAlly;
+        if (!target || target.hp <= 0 || target.isFled) {
+             addToLog("Your ally is not a valid target.", 'text-red-400');
+             isProcessingAction = false; // Unlock
+             return;
+        }
+    } else {
+        target = currentEnemies[targetIndex];
+    }
+    // --- END NPC ALLY ---
     if ((spellData.type === 'st' || spellData.type === 'aoe') && (!target || !target.isAlive())) {
         isProcessingAction = false; // Unlock if target is invalid
         renderBattleGrid();
@@ -1403,7 +1586,7 @@ async function castSpell(spellKey, targetIndex) { // Make async
     }
     // --- END ADDED ---
 
-    if (spellData.type === 'st' || spellData.type === 'aoe') {
+    if (spellData.type === 'st' || spellData.type === 'aoe' || (spellData.type === 'healing' && targetIndex === -1)) {
         const dx = Math.abs(player.x - target.x);
         const dy = Math.abs(player.y - target.y);
 
@@ -1413,6 +1596,7 @@ async function castSpell(spellKey, targetIndex) { // Make async
             return;
         }
     }
+    // --- END NPC ALLY ---
 
     // Calculate Final MP Cost
     let finalSpellCost = spell.cost;
@@ -1465,67 +1649,75 @@ async function castSpell(spellKey, targetIndex) { // Make async
     // --- END ADDED ---
 
     // Handle Healing and Support spells
-    if (spellData.type === 'healing' || spellData.type === 'support') {
-        // ... [Existing healing/support logic - unchanged, including Fertilized Seed check] ...
-         if (spellData.type === 'healing') {
-            let diceCount = spell.damage[0];
-            const spellAmp = catalyst.effect?.spell_amp || 0;
-            diceCount = Math.min(spell.cap, diceCount + spellAmp);
+    // --- NPC ALLY: Modified Healing Logic ---
+    if (spellData.type === 'healing') {
+        let diceCount = spell.damage[0];
+        const spellAmp = catalyst.effect?.spell_amp || 0;
+        diceCount = Math.min(spell.cap, diceCount + spellAmp);
 
-            let healAmount = rollDice(diceCount, spell.damage[1], `Healing Spell: ${spell.name}`).total + player.magicalDamageBonus;
+        let healAmount = rollDice(diceCount, spell.damage[1], `Healing Spell: ${spell.name}`).total + player.magicalDamageBonus;
 
-            if (player.statusEffects.buff_fertilized && spellData.element === 'nature') {
-                const healMultiplier = player.statusEffects.buff_fertilized.healMultiplier;
-                healAmount = Math.floor(healAmount * healMultiplier);
-                addToLog("The Fertilized Seed enhances the healing!", "text-green-200");
-            }
-            // --- ELEMENTAL: Innate Elementalist (Damage/Healing) ---
-            if (player.race === 'Elementals' && spellData.element === player.elementalAffinity) {
-                const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
-                healAmount = Math.floor(healAmount * damageBonus);
-                if (player.level >= 20) {
-                    let extraDieRoll = rollDice(1, spell.damage[1], 'Elemental Evo Die').total;
-                    healAmount += Math.min(spell.cap * spell.damage[1], extraDieRoll); // Cap extra die damage
-                }
-            }
-            // --- End Elemental Logic ---
-
-            // --- DRAGONBORN: Bloodline Attunement (Damage/Healing) ---
-            if (player.race === 'Dragonborn') {
-                const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
-                healAmount = Math.floor(healAmount * damageBonus);
-            }
-            // --- End Dragonborn Logic ---
-
-            player.hp = Math.min(player.maxHp, player.hp + healAmount);
-            addToLog(`You recover <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-green-300');
-            updateStatsView();
+        if (player.statusEffects.buff_fertilized && spellData.element === 'nature') {
+            const healMultiplier = player.statusEffects.buff_fertilized.healMultiplier;
+            healAmount = Math.floor(healAmount * healMultiplier);
+            addToLog("The Fertilized Seed enhances the healing!", "text-green-200");
         }
-        else if (spellData.type === 'support') {
-            if (spell.effect) {
-                // Check if it's a buff or debuff
-                if (spell.effect.type.startsWith('buff_')) {
-                    player.statusEffects[spell.effect.type] = { ...spell.effect };
-                    addToLog(`You are filled with the power of ${spell.name}!`, 'text-yellow-300');
-                    if (spell.effect.cleanse) {
-                        const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic'].includes(key));
-                        if (debuffs.length > 0) {
-                            debuffs.forEach(key => delete player.statusEffects[key]);
-                            addToLog(`The divine light purges your ailments!`, 'text-yellow-200');
-                        }
+        // --- ELEMENTAL: Innate Elementalist (Damage/Healing) ---
+        if (player.race === 'Elementals' && spellData.element === player.elementalAffinity) {
+            const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
+            healAmount = Math.floor(healAmount * damageBonus);
+            if (player.level >= 20) {
+                let extraDieRoll = rollDice(1, spell.damage[1], 'Elemental Evo Die').total;
+                healAmount += Math.min(spell.cap * spell.damage[1], extraDieRoll); // Cap extra die damage
+            }
+        }
+        // --- End Elemental Logic ---
+
+        // --- DRAGONBORN: Bloodline Attunement (Damage/Healing) ---
+        if (player.race === 'Dragonborn') {
+            const damageBonus = (player.level >= 20) ? 1.20 : 1.10;
+            healAmount = Math.floor(healAmount * damageBonus);
+        }
+        // --- End Dragonborn Logic ---
+
+        // Determine who to heal
+        if (targetIndex === -1 && target) { // Target is the ally
+             target.hp = Math.min(target.maxHp, target.hp + healAmount);
+             addToLog(`You heal your ally ${target.name} for <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-green-300');
+             renderBattleGrid(); // Update ally HP bar
+        } else { // Target is the player
+             player.hp = Math.min(player.maxHp, player.hp + healAmount);
+             addToLog(`You recover <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-green-300');
+             updateStatsView();
+        }
+    }
+    // --- END NPC ALLY ---
+    else if (spellData.type === 'support') {
+        // ... [Existing support logic - unchanged] ...
+        if (spell.effect) {
+            // Check if it's a buff or debuff
+            if (spell.effect.type.startsWith('buff_')) {
+                player.statusEffects[spell.effect.type] = { ...spell.effect };
+                addToLog(`You are filled with the power of ${spell.name}!`, 'text-yellow-300');
+                if (spell.effect.cleanse) {
+                    const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic'].includes(key));
+                    if (debuffs.length > 0) {
+                        debuffs.forEach(key => delete player.statusEffects[key]);
+                        addToLog(`The divine light purges your ailments!`, 'text-yellow-200');
                     }
-                } else if (spell.effect.type.startsWith('debuff_')) {
-                    // Apply debuff to all enemies
-                    currentEnemies.forEach(enemy => {
-                        if (enemy.isAlive()) {
-                            enemy.statusEffects[spell.effect.type] = { ...spell.effect };
-                        }
-                    });
-                    addToLog(`Your enemies are weakened by ${spell.name}!`, 'text-red-400');
                 }
+            } else if (spell.effect.type.startsWith('debuff_')) {
+                // Apply debuff to all enemies
+                currentEnemies.forEach(enemy => {
+                    if (enemy.isAlive()) {
+                        enemy.statusEffects[spell.effect.type] = { ...spell.effect };
+                    }
+                });
+                addToLog(`Your enemies are weakened by ${spell.name}!`, 'text-red-400');
             }
         }
     }
+
     // Handle Offensive spells
     else if (spellData.type === 'st' || spellData.type === 'aoe') {
         let diceCount = spell.damage[0];
@@ -1874,8 +2066,9 @@ async function castSpell(spellKey, targetIndex) { // Make async
              spellFollowUpChance *= 1.5;
         }
         // Find a VALID living target for follow-up (original target OR any living enemy)
-        const validFollowUpTarget = (target && target.isAlive()) ? target : currentEnemies.find(e => e.isAlive());
-
+        // --- NPC ALLY: Ensure follow-up doesn't target ally ---
+        const validFollowUpTarget = (target && target.isAlive() && target !== player.npcAlly) ? target : currentEnemies.find(e => e.isAlive());
+        // --- END NPC ALLY ---
         console.log(`DEBUG: Checking Spell Follow-up. Chance: ${spellFollowUpChance}, Target: ${validFollowUpTarget?.name}`);
         if (validFollowUpTarget && player.rollForEffect(spellFollowUpChance, 'Spell Follow-up')) {
              console.log("DEBUG: Spell Follow-up Proc'd!");
@@ -2336,6 +2529,62 @@ function checkBattleStatus(isReaction = false) {
     if (defeatedEnemiesThisCheck.length > 0) {
         defeatedEnemiesThisCheck.forEach(enemy => {
             addToLog(`You have defeated ${enemy.name}!`, 'text-green-400 font-bold');
+
+            // --- Added Kill Counters & Key Drop Logic ---
+            let droppedKey = null;
+            if (player.level >= 4) {
+                player.killsSinceLevel4++;
+                console.log(`Kills since Level 4: ${player.killsSinceLevel4}`); // Debug log
+                if (player.killsSinceLevel4 === 5) {
+                    
+                    // --- NEW: Randomized logic for Ranger and Cook ---
+                    if (player._classKey === 'ranger' || player._classKey === 'cook') {
+                        const randomKey = Math.random() < 0.5 ? 'blacksmith_key' : 'tower_key';
+                        const alternateKey = randomKey === 'blacksmith_key' ? 'tower_key' : 'blacksmith_key';
+
+                        if (randomKey === 'blacksmith_key' && !player.unlocks.hasBlacksmithKey) {
+                            droppedKey = 'blacksmith_key';
+                        } else if (randomKey === 'tower_key' && !player.unlocks.hasTowerKey) {
+                            droppedKey = 'tower_key';
+                        } else if (alternateKey === 'blacksmith_key' && !player.unlocks.hasBlacksmithKey) {
+                            // If they already had the random key, try to give the alternate
+                            droppedKey = 'blacksmith_key';
+                        } else if (alternateKey === 'tower_key' && !player.unlocks.hasTowerKey) {
+                            // If they already had the random key, try to give the alternate
+                            droppedKey = 'tower_key';
+                        }
+                        // If they have both, droppedKey remains null
+                        
+                    } else {
+                        // --- Original logic for all other classes ---
+                        if (MARTIAL_CLASSES.includes(player._classKey) && !player.unlocks.hasBlacksmithKey) {
+                            droppedKey = 'blacksmith_key';
+                        } else if (MAGIC_CLASSES.includes(player._classKey) && !player.unlocks.hasTowerKey) {
+                            droppedKey = 'tower_key';
+                        }
+                    }
+                }
+            }
+            if (player.level >= 7) {
+                player.killsSinceLevel7++;
+                 console.log(`Kills since Level 7: ${player.killsSinceLevel7}`); // Debug log
+                if (player.killsSinceLevel7 === 5 && !droppedKey) { // Only drop second key if first didn't drop this kill
+                    if (!player.unlocks.hasBlacksmithKey) {
+                        droppedKey = 'blacksmith_key';
+                    } else if (!player.unlocks.hasTowerKey) {
+                        droppedKey = 'tower_key';
+                    }
+                }
+            }
+
+            if (droppedKey) {
+                 console.log(`Attempting to add key: ${droppedKey}`); // Debug log
+                 // Add key silently, the addToInventory function handles the unlock flag and message
+                 player.addToInventory(droppedKey, 1, false);
+                 addToLog(`The fallen ${enemy.name} dropped a ${getItemDetails(droppedKey).name}! Looks sturdy... wonder what it unlocks back in town?`, 'text-yellow-400 font-bold');
+            }
+            // --- End Added ---
+
             if (preTrainingState === null) {
                 if (enemy.rarityData.name === 'Legendary') {
                     const speciesKey = enemy.speciesData.key;
@@ -2344,9 +2593,14 @@ function checkBattleStatus(isReaction = false) {
                         addToLog(`*** LEGACY QUEST UPDATE: Legendary ${enemy.speciesData.name} slain! ***`, 'text-purple-300 font-bold');
                     }
                 }
-                player.gainXp(enemy.xpReward);
+
+                // --- CHANGE START: Moved Gold Gain before XP Gain ---
                 player.gold += enemy.goldReward;
                 addToLog(`You found <span class="font-bold">${enemy.goldReward}</span> G.`, 'text-yellow-400');
+                
+                player.gainXp(enemy.xpReward); // gainXp calls updateStatsView(), so gold must be added BEFORE this line
+                // --- CHANGE END ---
+
 
                 // Loot Drop Logic
                 for (const item in enemy.lootTable) {
@@ -2455,11 +2709,20 @@ function checkBattleStatus(isReaction = false) {
              return; // Stop further processing if victory occurred
         }
     }
+        // --- NPC ALLY: Check if ally fled ---
+    if (player.npcAlly && player.npcAlly.hp <= 0 && !player.npcAlly.isFled) {
+        player.npcAlly.isFled = true;
+        addToLog(`<span class="font-bold text-red-500">${player.npcAlly.name} has been defeated and fled the battle!</span>`, "text-red-500");
+        // We check for this state in renderPostBattleMenu
+        renderBattleGrid(); // Re-render to remove ally from grid
+    }
+    // --- END NPC ALLY ---
 
     // MODIFIED: Removed the automatic call to handlePlayerEndOfTurn here.
     // It's now called by finalizePlayerAction after the *entire* player action sequence.
     // This function now *only* checks for enemy deaths and processes them.
 }
+
 
 // NEW: Helper function to finalize player action and transition turn
 function finalizePlayerAction() {
@@ -2565,9 +2828,16 @@ function handlePlayerEndOfTurnEffects() {
     }
 
      // If drone exists and is alive, it's the drone's turn next
+     // If drone exists and is alive, it's the drone's turn next
     if (gameState.activeDrone && gameState.activeDrone.isAlive()) {
         setTimeout(droneTurn, 100); // Add slight delay before drone turn
-    } else {
+    } 
+    // --- NPC ALLY: Check for Ally Turn ---
+    else if (player.npcAlly && player.npcAlly.hp > 0 && !player.npcAlly.isFled && player.npcAlly.x !== -1) {
+        setTimeout(startNpcTurn, 100); // Ally turn
+    }
+    // --- END NPC ALLY ---
+    else {
         setTimeout(enemyTurn, 100); // Otherwise, proceed to enemy turn after delay
     }
 }
@@ -2733,6 +3003,265 @@ async function enemyTurn() {
     }
 }
 
+async function startNpcTurn() {
+    if (gameState.battleEnded || !player.npcAlly || player.npcAlly.hp <= 0 || player.npcAlly.isFled) {
+        setTimeout(enemyTurn, 100); // Ally can't act, skip to enemy
+        return;
+    }
+
+    const ally = player.npcAlly;
+    let actionTaken = false; // Flag to track if the ally did something
+
+    addToLog(`Your ally ${ally.name}'s turn!`, 'text-blue-300');
+
+    // --- AI Priority Checklist ---
+
+    // 1. Check for paralysis/petrification
+    if (ally.statusEffects.paralyzed || ally.statusEffects.petrified) {
+        const status = ally.statusEffects.paralyzed ? 'paralyzed' : 'petrified';
+        addToLog(`${ally.name} is ${status} and cannot act!`, 'text-yellow-500');
+        actionTaken = true; // "Action" was to be paralyzed
+    }
+
+    // 2. Item Logic (Priority 1: Survival)
+    if (!actionTaken && (ally.hp / ally.maxHp < 0.25)) {
+        // Find the best health potion they have
+        let potionToUse = null;
+        if (ally.inventory.items['superior_health_potion'] > 0) potionToUse = 'superior_health_potion';
+        else if (ally.inventory.items['condensed_health_potion'] > 0) potionToUse = 'condensed_health_potion';
+        else if (ally.inventory.items['health_potion'] > 0) potionToUse = 'health_potion';
+        
+        if (potionToUse) {
+            ally.useItem(potionToUse);
+            actionTaken = true;
+        }
+    }
+
+    if (!actionTaken && (ally.mp / ally.maxMp < 0.25)) {
+        // Find the best mana potion they have
+        let potionToUse = null;
+        if (ally.inventory.items['superior_mana_potion'] > 0) potionToUse = 'superior_mana_potion';
+        else if (ally.inventory.items['condensed_mana_potion'] > 0) potionToUse = 'condensed_mana_potion';
+        else if (ally.inventory.items['mana_potion'] > 0) potionToUse = 'mana_potion';
+        
+        if (potionToUse) {
+            ally.useItem(potionToUse);
+            actionTaken = true;
+        }
+    }
+
+    // 3. Buff Item Logic (Low Priority)
+    if (!actionTaken && Math.random() < 0.15) { // 15% chance to check for buffs
+        if (ally.inventory.items['whetstone'] > 0 && !ally.statusEffects['buff_whetstone']) {
+            // Only use whetstone if weapon is physical
+            const weaponElement = ally.weaponElement;
+            if (weaponElement === 'none' || weaponElement === 'physical') {
+                ally.useItem('whetstone');
+                actionTaken = true;
+            }
+        }
+        // (Add other buff item logic here, e.g., magic_rock_dust for mages)
+    }
+
+    // 4. Combat Logic (If no item was used)
+    if (!actionTaken) {
+        // Find nearest living enemy
+        let target = null;
+        let minDistance = Infinity;
+        currentEnemies.forEach(enemy => {
+            if (enemy.isAlive()) {
+                const distance = Math.abs(ally.x - enemy.x) + Math.abs(ally.y - enemy.y);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    target = enemy;
+                }
+            }
+        });
+
+        if (target) {
+            const distance = minDistance;
+            const weaponRange = ally.equippedWeapon.range || 1;
+            const catalystRange = ally.equippedCatalyst.range || 3;
+            
+            let bestSpell = null;
+            let canCastSpell = false;
+            
+            // Check for magic action first
+            if (MAGIC_CLASSES.includes(ally._classKey)) {
+                bestSpell = findBestSpell(ally, target);
+                if (bestSpell) {
+                    const spellCost = SPELLS[bestSpell].tiers[ally.spells[bestSpell].tier - 1].cost;
+                    if (ally.mp >= spellCost) {
+                        canCastSpell = true;
+                    }
+                }
+            }
+
+            // --- AI Decision Tree ---
+            if (MAGIC_CLASSES.includes(ally._classKey) && canCastSpell && distance <= catalystRange) {
+                // --- MAGE: In spell range & can cast ---
+                if (distance === 1) {
+                    // Too close, fall back
+                    addToLog(`${ally.name} falls back to a safer distance!`);
+                    await ally.moveTowards(player); // Move towards player
+                    actionTaken = true;
+                } else {
+                    // Good range, cast spell
+                    ally.castSpell(bestSpell, target);
+                    actionTaken = true;
+                }
+            } else if (MARTIAL_CLASSES.includes(ally._classKey)) {
+                // --- MARTIAL: Logic ---
+                const isRangedWeapon = (weaponRange > 4);
+                if (isRangedWeapon && distance === 1) {
+                    // Too close with ranged, move away
+                    addToLog(`${ally.name} repositions for a better shot!`);
+                    await ally.moveTowards(player); // Move towards player
+                    actionTaken = true;
+                } else if (distance <= weaponRange) {
+                    // In range, attack
+                    await ally.attack(target); // Await attack (which is just the attack part)
+                    actionTaken = true;
+                } else {
+                    // Out of range, move closer
+                    addToLog(`${ally.name} moves towards ${target.name}.`);
+                    await ally.moveTowards(target); // Await movement
+                    actionTaken = true;
+                }
+            } else if (distance > weaponRange && distance > catalystRange) {
+                // --- ALL: Out of range for everything ---
+                addToLog(`${ally.name} moves towards ${target.name}.`);
+                await ally.moveTowards(target); // Await movement
+                actionTaken = true;
+            } else if (distance <= weaponRange) {
+                // --- FALLBACK: In weapon range (e.g., Mage out of mana) ---
+                addToLog(`${ally.name} falls back on their weapon!`);
+                await ally.attack(target);
+                actionTaken = true;
+            } else {
+                // --- FINAL FALLBACK (e.g., in spell range but not weapon range, but can't cast) ---
+                addToLog(`${ally.name} moves to attack ${target.name}.`);
+                await ally.moveTowards(target);
+                actionTaken = true;
+            }
+
+        } else {
+            addToLog(`${ally.name} has no targets.`);
+            actionTaken = true; // "Action" was to do nothing
+        }
+    }
+    
+    // Check if ally's action ended the battle
+    if (!gameState.battleEnded) {
+        checkBattleStatus(true); // isReaction = true
+    }
+    if (gameState.battleEnded) return; // Stop if battle ended
+
+    // Proceed to finalize ally turn
+    if (!gameState.battleEnded) {
+         setTimeout(finalizeNpcTurn, 200);
+    }
+}
+
+// --- NEW HELPER FUNCTION ---
+/**
+ * Finds the best offensive spell for an ally to use.
+ * @param {NpcAlly} ally - The ally casting the spell.
+ * @param {Enemy} target - The enemy being targeted.
+ * @returns {string|null} The key of the best spell, or null if none.
+ */
+function findBestSpell(ally, target) {
+    let bestSpell = null;
+    let maxScore = 0; // 3 = Super effective, 2 = ST, 1 = Basic
+    
+    for (const spellKey in ally.spells) {
+        const spellData = SPELLS[spellKey];
+        if (!spellData || spellData.type === 'healing' || spellData.type === 'support') {
+            continue; // Skip non-offensive spells
+        }
+        
+        const spellElement = spellData.element;
+        const targetElement = target.element;
+        let score = 1; // Base score for any offensive spell
+        
+        if (spellData.type === 'st') {
+            score = 2; // Prefer single-target spells for AI
+        }
+        
+        // Check for super-effective
+        if (spellElement !== 'none' && targetElement !== 'none') {
+            const modifier = calculateElementalModifier(spellElement, targetElement);
+            if (modifier > 1) {
+                score = 3; // Highest priority
+            } else if (modifier < 1) {
+                score = 0; // Avoid "not effective"
+            }
+        }
+        
+        if (score > maxScore) {
+            // Check if ally can afford it
+            const spellTier = ally.spells[spellKey].tier;
+            const spellCost = spellData.tiers[spellTier - 1].cost;
+            if (ally.mp >= spellCost) {
+                maxScore = score;
+                bestSpell = spellKey;
+            }
+        }
+    }
+    return bestSpell;
+}
+    
+
+// --- New Function: finalizeNpcTurn ---
+function finalizeNpcTurn() {
+    if (gameState.battleEnded || !player.npcAlly) {
+        setTimeout(enemyTurn, 100); // Proceed to enemy turn
+        return;
+    }
+    
+    const ally = player.npcAlly;
+    if (ally.hp <= 0 || ally.isFled) {
+         setTimeout(enemyTurn, 100); // Ally is out, proceed to enemy
+         return;
+    }
+
+    // Handle ally's status effects (DoTs, durations)
+    const effects = ally.statusEffects;
+    for (const effectKey in effects) {
+        if (effects[effectKey].duration && effects[effectKey].duration !== Infinity) {
+            effects[effectKey].duration--;
+            if (effects[effectKey].duration <= 0) {
+                delete effects[effectKey];
+                const effectName = effectKey.replace(/buff_|debuff_/g, '').replace(/_/g, ' ');
+                addToLog(`${ally.name}'s ${effectName} has worn off.`);
+            }
+        }
+        // Handle DoTs
+        if (effectKey === 'poison' && effects[effectKey]) {
+            const poisonDmg = Math.floor(ally.maxHp * 0.05);
+            ally.hp -= poisonDmg;
+            addToLog(`${ally.name} takes <span class="font-bold text-green-600">${poisonDmg}</span> poison damage.`, 'text-green-600');
+        }
+        if (effectKey === 'toxic' && effects[effectKey]) {
+            const toxicDmg = Math.floor(ally.maxHp * 0.1);
+            ally.hp -= toxicDmg;
+            addToLog(`The toxin deals <span class="font-bold text-green-800">${toxicDmg}</span> damage to ${ally.name}!`, 'text-green-800');
+        }
+        // Add other DoTs if needed (e.g., swallowed, though ally shouldn't be swallowed)
+    }
+
+    // Check if ally fled from DoT
+    if (ally.hp <= 0 && !ally.isFled) {
+        ally.isFled = true;
+        addToLog(`<span class="font-bold text-red-500">${ally.name} has succumbed to their wounds and fled!</span>`, "text-red-500");
+    }
+
+    renderBattleGrid(); // Update ally HP bar from DoTs
+
+    // Proceed to enemy turn
+    setTimeout(enemyTurn, 100);
+}
+
 function beginPlayerTurn() {
     if (gameState.battleEnded) return;
 
@@ -2745,6 +3274,11 @@ function beginPlayerTurn() {
     // Clear Haste's "used" flag
     if (player.statusEffects.buff_haste?.turnUsed) player.statusEffects.buff_haste.turnUsed = false;
     if (player.statusEffects.buff_hermes?.turnUsed) player.statusEffects.buff_hermes.turnUsed = false;
+
+    if (player.npcAlly) {
+         if (player.npcAlly.statusEffects.buff_haste?.turnUsed) player.npcAlly.statusEffects.buff_haste.turnUsed = false;
+         if (player.npcAlly.statusEffects.buff_hermes?.turnUsed) player.npcAlly.statusEffects.buff_hermes.turnUsed = false;
+    }
 
     // Check for paralysis/petrification at the start of the turn
     if (player.statusEffects.paralyzed || player.statusEffects.petrified) {
@@ -2778,6 +3312,12 @@ async function checkPlayerDeath() {
     gameState.playerIsDying = true;
     gameState.activeDrone = null; // Clear drone on death
     gameState.markedTarget = null; // Clear mark on death
+
+    if (player.npcAlly) {
+        player.npcAlly.isFled = true; // Ally flees if player dies
+        addToLog(`${player.npcAlly.name} sees your fall and flees the battle!`, "text-gray-400");
+    }
+    // --- END NPC ALLY --- 
     const killer = currentEnemies.length > 0 ? currentEnemies[0].name : 'the wilderness';
     const template = document.getElementById('template-death');
     render(template.content.cloneNode(true));
