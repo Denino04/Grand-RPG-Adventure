@@ -424,13 +424,14 @@ function renderBattleGrid(highlightTargets = false, highlightType = 'magic') { /
                 if (allyIsAlive && ally.x === x && ally.y === y) {
                     cell.classList.add('ally'); // Use new 'ally' CSS class
                     cell.innerHTML = `
-                        <div class="ally-emoji">🛡️</div> <!-- Placeholder emoji -->
+                        <div class="ally-emoji">${getNpcAllyEmoji(ally)}</div> <!-- MODIFIED: Use new function -->
                         <div class="ally-hp-bar-bg">
                             <div class="ally-hp-bar" style="width: ${ (ally.hp / ally.maxHp) * 100}%"></div>
                         </div>
                     `;
                     cell.addEventListener('mouseover', (event) => showAllyInfo(ally, event)); // New info function
                     cell.addEventListener('mouseout', hideTooltip); // Use hideTooltip, not hideEnemyInfo
+
                     cell.addEventListener('click', (event) => {
                         if (gameState.action === null) {
                             showAllyInfo(ally, event, true); // Force show on click

@@ -3161,6 +3161,23 @@ class Enemy extends Entity {
     }
 }
 
+function getNpcAllyEmoji(ally) {
+    if (!ally || !ally.raceKey) return '🛡️'; // Default fallback
+
+    // Handle Elementals (defaulting to fire, since they don't have affinity)
+    if (ally.raceKey === 'Elementals') {
+        // Allies don't have elementalAffinity, so we'll default
+        return ELEMENTAL_AFFINITY_EMOJIS['fire'] || '🔥'; 
+    }
+
+    // Handle other races
+    const raceEmojis = PLAYER_EMOJIS[ally.raceKey];
+    if (!raceEmojis) return '🛡️'; // Default if race not in map
+
+    // Allies don't have gender, so always use the 'Neutral' emoji
+    // Fallback to Male, then Female, then the default '🛡️'
+    return raceEmojis['Neutral'] || raceEmojis['Male'] || raceEmojis['Female'] || '🛡️';
+}
 
 // --- CORE LOGIC FUNCTIONS ---
 
