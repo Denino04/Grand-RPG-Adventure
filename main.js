@@ -578,6 +578,10 @@ async function loadGameFromKey(docId, isImport = false) {
             
             // Now, copy all saved properties *back* onto the new instance
             Object.assign(newAlly, allyData);
+
+            // --- ADDED: Link ally's racial/class abilities ---
+            newAlly.updateAbilityReferences();
+            // --- END ADDED ---
             
             // --- MIGRATION (for ally) ---
             if (!newAlly.inventory) newAlly.inventory = { items: {}, size: 10, stack: 10 };

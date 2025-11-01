@@ -1285,7 +1285,7 @@ function renderResidentialDistrict() {
         addToLog("A new military advisor has arrived in the Residential District!", "text-yellow-400 font-bold");
         saveGame(); // Save the new flag state immediately
     }
-    // --- END FIX ---
+    // --- END FIX ---  
 
     const container = document.createElement('div');
     container.className = 'flex flex-col items-center justify-center w-full h-full';

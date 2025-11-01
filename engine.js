@@ -1661,8 +1661,16 @@ class NpcAlly extends Entity {
         this._classKey = classKey; // Store the key, even if it's undefined
         const classData = CLASSES[classKey]; // Get classData *once*
         this.raceKey = raceKey || 'Human'; // Store the race key
+        this.race = RACES[this.raceKey]?.name || 'Human'; // <-- ADDED: Set race display name
+
+        // --- ROBUSTNESS: Ensure this.race is set, even if raceKey was missing ---
+        if (!this.race && this.raceKey) {
+            this.race = RACES[this.raceKey]?.name || 'Human';
+        }
+        // --- END ROBUSTNESS ---
 
         if (classData) {
+
             this.class = classData.name;
         } else {
             this.class = "Unknown Ally"; // Assign a default name
@@ -1694,9 +1702,13 @@ class NpcAlly extends Entity {
         this.bonusIntelligence = 0;
         this.bonusLuck = 0;
         
+        // --- ADDED: Ability properties ---
+        this.racialPassive = (chance) => chance; // Default pass-through function
+        this.signatureAbilityData = null; // Reference to the ability data object
+        // --- END ADDED ---
+        
         // --- Stat Allocation ---
         this.calculateStats(playerLevel); // This will set the level and distribute points
-
         // --- NEW Equipment & Inventory ---
         this.equippedWeapon = WEAPONS['fists'];
         this.equippedCatalyst = CATALYSTS['no_catalyst'];
@@ -1727,18 +1739,148 @@ class NpcAlly extends Entity {
             });
         }
         
-        // --- NEW: Learn Starting Spells ---
         if (classData && classData.startingSpells) {
             for (const spellKey in classData.startingSpells) {
                 this.spells[spellKey] = { tier: classData.startingSpells[spellKey] };
             }
         }
-        // --- END NEW ---
 
+        this.updateAbilityReferences();
         // Final HP/MP calculation
         this.hp = this.maxHp;
         this.mp = this.maxMp;
     }
+
+    updateAbilityReferences() {
+        console.log(`DEBUG: updateAbilityReferences called for Ally. Race Key: "${this.raceKey}"`);
+
+        // Get racial passive function
+        this.racialPassive = RACES[this.raceKey]?.passive?.applyEffect || ((chance, playerLevel) => chance);
+        console.log("DEBUG: Ally Racial Passive Function assigned:", typeof this.racialPassive === 'function');
+        
+        // Placeholder for signature ability
+        const classData = this._classKey ? CLASSES[this._classKey] : null;
+        this.signatureAbilityData = classData ? classData.signatureAbility : null;
+        // We aren't *using* this yet, but it's correct to set it here.
+    }
+
+    get resistanceChance() {
+        let baseResist = Math.min(0.5, ((this.luck + this.bonusLuck) / 100));
+        // --- CLANKERS: Absolute Logic ---
+        if (this.race === 'Clankers') {
+            const multiplier = (this.level >= 20) ? 2.0 : 1.5; // 100% or 50% relative bonus
+            baseResist = Math.min(0.80, baseResist * multiplier); // Cap at 80%
+        }
+        // --- End Clankers Logic ---
+        return baseResist;
+    }
+
+    rollForEffect(baseChance, debugPurpose = "Unknown Effect") {
+        // --- CHANCE LOGGING: Log initial state ---
+        if (logChanceCalculations) { // Check the new global flag
+            addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Base Chance = ${(baseChance * 100).toFixed(1)}%`, 'text-gray-500');
+        }
+
+        if (baseChance <= 0) {
+             // --- CHANCE LOGGING: Log failure due to 0% ---
+             if (logChanceCalculations) addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Result = FAIL (Base chance <= 0)`, 'text-gray-500');
+             return false;
+        }
+        if (baseChance >= 1) {
+             // --- CHANCE LOGGING: Log success due to 100% ---
+             if (logChanceCalculations) addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Result = SUCCESS (Base chance >= 1)`, 'text-gray-500');
+            return true;
+        }
+
+
+        let modifiedChance = baseChance;
+        let logSteps = []; // Keep track of modifications for logging
+
+        // 1. Apply Dragonborn penalty first
+        if (this.race === 'Dragonborn') {
+            const penalty = (this.level >= 20) ? 0.25 : 0.5; // 75% reduction or 50% reduction
+            const oldChance = modifiedChance;
+            modifiedChance *= penalty;
+            logSteps.push(`Dragonborn Penalty x${penalty.toFixed(2)} -> ${(modifiedChance * 100).toFixed(1)}%`);
+        }
+
+        // 2. Apply Human bonus
+        // (Uses this.racialPassive, which was set in constructor by updateAbilityReferences)
+        const humanBonusApplied = this.race === 'Human' && typeof this.racialPassive === 'function';
+        if (humanBonusApplied) {
+            const oldChance = modifiedChance;
+            modifiedChance = this.racialPassive(modifiedChance, this.level); // Call the specific function from RACES data
+            logSteps.push(`Human Bonus -> ${(modifiedChance * 100).toFixed(1)}%`);
+        }
+
+        // --- CHANCE LOGGING: Log final chance before roll ---
+        if (logChanceCalculations && logSteps.length > 0) {
+             addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Modifications => ${logSteps.join(' | ')}`, 'text-gray-500');
+        } else if (logChanceCalculations) {
+            addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Final Chance = ${(modifiedChance * 100).toFixed(1)}% (No mods applied)`, 'text-gray-500');
+        }
+
+
+        // 3. Make the initial roll
+        let roll = Math.random();
+        // --- CHANCE LOGGING: Log the roll ---
+        if (logChanceCalculations) {
+            addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Rolled ${roll.toFixed(3)} vs Chance ${(modifiedChance * 100).toFixed(1)}%`, 'text-gray-500');
+        }
+
+        if (roll < modifiedChance) {
+            // --- CHANCE LOGGING: Log success ---
+            if (logChanceCalculations) addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Result = SUCCESS`, 'text-green-400');
+            if (isDebugVisible && !logChanceCalculations) console.log(`Racial Roll [ALLY: ${this.name} - ${debugPurpose}]: SUCCESS (Base: ${baseChance.toFixed(2)}, Mod: ${modifiedChance.toFixed(2)}, Roll: ${roll.toFixed(2)})`);
+            return true; // Success!
+        }
+
+        // 4. Handle Halfling reroll on failure
+        if (this.race === 'Halfling') {
+            const rerollChance = (this.level >= 20) ? (1/6) : 0.10; // 10% or 1-in-6
+             // --- CHANCE LOGGING: Log Halfling attempt ---
+             if (logChanceCalculations) {
+                 addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Halfling Reroll Check (${(rerollChance * 100).toFixed(1)}% chance)`, 'text-gray-500');
+             }
+
+            let rerollLuckRoll = Math.random(); // Roll for the *chance* to reroll
+            if (rerollLuckRoll < rerollChance) {
+                 // --- CHANCE LOGGING: Log Halfling reroll triggered ---
+                 if (logChanceCalculations) addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Halfling Reroll Triggered! Rerolling...`, 'text-yellow-300');
+
+                // Halfling luck triggers a *recalculation* against the modified chance, not a guaranteed success
+                let reroll = Math.random();
+                 // --- CHANCE LOGGING: Log the actual reroll value ---
+                 if (logChanceCalculations) {
+                    addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Rerolled ${reroll.toFixed(3)} vs Chance ${(modifiedChance * 100).toFixed(1)}%`, 'text-yellow-300');
+                 }
+
+                if (reroll < modifiedChance) {
+                    addToLog(`${this.name}'s uncanny luck grants them a second chance... and it succeeds!`, "text-green-300");
+                    // --- CHANCE LOGGING: Log Halfling success ---
+                    if (logChanceCalculations) addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Result = HALFLING SUCCESS`, 'text-green-400');
+                    if (isDebugVisible && !logChanceCalculations) console.log(`Racial Roll [ALLY: ${this.name} - ${debugPurpose}]: HALFLING SUCCESS (Base: ${baseChance.toFixed(2)}, Mod: ${modifiedChance.toFixed(2)}, Reroll: ${reroll.toFixed(2)})`);
+                    return true; // Reroll succeeded!
+                } else {
+                     // --- CHANCE LOGGING: Log Halfling reroll failure ---
+                     if (logChanceCalculations) addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Reroll Failed. Result = FAIL`, 'text-red-400');
+                }
+            } else {
+                // --- CHANCE LOGGING: Log Halfling luck didn't trigger ---
+                if (logChanceCalculations) addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Halfling Reroll Not Triggered. Result = FAIL`, 'text-red-400');
+            }
+             // Fall through to standard failure logging if reroll wasn't attempted or failed
+        }
+
+        // 5. Standard failure for all other races (or Halfling fail)
+        // --- CHANCE LOGGING: Log final failure ---
+        if (logChanceCalculations && this.race !== 'Halfling') { // Avoid double logging Halfling fail
+             addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Result = FAIL`, 'text-red-400');
+        }
+        if (isDebugVisible && !logChanceCalculations) console.log(`Racial Roll [ALLY: ${this.name} - ${debugPurpose}]: FAIL (Base: ${baseChance.toFixed(2)}, Mod: ${modifiedChance.toFixed(2)}, Roll: ${roll.toFixed(2)})`);
+        return false;
+    }
+    // --- END ADDED ---
 
     // --- Stat Calculation Method ---
     calculateStats(playerLevel) {
@@ -1781,26 +1923,339 @@ class NpcAlly extends Entity {
     get evasionChance() { return Math.min(0.2, (((this.luck + this.bonusLuck) * 0.5) / 100)); }
     get resistanceChance() { return Math.min(0.5, ((this.luck + this.bonusLuck) / 100)); }
 
-    // --- Simplified TakeDamage (No complex avoidance/reflection) ---
-    takeDamage(damage, options = {}) {
-        const isMagicAttack = options.isMagic || (options.element && options.element !== 'none');
-        let effectiveDefense = isMagicAttack ? this.magicalDefense : this.physicalDefense;
-        
-        // Add gear defense
-        effectiveDefense += (this.equippedArmor?.defense || 0);
-        effectiveDefense += (this.equippedShield?.defense || 0);
-        
-        if (options.ignore_defense) {
-             effectiveDefense *= (1 - (options.ignore_defense || 0));
+    _calculateAvoidanceChances() {
+        const shield = this.equippedShield;
+        const armor = this.equippedArmor;
+        const weapon = this.equippedWeapon;
+        let dodgeChance = this.evasionChance;
+        let parryChance = 0;
+        let blockChance = (shield?.blockChance || 0) + (armor?.blockChance || 0);
+
+        // Gear Dodge/Parry Bonuses/Penalties
+        if (armor && armor.effect?.type === 'dodge') dodgeChance += armor.effect.chance;
+        else if (armor && armor.metallic) dodgeChance *= 0.5;
+        if (shield && ['Tower Greatshield', 'Heavy Slabshield'].includes(shield.name)) dodgeChance *= 0.5;
+        if (shield && shield.effect?.type === 'parry') parryChance += shield.effect.chance;
+        if (weapon.effect?.parry) parryChance += weapon.effect.parry;
+
+        // Racial Bonuses/Penalties
+        if (this.race === 'Elf' && (!armor || !armor.metallic)) {
+            let relativeBonus = dodgeChance * 0.5;
+            let cappedBonus = Math.min(relativeBonus, 0.50);
+            dodgeChance += cappedBonus;
         }
-        if (options.armorPierce) {
-             effectiveDefense *= (1 - (options.armorPierce || 0));
+        if (this.race === 'Beastkin') {
+            dodgeChance *= 1.25;
+            parryChance *= 1.25;
+            blockChance *= 1.25;
         }
 
+        // Status Effects Modifiers (Simplified for Ally)
+        if (this.statusEffects.buff_shroud || this.statusEffects.buff_voidwalker) dodgeChance *= 1.5;
+        if (this.statusEffects.buff_hermes) dodgeChance *= 2;
+        if (this.statusEffects.bonus_speed) dodgeChance += this.statusEffects.bonus_speed.dodge;
+        if (this.statusEffects.slowed) dodgeChance = Math.max(0, dodgeChance + this.statusEffects.slowed.dodge);
+        if (this.statusEffects.clumsy) dodgeChance = Math.max(0, dodgeChance + this.statusEffects.clumsy.dodge);
+
+        // Clamp chances
+        dodgeChance = Math.max(0, Math.min(0.95, dodgeChance));
+        parryChance = Math.max(0, Math.min(0.95, parryChance));
+        blockChance = Math.max(0, Math.min(0.95, blockChance));
+
+        return { dodge: dodgeChance, parry: parryChance, block: blockChance };
+    }
+
+    _attemptAvoidance(avoidanceChances, attacker) {
+        // --- Parry Check ---
+        if (attacker && this.rollForEffect(avoidanceChances.parry, 'Parry') && attacker.isAlive()) {
+            attacker.attackParried = true;
+            addToLog(`${this.name} parried ${attacker.name}'s attack!`, 'text-yellow-300 font-bold');
+            this._handleParryCounterAttack(attacker);
+            return true; // Avoided
+        }
+
+        // --- Dodge Check ---
+        if (attacker && this.rollForEffect(avoidanceChances.dodge, 'Dodge')) {
+            attacker.attackParried = true;
+            addToLog(`${this.name} dodged ${attacker.name}'s attack!`, 'text-teal-300 font-bold');
+            return true; // Avoided
+        }
+
+        // --- Block Check ---
+        if (this.rollForEffect(avoidanceChances.block, 'Block')) {
+            if (attacker) attacker.attackParried = true;
+            addToLog(`${this.name} blocked the attack!`, 'text-cyan-400 font-bold');
+            return true; // Avoided
+        }
+
+        return false; // Not avoided
+    }
+
+    /** Handles the counter-attack logic after a successful parry (Simplified for Ally). */
+    _handleParryCounterAttack(attacker) {
+        setTimeout(() => {
+            if (gameState.battleEnded || !attacker || !attacker.isAlive()) return;
+            addToLog(`${this.name} launches a swift counter-attack!`, 'text-yellow-300');
+
+            const weapon = this.equippedWeapon;
+            let messageLog = [];
+
+            // --- Dwarf: Craftsmen's Intuition (Evolution) ---
+            let attackDamageDice = [...weapon.damage]; // [numDice, sides]
+            if (this.race === 'Dwarf' && this.level >= 20) {
+                if (attackDamageDice[1] === 6) { attackDamageDice[1] = 8; }
+                else if (attackDamageDice[1] === 8) { attackDamageDice[1] = 10; }
+            }
+
+            let rollResult = rollDice(attackDamageDice[0], attackDamageDice[1], `${this.name} Parry`);
+            let baseWeaponDamage = rollResult.total;
+            let statBonus = this.physicalDamageBonus;
+
+            let damage = baseWeaponDamage;
+            const statMultiplier = 1 + statBonus / 20;
+            damage = Math.floor(damage * statMultiplier);
+
+            const strengthFlatBonus = Math.floor(this.strength / 5);
+            damage += strengthFlatBonus;
+
+            let attackEffects = { element: this.weaponElement };
+
+            // --- DRAGONBORN: Bloodline Attunement (Damage) ---
+            if (this.race === 'Dragonborn') {
+                const damageBonus = (this.level >= 20) ? 1.20 : 1.10;
+                damage = Math.floor(damage * damageBonus);
+            }
+
+            // Critical Hit Calculation (Simplified)
+            let critChance = this.critChance;
+            const canWeaponCrit = weapon.class === 'Dagger' || weapon.effect?.critChance;
+            if (canWeaponCrit) {
+                if (weapon.class === 'Dagger') critChance += 0.1;
+                if (weapon.effect?.critChance) critChance += weapon.effect.critChance;
+
+                if (this.rollForEffect(critChance, 'Parry Crit')) {
+                    let critMultiplier = weapon.effect?.critMultiplier || 1.5;
+                    damage = Math.floor(damage * critMultiplier);
+                    messageLog.push(`CRITICAL HIT!`);
+                }
+            }
+
+            // Armor Pierce
+            if (weapon.class === 'Thrusting Sword') attackEffects.armorPierce = 0.2;
+            if (weapon.effect?.armorPierce) attackEffects.armorPierce = (attackEffects.armorPierce || 0) + weapon.effect.armorPierce;
+           
+            const damageResult = attacker.takeDamage(damage, attackEffects);
+            const finalDamage = damageResult.damageDealt;
+
+            let damageType = weapon.damageType || 'physical';
+            if (attackEffects.element && attackEffects.element !== 'none') {
+                damageType = ELEMENTS[attackEffects.element].name;
+            }
+            let logMessagesCombined = messageLog.join(' ');
+            addToLog(`${this.name}'s riposte hits ${attacker.name} for <span class="font-bold text-yellow-300">${finalDamage}</span> ${damageType} damage. ${logMessagesCombined}`);
+
+            // Lifesteal
+            if (finalDamage > 0) {
+                let lifestealAmount = 0;
+                if (weapon.class === 'Reaper') lifestealAmount += finalDamage * 0.1;
+                if (weapon.effect?.lifesteal) lifestealAmount += finalDamage * weapon.effect.lifesteal;
+                if (lifestealAmount > 0 && attacker.speciesData.class !== 'Undead') {
+                    const healedAmount = Math.floor(lifestealAmount);
+                    if (healedAmount > 0) {
+                        this.hp = Math.min(this.maxHp, this.hp + healedAmount);
+                        addToLog(`${this.name} drains <span class="font-bold text-green-400">${healedAmount}</span> HP.`);
+                    }
+                }
+            }
+            
+            if (!gameState.battleEnded) {
+                checkBattleStatus(true); // Check if the counter-attack was fatal
+                renderBattleGrid(); // Update ally HP bar if they lifestealed
+            }
+        }, 300);
+    }
+
+    _applyAlchemicalBarrier(incomingDamage) {
+        if (this.statusEffects.alchemical_barrier && this.statusEffects.alchemical_barrier.hp > 0) {
+            const barrierHP = this.statusEffects.alchemical_barrier.hp;
+            if (incomingDamage >= barrierHP) {
+                incomingDamage -= barrierHP;
+                delete this.statusEffects.alchemical_barrier;
+                addToLog(`${this.name}'s alchemical barrier shatters, absorbing <span class="font-bold text-cyan-300">${barrierHP}</span> damage!`, 'text-cyan-400');
+            } else {
+                this.statusEffects.alchemical_barrier.hp -= incomingDamage;
+                addToLog(`${this.name}'s alchemical barrier absorbs <span class="font-bold text-cyan-300">${incomingDamage}</span> damage! (${this.statusEffects.alchemical_barrier.hp} HP remaining)`, 'text-cyan-400');
+                return 0; // Damage fully absorbed
+            }
+        }
+        return incomingDamage; // Return remaining damage
+    }
+
+    _applyDamageVulnerabilities(damage, isMagicAttack, ignoresDefense, attacker = null) {
+        let modifiedDamage = damage;
+        // --- ORC: Brutish Physique ---
+        if (this.race === 'Orc') {
+            if (!isMagicAttack && !ignoresDefense) { // Physical damage
+                modifiedDamage = Math.floor(modifiedDamage * 0.9); // 10% reduction
+                addToLog(`${this.name}'s brutish physique shrugs off some physical damage!`, "text-gray-400");
+            } else if (isMagicAttack && this.level < 20) { // Magical damage, pre-evolution
+                modifiedDamage = Math.floor(modifiedDamage * 1.1); // 10% weakness
+                addToLog(`${this.name}'s physique is vulnerable to magic!`, "text-red-400");
+            }
+        }
+        // --- End Orc Logic ---
+
+        // (Other buffs like Enrage)
+        if (this.statusEffects.buff_enrage && !isMagicAttack && !ignoresDefense) {
+            modifiedDamage = Math.floor(modifiedDamage * 1.5);
+            addToLog(`${this.name}'s rage leaves them open!`, `text-red-400`);
+        }
+         // Elemental vulnerability from status
+        if(this.statusEffects.elemental_vuln && attacker?.element === this.statusEffects.elemental_vuln.element){
+            modifiedDamage = Math.floor(modifiedDamage * 1.25);
+            addToLog(`${this.name} is vulnerable to ${attacker.element} and takes extra damage!`, 'text-red-600');
+        }
+
+        return modifiedDamage;
+    }
+
+    _calculateEffectiveDefense(isMagicAttack, attackerElement, ignoresDefense, attacker = null) {
+        if (ignoresDefense) {
+            addToLog(`The attack ignores ${this.name}'s defense!`, 'text-yellow-500 font-bold');
+            return 0;
+        }
+
+        const shield = this.equippedShield;
+        const armor = this.equippedArmor;
+        let baseDefense = isMagicAttack ? this.magicalDefense : this.physicalDefense;
+        let shieldDefense = shield?.defense || 0;
+        let armorDefense = armor?.defense || 0;
+        let totalDefense = baseDefense + shieldDefense + armorDefense;
+
+        // Apply Elemental resistances/weaknesses from gear
+        if (attackerElement && attackerElement !== 'none') {
+            const armorMod = calculateElementalModifier(attackerElement, this.armorElement);
+            if (armorMod !== 1) {
+                totalDefense += (armor.defense || 0) * (armorMod - 1);
+                addToLog(`${this.name}'s armor enchantment ${armorMod > 1 ? 'resists' : 'is weak to'} the attack!`, armorMod > 1 ? 'text-green-400' : 'text-red-500');
+            }
+            const shieldMod = calculateElementalModifier(attackerElement, this.shieldElement);
+            if (shieldMod !== 1) {
+                totalDefense += (shield.defense || 0) * (shieldMod - 1);
+                addToLog(`${this.name}'s shield enchantment ${shieldMod > 1 ? 'resists' : 'is weak to'} the attack!`, shieldMod > 1 ? 'text-green-400' : 'text-red-500');
+            }
+        }
+
+        // Apply defense buffs/debuffs
+        if (this.statusEffects.stonehide) totalDefense *= this.statusEffects.stonehide.multiplier;
+        if (this.statusEffects.buff_defense) totalDefense *= this.statusEffects.buff_defense.multiplier;
+        if (this.statusEffects.buff_magic_defense && isMagicAttack) totalDefense *= this.statusEffects.buff_magic_defense.multiplier;
+        if (this.statusEffects.buff_divine && isMagicAttack) totalDefense *= this.statusEffects.buff_divine.multiplier;
+
+        // Apply Penetration/Bypass
+        if (attacker?.element === 'void') {
+            totalDefense *= 0.5; // Void bypasses 50%
+            addToLog(`The void attack partially bypasses ${this.name}'s defense!`, 'text-purple-400');
+        }
+
+        return Math.floor(Math.max(0, totalDefense));
+    }
+
+    _applyAndLogDamage(damage, effectiveDefense, attacker, isMagicAttack) {
         const finalDamage = Math.max(0, Math.floor(damage - effectiveDefense));
         this.hp -= finalDamage;
         this.hp = Math.max(0, this.hp);
 
+        let damageType = '';
+        if (attacker && attacker.element && attacker.element !== 'none') {
+            damageType = ` ${ELEMENTS[attacker.element].name}`;
+        } else if (isMagicAttack) {
+            damageType = ' magical';
+        }
+        addToLog(`${this.name} takes <span class="font-bold text-red-400">${finalDamage}</span>${damageType} damage.`);
+        return finalDamage;
+    }
+
+    _handleReflectEffects(finalDamageDealt, originalDamage, attacker) {
+        if (!attacker || !attacker.isAlive()) return;
+
+        const armor = this.equippedArmor;
+        const shield = this.equippedShield;
+        let reflectedDamage = 0;
+        let reflectSource = '';
+        let reflectElement = 'none';
+
+        if (armor?.effect?.reflect_damage) {
+            reflectedDamage = Math.floor(originalDamage * armor.effect.reflect_damage);
+            reflectSource = armor.name;
+            reflectElement = this.armorElement;
+        }
+        else if (shield?.effect?.type === 'reflect') {
+            reflectedDamage = Math.floor(originalDamage * shield.effect.amount);
+            reflectSource = shield.name;
+            reflectElement = this.shieldElement;
+        }
+
+        if (reflectedDamage > 0) {
+            const damageResult = attacker.takeDamage(reflectedDamage, { element: reflectElement });
+            const finalReflected = damageResult.damageDealt;
+            addToLog(`${this.name}'s ${reflectSource} reflects <span class="font-bold text-orange-400">${finalReflected}</span> damage back at ${attacker.name}!`, 'text-orange-300');
+            if (!gameState.battleEnded) checkBattleStatus(true);
+            if (!attacker.isAlive()) return;
+        }
+
+        // Tiefling Passive
+        if (this.race === 'Tiefling' && finalDamageDealt > 0) {
+            const reflectionCost = (this.level >= 20) ? 0 : 5;
+            if (this.mp >= reflectionCost) {
+                if (reflectionCost > 0) this.mp -= reflectionCost;
+                reflectedDamage = Math.floor(finalDamageDealt * 0.10);
+                if (reflectedDamage > 0) {
+                    const damageResult = attacker.takeDamage(reflectedDamage, { isMagic: true, element: 'fire', ignore_defense: 1.0 });
+                    const finalReflected = damageResult.damageDealt;
+                    addToLog(`${this.name}'s infernal blood rebukes ${attacker.name} for <span class="font-bold text-red-500">${finalReflected}</span> fire damage!`, 'text-orange-400');
+                     if (!gameState.battleEnded) checkBattleStatus(true);
+                }
+            }
+        }
+    }
+
+    // --- REPLACED: Main takeDamage function ---
+    takeDamage(damage, options = {}) {
+        // 1. Calculate Avoidance (For Elf, Beastkin)
+        const avoidanceChances = this._calculateAvoidanceChances();
+        const attacker = options.attacker || (options.element ? { element: options.element } : null); // Create mock attacker for options
+
+        // 2. Attempt Avoidance (Parry > Dodge > Block)
+        if (this._attemptAvoidance(avoidanceChances, attacker)) {
+            if (gameState.currentView === 'battle') renderBattleGrid();
+            return { damageDealt: 0, knockback: 0 };
+        }
+
+        // --- Damage Continues ---
+        const originalDamage = damage;
+
+        // 3. Apply Alchemical Barrier
+        damage = this._applyAlchemicalBarrier(damage);
+        if (damage <= 0) {
+            if (gameState.currentView === 'battle') renderBattleGrid();
+            return { damageDealt: 0, knockback: 0 };
+        }
+
+        // 4. Determine Attack Type & Apply Vulnerabilities (For Orc)
+        const isMagicAttack = (attacker?.element && attacker.element !== 'none') || options.isMagic || options.ignore_defense;
+        damage = this._applyDamageVulnerabilities(damage, isMagicAttack, options.ignore_defense, attacker);
+
+        // 5. Calculate Effective Defense
+        const effectiveDefense = this._calculateEffectiveDefense(isMagicAttack, attacker?.element, options.ignore_defense, attacker);
+        
+        // 6. Apply Damage & Log
+        const finalDamageDealt = this._applyAndLogDamage(damage, effectiveDefense, attacker, isMagicAttack);
+
+        // 7. Handle Reflect Effects (For Tiefling)
+        this._handleReflectEffects(finalDamageDealt, originalDamage, attacker);
+        
+        // 8. Check for Flee state
         if (this.hp <= 0 && !this.isFled) {
             this.isFled = true;
             addToLog(`<span class="font-bold text-red-500">${this.name} has been defeated and fled the battle!</span>`, "text-red-500");
@@ -1809,8 +2264,9 @@ class NpcAlly extends Entity {
         if (gameState.currentView === 'battle') {
             renderBattleGrid();
         }
-        return { damageDealt: finalDamage, knockback: 0 }; // Ally doesn't handle knockback
+        return { damageDealt: finalDamageDealt, knockback: 0 }; // Allies don't handle knockback
     }
+    // --- END REPLACED ---
 
     // --- Battle AI ---
     async attack(target) {
@@ -1837,11 +2293,27 @@ class NpcAlly extends Entity {
         if (!target || !target.isAlive()) return;
         
         const weapon = this.equippedWeapon;
+        let attackDamageDice = [...weapon.damage]; // [numDice, sides]
+        if (this.race === 'Dwarf' && this.level >= 20) {
+            if (attackDamageDice[1] === 6) { attackDamageDice[1] = 8; }
+            else if (attackDamageDice[1] === 8) { attackDamageDice[1] = 10; }
+        }
         let rollResult = rollDice(weapon.damage[0], weapon.damage[1], `${this.name} Attack`);
         let baseDamage = rollResult.total;
         
-        let damage = baseDamage + this.physicalDamageBonus;
+        let statBonus = this.physicalDamageBonus;
+        const statMultiplier = 1 + statBonus / 20;
+        let damage = Math.floor(baseDamage * statMultiplier);
         
+        // Use total strength (base + bonus) for the flat bonus
+        const strengthFlatBonus = Math.floor((this.strength + this.bonusStrength) / 5);
+        damage += strengthFlatBonus;
+
+        if (this.race === 'Dragonborn') {
+            const damageBonus = (this.level >= 20) ? 1.20 : 1.10;
+            damage = Math.floor(damage * damageBonus);
+        }
+
         if (Math.random() < this.critChance) {
             const critMultiplier = weapon.effect?.critMultiplier || 1.5;
             damage = Math.floor(damage * critMultiplier);
@@ -1862,7 +2334,11 @@ class NpcAlly extends Entity {
 
         if (path && path.length > 1) {
             addToLog(`${this.name} moves towards ${target.name}!`);
-            const stepsToTake = Math.min(path.length - 1, 2); // Hardcoded move speed of 2
+            let moveDistance = 2; // Base move distance for ally
+            if (this.race === 'Elf' && (!this.equippedArmor || !this.equippedArmor.metallic)) {
+                moveDistance += (this.level >= 20 ? 2 : 1);
+            }
+            const stepsToTake = Math.min(path.length - 1, moveDistance); // <-- MODIFIED
 
             for (let i = 1; i <= stepsToTake; i++) {
                 const nextStep = path[i];
@@ -1943,7 +2419,9 @@ class NpcAlly extends Entity {
 
         if (itemType === 'weapon' || itemType === 'catalyst' || itemType === 'shield') {
             // 2-of-3 rule logic
-            const isTwoHanded = details.class === 'Hand-to-Hand' || details.effect?.dualWield;
+            let isTwoHanded = details.class === 'Hand-to-Hand' || details.effect?.dualWield;
+            if (isTwoHanded && details.class === 'Hand-to-Hand' && this.race === 'Beastkin' && this.level >= 20) isTwoHanded = false;
+
             let unequippedItemKey = null;
 
             if (isTwoHanded) {
@@ -1969,6 +2447,12 @@ class NpcAlly extends Entity {
                 this.equipmentOrder.push(itemType); // Add new type
             }
 
+            let isEquippedWeaponTwoHanded = this.equippedWeapon?.class === 'Hand-to-Hand' || this.equippedWeapon?.effect?.dualWield;
+            if (isEquippedWeaponTwoHanded && this.equippedWeapon?.class === 'Hand-to-Hand' && this.race === 'Beastkin' && this.level >= 20) isEquippedWeaponTwoHanded = false;
+            if ((itemType === 'shield' || itemType === 'catalyst') && isEquippedWeaponTwoHanded) {
+                if (!silent) addToLog(`${this.name} cannot use a ${itemType} while using ${this.equippedWeapon.name}.`, 'text-red-400');
+                return null;
+            }
             // Now, equip the new item
             if (itemType === 'weapon') {
                 this.equippedWeapon = details;
@@ -2124,8 +2608,19 @@ class NpcAlly extends Entity {
         const spellAmp = catalyst.effect?.spell_amp || 0;
         diceCount = Math.min(spell.cap, diceCount + spellAmp);
         
-        let damage = rollDice(diceCount, spell.damage[1], `${this.name} Spell`).total + this.magicalDamageBonus;
+        let baseDamage = rollDice(diceCount, spell.damage[1], `${this.name} Spell`).total;
+        let statBonus = this.magicalDamageBonus;
         
+        const statMultiplier = 1 + statBonus / 20;
+        let damage = Math.floor(baseDamage * statMultiplier);
+
+        const intFlatBonus = Math.floor((this.intelligence + this.bonusIntelligence) / 5);
+        damage += intFlatBonus;
+
+        if (this.race === 'Dragonborn') {
+            const damageBonus = (this.level >= 20) ? 1.20 : 1.10;
+            damage = Math.floor(damage * damageBonus);
+        }        
         // Simplified crit
         const spellCritChance = this.critChance + (catalyst.effect?.spell_crit_chance || 0);
         if (Math.random() < spellCritChance) {
@@ -2711,13 +3206,15 @@ function getQuestDetails(questIdentifier) {
 
 function applyStatusEffect(target, effectType, effectData, sourceName) {
     let resistChance = 0;
-    if (target instanceof Player) {
+    if (target instanceof Player || target instanceof NpcAlly) { // <-- MODIFIED: Include NpcAlly
         resistChance = target.resistanceChance; // Base resist (includes Clankers bonus)
 
-        // Add resistance from gear
-        const shield = target.equippedShield;
-        if (shield && shield.effect?.type === 'debuff_resist') {
-            resistChance += (1 - resistChance) * shield.effect.chance; // Multiplicative stacking
+        // Add resistance from gear (Player only for now)
+        if (target instanceof Player) { // <-- ADDED: Specific check for Player gear
+            const shield = target.equippedShield;
+            if (shield && shield.effect?.type === 'debuff_resist') {
+                resistChance += (1 - resistChance) * shield.effect.chance; // Multiplicative stacking
+            }
         }
          // Add resistance from status effects (like resist potions)
         const resistKey = `resist_${effectType}`; // Assumes potion effects match 'resist_poison', etc.
@@ -2729,16 +3226,19 @@ function applyStatusEffect(target, effectType, effectData, sourceName) {
         // Apply Human/Dragonborn/Halfling logic using rollForEffect
         // We are rolling to RESIST, so we use (1 - resistChance) as the "failure" chance
         if (target.rollForEffect(resistChance, 'Debuff Resist')) {
-            addToLog(`You resisted the ${effectType} effect from ${sourceName}!`, 'text-cyan-300 font-bold');
+            const logMsg = (target instanceof Player) ? "You resisted" : `${target.name} resisted`; // <-- MODIFIED: Ally-aware log
+            addToLog(`${logMsg} the ${effectType} effect from ${sourceName}!`, 'text-cyan-300 font-bold');
             return; // Effect resisted
         }
     }
 
     // --- AASIMAR: Divine Regeneration (Debuff Reduction) ---
-    if (target instanceof Player && target.race === 'Aasimar') {
+    // <-- MODIFIED: Check for Player OR NpcAlly
+    if ((target instanceof Player || target instanceof NpcAlly) && target.race === 'Aasimar') {
         if (effectData.duration && effectData.duration > 1) {
             effectData.duration = Math.max(1, effectData.duration - 1); // Reduce by 1, min 1
-            addToLog("Your divine nature lessens the debuff's duration!", "text-yellow-200");
+            const logMsg = (target instanceof Player) ? "Your divine nature lessens" : `${target.name}'s divine nature lessens`; // <-- MODIFIED: Ally-aware log
+            addToLog(`${logMsg} the debuff's duration!`, "text-yellow-200");
         }
     }
     // --- End Aasimar Logic ---

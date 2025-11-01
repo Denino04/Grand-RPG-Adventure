@@ -2691,6 +2691,43 @@ function checkBattleStatus(isReaction = false) {
                     }
                 }
                 // --- End Recipe Drop Logic ---
+            const baseSeedDropChance = 0.10; // 10% base chance
+            const seedLuckBonus = Math.min(0.15, (player.luck * 0.5) / 100); // Max +15% from luck
+            const finalSeedDropChance = baseSeedDropChance + seedLuckBonus;
+
+            if (logChanceCalculations) {
+                addToLog(`DEBUG: Seed Roll Chance: Base = ${(baseSeedDropChance * 100).toFixed(1)}%, Luck = +${(seedLuckBonus * 100).toFixed(1)}% => Final = ${(finalSeedDropChance * 100).toFixed(1)}%`, 'text-gray-500');
+            }
+
+            if (preTrainingState === null && player.rollForEffect(finalSeedDropChance, 'Seed Drop')) {
+                const enemyTier = enemy.speciesData.tier;
+                let weights;
+                
+                // Determine seed rarity pool based on enemy tier
+                if (enemyTier === 1) weights = [100, 0, 0];   // [Common, Uncommon, Rare]
+                else if (enemyTier === 2) weights = [70, 30, 0];
+                else if (enemyTier === 3) weights = [20, 80, 0];
+                else if (enemyTier === 4) weights = [0, 70, 30];
+                else if (enemyTier === 5) weights = [0, 30, 70];
+                else weights = [100, 0, 0]; // Default to Common
+
+                const chosenRarity = choices(['Common', 'Uncommon', 'Rare'], weights);
+
+                // Find all seeds (seeds or saplings) that match that rarity
+                const availableSeeds = Object.keys(ITEMS).filter(key => {
+                    const details = ITEMS[key];
+                    return details && (details.type === 'seed' || details.type === 'sapling') && details.rarity === chosenRarity;
+                });
+
+                if (logChanceCalculations) {
+                    addToLog(`DEBUG: Seed Drop. Tier ${enemyTier} rolled Rarity: ${chosenRarity}. Found seeds: [${availableSeeds.join(', ')}]`, 'text-gray-500');
+                }
+
+                if (availableSeeds.length > 0) {
+                    const seedKey = availableSeeds[Math.floor(Math.random() * availableSeeds.length)];
+                    player.addToInventory(seedKey, 1, true); // Add and log the seed
+                }
+            }
 
 
                 if (player.activeQuest && player.activeQuest.category === 'extermination') {
@@ -3024,31 +3061,55 @@ async function startNpcTurn() {
     }
 
     // 2. Item Logic (Priority 1: Survival)
-    if (!actionTaken && (ally.hp / ally.maxHp < 0.25)) {
-        // Find the best health potion they have
+    const lostHp = ally.maxHp - ally.hp;
+    const potionEffectiveness = {
+        'superior_health_potion': 100,
+        'condensed_health_potion': 50,
+        'health_potion': 20
+    };
+    
+    if (!actionTaken && lostHp > 0) {
         let potionToUse = null;
-        if (ally.inventory.items['superior_health_potion'] > 0) potionToUse = 'superior_health_potion';
-        else if (ally.inventory.items['condensed_health_potion'] > 0) potionToUse = 'condensed_health_potion';
-        else if (ally.inventory.items['health_potion'] > 0) potionToUse = 'health_potion';
         
+        if (ally.inventory.items['superior_health_potion'] > 0 && lostHp >= potionEffectiveness['superior_health_potion']) {
+            potionToUse = 'superior_health_potion';
+        } else if (ally.inventory.items['condensed_health_potion'] > 0 && lostHp >= potionEffectiveness['condensed_health_potion']) {
+            potionToUse = 'condensed_health_potion';
+        } else if (ally.inventory.items['health_potion'] > 0 && lostHp >= potionEffectiveness['health_potion']) {
+            potionToUse = 'health_potion';
+        }
+
         if (potionToUse) {
             ally.useItem(potionToUse);
             actionTaken = true;
         }
     }
 
-    if (!actionTaken && (ally.mp / ally.maxMp < 0.25)) {
-        // Find the best mana potion they have
+    const lostMp = ally.maxMp - ally.mp;
+    const manaPotionEffectiveness = {
+        'superior_mana_potion': 150,
+        'condensed_mana_potion': 100,
+        'mana_potion': 50
+    };
+
+    if (!actionTaken && lostMp > 0) {
         let potionToUse = null;
-        if (ally.inventory.items['superior_mana_potion'] > 0) potionToUse = 'superior_mana_potion';
-        else if (ally.inventory.items['condensed_mana_potion'] > 0) potionToUse = 'condensed_mana_potion';
-        else if (ally.inventory.items['mana_potion'] > 0) potionToUse = 'mana_potion';
         
+        if (ally.inventory.items['superior_mana_potion'] > 0 && lostMp >= manaPotionEffectiveness['superior_mana_potion']) {
+            potionToUse = 'superior_mana_potion';
+        } else if (ally.inventory.items['condensed_mana_potion'] > 0 && lostMp >= manaPotionEffectiveness['condensed_mana_potion']) {
+            potionToUse = 'condensed_mana_potion';
+        } else if (ally.inventory.items['mana_potion'] > 0 && lostMp >= manaPotionEffectiveness['mana_potion']) {
+            potionToUse = 'mana_potion';
+        }
+
         if (potionToUse) {
             ally.useItem(potionToUse);
             actionTaken = true;
         }
     }
+    // --- END MODIFICATION ---
+
 
     // 3. Buff Item Logic (Low Priority)
     if (!actionTaken && Math.random() < 0.15) { // 15% chance to check for buffs
@@ -3102,9 +3163,51 @@ async function startNpcTurn() {
                 // --- MAGE: In spell range & can cast ---
                 if (distance === 1) {
                     // Too close, fall back
-                    addToLog(`${ally.name} falls back to a safer distance!`);
-                    await ally.moveTowards(player); // Move towards player
-                    actionTaken = true;
+                    addToLog(`${ally.name} is too close and tries to fall back!`); // <-- MODIFIED LOG
+
+                    // --- NEW FALLBACK LOGIC (Simple) ---
+                    let moveDistance = 2; // Base ally move
+                    if (ally.race === 'Elf' && (!ally.equippedArmor || !ally.equippedArmor.metallic)) {
+                        moveDistance += (ally.level >= 20 ? 2 : 1);
+                    }
+
+                    // Find all adjacent cells
+                    const neighbors = [
+                        { x: ally.x, y: ally.y - 1 }, { x: ally.x, y: ally.y + 1 },
+                        { x: ally.x - 1, y: ally.y }, { x: ally.x + 1, y: ally.y }
+                    ];
+
+                    let bestCell = null;
+                    let maxDistFromEnemy = distance; // Current distance is 1
+
+                    for (const cell of neighbors) {
+                        // Check if cell is valid and not blocked *for an ally*
+                        // isCellBlocked(x, y, forEnemy = false, canFly = false, isAllyMoving = false)
+                        if (!isCellBlocked(cell.x, cell.y, false, false, true)) { // isAllyMoving = true
+                            const distFromEnemy = Math.abs(cell.x - target.x) + Math.abs(cell.y - target.y);
+                            
+                            // We want a cell that is > 1 distance from the enemy
+                            if (distFromEnemy > maxDistFromEnemy) {
+                                bestCell = cell;
+                                maxDistFromEnemy = distFromEnemy;
+                                // break; // Found one, that's good enough
+                            }
+                        }
+                    }
+
+                    if (bestCell) {
+                        // Found a cell to move to.
+                        // `moveTowards` will pathfind. We just give it the target coordinates.
+                        await ally.moveTowards(bestCell);
+                        actionTaken = true;
+                    } else {
+                        // Trapped! No adjacent cell to move to.
+                        addToLog(`${ally.name} is trapped and casts the spell anyway!`);
+                        ally.castSpell(bestSpell, target);
+                        actionTaken = true;
+                    }
+                    // --- END NEW FALLBACK LOGIC ---
+
                 } else {
                     // Good range, cast spell
                     ally.castSpell(bestSpell, target);
@@ -3223,6 +3326,16 @@ function finalizeNpcTurn() {
     if (ally.hp <= 0 || ally.isFled) {
          setTimeout(enemyTurn, 100); // Ally is out, proceed to enemy
          return;
+    }
+
+    // --- ADDED: Aasimar Racial Passive ---
+    if (ally.race === 'Aasimar') {
+        const healPercent = (ally.level >= 20) ? 0.05 : 0.02; // 5% or 2%
+        const healAmount = Math.floor(ally.maxHp * healPercent);
+        if (ally.hp < ally.maxHp && healAmount > 0) {
+            ally.hp = Math.min(ally.maxHp, ally.hp + healAmount);
+            addToLog(`${ally.name}'s divine nature regenerates <span class="font-bold text-green-300">${healAmount}</span> HP.`, 'text-yellow-200');
+        }
     }
 
     // Handle ally's status effects (DoTs, durations)
