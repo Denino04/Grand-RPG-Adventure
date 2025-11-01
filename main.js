@@ -586,6 +586,8 @@ async function loadGameFromKey(docId, isImport = false) {
             // --- MIGRATION (for ally) ---
             if (!newAlly.inventory) newAlly.inventory = { items: {}, size: 10, stack: 10 };
             if (!newAlly.equipmentOrder) newAlly.equipmentOrder = [];
+            if (newAlly.isResting === undefined) newAlly.isResting = false; // <<< NEW
+
             // --- END MIGRATION ---
             
             // Re-link equipment details from keys
@@ -722,6 +724,28 @@ async function loadGameFromKey(docId, isImport = false) {
         player.recalculateGrowthBonuses(); // Recalculate derived stats based on loaded points
         player.hp = Math.min(parsedData.hp, player.maxHp); // Ensure HP/MP aren't above recalculated max
         player.mp = Math.min(parsedData.mp, player.maxMp);
+                // --- NEW: Sync Ally Level on Load ---
+        if (player.npcAlly) {
+            // Get HP/MP percentages *before* recalculating stats
+            const oldMaxHp = player.npcAlly.maxHp || player.maxHp; // Use player max as fallback
+            const oldHp = player.npcAlly.hp;
+            const oldMaxMp = player.npcAlly.maxMp || player.maxMp;
+            const oldMp = player.npcAlly.mp;
+
+            // Recalculate level and stats based on player's *current* level
+            player.npcAlly.calculateStats(player.level); 
+            
+            // Preserve HP/MP percentage from save
+            const hpPercent = (oldMaxHp > 0) ? (oldHp / oldMaxHp) : 1;
+            const mpPercent = (oldMaxMp > 0) ? (oldMp / oldMaxMp) : 1;
+            
+            // Apply percentages to *new* max values
+            player.npcAlly.hp = Math.max(1, Math.floor(player.npcAlly.maxHp * hpPercent));
+            player.npcAlly.mp = Math.floor(player.npcAlly.maxMp * mpPercent);
+            
+            console.log(`Synced ally ${player.npcAlly.name} to Lvl ${player.npcAlly.level}.`);
+        }
+        // --- END NEW ---
         console.log("Stats recalculated.");
 
         // --- EQUIPMENT RE-ASSIGNMENT (Prioritize Key, Fallback to Name) ---

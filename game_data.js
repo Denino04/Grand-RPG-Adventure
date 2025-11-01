@@ -408,11 +408,10 @@ const BIOMES = {
 
 const BATTLE_GRIDS = {
     'square_3x3': { width: 3, height: 3, layout: [1,1,1, 1,1,1, 1,1,1] }, // Added for training
-    'square_4x4': { width: 4, height: 4, layout: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1] }, // Added for training
+    'square_4x4': { width: 4, height: 4, layout: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1] }, // Added for training  
     'square_5x5': { width: 5, height: 5, layout: [1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1] },
     'square_6x6': { width: 6, height: 6, layout: [1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1] },
-    'l_shape_5': { width: 5, height: 5, layout: [1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,1, 1,0,0,0,0] },
-    'h_shape_5': { width: 5, height: 5, layout: [1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1] },
+    
     'rect_6x4': { width: 6, height: 4, layout: [1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1,1,1,1] },
     'rect_4x6': { width: 4, height: 6, layout: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1] },
     'rect_5x6': { width: 5, height: 6, layout: [1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1] },

@@ -131,22 +131,23 @@ const ITEMS = {
     'chicken_meat': {name: 'Chicken Meat', type: 'food_ingredient', price: 15, rarity: 'Uncommon', description: 'Surprisingly normal-tasting meat from a cockatrice.', cookingType: 'meat'},
     'horse_meat': {name: 'Horse Meat', type: 'food_ingredient', price: 30, rarity: 'Uncommon', description: 'Meat from a unicorn. Tastes magical and a little sad.', cookingType: 'meat'},
     'whale_meat': {name: 'Whale Meat', type: 'food_ingredient', price: 100, rarity: 'Rare', description: 'A massive cut of blubbery meat from a Livyatan.', cookingType: 'meat'}, // Added cookingType
-    'blackwheat': {name: 'Blackwheat', type: 'food_ingredient', price: 30, rarity: 'Common', description: 'A dark, hardy grain.', alchemyType: 'secondary_reagent', cookingType: 'veggie'},
-    'cinnamonwood_log': {name: 'Cinnamonwood Log', type: 'food_ingredient', price: 30, rarity: 'Common', description: 'A fragrant log.', alchemyType: 'secondary_reagent', cookingType: 'veggie'},
-    'brineflower_leaf': {name: 'Brineflower Leaf', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'A salty leaf.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
-    'beetsnip_carrot': {name: 'Beetsnip Carrot', type: 'food_ingredient', price: 30, rarity: 'Common', description: 'A sweet and earthy root vegetable.', alchemyType: 'secondary_reagent', cookingType: 'veggie'},
-    'sweet_dandelion': {name: 'Sweet Dandelion', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'A tasty, edible flower.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
-    'ground_tater': {name: 'Ground Tater', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'A large, starchy potato.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
-    'orchidvine_fruit': {name: 'Orchidvine Fruit', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'An exotic and flavorful fruit.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
-    'koriandre_sprig': {name: 'Koriandre Sprig', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'A sprig of a strong, pungent herb.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
-    'jet_pepper': {name: 'Jet Pepper', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'A very spicy pepper.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
-    'dragon_chili': {name: 'Dragon Chili', type: 'food_ingredient', price: 100, rarity: 'Uncommon', description: 'An excruciatingly hot chili.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
-    'screaming_lotus': { name: 'Screaming Lotus', type: 'alchemy', price: 30, rarity: 'Common', description: 'A flower that emits a low hum.', alchemyType: 'secondary_reagent', cookingType: 'veggie' },
-    'maizemother_cob': {name: 'Maizemother Cob', type: 'food_ingredient', price: 300, rarity: 'Rare', description: 'A massive cob of corn with kernels like jewels.', cookingType: 'veggie'},
-    'crystal_apple': {name: 'Crystal Apple', type: 'food_ingredient', price: 500, rarity: 'Rare', description: 'A crisp apple with translucent, crystalline flesh.', alchemyType: 'secondary_reagent'},
-    'blood_peach': {name: 'Blood Peach', type: 'food_ingredient', price: 500, rarity: 'Rare', description: 'A juicy peach with deep red flesh that invigorates the body.', alchemyType: 'secondary_reagent'},
-    'ice_cherry': {name: 'Ice Cherry', type: 'food_ingredient', price: 500, rarity: 'Rare', description: 'A cherry that is perpetually cold to the touch.', alchemyType: 'secondary_reagent'},
+    'blackwheat': {name: 'Blackwheat', type: 'food_ingredient', price: 45, sellPrice: 45, rarity: 'Common', description: 'A dark, hardy grain.', alchemyType: 'secondary_reagent', cookingType: 'veggie'},
+    'cinnamonwood_log': {name: 'Cinnamonwood Log', type: 'food_ingredient', price: 45, sellPrice: 45, rarity: 'Common', description: 'A fragrant log.', alchemyType: 'secondary_reagent', cookingType: 'veggie'},
+    'brineflower_leaf': {name: 'Brineflower Leaf', type: 'food_ingredient', price: 300, sellPrice: 300, rarity: 'Uncommon', description: 'A salty leaf.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
+    'beetsnip_carrot': {name: 'Beetsnip Carrot', type: 'food_ingredient', price: 45, sellPrice: 45, rarity: 'Common', description: 'A sweet and earthy root vegetable.', alchemyType: 'secondary_reagent', cookingType: 'veggie'},
+    'sweet_dandelion': {name: 'Sweet Dandelion', type: 'food_ingredient', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A tasty, edible flower.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
+    'ground_tater': {name: 'Ground Tater', type: 'food_ingredient', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A large, starchy potato.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
+    'orchidvine_fruit': {name: 'Orchidvine Fruit', type: 'food_ingredient', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'An exotic and flavorful fruit.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
+    'koriandre_sprig': {name: 'Koriandre Sprig', type: 'food_ingredient', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A sprig of a strong, pungent herb.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
+    'jet_pepper': {name: 'Jet Pepper', type: 'food_ingredient', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A very spicy pepper.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
+    'dragon_chili': {name: 'Dragon Chili', type: 'food_ingredient', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'An excruciatingly hot chili.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
+    'screaming_lotus': { name: 'Screaming Lotus', type: 'alchemy', price: 45, sellPrice: 45, rarity: 'Common', description: 'A flower that emits a low hum.', alchemyType: 'secondary_reagent', cookingType: 'veggie' },
+    'maizemother_cob': {name: 'Maizemother Cob', type: 'food_ingredient', price: 450, sellPrice: 450, rarity: 'Rare', description: 'A massive cob of corn with kernels like jewels.', cookingType: 'veggie'},
+    'crystal_apple': {name: 'Crystal Apple', type: 'food_ingredient', price: 750, sellPrice: 750, rarity: 'Rare', description: 'A crisp apple with translucent, crystalline flesh.', alchemyType: 'secondary_reagent'},
+    'blood_peach': {name: 'Blood Peach', type: 'food_ingredient', price: 750, sellPrice: 750, rarity: 'Rare', description: 'A juicy peach with deep red flesh that invigorates the body.', alchemyType: 'secondary_reagent'},
+    'ice_cherry': {name: 'Ice Cherry', type: 'food_ingredient', price: 750, sellPrice: 750, rarity: 'Rare', description: 'A cherry that is perpetually cold to the touch.', alchemyType: 'secondary_reagent'},
     'wild_wine': {name: 'Wild Wine', type: 'food_ingredient', price: 25, rarity: 'Uncommon', description: 'A rough, potent wine favored by bandits and outlaws.', alchemyType: 'catalyst', cookingType: 'seasoning'}, // Added cookingType
+
 
     // Alchemy Ingredients (Specific)
     'chimera_claw': {name: 'Chimera Claw', type: 'alchemy', price: 200, rarity: 'Epic', description: 'A razor-sharp claw from a Chimera, still dripping with poison.'}, // Rarity increased
@@ -161,13 +162,12 @@ const ITEMS = {
     'void_heart': { name: 'Void Heart', type: 'alchemy', price: 2000, rarity: 'Legendary', description: 'A pulsating shard of darkness from a Dullahan.'}, // Rarity increased
     'troll_blood': {name: 'Troll Blood', type: 'alchemy', price: 50, rarity: 'Rare', description: 'Viscous, green blood that slowly regenerates. A powerful alchemical ingredient.', alchemyType: 'catalyst'},
     // Adding remaining specific alchemy ingredients
-    'sunshine_flower': {name: 'Sunshine Flower', type: 'alchemy', price: 100, rarity: 'Uncommon', description: 'A flower that radiates warmth.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
-    'sealotus_pad': {name: 'Sealotus Pad', type: 'alchemy', price: 100, rarity: 'Uncommon', description: 'A lily pad with calming properties.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
-    'fulgurbloom': {name: 'Fulgurbloom', type: 'alchemy', price: 100, rarity: 'Uncommon', description: 'A flower that crackles with electrical energy.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
-    'lantern_rose': {name: 'Lantern Rose', type: 'alchemy', price: 100, rarity: 'Uncommon', description: 'A rose that gives off a soft, steady light.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
-    'blackleaf': {name: 'Blackleaf', type: 'alchemy', price: 100, rarity: 'Uncommon', description: 'A leaf used in shadowy concoctions.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
-    'exploding_citrus': {name: 'Exploding Citrus', type: 'alchemy', price: 500, rarity: 'Rare', description: 'A citrus fruit that fizzes and pops. Handle with care.', alchemyType: 'secondary_reagent'},
-
+    'sunshine_flower': {name: 'Sunshine Flower', type: 'alchemy', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A flower that radiates warmth.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
+    'sealotus_pad': {name: 'Sealotus Pad', type: 'alchemy', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A lily pad with calming properties.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
+    'fulgurbloom': {name: 'Fulgurbloom', type: 'alchemy', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A flower that crackles with electrical energy.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
+    'lantern_rose': {name: 'Lantern Rose', type: 'alchemy', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A rose that gives off a soft, steady light.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
+    'blackleaf': {name: 'Blackleaf', type: 'alchemy', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A leaf used in shadowy concoctions.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
+    'exploding_citrus': {name: 'Exploding Citrus', type: 'alchemy', price: 750, sellPrice: 750, rarity: 'Rare', description: 'A citrus fruit that fizzes and pops. Handle with care.', alchemyType: 'secondary_reagent'},
 
     // --- Special & Crafting Items ---
     'undying_heart': { name: 'Undying Heart', type: 'special', price: 1000, sellPrice: 100, rarity: 'Rare', description: 'A pulsating heart that refuses to stop beating. Used in powerful rituals.' }, // Added sellPrice

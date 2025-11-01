@@ -2,6 +2,7 @@ let statAllocationAmount = 1;
 let storageSortOrder = 'category';
 // State for inventory tab
 let inventoryActiveTab = 'consumables'; // Default tab
+let sellActiveTab = 'consumables'; // NEW: State for sell tab
 
 function setStorageSortOrder(order) {
     storageSortOrder = order;
@@ -1533,9 +1534,24 @@ function learnNpcSpell(spellKey) {
     updateStatsView(); // Update gold
     renderNpcSpellTraining(); // Refresh the spell list
 }
-/**
- * Pays the NPC ally's salary.
- */
+
+function restNpcAlly(cost) {
+    if (!player || !player.npcAlly || player.npcAlly.isResting) return;
+
+    if (player.gold < cost) {
+        addToLog(`You cannot afford the ${cost} G to let ${player.npcAlly.name} rest.`, 'text-red-400');
+        return;
+    }
+
+    player.gold -= cost;
+    player.npcAlly.isResting = true;
+    
+    addToLog(`You paid ${cost} G. ${player.npcAlly.name} will rest for the next encounter to recover.`, 'text-green-300');
+    
+    updateStatsView();
+    renderBarracks(); // Refresh the barracks UI
+}
+
 function payNpcSalary(salary) {
     if (!player || !player.npcAlly) return;
 
@@ -1628,10 +1644,21 @@ function renderBarracks() {
                         <button onclick="renderNpcInventory()" class="btn btn-primary w-full">Manage Equipment & Items</button>
                         <!-- NEW SPELL BUTTON -->
                         <button onclick="renderNpcSpellTraining()" class="btn btn-primary w-full">Manage Spells</button>
+                        
+                        <!-- NEW REST BUTTON -->
+                        ${(() => {
+                            const restCost = Math.floor((10 + 5 * player.level) / 2);
+                            if (ally.isResting) {
+                                return `<button class="btn btn-primary w-full" disabled>Ally is Resting</button>`;
+                            } else {
+                                return `<button onclick="restNpcAlly(${restCost})" class="btn btn-primary w-full" ${player.gold < restCost ? 'disabled' : ''}>Rest Ally (${restCost} G)</button>`;
+                            }
+                        })()}
+                        <!-- END REST BUTTON -->
                         <button onclick="dismissNpc(false)" class="btn btn-action w-full">Dismiss Ally</button>
                      </div>`;
         }
-        
+
         html += `   </div>
                 </div>`;
 
@@ -3039,84 +3066,248 @@ function renderBlacksmithCraft() {
 
 function renderSell() {
     updateRealTimePalette();
-    const scrollable = mainView.querySelector('.inventory-scrollbar');
+    const scrollable = mainView.querySelector(`#sell-${sellActiveTab}-list`); // Get active list
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
 
     lastViewBeforeInventory = 'sell';
     gameState.currentView = 'sell';
 
-    let sellableHtml = '';
-    const categories = ['items', 'weapons', 'armor', 'shields', 'catalysts'];
-    let hasSellableItems = false;
+    // --- NEW TABBED LAYOUT ---
+    const tabs = [
+        { key: 'consumables', icon: '🧪', title: 'Consumables' },
+        { key: 'gardens', icon: '🌱', title: 'Gardens' },
+        { key: 'materials', icon: '🧱', title: 'Materials' },
+        { key: 'weapons', icon: '⚔️', title: 'Weapons' },
+        { key: 'catalysts', icon: '🔮', title: 'Catalysts' },
+        { key: 'armor', icon: '⛊', title: 'Armor' },
+        { key: 'shields', icon: '🛡️', title: 'Shields' },
+        { key: 'lures', icon: '🎣', title: 'Lures' }
+    ];
 
-    categories.forEach(category => {
-        let itemsInCategory = [];
-        if (category === 'items') {
-            itemsInCategory = Object.keys(player.inventory.items);
-        } else {
-            if (!Array.isArray(player.inventory[category])) {
-                 player.inventory[category] = [];
-            }
-            itemsInCategory = [...new Set(player.inventory[category])];
-        }
-
-        if (itemsInCategory.length > 0) {
-            let categoryHtml = '';
-            itemsInCategory.forEach(key => {
-                const details = getItemDetails(key);
-                if (details && details.price > 0 && details.type !== 'key') {
-                    const sellPrice = Math.floor(details.price / 4);
-                    let count = 0;
-                     if (category === 'items') {
-                        count = player.inventory.items[key] || 0;
-                    } else {
-                        count = player.inventory[category].filter(i => i === key).length;
-                    }
-
-                     // Don't list equipped items for sale
-                    const isEquipped = (category === 'weapons' && player.equippedWeapon.name === details.name) ||
-                                     (category === 'armor' && player.equippedArmor.name === details.name) ||
-                                     (category === 'shields' && player.equippedShield.name === details.name) ||
-                                     (category === 'catalysts' && player.equippedCatalyst.name === details.name);
-
-
-                    if (count > 0 && !isEquipped) {
-                        hasSellableItems = true;
-                        categoryHtml += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
-                                        <span>${details.name} (x${count})</span>
-                                        <div>
-                                            <span class="text-yellow-400 font-semibold mr-4">${sellPrice} G</span>
-                                            <button onclick="sellItem('${category}', '${key}', ${sellPrice})" class="btn btn-primary text-sm py-1 px-3">Sell</button>
-                                        </div>
-                                     </div>`;
-                    }
-                }
-            });
-            if (categoryHtml) {
-                 sellableHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${capitalize(category)}</h3><div class="space-y-2">${categoryHtml}</div>`;
-            }
-        }
+    let tabHtml = '<div class="grid grid-cols-4 gap-1 mb-2">'; // 4 columns
+    tabs.forEach(tab => {
+        const isActive = sellActiveTab === tab.key;
+        const bgColor = isActive ? 'bg-yellow-600 border-yellow-800' : 'bg-slate-700 hover:bg-slate-600 border-slate-900';
+        tabHtml += `<button onclick="setSellTab('${tab.key}')" class="btn ${bgColor} text-xs py-1 px-2 flex items-center justify-center gap-1 w-full">${tab.icon} ${tab.title}</button>`;
     });
+    tabHtml += '</div>';
 
-    if (!hasSellableItems) {
-        sellableHtml = '<p class="text-center text-gray-400 mt-8">You have nothing of value to sell.</p>';
+    let rightPaneContent = '';
+    // Renaming 'items' to 'consumables' for clarity
+    switch (sellActiveTab) {
+        case 'consumables': rightPaneContent = renderSellList('items', 'Consumables'); break;
+        case 'gardens': rightPaneContent = renderSellList('gardens', 'Gardens'); break;
+        case 'materials': rightPaneContent = renderSellList('materials', 'Materials'); break;
+        case 'weapons': rightPaneContent = renderSellList('weapons', 'Weapons'); break;
+        case 'catalysts': rightPaneContent = renderSellList('catalysts', 'Catalysts'); break;
+        case 'armor': rightPaneContent = renderSellList('armor', 'Armor'); break;
+        case 'shields': rightPaneContent = renderSellList('shields', 'Shields'); break;
+        case 'lures': rightPaneContent = renderSellList('lures', 'Lures'); break;
+        default: rightPaneContent = renderSellList('items', 'Consumables');
     }
 
-    let html = `<div class="w-full">
-                    <h2 class="font-medieval text-3xl mb-4 text-center">Sell Items</h2>
-                    <p class="text-center text-gray-400 mb-4">You get 25% of an item's value when selling.</p>
-                    <div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${sellableHtml}</div>
-                    <div class="text-center mt-4">
-                        <button onclick="renderShop('store')" class="btn btn-primary">Back to Store</button>
-                    </div>
-                </div>`;
+    let html = `
+        <div class="w-full text-left h-full flex flex-col">
+            <h2 class="font-medieval text-3xl mb-2 text-center">Sell Items</h2>
+            <p class="text-center text-gray-400 text-sm mb-2">Sell price: 25% of value (or 100% for crops). Equipped items cannot be sold.</p>
+            ${tabHtml}
+            <div class="flex-grow overflow-hidden h-72">
+                ${rightPaneContent}
+            </div>
+            <div class="text-center mt-3">
+                <button onclick="renderShop('store')" class="btn btn-primary">Back to Store</button>
+            </div>
+        </div>`;
+    // --- END NEW TABBED LAYOUT ---
+
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
 
-    const newScrollable = mainView.querySelector('.inventory-scrollbar');
+    const newScrollable = mainView.querySelector(`#sell-${sellActiveTab}-list`);
     if (newScrollable) newScrollable.scrollTop = scrollPos;
 }
+
+const renderSellList = (category, title) => {
+    let list = [];
+    let itemCounts = {};
+    let html = ''; // Start empty
+
+    // Sorting/Type map logic
+    const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'enchant', 'experimental'];
+    const typeMapConsumables = {
+        'healing': 'Healing Potions',
+        'mana_restore': 'Mana Potions',
+        'buff': 'Buff Items',
+        'cleanse': 'Cleansing Items',
+        'cleanse_specific': 'Antidotes/Needles',
+        'buff_apply': 'Greases/Enhancements',
+        'debuff_apply': 'Throwables (Debuff)',
+        'debuff_special': 'Throwables (Special)',
+        'enchant': 'Essences',
+        'experimental': 'Mysterious Concoctions'
+    };
+    const materialOrder = ['food_ingredient', 'alchemy', 'enchant', 'special', 'junk'];
+    const typeMapMaterials = {
+         'food_ingredient': 'Cooking Ingredients',
+         'alchemy': 'Alchemy Reagents',
+         'enchant': 'Essences (Crafting)',
+         'special': 'Special Items',
+         'junk': 'Junk & Trophies'
+    };
+    const gardenOrder = ['seed', 'sapling'];
+    const typeMapGardens = {
+        'seed': 'Seeds',
+        'sapling': 'Saplings'
+    };
+
+    // --- Populate 'list' based on category ---
+     if (category === 'items') { // Handling 'Consumables' Tab
+        const allConsumableKeys = Object.keys(player.inventory.items).filter(key => {
+            const details = getItemDetails(key);
+            // MODIFIED: Filter for sellable consumables
+            return details && consumableOrder.includes(details.type) && details.price > 0;
+        });
+         const itemsWithDetails = allConsumableKeys.map(key => ({ key, details: getItemDetails(key) }));
+         itemsWithDetails.sort((a, b) => {
+             const typeAIndex = consumableOrder.indexOf(a.details.type);
+             const typeBIndex = consumableOrder.indexOf(b.details.type);
+             if (typeAIndex !== typeBIndex) {
+                 const finalAIndex = typeAIndex === -1 ? consumableOrder.length : typeAIndex;
+                 const finalBIndex = typeBIndex === -1 ? consumableOrder.length : typeBIndex;
+                 return finalAIndex - finalBIndex;
+             }
+             return a.details.name.localeCompare(b.details.name);
+         });
+         list = itemsWithDetails;
+    } else if (category === 'gardens') { // Handling 'Gardens' Tab
+        const allGardenKeys = Object.keys(player.inventory.items).filter(key => {
+            const details = getItemDetails(key);
+             // MODIFIED: Filter for sellable garden items
+            return details && gardenOrder.includes(details.type) && (details.price > 0 || details.sellPrice > 0);
+        });
+        const itemsWithDetails = allGardenKeys.map(key => ({ key, details: getItemDetails(key) }));
+        itemsWithDetails.sort((a, b) => {
+             const typeAIndex = gardenOrder.indexOf(a.details.type);
+             const typeBIndex = gardenOrder.indexOf(b.details.type);
+             if (typeAIndex !== typeBIndex) {
+                 return typeAIndex - typeBIndex;
+             }
+             return a.details.name.localeCompare(b.details.name);
+        });
+        list = itemsWithDetails;
+    } else if (category === 'materials') { // Handling 'Materials' Tab
+        const allMaterialKeys = Object.keys(player.inventory.items).filter(key => {
+            const details = getItemDetails(key);
+            // MODIFIED: Filter for sellable materials (excluding key items)
+            return details && materialOrder.includes(details.type) && details.price > 0 && details.type !== 'key';
+        });
+        const itemsWithDetails = allMaterialKeys.map(key => ({ key, details: getItemDetails(key) }));
+        itemsWithDetails.sort((a, b) => {
+             const typeAIndex = materialOrder.indexOf(a.details.type);
+             const typeBIndex = materialOrder.indexOf(b.details.type);
+             if (typeAIndex !== typeBIndex) {
+                 const finalAIndex = typeAIndex === -1 ? materialOrder.length : typeAIndex;
+                 const finalBIndex = typeBIndex === -1 ? materialOrder.length : typeBIndex;
+                 return finalAIndex - finalBIndex;
+             }
+             return a.details.name.localeCompare(b.details.name);
+        });
+        list = itemsWithDetails;
+    } else if (category === 'lures') {
+        list = Object.keys(player.inventory.lures).filter(key => {
+            const details = getItemDetails(key);
+            return details && details.price > 0; // Filter for sellable lures
+        }).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name));
+    } else { // Equipment
+        if (!Array.isArray(player.inventory[category])) player.inventory[category] = [];
+        player.inventory[category] = player.inventory[category].filter(key => getItemDetails(key)); // Filter invalid keys
+        player.inventory[category].forEach(key => itemCounts[key] = (itemCounts[key] || 0) + 1);
+        list = Object.keys(itemCounts).filter(key => {
+             const details = getItemDetails(key);
+             return details && details.price > 0 && details.rarity !== 'Broken'; // Filter for sellable, non-broken
+        }).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name));
+    }
+
+    // --- Render the List ---
+     if (list.length === 0) {
+        return `<p class="text-gray-400 text-center mt-4">No ${title.toLowerCase()} to sell.</p>`;
+    }
+
+    html += `<div id="sell-${category}-list" class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-2">`; // Added space-y-2
+
+    let currentSubType = ''; // Track the current sub-type for headers
+    if (category === 'items' || category === 'materials' || category === 'gardens') {
+        const typeMap = category === 'items' ? typeMapConsumables : (category === 'materials' ? typeMapMaterials : typeMapGardens);
+
+        list.forEach(itemObj => {
+            const key = itemObj.key;
+            const details = itemObj.details;
+             if (!details) return;
+
+             const subType = details.type;
+             if (subType !== currentSubType) {
+                 currentSubType = subType;
+                 const subHeader = typeMap[subType] || capitalize(subType);
+                 html += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2">${subHeader}</h4>`;
+             }
+
+             let countStr = '';
+             let count = player.inventory.items[key] || 0;
+             if (count > 1) countStr = `(x${count})`;
+
+             // --- MODIFIED: Sell Button Logic ---
+             const sellPrice = Math.floor(details.sellPrice || (details.price / 4)); // Use sellPrice if available, else 1/4
+             if (sellPrice <= 0) return; // Don't show if not sellable
+
+             let buttonHtml = `<button onclick="sellItem('items', '${key}', ${sellPrice})" class="btn btn-primary text-sm py-1 px-3">Sell (${sellPrice} G)</button>`;
+             // --- END MODIFIED ---
+
+             html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr}</span>${buttonHtml}</div>`;
+        });
+    } else { // Equipment or Lures
+         list.forEach(key => {
+             const details = getItemDetails(key);
+             if (!details) return;
+
+             let countStr = '';
+             let count = 0;
+             let buttonHtml = '';
+             const sellPrice = Math.floor(details.sellPrice || (details.price / 4)); // Use sellPrice if available, else 1/4
+             if (sellPrice <= 0) return; // Don't show
+
+             if (category === 'lures') {
+                 count = player.inventory.lures[key] || 0;
+                 countStr = `(x${count} uses)`;
+                 // --- MODIFIED: Sell Button for Lures ---
+                 buttonHtml = `<button onclick="sellItem('lures', '${key}', ${sellPrice})" class="btn btn-primary text-sm py-1 px-3">Sell (${sellPrice} G)</button>`;
+             } else { // Equipment
+                 count = itemCounts[key] || 0;
+                 if (count > 1) countStr = `(x${count})`;
+
+                 // --- MODIFIED: Sell Button for Equipment (check equipped) ---
+                 const isEquipped = (category === 'weapons' && WEAPONS[key]?.name === player.equippedWeapon?.name) ||
+                                  (category === 'catalysts' && CATALYSTS[key]?.name === player.equippedCatalyst?.name) ||
+                                  (category === 'armor' && ARMOR[key]?.name === player.equippedArmor?.name) ||
+                                  (category === 'shields' && SHIELDS[key]?.name === player.equippedShield?.name);
+                
+                if (isEquipped) {
+                    // Show one equipped, and if count > 1, show a sell button for the rest
+                    countStr = `(x${count-1} in bag)`;
+                    buttonHtml = `<button class="btn btn-primary text-sm py-1 px-3" disabled>Equipped</button>`;
+                    if (count > 1) { // Have more than one
+                        buttonHtml += `<button onclick="sellItem('${category}', '${key}', ${sellPrice})" class="btn btn-primary text-sm py-1 px-3 ml-2">Sell (${sellPrice} G)</button>`;
+                    }
+                } else { // Not equipped
+                     buttonHtml = `<button onclick="sellItem('${category}', '${key}', ${sellPrice})" class="btn btn-primary text-sm py-1 px-3">Sell (${sellPrice} G)</button>`;
+                }
+             }
+             html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr}</span>${buttonHtml}</div>`;
+        });
+    }
+    html += `</div>`; // Close scrollable div
+    return html;
+};
 
 function renderSageTowerTrain() {
     applyTheme('magic');
@@ -3311,6 +3502,11 @@ function renderSageTowerCraft() {
 window.setInventoryTab = function(tabName) {
     inventoryActiveTab = tabName;
     renderInventory(); // Re-render with the new active tab
+}
+
+window.setSellTab = function(tabName) {
+    sellActiveTab = tabName;
+    renderSell(); // Re-render with the new active tab
 }
 
 function renderInventory() {
@@ -3845,10 +4041,19 @@ function renderPostBattleMenu() {
     player.clearEncounterBuffs();
     gameState.activeDrone = null; // Clear drone
     
-    // --- NPC ALLY: Handle post-battle ---
     if (player.npcAlly) {
         player.npcAlly.clearBattleBuffs(); // Clear ally buffs
-        if (player.npcAlly.isFled) {
+
+        // --- NEW: Handle Resting Ally ---
+        if (player.npcAlly.isResting) {
+            player.npcAlly.isResting = false;
+            player.npcAlly.hp = player.npcAlly.maxHp;
+            player.npcAlly.mp = player.npcAlly.maxMp;
+            addToLog(`${player.npcAlly.name} has finished resting and is fully recovered!`, "text-green-300");
+            // Do not increment encountersSinceLastPay
+        }
+        // --- END NEW ---
+        else if (player.npcAlly.isFled) {
             addToLog(`<span class="font-bold text-red-700">${player.npcAlly.name} has fled and is gone for good, taking all their equipment...</span>`, "text-red-700");
             player.npcAlly = null; // Ally is permanently gone
             player.encountersSinceLastPay = 0; // Reset counter

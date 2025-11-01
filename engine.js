@@ -1023,6 +1023,14 @@ class Player extends Entity {
             addToLog("The whispers of shady dealings start to fly around. It looks like the black market has reached this frontier town.");
         }
         // --- End Added ---
+                // --- NEW: Level up NPC Ally ---
+        if (this.npcAlly) {
+            this.npcAlly.calculateStats(this.level); // Recalculate stats based on player's NEW level
+            this.npcAlly.hp = this.npcAlly.maxHp; // Full heal on level up
+            this.npcAlly.mp = this.npcAlly.maxMp;
+            addToLog(`Your ally, ${this.npcAlly.name}, has grown stronger! They are now level ${this.npcAlly.level}.`, 'text-blue-300');
+        }
+        // --- END NEW ---
 
 
         // Trigger level up screen display AFTER current action completes, if not in battle
@@ -1656,6 +1664,7 @@ class NpcAlly extends Entity {
         this.x = -1;
         this.y = -1;
         this.isFled = false;
+        this.isResting = false; // <<< NEWstrengthFlatBonus
         
         // --- Base Stats & Class ---
         this._classKey = classKey; // Store the key, even if it's undefined
@@ -1750,6 +1759,7 @@ class NpcAlly extends Entity {
         this.hp = this.maxHp;
         this.mp = this.maxMp;
     }
+    isAlive() { return this.hp > 0; }
 
     updateAbilityReferences() {
         console.log(`DEBUG: updateAbilityReferences called for Ally. Race Key: "${this.raceKey}"`);
@@ -2298,15 +2308,17 @@ class NpcAlly extends Entity {
             if (attackDamageDice[1] === 6) { attackDamageDice[1] = 8; }
             else if (attackDamageDice[1] === 8) { attackDamageDice[1] = 10; }
         }
-        let rollResult = rollDice(weapon.damage[0], weapon.damage[1], `${this.name} Attack`);
+        // --- MODIFIED: Use attackDamageDice (for Dwarf passive) ---
+        let rollResult = rollDice(attackDamageDice[0], attackDamageDice[1], `${this.name} Attack`);
         let baseDamage = rollResult.total;
         
-        let statBonus = this.physicalDamageBonus;
+        const statBonus = this.physicalDamageBonus;
         const statMultiplier = 1 + statBonus / 20;
+        // --- MODIFIED: Initialize 'damage' variable ---
         let damage = Math.floor(baseDamage * statMultiplier);
         
-        // Use total strength (base + bonus) for the flat bonus
-        const strengthFlatBonus = Math.floor((this.strength + this.bonusStrength) / 5);
+        // --- MODIFIED: Use base stat for flat bonus, just like player ---
+        const strengthFlatBonus = Math.floor(this.strength / 5);
         damage += strengthFlatBonus;
 
         if (this.race === 'Dragonborn') {
@@ -2573,8 +2585,8 @@ class NpcAlly extends Entity {
      * @param {Enemy} target - The enemy to target.
      * @returns {boolean} True if the spell was successfully cast.
      */
-    castSpell(spellKey, target) {
-        if (!target || !target.isAlive()) return false;
+    async castSpell(spellKey, target) { // Make async for potential future delays
+        if (!target) return false;
         
         const spellData = SPELLS[spellKey];
         const allySpell = this.spells[spellKey];
@@ -2602,21 +2614,69 @@ class NpcAlly extends Entity {
         
         this.mp -= finalSpellCost;
         addToLog(`${this.name} casts <span class="font-bold text-purple-300">${spell.name}</span>!`);
-        
-        // Damage calculation (simplified)
+
+        // --- NEW: Handle Healing Spells ---
+        if (spellData.element === 'healing' || spellData.type === 'support') {
+            if (spellData.element === 'healing') {
+                let diceCount = spell.damage[0];
+                const spellAmp = catalyst.effect?.spell_amp || 0;
+            diceCount = Math.min(spell.cap, diceCount + spellAmp);
+
+            let healAmount = rollDice(diceCount, spell.damage[1], `Ally Heal: ${spell.name}`).total;
+            
+            // Apply Ally's magical damage bonus (Intelligence)
+            const statBonus = this.magicalDamageBonus;
+            const statMultiplier = 1 + statBonus / 20;
+            healAmount = Math.floor(healAmount * statMultiplier);
+            const intFlatBonus = Math.floor(this.intelligence / 5);
+            healAmount += intFlatBonus;
+
+            // Apply Ally's racial passives (Dragonborn, Elemental[healing])
+            if (this.race === 'Elementals' && spellData.element === this.elementalAffinity) { // Assuming ally can have affinity
+                const damageBonus = (this.level >= 20) ? 1.20 : 1.10;
+                healAmount = Math.floor(healAmount * damageBonus);
+                if (this.level >= 20) {
+                    let extraDieRoll = rollDice(1, spell.damage[1], 'Elemental Evo Die').total;
+                    healAmount += Math.min(spell.cap * spell.damage[1], extraDieRoll);
+                }
+            } else if (this.race === 'Dragonborn') {
+                const damageBonus = (this.level >= 20) ? 1.20 : 1.10;
+                healAmount = Math.floor(healAmount * damageBonus);
+            }
+
+            // Apply heal to the target (which could be player or ally)
+            target.hp = Math.min(target.maxHp, target.hp + healAmount);
+            const targetName = (target === player) ? "you" : target.name;
+            addToLog(`${this.name} heals ${targetName} for <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-green-300');
+            
+            if (target === player) updateStatsView();
+            else renderBattleGrid(); // Update ally HP bar
+            
+            return true; // Cast was successful
+        }
+    }
+        // --- END NEW HEALING LOGIC ---
+
+
+        // --- Offensive Spell Logic ---
+        if (!target.isAlive()) return false; // Check after healing, in case target was somehow invalid
+
         let diceCount = spell.damage[0];
         const spellAmp = catalyst.effect?.spell_amp || 0;
         diceCount = Math.min(spell.cap, diceCount + spellAmp);
         
-        let baseDamage = rollDice(diceCount, spell.damage[1], `${this.name} Spell`).total;
-        let statBonus = this.magicalDamageBonus;
+        let damage = rollDice(diceCount, spell.damage[1], `${this.name} Spell`).total;
         
+        // --- MODIFIED: Apply same formula as player ---
+        const statBonus = this.magicalDamageBonus;
         const statMultiplier = 1 + statBonus / 20;
-        let damage = Math.floor(baseDamage * statMultiplier);
-
-        const intFlatBonus = Math.floor((this.intelligence + this.bonusIntelligence) / 5);
+        damage = Math.floor(damage * statMultiplier);
+        
+        // --- MODIFIED: Use base stat for flat bonus, just like player ---
+        const intFlatBonus = Math.floor(this.intelligence / 5);
         damage += intFlatBonus;
-
+        // --- END MODIFIED ---
+        
         if (this.race === 'Dragonborn') {
             const damageBonus = (this.level >= 20) ? 1.20 : 1.10;
             damage = Math.floor(damage * damageBonus);

@@ -89,6 +89,10 @@ function startBattle(biomeKey, trainingConfig = null) {
                 validCells.splice(validCells.indexOf(allyCell), 1); // Remove from valid
             }
             // If no adjacent cell, ally won't spawn in tutorial
+        } else if (player.npcAlly && player.npcAlly.hp > 0) {
+            // <<< NEW: Log why ally didn't spawn in tutorial
+            if (player.encountersSinceLastPay >= 5) addToLog(`${player.npcAlly.name} refuses to join the tutorial fight until paid!`, 'text-yellow-400');
+            else if (player.npcAlly.isResting) addToLog(`${player.npcAlly.name} is resting and skips the tutorial fight.`, 'text-gray-400');
         }
         // --- END NPC ALLY ---
 
@@ -115,7 +119,8 @@ function startBattle(biomeKey, trainingConfig = null) {
         const occupiedCells = new Set([`${player.x},${player.y}`]);
         
         // --- NPC ALLY: Spawn Ally in Training ---
-        if (player.npcAlly && player.npcAlly.hp > 0) {
+        if (player.npcAlly && player.npcAlly.hp > 0 && player.encountersSinceLastPay < 5 && !player.npcAlly.isResting) { // <<< MODIFIED
+
             // Try to spawn to the right, fallback to left
             let allyX = player.x + 1;
             let allyY = player.y;
@@ -127,8 +132,11 @@ function startBattle(biomeKey, trainingConfig = null) {
                 player.npcAlly.y = allyY;
                 occupiedCells.add(`${allyX},${allyY}`);
             } // If both blocked, ally doesn't spawn
-        }
-        // --- END NPC ALLY ---
+        } else if (player.npcAlly && player.npcAlly.hp > 0) {
+            // <<< NEW: Log why ally didn't spawn in training
+            if (player.encountersSinceLastPay >= 5) addToLog(`${player.npcAlly.name} refuses to train until paid!`, 'text-yellow-400');
+            else if (player.npcAlly.isResting) addToLog(`${player.npcAlly.name} is resting and skips the training session.`, 'text-gray-400');
+        }        // --- END NPC ALLY ---
 
         trainingConfig.enemies.forEach((enemyConfig, index) => {
             const species = MONSTER_SPECIES[enemyConfig.key];
@@ -194,7 +202,7 @@ function startBattle(biomeKey, trainingConfig = null) {
         }
 
         // --- NPC ALLY: Spawn Ally in Standard Battle ---
-        if (player.npcAlly && player.npcAlly.hp > 0) {
+        if (player.npcAlly && player.npcAlly.hp > 0 && player.encountersSinceLastPay < 5 && !player.npcAlly.isResting) { // <<< MODIFIED
             // Find adjacent, valid, unoccupied cell
             const potentialSpawns = [
                 {x: player.x + 1, y: player.y}, {x: player.x - 1, y: player.y},
@@ -215,6 +223,10 @@ function startBattle(biomeKey, trainingConfig = null) {
                 addToLog("There was no room for your ally to join the fight!", "text-yellow-400");
                 // Ally just doesn't spawn this fight
             }
+        } else if (player.npcAlly && player.npcAlly.hp > 0) {
+             // <<< NEW: Log why ally didn't spawn
+            if (player.encountersSinceLastPay >= 5) addToLog(`${player.npcAlly.name} refuses to join the fight until paid!`, 'text-yellow-400');
+            else if (player.npcAlly.isResting) addToLog(`${player.npcAlly.name} is resting and sits this one out.`, 'text-gray-400');
         }
         // --- END NPC ALLY ---
 
@@ -3110,7 +3122,60 @@ async function startNpcTurn() {
         }
     }
     // --- END MODIFICATION ---
+    if (!actionTaken) {
+        // Check if they *have* healing potions (as per constraint)
+        const hasHealingPotion = (ally.inventory.items['health_potion'] || 0) > 0 ||
+                                 (ally.inventory.items['condensed_health_potion'] || 0) > 0 ||
+                                 (ally.inventory.items['superior_health_potion'] || 0) > 0;
+        
+        if (!hasHealingPotion) {
+            const healingSpellKey = findBestHealingSpell(ally);
+            
+            if (healingSpellKey) {
+                const spellData = SPELLS[healingSpellKey];
+                const spell = spellData.tiers[ally.spells[healingSpellKey].tier - 1];
+                
+                // --- MODIFIED: Add catalyst bonus to threshold calculation ---
+                const catalyst = ally.equippedCatalyst;
+                const spellAmp = catalyst?.effect?.spell_amp || 0;
+                const diceCount = Math.min(spell.cap, spell.damage[0] + spellAmp);
+                
+                // Calculate average heal amount
+                const avgBaseHeal = (diceCount * (1 + spell.damage[1])) / 2; // Use modified diceCount
+                const statBonus = ally.magicalDamageBonus;
+                const statMultiplier = 1 + statBonus / 20;
+                let healThreshold = Math.floor(avgBaseHeal * statMultiplier) + Math.floor(ally.intelligence / 5);
+                // Apply racial bonuses to the threshold
+                if (ally.race === 'Dragonborn') healThreshold *= (ally.level >= 20) ? 1.20 : 1.10;
+                // (Add Elemental[healing] check here if allies get affinities later)
+                healThreshold = Math.floor(healThreshold);
 
+                // Calculate cost
+                let finalSpellCost = spell.cost;
+                if (ally.equippedCatalyst.effect?.mana_discount) {
+                    finalSpellCost = Math.max(1, finalSpellCost - ally.equippedCatalyst.effect.mana_discount);
+                }
+
+                if (ally.mp >= finalSpellCost) {
+                    const allyHpMissing = ally.maxHp - ally.hp;
+                    const playerHpMissing = player.maxHp - player.hp;
+                    let targetToHeal = null;
+
+                    if (allyHpMissing >= healThreshold) {
+                        targetToHeal = ally; // Heal self first
+                    } else if (playerHpMissing >= healThreshold) {
+                        targetToHeal = player; // Heal player if self is okay
+                    }
+
+                    if (targetToHeal) {
+                        await ally.castSpell(healingSpellKey, targetToHeal);
+                        actionTaken = true;
+                    }
+                }
+            }
+        }
+    }
+    // --- END NEW HEALING LOGIC ---
 
     // 3. Buff Item Logic (Low Priority)
     if (!actionTaken && Math.random() < 0.15) { // 15% chance to check for buffs
@@ -3315,6 +3380,24 @@ function findBestSpell(ally, target) {
     return bestSpell;
 }
     
+function findBestHealingSpell(ally) {
+    let bestHeal = null;
+    let maxTier = 0;
+
+    for (const spellKey in ally.spells) {
+        const spellData = SPELLS[spellKey];
+        // Check if the spell exists and is a healing spell
+        if (spellData && spellData.element === 'healing') {
+            const spellTier = ally.spells[spellKey].tier;
+            // Find the highest tier healing spell they know
+            if (spellTier > maxTier) {
+                maxTier = spellTier;
+                bestHeal = spellKey;
+            }
+        }
+    }
+    return bestHeal;
+}
 
 // --- New Function: finalizeNpcTurn ---
 function finalizeNpcTurn() {
