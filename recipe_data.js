@@ -567,7 +567,7 @@ const ALCHEMY_RECIPES = {
                 <li>Reagent C: 2 units, Cryo-Prunus (ice_cherry)</li>
                 <li>Catalyst: 1 unit, Troll-Sourced Coagulant Catalyst (troll_blood)</li>
             </ul>
-            <h4 class='font-bold text-lg text-yellow-300 mb-2'>Methodology</h4>
+            <h4 class'font-bold text-lg text-yellow-300 mb-2'>Methodology</h4>
             <p class='mb-2'>The final-stage refinement uses the Troll-Sourced Catalyst to fuse the endothermic properties of the Cryo-Prunus with the fortified thermal field of the base potion.</p>
             <h4 class='font-bold text-lg text-yellow-300 mb-2'>Outcome</h4>
             <p class='mb-2'>Grants a 20% resistance to Fire-aspected energy for 10 turns.</p>
@@ -709,7 +709,7 @@ const ALCHEMY_RECIPES = {
             <p class='mb-2'>The life-giving properties of the Sanguine Prunus Persica are inverted through catalysis, creating an energy-devouring field instead of an energy-emitting one.</p>
             <h4 class='font-bold text-lg text-yellow-300 mb-2'>Outcome</h4>
             <p class='mb-2'>Grants a 20% resistance to Light-aspected energy for 10 turns.</p>
-            <h4 class='font-bold text-lg text-yellow-300 mb-2'>Addendum</h4>
+            <h4 classs='font-bold text-lg text-yellow-300 mb-2'>Addendum</h4>
             <p class='italic text-gray-400'>One of my more ethically ambiguous creations. To turn a life-giving agent into its opposite feels... philosophically questionable. It is, however, remarkably effective.</p>
         `
     },
@@ -756,13 +756,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 portion of Rabbit Meat, 2 Vegetables of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> A simple roast is best. Braise the rabbit low and slow with the vegetables until the meat is tender enough to pull apart with a fork.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “My dear Kiky once tried to explain the 'Maillard reaction' to me, going on about amino acids and reducing sugars. I told them it’s simpler than that: brown food tastes better. This is the first meal I ever made for them, and it’s still a favorite. It’s simple, honest, and puts some real fight back in your arms.”</p>
-            <p class='mt-4'><strong>Result:</strong> A hearty meal that restores 60 HP and increases your physical damage by 5% for your next 3 encounters.</p>
+            <p class='mt-4'><strong>Result:</strong> A hearty meal that restores 60 HP and increases your physical damage by 10% for your next 3 encounters.</p>
         `,
         ingredients: { 'rabbit_meat': 1, 'veggie': 2 },
         effect: { 
             type: 'buff', 
             heal: 60,
-            buffs: [{ stat: 'physical_damage', value: 1.05, duration: 3 }]
+            buffs: [{ stat: 'physical_damage', value: 1.10, duration: 3 }]
         }
     },
     'humming_medley': {
@@ -774,13 +774,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 Screaming Lotus, 2 Vegetables of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> A quick chop and sauté in a hot pan with a bit of oil or butter is all this needs. The lotus will soften, and its hum will become a gentle background note.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “Don't be put off by the humming; it's a sign that the lotus is fresh. Kiky says it’s a 'low-frequency resonance that aids synaptic focus.' I just find it helps clear my head when I’m trying to remember a complex spell rotation. A perfect side dish for any aspiring mage.”</p>
-            <p class='mt-4'><strong>Result:</strong> Restores 60 HP and boosts your magical damage by 5% for 3 encounters.</p>
+            <p class='mt-4'><strong>Result:</strong> Restores 60 HP and boosts your magical damage by 10% for 3 encounters.</p>
         `,
         ingredients: { 'screaming_lotus': 1, 'veggie': 2 },
         effect: { 
             type: 'buff', 
             heal: 60,
-            buffs: [{ stat: 'magical_damage', value: 1.05, duration: 3 }]
+            buffs: [{ stat: 'magical_damage', value: 1.10, duration: 3 }]
         }
     },
     'fortifying_meat_pie': {
@@ -798,7 +798,7 @@ const COOKING_RECIPES = {
         effect: { 
             type: 'buff', 
             heal: 50,
-            buffs: [{ stat: 'max_hp', value: 1.10, duration: 3 }]
+            buffs: [{ stat: 'max_hp', value: 1.10, duration: 3 }] // CHANGED
         }
     },
     'spiced_root_stew': {
@@ -810,13 +810,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 Cinnamonwood Log, 2 Vegetables of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> Let the cinnamonwood log simmer in your stew broth for at least an hour to infuse it with its warm, fragrant energy before adding the vegetables.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “Kiky uses cinnamonwood for their more… volatile alchemical formulas. I prefer to use it for this. The aroma fills the whole house and the stew itself seems to expand your spirit, making you feel full of magical potential.”</p>
-            <p class='mt-4'><strong>Result:</strong> A fragrant stew that restores 50 HP and increases your Max MP by 15% for 3 encounters.</p>
+            <p class='mt-4'><strong>Result:</strong> A fragrant stew that restores 50 HP and increases your Max MP by 10% for 3 encounters.</p>
         `,
         ingredients: { 'cinnamonwood_log': 1, 'veggie': 2 },
         effect: { 
             type: 'buff', 
             heal: 50,
-            buffs: [{ stat: 'max_mp', value: 1.15, duration: 3 }]
+            buffs: [{ stat: 'max_mp', value: 1.10, duration: 3 }] // CHANGED
         }
     },
     'hunters_lunch': {
@@ -882,13 +882,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 portion of Rabbit Meat, 1 portion of Blackwheat, 1 Vegetable of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> Simmer all ingredients together in a pot for a long time. The longer it cooks, the thicker and more savory it gets.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “There's nothing like it after a long day of getting knocked around. A proper, thick stew that warms you from the inside out and knits you back together. It's like a hug in a bowl, if a hug could also heal gaping axe wounds.”</p>
-            <p class='mt-4'><strong>Result:</strong> A profoundly restorative meal. Heals for 80 HP plus an extra 5% of your Max HP.</p>
+            <p class='mt-4'><strong>Result:</strong> A profoundly restorative meal. Heals for 80 HP and regenerates 10% of your Max HP for 3 encounters.</p>
         `,
         ingredients: { 'rabbit_meat': 1, 'blackwheat': 1, 'veggie': 1 },
         effect: { 
-            type: 'heal_percent', 
+            type: 'buff',
             heal: 80,
-            heal_percent: 0.05
+            buffs: [{ stat: 'hp_regen_percent', value: 0.10, duration: 3 }] // CHANGED
         }
     },
     'clarifying_broth': {
@@ -900,13 +900,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 Beetsnip Carrot, 1 Screaming Lotus, 1 Vegetable of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> A gentle simmer is all that's needed to draw out the properties of the lotus. Strain the broth before serving it warm.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “A light, simple broth for when your head is fuzzy from one too many void spells. Kiky says it's because the active compounds 'neutralize residual chaotic energies.' I just know it works when you need to focus.”</p>
-            <p class='mt-4'><strong>Result:</strong> A clear broth that restores 70 HP and 10% of your Max MP.</p>
+            <p class='mt-4'><strong>Result:</strong> A clear broth that restores 70 HP and regenerates 10% of your Max MP for 3 encounters.</p>
         `,
         ingredients: { 'beetsnip_carrot': 1, 'screaming_lotus': 1, 'veggie': 1 },
         effect: { 
-            type: 'mana_percent', 
+            type: 'buff',
             heal: 70,
-            mana_percent: 0.10
+            buffs: [{ stat: 'mp_regen_percent', value: 0.10, duration: 3 }] // CHANGED
         }
     },
     // --- TIER 2: JOURNEYMAN'S BISTRO ---
@@ -919,13 +919,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 portion of Wolf Meat, 1 Vegetable of your choice, 1 Seasoning of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> Dire wolf meat is tough, so you have to pound it with a mallet for a good while. Once tenderized, sear it hot and fast with your favorite spices.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “Kiky once developed a fantastic 'enzymatic hydrolysis solution' to tenderize this meat. I told them a hammer works just fine. When you season it right, this steak brings out a primal strength you didn’t know you had.”</p>
-            <p class='mt-4'><strong>Result:</strong> A tough but rewarding meal. Restores 50 HP and increases physical damage by 10% for 3 encounters.</p>
+            <p class='mt-4'><strong>Result:</strong> A tough but rewarding meal. Restores 50 HP and increases physical damage by 20% for 3 encounters.</p>
         `,
         ingredients: { 'wolf_meat': 1, 'veggie': 1, 'seasoning': 1 },
         effect: { 
             type: 'buff', 
             heal: 50,
-            buffs: [{ stat: 'physical_damage', value: 1.10, duration: 3 }]
+            buffs: [{ stat: 'physical_damage', value: 1.20, duration: 3 }]
         }
     },
     'arcane_fruit_tart': {
@@ -937,13 +937,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 Orchidvine Fruit, 1 Vegetable of your choice, 1 Seasoning of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> Create a simple pastry shell and fill it with the chopped orchidvine fruit. A little sugar or honey helps. Bake until the crust is golden.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “Kiky gets so excited when I bring home an Orchidvine Fruit, going on about its 'complex mana-rich molecular structure.' I just think it makes a lovely, sweet tart that helps a mage feel their best after a long day of study.”</p>
-            <p class='mt-4'><strong>Result:</strong> A magical dessert that restores 50 HP and boosts magical damage by 10% for 3 encounters.</p>
+            <p class='mt-4'><strong>Result:</strong> A magical dessert that restores 50 HP and boosts magical damage by 20% for 3 encounters.</p>
         `,
         ingredients: { 'orchidvine_fruit': 1, 'veggie': 1, 'seasoning': 1 },
         effect: { 
             type: 'buff', 
             heal: 50,
-            buffs: [{ stat: 'magical_damage', value: 1.10, duration: 3 }]
+            buffs: [{ stat: 'magical_damage', value: 1.20, duration: 3 }]
         }
     },
     'loaded_tater': {
@@ -961,7 +961,7 @@ const COOKING_RECIPES = {
         effect: { 
             type: 'buff', 
             heal: 40,
-            buffs: [{ stat: 'max_hp', value: 1.20, duration: 3 }]
+            buffs: [{ stat: 'max_hp', value: 1.20, duration: 3 }] // CHANGED
         }
     },
     'calming_tea_ceremony': {
@@ -973,13 +973,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 Sealotus Pad, 1 Vegetable of your choice, 1 Seasoning of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> This is more about the ritual than the recipe. Gently steep the lily pad in hot, but not boiling, water. Serve in a small cup and drink slowly.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “Sometimes, the quiet moments are the most important. This tea is a ritual Kiky and I share to clear our heads. It expands your spiritual capacity, making you feel more connected to the world's magic.”</p>
-            <p class='mt-4'><strong>Result:</strong> A meditative brew that restores 40 HP and increases your Max MP by 30% for 3 encounters.</p>
+            <p class='mt-4'><strong>Result:</strong> A meditative brew that restores 40 HP and increases your Max MP by 20% for 3 encounters.</p>
         `,
         ingredients: { 'sealotus_pad': 1, 'veggie': 1, 'seasoning': 1 },
         effect: { 
             type: 'buff', 
             heal: 40,
-            buffs: [{ stat: 'max_mp', value: 1.30, duration: 3 }]
+            buffs: [{ stat: 'max_mp', value: 1.20, duration: 3 }] // CHANGED
         }
     },
     'lucky_greens_salad': {
@@ -1045,13 +1045,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 portion of Chicken Meat, 2 Vegetables of your choice, 1 Seasoning of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> Simmer the cockatrice meat for a very long time to create a rich, golden broth. Add finely chopped vegetables.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “This is my masterpiece for when Kiky's been cooped up in the lab for too long and forgets to eat. It's comfort in a bowl that can mend wounds and lift even the most scientifically-minded spirits.”</p>
-            <p class='mt-4'><strong>Result:</strong> A true cure-all. Heals for 70 HP plus an extra 15% of your Max HP.</p>
+            <p class='mt-4'><strong>Result:</strong> A true cure-all. Heals for 70 HP and regenerates 15% of your Max HP for 3 encounters.</p>
         `,
         ingredients: { 'chicken_meat': 1, 'veggie': 2, 'seasoning': 1 },
         effect: { 
-            type: 'heal_percent', 
+            type: 'buff',
             heal: 70,
-            heal_percent: 0.15
+            buffs: [{ stat: 'hp_regen_percent', value: 0.15, duration: 3 }] // CHANGED
         }
     },
     'salty_seafood_stew': {
@@ -1063,13 +1063,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 Brineflower Leaf, 1 portion of Meat, 2 Vegetables of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> The brineflower leaf is salty enough on its own, so be careful with other seasonings. Simmer it with the meat and vegetables for a taste of the sea.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “This stew restores your inner flow, washing away fatigue and refilling your arcane wellspring. It's a favorite of Kiky's after they've spent all their magic on a particularly complex experiment.”</p>
-            <p class='mt-4'><strong>Result:</strong> A taste of the ocean. Restores 60 HP and 20% of your Max MP.</p>
+            <p class='mt-4'><strong>Result:</strong> A taste of the ocean. Restores 60 HP and regenerates 20% of your Max MP for 3 encounters.</p>
         `,
         ingredients: { 'brineflower_leaf': 1, 'meat': 1, 'veggie': 2 },
         effect: { 
-            type: 'mana_percent', 
+            type: 'buff',
             heal: 60,
-            mana_percent: 0.20
+            buffs: [{ stat: 'mp_regen_percent', value: 0.20, duration: 3 }] // CHANGED
         }
     },
     // --- TIER 3: MASTER CHEF'S CREATIONS ---
@@ -1082,13 +1082,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 portion of Horse Meat, 2 Vegetables of your choice, 1 Seasoning of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> You must cook unicorn meat with respect. A simple, perfect sear in a hot pan is all it needs. Do not overcook it.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “Kiky has a twenty-page paper on the 'bio-celestial energy' inherent in unicorn tissue. I have a simpler take: eating this steak makes you strong enough to punch a mountain in half. It is a meal for heroes.”</p>
-            <p class='mt-4'><strong>Result:</strong> A truly magical meal. Restores 40 HP and increases physical damage by 15% for 3 encounters.</p>
+            <p class='mt-4'><strong>Result:</strong> A truly magical meal. Restores 40 HP and increases physical damage by 30% for 3 encounters.</p>
         `,
         ingredients: { 'horse_meat': 1, 'veggie': 2, 'seasoning': 1 },
         effect: { 
             type: 'buff', 
             heal: 40,
-            buffs: [{ stat: 'physical_damage', value: 1.15, duration: 3 }]
+            buffs: [{ stat: 'physical_damage', value: 1.30, duration: 3 }]
         }
     },
     'crystalline_energy_tart': {
@@ -1100,13 +1100,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 Crystal Apple, 2 Vegetables of your choice, 1 Seasoning of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> The challenge is to bake the tart without dissolving the apple's delicate crystalline structure. A low, gentle heat is key.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “This tart is almost too beautiful to eat. Kiky helped me perfect the baking process to preserve what they call the apple's 'arcane matrix.' The result is a dessert that makes any spellcaster feel like an archmage.”</p>
-            <p class='mt-4'><strong>Result:</strong> A work of art. Restores 40 HP and boosts magical damage by 15% for 3 encounters.</p>
+            <p class='mt-4'><strong>Result:</strong> A work of art. Restores 40 HP and boosts magical damage by 30% for 3 encounters.</p>
         `,
         ingredients: { 'crystal_apple': 1, 'veggie': 2, 'seasoning': 1 },
         effect: { 
             type: 'buff', 
             heal: 40,
-            buffs: [{ stat: 'magical_damage', value: 1.15, duration: 3 }]
+            buffs: [{ stat: 'magical_damage', value: 1.30, duration: 3 }]
         }
     },
     'livyatans_grand_steak': {
@@ -1124,7 +1124,7 @@ const COOKING_RECIPES = {
         effect: { 
             type: 'buff', 
             heal: 30,
-            buffs: [{ stat: 'max_hp', value: 1.30, duration: 3 }]
+            buffs: [{ stat: 'max_hp', value: 1.30, duration: 3 }] // CHANGED
         }
     },
     'nectar_of_the_soul': {
@@ -1136,13 +1136,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 Blood Peach, 1 Vegetable of your choice, 2 Seasonings of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> Best served fresh, with a light dusting of spice to complement its deep, rich flavor. To cook it is to waste its perfection.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “This dessert, made from a single, perfect blood peach, deepens your spiritual reservoir in a way that's hard to describe. It's the kind of clarity that mages spend their whole lives seeking, found in one perfect piece of fruit.”</p>
-            <p class='mt-4'><strong>Result:</strong> The food of the gods. Restores 30 HP and increases your Max MP by 45% for 3 encounters.</p>
+            <p class='mt-4'><strong>Result:</strong> The food of the gods. Restores 30 HP and increases your Max MP by 30% for 3 encounters.</p>
         `,
         ingredients: { 'blood_peach': 1, 'veggie': 1, 'seasoning': 2 },
         effect: { 
             type: 'buff', 
             heal: 30,
-            buffs: [{ stat: 'max_mp', value: 1.45, duration: 3 }]
+            buffs: [{ stat: 'max_mp', value: 1.30, duration: 3 }] // CHANGED
         }
     },
     'feast_of_fortune': {
@@ -1208,13 +1208,13 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 portion of Horse Meat, 1 Blood Peach, 2 Vegetables of your choice, 1 Seasoning of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> A slow roast, with the meat constantly basted in the juices of the blood peach. A legendary combination of magical meat and life-giving fruit.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “Kiky and I worked on this one together—my cooking, their alchemical knowledge of how these ingredients interact. The result is a meal that can truly bring an adventurer back from the brink of death. I’m very proud of this one.”</p>
-            <p class='mt-4'><strong>Result:</strong> The ultimate revival meal. Heals for 50 HP plus a massive 25% of your Max HP.</p>
+            <p class='mt-4'><strong>Result:</strong> The ultimate revival meal. Heals for 50 HP and regenerates a massive 20% of your Max HP for 3 encounters.</p>
         `,
         ingredients: { 'horse_meat': 1, 'blood_peach': 1, 'veggie': 2, 'seasoning': 1 },
         effect: { 
-            type: 'heal_percent', 
+            type: 'buff',
             heal: 50,
-            heal_percent: 0.25
+            buffs: [{ stat: 'hp_regen_percent', value: 0.20, duration: 3 }] // CHANGED
         }
     },
     'abyssal_ambrosia': {
@@ -1226,15 +1226,14 @@ const COOKING_RECIPES = {
             <p class='mb-2'><strong>Ingredients:</strong> 1 portion of Whale Meat, 1 Crystal Apple, 2 Vegetables of your choice, 1 Seasoning of your choice.</p>
             <p class='mb-2'><strong>Method:</strong> The dimensional meat must be rendered down into a broth, in which the crystal apple is gently poached. This blends the essence of a dimensional beast and a crystal apple into a food that restores the deepest wells of magic.</p>
             <p class='mb-2 italic text-gray-400'><strong>Nathalie's Note:</strong> “This was another collaboration. Kiky was fascinated by the idea of combining two such potent magical ingredients. The result is a dish that tastes like the cosmos itself, granting a momentary connection to the raw source of all arcane power.”</p>
-            <p class='mt-4'><strong>Result:</strong> Food for an archmage. Restores 40 HP and an incredible 30% of your Max MP.</p>
+            <p class='mt-4'><strong>Result:</strong> Food for an archmage. Restores 40 HP and regenerates an incredible 30% of your Max MP for 3 encounters.</p>
         `,
         ingredients: { 'whale_meat': 1, 'crystal_apple': 1, 'veggie': 2, 'seasoning': 1 },
         effect: { 
-            type: 'mana_percent', 
+            type: 'buff',
             heal: 40,
-            mana_percent: 0.30
+            buffs: [{ stat: 'mp_regen_percent', value: 0.30, duration: 3 }] // CHANGED
         }
     }
 };
-
 

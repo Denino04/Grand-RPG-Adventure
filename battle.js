@@ -886,6 +886,7 @@ async function movePlayer(x, y) {
     }
     if(player.statusEffects.bonus_speed) moveDistance += player.statusEffects.bonus_speed.move;
     if(player.statusEffects.slowed) moveDistance = Math.max(1, moveDistance + player.statusEffects.slowed.move);
+    if (player.foodBuffs.movement_speed) moveDistance += player.foodBuffs.movement_speed.value; // <-- ADDED
 
     const path = findPath({x: player.x, y: player.y}, {x, y}, isFlying);
 
@@ -1196,6 +1197,13 @@ function performAttack(targetIndex) {
             damage = Math.floor(damage * comboBonus);
             calcLog.steps.push({ description: `Curved Sword Combo (${gameState.comboCount}x)`, value: `x${comboBonus.toFixed(2)}`, result: damage });
         }
+
+                // --- Food Buff ---
+        if (player.foodBuffs.physical_damage) {
+            damage = Math.floor(damage * player.foodBuffs.physical_damage.value);
+            calcLog.steps.push({ description: "Food Buff (Phys Dmg)", value: `x${player.foodBuffs.physical_damage.value.toFixed(2)}`, result: damage });
+        }
+        // --- End Food Buff ---
 
         // --- Ranger: Hunter's Mark Bonus Damage ---
         if (attackTarget.isMarked && attackTarget === gameState.markedTarget) {
@@ -1757,7 +1765,12 @@ async function castSpell(spellKey, targetIndex) { // Make async
         // Use the potentially modified dice for the roll
         let damage = rollDice(diceCount, spellDamageDice[1], `Player Spell: ${spell.name}`).total + player.magicalDamageBonus;
         // --- END ADDED ---
-
+        
+        if (player.foodBuffs.magical_damage) {
+            damage = Math.floor(damage * player.foodBuffs.magical_damage.value);
+            addToLog("Your meal empowers the spell!", "text-green-300");
+        }
+        // --- End Food Buff ---
 
         // --- ELEMENTAL/DRAGONBORN DAMAGE BONUSES ---
         if (player.race === 'Elementals' && spellData.element === player.elementalAffinity) {
@@ -2150,6 +2163,7 @@ function battleAction(type, actionData = null) {
             }
             if(player.statusEffects.bonus_speed) moveDistance += player.statusEffects.bonus_speed.move;
             if(player.statusEffects.slowed) moveDistance = Math.max(1, moveDistance + player.statusEffects.slowed.move);
+            if (player.foodBuffs.movement_speed) moveDistance += player.foodBuffs.movement_speed.value; // <-- ADDED
 
             const reachableCells = findReachableCells({x: player.x, y: player.y}, moveDistance);
             cells.forEach(c => {
@@ -2838,7 +2852,20 @@ function handlePlayerEndOfTurnEffects() {
         }
     }
     // --- End Aasimar Logic ---
-
+    if (player.foodBuffs.hp_regen_percent && player.hp < player.maxHp) {
+        const healAmount = Math.floor(player.maxHp * player.foodBuffs.hp_regen_percent.value);
+        if (healAmount > 0) {
+            player.hp = Math.min(player.maxHp, player.hp + healAmount);
+            addToLog(`Your meal regenerates <span class="font-bold text-green-300">${healAmount}</span> HP.`, 'text-green-300');
+        }
+    }
+    if (player.foodBuffs.mp_regen_percent && player.mp < player.maxMp) {
+        const regenAmount = Math.floor(player.maxMp * player.foodBuffs.mp_regen_percent.value);
+        if (regenAmount > 0) {
+            player.mp = Math.min(player.maxMp, player.mp + regenAmount);
+            addToLog(`Your meal restores <span class="font-bold text-blue-300">${regenAmount}</span> MP.`, 'text-blue-300');
+        }
+    }
     // Handle status effect durations and DoTs
     const effects = player.statusEffects;
     for (const effectKey in effects) {
@@ -3049,9 +3076,21 @@ async function enemyTurn() {
 
     // After all enemies have acted
     if (!gameState.battleEnded) {
+        // --- HASTE FIX ---
+        // This is the end of the full "round" (Player + Ally + Enemies).
+        // Reset the 'turnUsed' flag for Haste buffs before starting the player's new logical turn.
+        if (player.statusEffects.buff_haste?.turnUsed) player.statusEffects.buff_haste.turnUsed = false;
+        if (player.statusEffects.buff_hermes?.turnUsed) player.statusEffects.buff_hermes.turnUsed = false;
+        if (player.npcAlly) {
+             if (player.npcAlly.statusEffects.buff_haste?.turnUsed) player.npcAlly.statusEffects.buff_haste.turnUsed = false;
+             if (player.npcAlly.statusEffects.buff_hermes?.turnUsed) player.npcAlly.statusEffects.buff_hermes.turnUsed = false;
+        }
+        // --- END HASTE FIX ---
+        
         beginPlayerTurn();
     }
 }
+
 
 async function startNpcTurn() {
     if (gameState.battleEnded || !player.npcAlly || player.npcAlly.hp <= 0 || player.npcAlly.isFled) {
@@ -3468,14 +3507,6 @@ function beginPlayerTurn() {
     $('#inventory-btn').disabled = false;
     $('#character-sheet-btn').disabled = false;
 
-    // Clear Haste's "used" flag
-    if (player.statusEffects.buff_haste?.turnUsed) player.statusEffects.buff_haste.turnUsed = false;
-    if (player.statusEffects.buff_hermes?.turnUsed) player.statusEffects.buff_hermes.turnUsed = false;
-
-    if (player.npcAlly) {
-         if (player.npcAlly.statusEffects.buff_haste?.turnUsed) player.npcAlly.statusEffects.buff_haste.turnUsed = false;
-         if (player.npcAlly.statusEffects.buff_hermes?.turnUsed) player.npcAlly.statusEffects.buff_hermes.turnUsed = false;
-    }
 
     // Check for paralysis/petrification at the start of the turn
     if (player.statusEffects.paralyzed || player.statusEffects.petrified) {

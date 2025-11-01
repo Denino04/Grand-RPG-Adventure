@@ -5525,13 +5525,6 @@ function cookRecipe(recipeKey) {
             player.hp = player.maxHp;
             player.mp = player.maxMp;
             break;
-        case 'heal_percent':
-             // Apply % heal ON TOP of flat heal if both exist
-            player.hp = Math.min(player.maxHp, player.hp + Math.floor(player.maxHp * effect.heal_percent));
-            break;
-        case 'mana_percent':
-            player.mp = Math.min(player.maxMp, player.mp + Math.floor(player.maxMp * effect.mana_percent));
-            break;
         case 'buff':
             effect.buffs.forEach(buff => {
                 // Handle different buff types correctly
@@ -5539,7 +5532,7 @@ function cookRecipe(recipeKey) {
                      // Additive movement speed
                      player.foodBuffs[buff.stat] = { value: buff.value, duration: buff.duration };
                 } else {
-                     // Multiplicative for others (like damage, max hp/mp, loot, xp)
+                     // Multiplicative/Value-based for others (like damage, max hp/mp, loot, xp, and new regen)
                      player.foodBuffs[buff.stat] = { value: buff.value, duration: buff.duration };
                 }
             });

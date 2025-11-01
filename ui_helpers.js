@@ -327,14 +327,14 @@ function showTooltip(itemKey, event) {
                          let valueDisplay = '';
                          if (buff.stat === 'movement_speed') {
                               valueDisplay = `+${buff.value}`;
+                         } else if (buff.stat === 'hp_regen_percent' || buff.stat === 'mp_regen_percent') { // <-- ADDED THIS
+                              valueDisplay = `${(buff.value * 100).toFixed(0)}% / encounter`; // <-- ADDED THIS
                          } else {
                               valueDisplay = `+${((buff.value - 1) * 100).toFixed(0)}%`;
                          }
                         content += `<li>Effect: ${valueDisplay} ${capitalize(statName)} for ${buff.duration} encounters</li>`;
                     });
                     break;
-                case 'heal_percent': content += `<li>Effect: Restores ${effect.heal_percent * 100}% of Max HP</li>`; break;
-                case 'mana_percent': content += `<li>Effect: Restores ${effect.mana_percent * 100}% of Max MP</li>`; break;
                 case 'full_restore': content += `<li>Effect: Fully restores HP and MP</li>`; break;
             }
             content += '</ul></div>';
