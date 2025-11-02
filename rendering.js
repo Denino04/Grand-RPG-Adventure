@@ -3,10 +3,21 @@ let storageSortOrder = 'category';
 // State for inventory tab
 let inventoryActiveTab = 'consumables'; // Default tab
 let sellActiveTab = 'consumables'; // NEW: State for sell tab
+let storagePlayerInvTab = 'consumables';
+let storageChestTab = 'consumables';
 
 function setStorageSortOrder(order) {
     storageSortOrder = order;
     renderHouseStorage();
+}
+
+window.setStoragePlayerInvTab = function(tabName) {
+    storagePlayerInvTab = tabName;
+    renderHouseStorage(); // Re-render the storage UI
+}
+window.setStorageChestTab = function(tabName) {
+    storageChestTab = tabName;
+    renderHouseStorage(); // Re-render the storage UI
 }
 
 function getWeaponStatsString(weapon) {
@@ -1037,90 +1048,161 @@ function renderHouse() {
     render(container);
 }
 
+function _renderStorageItemList(source, type, activeTab, moveAction) {
+    let list = [];
+    let itemCounts = {}; // For equipment
+    let html = '';
+    const arrow = type === 'inventory' ? '↓' : '↑';
+
+    // Define type orders for sorting within tabs
+    const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'experimental'];
+    const typeMapConsumables = {
+        'healing': 'Healing Potions', 'mana_restore': 'Mana Potions', 'buff': 'Buff Items',
+        'cleanse': 'Cleansing Items', 'cleanse_specific': 'Antidotes/Needles', 'buff_apply': 'Greases/Enhancements',
+        'debuff_apply': 'Throwables (Debuff)', 'debuff_special': 'Throwables (Special)', 'experimental': 'Mysterious Concoctions'
+    };
+    const materialOrder = ['food_ingredient', 'alchemy', 'enchant', 'special', 'junk'];
+    const typeMapMaterials = {
+         'food_ingredient': 'Cooking Ingredients', 'alchemy': 'Alchemy Reagents', 'enchant': 'Essences (Crafting)',
+         'special': 'Special Items', 'junk': 'Junk & Trophies'
+    };
+    const gardenOrder = ['seed', 'sapling'];
+    const typeMapGardens = { 'seed': 'Seeds', 'sapling': 'Saplings' };
+
+    // 1. Populate 'list' based on activeTab
+    switch (activeTab) {
+        case 'consumables':
+        case 'gardens':
+        case 'materials':
+            const itemOrder = (activeTab === 'consumables') ? consumableOrder : (activeTab === 'gardens' ? gardenOrder : materialOrder);
+            const sourceItems = source.items || {};
+            
+            const allItemKeys = Object.keys(sourceItems).filter(key => {
+                const details = getItemDetails(key);
+                // Filter for items matching the tab's types
+                return details && itemOrder.includes(details.type) && details.type !== 'key' && details.rarity !== 'Broken';
+            });
+            
+            const itemsWithDetails = allItemKeys.map(key => ({ key, details: getItemDetails(key) }));
+            
+            // Sort by subtype, then name
+            itemsWithDetails.sort((a, b) => {
+                 const typeAIndex = itemOrder.indexOf(a.details.type);
+                 const typeBIndex = itemOrder.indexOf(b.details.type);
+                 if (typeAIndex !== typeBIndex) return typeAIndex - typeBIndex;
+                 return a.details.name.localeCompare(b.details.name);
+            });
+            list = itemsWithDetails; // This is now an array of {key, details}
+            break;
+
+        case 'lures':
+            const sourceLures = source.lures || {};
+            list = Object.keys(sourceLures)
+                .filter(key => (sourceLures[key] || 0) > 0)
+                .map(key => ({ key, details: getItemDetails(key) })) // Get details for sorting
+                .sort((a, b) => a.details.name.localeCompare(b.details.name));
+            break;
+            
+        case 'weapons':
+        case 'catalysts':
+        case 'armor':
+        case 'shields':
+            const sourceEquip = source[activeTab] || [];
+            if (!Array.isArray(sourceEquip)) break;
+            
+            const equipCounts = {};
+            sourceEquip.forEach(key => {
+                const details = getItemDetails(key);
+                if (!details || details.rarity === 'Broken') return;
+
+                // If rendering player's inventory, check if equipped
+                if (type === 'inventory') {
+                    const isEquipped = (activeTab === 'weapons' && details.name === player.equippedWeapon.name) ||
+                                     (activeTab === 'catalysts' && details.name === player.equippedCatalyst.name) ||
+                                     (activeTab === 'armor' && details.name === player.equippedArmor.name) ||
+                                     (activeTab === 'shields' && details.name === player.equippedShield.name);
+                    if (!isEquipped) { // Only count unequipped items
+                        equipCounts[key] = (equipCounts[key] || 0) + 1;
+                    }
+                } else { // If rendering storage, count everything
+                    equipCounts[key] = (equipCounts[key] || 0) + 1;
+                }
+            });
+            
+            list = Object.keys(equipCounts)
+                .map(key => ({ key, details: getItemDetails(key), count: equipCounts[key] })) // Store the count
+                .sort((a, b) => a.details.name.localeCompare(b.details.name));
+            break;
+    }
+
+    // 2. Render the List HTML
+    if (list.length === 0) {
+        const itemTitle = activeTab.replace(/_/g, ' ');
+        return `<p class="text-gray-400 text-center mt-4">No ${itemTitle} found.</p>`;
+    }
+
+    html += `<div id="storage-${type}-${activeTab}-list" class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-2">`;
+
+    let currentSubType = '';
+    if (['consumables', 'materials', 'gardens'].includes(activeTab)) {
+        const typeMap = (activeTab === 'consumables') ? typeMapConsumables : (activeTab === 'gardens' ? typeMapGardens : typeMapMaterials);
+        
+        list.forEach(itemObj => {
+            const key = itemObj.key;
+            const details = itemObj.details;
+            if (!details) return;
+
+            const subType = details.type;
+            if (subType !== currentSubType) {
+                currentSubType = subType;
+                const subHeader = typeMap[subType] || capitalize(subType);
+                html += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2">${subHeader}</h4>`;
+            }
+
+            let count = source.items[key] || 0;
+            let countStr = (count > 1) ? ` (x${count})` : '';
+            let action = `onclick="${moveAction}('items', '${key}')"`;
+
+            html += `
+                <div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
+                    <span>${details.name} ${countStr}</span>
+                    <button ${action} class="btn btn-primary text-lg py-0 px-3 leading-none">${arrow}</button>
+                </div>`;
+        });
+
+    } else { // Equipment or Lures
+        list.forEach(itemObj => {
+            const key = itemObj.key;
+            const details = itemObj.details;
+            let countStr = '';
+            let count = 0;
+            let buttonHtml = '';
+
+            if (activeTab === 'lures') {
+                count = source.lures[key] || 0;
+                countStr = `(x${count} uses)`;
+                buttonHtml = `<button onclick="${moveAction}('lures', '${key}')" class="btn btn-primary text-lg py-0 px-3 leading-none">${arrow}</button>`;
+            } else { // Equipment
+                count = itemObj.count; // Use the count from the object
+                if (count > 1) countStr = ` (x${count})`;
+                buttonHtml = `<button onclick="${moveAction}('${activeTab}', '${key}')" class="btn btn-primary text-lg py-0 px-3 leading-none">${arrow}</button>`;
+            }
+            
+            html += `
+                <div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
+                    <span>${details.name} ${countStr}</span>
+                    ${buttonHtml}
+                </div>`;
+        });
+    }
+
+    html += `</div>`; // Close scrollable div
+    return html;
+}
+
 function renderHouseStorage() {
     gameState.currentView = 'house_storage';
-
-    const renderItemList = (source, type, moveAction, sortOrder) => {
-        let allItems = [];
-        const categories = ['items', 'lures', 'weapons', 'catalysts', 'armor', 'shields'];
-        let hasContent = false;
-
-        // 1. Flatten all items into one array
-        categories.forEach(category => {
-            const itemsInCategory = source[category] || (category === 'items' || category === 'lures' ? {} : []);
-
-            if (category === 'items' || category === 'lures') {
-                Object.keys(itemsInCategory).forEach(key => {
-                    const count = itemsInCategory[key];
-                    const details = getItemDetails(key);
-                    if (count > 0 && details && details.type !== 'key') {
-                        allItems.push({ key, count, category, details });
-                    }
-                });
-            } else {
-                // For non-stackable, we need to handle duplicates by counting them
-                const itemCounts = {};
-                itemsInCategory.forEach(key => itemCounts[key] = (itemCounts[key] || 0) + 1);
-
-                Object.keys(itemCounts).forEach(key => {
-                    const details = getItemDetails(key);
-                    if (!details || details.rarity === 'Broken') return;
-
-                    let isEquipped = false;
-                    if (type === 'inventory') {
-                        isEquipped = (player.equippedWeapon.name === details.name && category === 'weapons') ||
-                                     (player.equippedArmor.name === details.name && category === 'armor') ||
-                                     (player.equippedShield.name === details.name && category === 'shields') ||
-                                     (player.equippedCatalyst.name === details.name && category === 'catalysts');
-                    }
-                    if (!isEquipped) {
-                        allItems.push({ key, count: itemCounts[key], category, details });
-                    }
-                });
-            }
-        });
-
-        hasContent = allItems.length > 0;
-        if (!hasContent) {
-            const message = type === 'inventory' ? 'Your inventory is empty of unequipped items.' : 'Your storage is empty.';
-            return `<p class="text-sm text-gray-500 text-center mt-4 col-span-full">${message}</p>`;
-        }
-
-        // 2. Sort the array
-        if (sortOrder === 'name') {
-            allItems.sort((a, b) => a.details.name.localeCompare(b.details.name));
-        } else if (sortOrder === 'cost') {
-            allItems.sort((a, b) => (b.details.price || 0) - (a.details.price || 0));
-        } else { // 'category' sort (default)
-            allItems.sort((a, b) => {
-                if (a.category !== b.category) {
-                    return categories.indexOf(a.category) - categories.indexOf(b.category);
-                }
-                return a.details.name.localeCompare(b.details.name);
-            });
-        }
-
-        // 3. Render the sorted list
-        let html = '';
-        let currentCategory = '';
-        allItems.forEach(item => {
-            if (sortOrder === 'category' && item.category !== currentCategory) {
-                currentCategory = item.category;
-                // Add a full-width header for the category
-                html += `<h4 class="font-bold text-yellow-300 mt-4 mb-2 text-sm uppercase tracking-wider col-span-full">${capitalize(currentCategory)}</h4>`;
-            }
-
-            const arrow = type === 'inventory' ? '↓' : '↑';
-            const countText = item.count > 1 ? ` (x${item.count})` : (item.category === 'lures' ? ` (x${item.count} uses)`: '');
-
-            html += `<div class="flex justify-between items-center p-2 bg-slate-900/50 rounded text-sm">
-                <span onmouseover="showTooltip('${item.key}', event)" onmouseout="hideTooltip()">${item.details.name}${countText}</span>
-                <button onclick="${moveAction}('${item.category}', '${item.key}')" class="btn btn-primary text-lg py-0 px-3 leading-none">${arrow}</button>
-            </div>`;
-        });
-
-        return `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">${html}</div>`;
-    };
+    lastViewBeforeInventory = 'house'; // Set return view
 
     // Ensure storage object and its properties exist to prevent errors with old saves
     if (!player.house.storage) {
@@ -1134,56 +1216,57 @@ function renderHouseStorage() {
     if (!storage.shields) storage.shields = [];
     if (!storage.catalysts) storage.catalysts = [];
 
+    // Get capacity limits
     const storageTier = player.house.storageTier || 0;
     const baseLimits = { unique: 10, stack: 10 };
-    const limits = HOME_IMPROVEMENTS.storage.upgrades[storageTier - 1]?.limits || baseLimits;
+    // Get limits for the *current* tier (index tier - 1)
+    const limits = storageTier > 0 ? (HOME_IMPROVEMENTS.storage.upgrades[storageTier - 1]?.limits || baseLimits) : baseLimits;
 
     const allStorageItems = [
-        ...Object.keys(storage.items),
-        ...Object.keys(storage.lures),
-        ...storage.weapons,
-        ...storage.armor,
-        ...storage.shields,
-        ...storage.catalysts
+        ...Object.keys(storage.items), ...Object.keys(storage.lures),
+        ...storage.weapons, ...storage.armor, ...storage.shields, ...storage.catalysts
     ];
     const uniqueItemCount = new Set(allStorageItems).size;
 
+    // --- Generate Tabbed Content ---
+    const playerTabsHtml = _renderStorageTabs(storagePlayerInvTab, 'setStoragePlayerInvTab');
+    const playerListHtml = _renderStorageItemList(player.inventory, 'inventory', storagePlayerInvTab, 'moveToStorage');
+    
+    const chestTabsHtml = _renderStorageTabs(storageChestTab, 'setStorageChestTab');
+    const chestListHtml = _renderStorageItemList(player.house.storage, 'storage', storageChestTab, 'moveFromStorage');
+    // --- End Tabbed Content ---
+
+
     let html = `
-        <div class="w-full max-w-4xl mx-auto flex flex-col h-full">
+        <div class="w-full max-w-5xl mx-auto flex flex-col h-full">
             <h2 class="font-medieval text-3xl mb-2 text-center">Storage Chest</h2>
             <p class="text-center text-sm text-gray-400 mb-4">Capacity: ${uniqueItemCount} / ${limits.unique} Unique Items | Max Stack: ${limits.stack}</p>
 
-            <div class="flex-grow flex flex-col bg-slate-800 rounded-lg overflow-hidden">
+            <div class="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden">
                 <!-- Inventory Section -->
-                <div class="p-4 flex-1 overflow-y-auto inventory-scrollbar">
-                    <div class="flex justify-between items-center mb-2 sticky top-0 bg-slate-800/80 backdrop-blur-sm py-2 z-10">
+                <div class="p-4 flex flex-col bg-slate-800 rounded-lg overflow-hidden">
+                    <div class="flex-shrink-0 flex justify-between items-center mb-2 sticky top-0 bg-slate-800/80 backdrop-blur-sm py-2 z-10">
                          <h3 class="font-bold text-xl text-yellow-300">Your Inventory</h3>
                          <button onclick="placeAllInStorage()" class="btn btn-primary text-sm py-1 px-3">Place All ↓</button>
                     </div>
-                    <div>
-                        ${renderItemList(player.inventory, 'inventory', 'moveToStorage', 'category')}
+                    ${playerTabsHtml}
+                    <div class="flex-grow overflow-y-auto inventory-scrollbar min-h-[200px]">
+                        ${playerListHtml}
                     </div>
                 </div>
 
-                <!-- Separator -->
-                <hr class="border-slate-600">
-
                 <!-- Storage Section -->
-                <div class="p-4 flex-1 overflow-y-auto inventory-scrollbar">
-                     <div class="flex flex-wrap justify-between items-center mb-2 sticky top-0 bg-slate-800/80 backdrop-blur-sm py-2 z-10 gap-2">
+                <div class="p-4 flex flex-col bg-slate-800 rounded-lg overflow-hidden">
+                     <div class="flex-shrink-0 flex flex-wrap justify-between items-center mb-2 sticky top-0 bg-slate-800/80 backdrop-blur-sm py-2 z-10 gap-2">
                          <div class="flex items-center gap-4">
                             <h3 class="font-bold text-xl text-yellow-300">Chest Storage</h3>
                             <button onclick="takeAllFromStorage()" class="btn btn-primary text-sm py-1 px-3">Take All ↑</button>
                          </div>
-                         <div class="flex items-center gap-2">
-                            <span class="text-sm text-gray-400">Sort by:</span>
-                            <button onclick="setStorageSortOrder('category')" class="btn ${storageSortOrder === 'category' ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2">Category</button>
-                            <button onclick="setStorageSortOrder('name')" class="btn ${storageSortOrder === 'name' ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2">Name</button>
-                            <button onclick="setStorageSortOrder('cost')" class="btn ${storageSortOrder === 'cost' ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2">Cost</button>
-                         </div>
+                         <!-- REMOVED SORT BUTTONS -->
                     </div>
-                     <div>
-                        ${renderItemList(player.house.storage, 'storage', 'moveFromStorage', storageSortOrder)}
+                    ${chestTabsHtml}
+                     <div class="flex-grow overflow-y-auto inventory-scrollbar min-h-[200px]">
+                        ${chestListHtml}
                     </div>
                 </div>
             </div>
@@ -1205,6 +1288,28 @@ function renderHouseStorage() {
     mainView.classList.add('p-2');
 }
 
+function _renderStorageTabs(activeTab, clickHandlerName) {
+    const tabs = [
+        { key: 'consumables', icon: '🧪', title: 'Consumables' },
+        { key: 'gardens', icon: '🌱', title: 'Gardens' },
+        { key: 'materials', icon: '🧱', title: 'Materials' },
+        { key: 'weapons', icon: '⚔️', title: 'Weapons' },
+        { key: 'catalysts', icon: '🔮', title: 'Catalysts' },
+        { key: 'armor', icon: '⛊', title: 'Armor' },
+        { key: 'shields', icon: '🛡️', title: 'Shields' },
+        { key: 'lures', icon: '🎣', title: 'Lures' }
+    ];
+    
+    let tabHtml = '<div class="grid grid-cols-4 gap-1 mb-2">'; // 4 columns
+    tabs.forEach(tab => {
+        const isActive = activeTab === tab.key;
+        const bgColor = isActive ? 'bg-yellow-600 border-yellow-800' : 'bg-slate-700 hover:bg-slate-600 border-slate-900';
+        // Added title attribute for hover tooltip
+        tabHtml += `<button onclick="${clickHandlerName}('${tab.key}')" class="btn ${bgColor} text-xs py-1 px-2 flex items-center justify-center gap-1 w-full" title="${capitalize(tab.key)}">${tab.icon}</button>`;
+    });
+    tabHtml += '</div>';
+    return tabHtml;
+}
 
 function renderSettingsMenu(originView = 'town') {
     lastViewBeforeInventory = originView;
@@ -1348,8 +1453,15 @@ function hireNpc(recruitIndex) {
     player.gold -= cost;
     
     // --- THIS IS THE FIX ---
-    // Create the new ally using all the recruit's data
-    player.npcAlly = new NpcAlly(recruit.name, recruit.classKey, recruit.raceKey, player.level);
+    // Create the new ally using all the recruit's data, including background
+    player.npcAlly = new NpcAlly(
+        recruit.name, 
+        recruit.classKey, 
+        recruit.raceKey, 
+        player.level,
+        recruit.backgroundKey,    // <-- ADDED
+        recruit.backgroundName  // <-- ADDED
+    );
     // --- END FIX ---
     player.encountersSinceLastPay = 0; // Reset pay counter
 
@@ -1360,7 +1472,7 @@ function hireNpc(recruitIndex) {
     updateStatsView();
     renderBarracks(); // Re-render to show the manage screen
     saveGame();
-}
+}   
 
 /**
  * Fires the current NPC ally. This is permanent.
@@ -1592,10 +1704,10 @@ function renderBarracks() {
                     <div class="bg-slate-800 p-4 rounded-lg">
                         <h3 class="font-bold text-2xl text-yellow-300 mb-2">${ally.name}</h3>
                         
-                        <!-- THIS IS THE FIX -->
-                        <!-- The old code only showed ally.class and ally.level -->
-                        <p class="text-lg text-gray-400 mb-4">${ally.raceKey ? capitalize(ally.raceKey) : 'Unknown Race'} ${ally.class} (Level ${ally.level})</p>
-                        <!-- END FIX -->
+                        <!-- MODIFIED: Added Background -->
+                        <p class="text-lg text-gray-400 mb-1">${ally.raceKey ? capitalize(ally.raceKey) : 'Unknown Race'} ${ally.class} (Level ${ally.level})</p>
+                        <p class="text-md text-gray-500 italic mb-4">${ally.background}</p>
+                        <!-- END MODIFICATION -->
                         
                         <div class="space-y-1 text-sm mb-4">
                             <p class="flex justify-between"><strong>HP:</strong> <span>${ally.hp} / ${ally.maxHp}</span></p>
@@ -1680,13 +1792,15 @@ function renderBarracks() {
             // --- FIX for undefined raceData ---
             const raceName = recruit.raceKey ? capitalize(recruit.raceKey) : "Unknown Race"; // The key *is* the name
             const className = classData ? classData.name : "Unknown Class";
-            // const classRole = ... // REMOVED THIS LINE, 'role' does not exist in NPC_STAT_ALLOCATIONS
             // --- END FIX ---
             
             html += `<div class="p-4 bg-slate-800 rounded-lg flex flex-col justify-between">
                         <div>
                             <h4 class="font-bold text-lg text-yellow-300">${recruit.name}</h4>
-                            <p class="text-sm text-gray-400 mb-2">${raceName} ${className}</p>
+                            <!-- MODIFIED: Added Background -->
+                            <p class="text-sm text-gray-400 mb-1">${raceName} ${className}</p>
+                            <p class="text-xs text-gray-500 italic mb-2">${recruit.backgroundName}</p>
+                            <!-- END MODIFICATION -->
                             <p class="text-xs text-gray-400 italic">"${classData ? classData.description : 'No description.'}"</p>
                         </div>
                         <button onclick="hireNpc(${index})" class="btn btn-primary w-full mt-4" ${player.gold < cost ? 'disabled' : ''}>
@@ -1707,6 +1821,8 @@ function renderBarracks() {
     container.innerHTML = html;
     render(container);
 }
+
+
 // --- New Function: payNpcSalary ---
 function payNpcSalary(salary) {
     if (!player || !player.npcAlly) return;
@@ -3109,7 +3225,6 @@ function renderSell() {
     let html = `
         <div class="w-full text-left h-full flex flex-col">
             <h2 class="font-medieval text-3xl mb-2 text-center">Sell Items</h2>
-            <p class="text-center text-gray-400 text-sm mb-2">Sell price: 25% of value (or 100% for crops). Equipped items cannot be sold.</p>
             ${tabHtml}
             <div class="flex-grow overflow-hidden h-72">
                 ${rightPaneContent}
@@ -3133,8 +3248,31 @@ const renderSellList = (category, title) => {
     let itemCounts = {};
     let html = ''; // Start empty
 
+    // --- START MODIFICATION: Dynamic Sell Price Logic ---
+    let sellMultiplier = 0.25; // Default to 1/4
+    switch (category) {
+        case 'materials':
+            sellMultiplier = 0.2; // 1/5
+            break;
+        case 'gardens':
+        case 'consumables':
+        case 'lures':
+            sellMultiplier = 0.25; // 1/4
+            break;
+        case 'weapons':
+        case 'catalysts':
+        case 'armor':
+        case 'shields':
+            sellMultiplier = 0.5; // 1/2
+            break;
+        // 'items' category is handled by the 'consumables' tab,
+        // so we just need to make sure the tab calls it correctly (which it does).
+    }
+    // --- END MODIFICATION ---
+
+
     // Sorting/Type map logic
-    const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'enchant', 'experimental'];
+    const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'experimental'];
     const typeMapConsumables = {
         'healing': 'Healing Potions',
         'mana_restore': 'Mana Potions',
@@ -3144,18 +3282,20 @@ const renderSellList = (category, title) => {
         'buff_apply': 'Greases/Enhancements',
         'debuff_apply': 'Throwables (Debuff)',
         'debuff_special': 'Throwables (Special)',
-        'enchant': 'Essences',
+        // 'enchant': 'Essences (Combat Use)', // <-- REMOVED
         'experimental': 'Mysterious Concoctions'
     };
+    // --- END MODIFICATION ---
     const materialOrder = ['food_ingredient', 'alchemy', 'enchant', 'special', 'junk'];
     const typeMapMaterials = {
          'food_ingredient': 'Cooking Ingredients',
          'alchemy': 'Alchemy Reagents',
-         'enchant': 'Essences (Crafting)',
+         'enchant': 'Essences (Crafting)', // <-- Essences live here now
          'special': 'Special Items',
          'junk': 'Junk & Trophies'
     };
     const gardenOrder = ['seed', 'sapling'];
+
     const typeMapGardens = {
         'seed': 'Seeds',
         'sapling': 'Saplings'
@@ -3257,7 +3397,8 @@ const renderSellList = (category, title) => {
              if (count > 1) countStr = `(x${count})`;
 
              // --- MODIFIED: Sell Button Logic ---
-             const sellPrice = Math.floor(details.sellPrice || (details.price / 4)); // Use sellPrice if available, else 1/4
+             // const sellPrice = Math.floor(details.sellPrice || (details.price / 4)); // Use sellPrice if available, else 1/4
+             const sellPrice = Math.floor(details.sellPrice || (details.price * sellMultiplier)); // <-- Use new multiplier
              if (sellPrice <= 0) return; // Don't show if not sellable
 
              let buttonHtml = `<button onclick="sellItem('items', '${key}', ${sellPrice})" class="btn btn-primary text-sm py-1 px-3">Sell (${sellPrice} G)</button>`;
@@ -3273,7 +3414,8 @@ const renderSellList = (category, title) => {
              let countStr = '';
              let count = 0;
              let buttonHtml = '';
-             const sellPrice = Math.floor(details.sellPrice || (details.price / 4)); // Use sellPrice if available, else 1/4
+             // const sellPrice = Math.floor(details.sellPrice || (details.price / 4)); // Use sellPrice if available, else 1/4
+             const sellPrice = Math.floor(details.sellPrice || (details.price * sellMultiplier)); // <-- Use new multiplier
              if (sellPrice <= 0) return; // Don't show
 
              if (category === 'lures') {
@@ -3552,7 +3694,8 @@ function renderInventory() {
         let html = ''; // Start empty
 
         // (Sorting/Type map logic remains the same)
-        const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'enchant', 'experimental'];
+        // --- MODIFICATION: Removed 'enchant' from consumables ---
+        const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'experimental'];
         const typeMapConsumables = { /* ... */
             'healing': 'Healing Potions',
             'mana_restore': 'Mana Potions',
@@ -3562,14 +3705,15 @@ function renderInventory() {
             'buff_apply': 'Greases/Enhancements',
             'debuff_apply': 'Throwables (Debuff)',
             'debuff_special': 'Throwables (Special)',
-            'enchant': 'Essences (Combat Use)',
+            // 'enchant': 'Essences (Combat Use)', // <-- REMOVED
             'experimental': 'Mysterious Concoctions'
         };
+        // --- END MODIFICATION ---
         const materialOrder = ['food_ingredient', 'alchemy', 'enchant', 'special', 'junk'];
         const typeMapMaterials = { /* ... */
              'food_ingredient': 'Cooking Ingredients',
              'alchemy': 'Alchemy Reagents',
-             'enchant': 'Essences (Crafting)',
+             'enchant': 'Essences (Crafting)', // <-- Essences live here now
              'special': 'Special Items',
              'junk': 'Junk & Trophies'
         };
@@ -4482,17 +4626,31 @@ function renderGarden() {
             <div id="seed-list" class="flex flex-wrap justify-center gap-2"></div>
              <button onclick="hideSeedSelection()" class="btn btn-action mt-3 text-sm">Cancel</button>
         </div>`;
+    
+    // --- START MODIFICATION ---
+    // Add the new Seedmaker selection box
+    html += `<div id="seedmaker-selection-box" class="hidden mt-4 p-4 bg-slate-800 rounded-lg max-w-md mx-auto">
+            <h3 id="seedmaker-selection-title" class="font-bold text-lg mb-2 text-yellow-300">Select Plant to Process</h3>
+            <div id="plant-list" class="flex flex-wrap justify-center gap-2"></div>
+             <button onclick="hideSeedmakerSelection()" class="btn btn-action mt-3 text-sm">Cancel</button>
+        </div>`;
 
-    html += `<div class="mt-6">
-                <button onclick="renderHouse()" class="btn btn-primary">Back to House</button>
-            </div>
+    html += `<div class="mt-6 flex justify-center gap-4">
+                <button onclick="renderHouse()" class="btn btn-primary">Back to House</button>`;
+    
+    // Add the Seedmaker button if tier is high enough
+    if (gardenTier >= 2) {
+        html += `<button onclick="showSeedmakerSelection()" class="btn btn-primary">Use Seedmaker</button>`;
+    }
+
+    html += `</div>
     </div>`;
+    // --- END MODIFICATION ---
 
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
 }
-
 
 function renderPlot(plot, index, isTreePlot) {
     let content = '';
@@ -4563,6 +4721,71 @@ function showSeedSelection(plotIndex, isTreePlot) {
 
     seedBox.classList.remove('hidden');
 }
+
+function showSeedmakerSelection() {
+    hideSeedSelection(); // Hide the other box just in case
+    const seedmakerBox = document.getElementById('seedmaker-selection-box');
+    const plantList = document.getElementById('plant-list');
+    if (!seedmakerBox || !plantList) {
+        console.error("Seedmaker UI elements not found!");
+        return;
+    }
+
+    // Build the reverse map (Plant Key -> Seed Key)
+    const PLANT_TO_SEED_MAP = {};
+    for (const seedKey in SEEDS) {
+        const plantKey = SEEDS[seedKey].growsInto;
+        PLANT_TO_SEED_MAP[plantKey] = seedKey;
+    }
+
+    // Find eligible items in inventory (must be a known plant)
+    const availablePlants = Object.keys(player.inventory.items).filter(key => 
+        PLANT_TO_SEED_MAP[key] && player.inventory.items[key] > 0
+    );
+    // Sort alphabetically
+    availablePlants.sort((a, b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name));
+
+
+    if (availablePlants.length === 0) {
+        addToLog("You have no harvested plants to process into seeds.", "text-yellow-400");
+        hideSeedmakerSelection(); // <-- ADDED THIS to close the empty box
+        return;
+    }
+
+    plantList.innerHTML = '';
+    availablePlants.forEach(plantKey => {
+        const details = getItemDetails(plantKey);
+        const count = player.inventory.items[plantKey];
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-primary text-sm';
+        btn.innerHTML = `${details.name} (x${count})`;
+        btn.onclick = () => processSeedmaker(plantKey); // Call the renderer-side function
+        plantList.appendChild(btn);
+    });
+
+    seedmakerBox.classList.remove('hidden');
+}
+
+
+/**
+ * Hides the Seedmaker item selection UI.
+ */
+function hideSeedmakerSelection() {
+    const seedmakerBox = document.getElementById('seedmaker-selection-box');
+    if (seedmakerBox) seedmakerBox.classList.add('hidden');
+}
+
+/**
+ * Acts as the bridge from the UI click to the engine logic.
+ * @param {string} plantKey The key of the plant item to process.
+ */
+function processSeedmaker(plantKey) {
+    processPlantInSeedmaker(plantKey); // Call engine logic
+    // Re-render the garden. This will hide the selection box
+    // and update the plant/seed counts in the list if it's reopened.
+    renderGarden(); 
+}
+
 
 function hideSeedSelection() {
      const seedBox = document.getElementById('seed-selection-box');

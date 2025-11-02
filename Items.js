@@ -171,14 +171,14 @@ const ITEMS = {
 
     // --- Special & Crafting Items ---
     'undying_heart': { name: 'Undying Heart', type: 'special', price: 1000, sellPrice: 100, rarity: 'Rare', description: 'A pulsating heart that refuses to stop beating. Used in powerful rituals.' }, // Added sellPrice
-    'fire_essence': { name: 'Fire Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, searing essence of fire.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'water_essence': { name: 'Water Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, flowing essence of water.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'earth_essence': { name: 'Earth Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, stoic essence of earth.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'wind_essence': { name: 'Wind Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, rushing essence of wind.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'lightning_essence': { name: 'Lightning Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, crackling essence of lightning.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'nature_essence': { name: 'Nature Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, vibrant essence of nature.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'light_essence': { name: 'Light Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, radiant essence of light.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'void_essence': { name: 'Void Essence', type: 'enchant', price: 500, sellPrice: 50, rarity: 'Uncommon', description: 'The pure, silent essence of the void.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'fire_essence': { name: 'Fire Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, searing essence of fire.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'water_essence': { name: 'Water Essence', type: 'enchant', price: 500,  rarity: 'Uncommon', description: 'The pure, flowing essence of water.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'earth_essence': { name: 'Earth Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, stoic essence of earth.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'wind_essence': { name: 'Wind Essence', type: 'enchant', price: 500,  rarity: 'Uncommon', description: 'The pure, rushing essence of wind.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'lightning_essence': { name: 'Lightning Essence', type: 'enchant', price: 500,  rarity: 'Uncommon', description: 'The pure, crackling essence of lightning.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'nature_essence': { name: 'Nature Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, vibrant essence of nature.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'light_essence': { name: 'Light Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, radiant essence of light.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    'void_essence': { name: 'Void Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, silent essence of the void.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
 
     // --- Key Items ---
     'bestiary_notebook': {name: 'Bestiary Notebook', type: 'key', price: 0, description: "A leather-bound book from a nervous researcher named Betty. Used to catalogue monster observations."},

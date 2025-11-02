@@ -573,7 +573,7 @@ async function loadGameFromKey(docId, isImport = false) {
             
             // --- THIS IS THE FIX ---
             // Pass the raceKey from the saved data, not the level
-            const newAlly = new NpcAlly(allyData.name, allyData._classKey, allyData.raceKey, allyData.level);
+            const newAlly = new NpcAlly(allyData.name, allyData._classKey, allyData.raceKey, allyData.level, allyData.backgroundKey, allyData.background);
             // --- END FIX ---
             
             // Now, copy all saved properties *back* onto the new instance
@@ -660,7 +660,31 @@ async function loadGameFromKey(docId, isImport = false) {
             // --- END NPC ALLY ---
         }
         // --- End Added ---
-        
+                // --- NEW: Retroactive Unlock Fix for saves that have 'false' ---
+        // This runs *after* the initial migration, catching old saves
+        if (player.level >= 5 && !player.unlocks.houseAvailable) {
+            player.unlocks.houseAvailable = true;
+            console.log("Retroactively unlocked House.");
+        }
+        if (player.level >= 5 && !player.unlocks.blackMarket) {
+            player.unlocks.blackMarket = true;
+            console.log("Retroactively unlocked Black Market.");
+        }
+        if (player.level >= 8 && !player.unlocks.barracks) {
+            player.unlocks.barracks = true;
+            console.log("Retroactively unlocked Barracks.");
+        }
+        // Check for keys, then unlock the location
+        if (player.inventory?.items?.['blacksmith_key'] && !player.unlocks.blacksmith) {
+            player.unlocks.blacksmith = true;
+            console.log("Retroactively unlocked Blacksmith (key found).");
+        }
+        if (player.inventory?.items?.['tower_key'] && !player.unlocks.sageTower) {
+            player.unlocks.sageTower = true;
+            console.log("Retroactively unlocked Sage Tower (key found).");
+        }
+        // --- END NEW ---
+
         if (!inv.items) inv.items = {};
         if (!inv.weapons) inv.weapons = [];
         if (!inv.catalysts) inv.catalysts = [];

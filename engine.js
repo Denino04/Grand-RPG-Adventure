@@ -1584,6 +1584,7 @@ class Player extends Entity {
     // --- END takeDamage refactoring ---
 }
 // --- NEW Drone Class ---
+// --- NEW Drone Class ---
 class Drone extends Entity {
     constructor(playerRef) {
         super("Magic Drone");
@@ -1627,12 +1628,17 @@ class Drone extends Entity {
         addToLog(`${this.name} fires a beam at ${target.name}!`);
 
         // Drone attack is considered magical
-        const finalDamage = target.takeDamage(damage, { isMagic: true, element: 'none' });
+        // --- THIS IS THE FIX ---
+        // target.takeDamage now returns an object { damageDealt, knockback }
+        const damageResult = target.takeDamage(damage, { isMagic: true, element: 'none' });
+        const finalDamageDealt = damageResult.damageDealt; // Get the actual number
 
-        calcLog.finalDamage = finalDamage;
+        calcLog.finalDamage = finalDamageDealt;
         logDamageCalculation(calcLog);
 
-        addToLog(`The beam hits for <span class="font-bold text-cyan-400">${finalDamage}</span> magical damage.`);
+        // Use the correct variable in the log
+        addToLog(`The beam hits for <span class="font-bold text-cyan-400">${finalDamageDealt}</span> magical damage.`);
+        // --- END FIX ---
     }
 
     takeDamage(damage, options = {}) {
@@ -1646,20 +1652,29 @@ class Drone extends Entity {
 
         if (!this.isAlive()) {
             addToLog(`${this.name} is destroyed!`, 'text-red-500');
-            gameState.activeDrone = null; // Remove drone reference
+            // --- MODIFIED: Check for player drone or NPC drone ---
+            if (this === gameState.activeDrone) {
+                gameState.activeDrone = null; // Remove player drone reference
+            } else if (this === gameState.npcActiveDrone) {
+                gameState.npcActiveDrone = null; // Remove NPC drone reference
+            }
+            // --- END MODIFICATION ---
         }
 
         // Update grid to show HP change if needed (might require drone HP bar)
         if (gameState.currentView === 'battle') {
             renderBattleGrid();
         }
-        return finalDamage;
+        
+        // --- MODIFIED: Return object ---
+        return { damageDealt: finalDamage, knockback: 0 };
+        // --- END MODIFICATION ---
     }
 }
 // --- END Drone Class ---
 class NpcAlly extends Entity {
     // --- CONSTRUCTOR MODIFIED to accept raceKey ---
-    constructor(name, classKey, raceKey, playerLevel) {
+    constructor(name, classKey, raceKey, playerLevel, backgroundKey, backgroundName) { // <-- MODIFIED SIGNATURE
         super(name);
         this.x = -1;
         this.y = -1;
@@ -1671,6 +1686,8 @@ class NpcAlly extends Entity {
         const classData = CLASSES[classKey]; // Get classData *once*
         this.raceKey = raceKey || 'Human'; // Store the race key
         this.race = RACES[this.raceKey]?.name || 'Human'; // <-- ADDED: Set race display name
+        this.backgroundKey = backgroundKey;
+        this.background = backgroundName;
 
         // --- ROBUSTNESS: Ensure this.race is set, even if raceKey was missing ---
         if (!this.race && this.raceKey) {
@@ -1695,12 +1712,12 @@ class NpcAlly extends Entity {
 
         // Base stats now come from the provided raceKey
         const raceStats = RACES[this.raceKey] || RACES['Human'];
-        this.vigor = raceStats.Vigor;
-        this.focus = raceStats.Focus;
-        this.stamina = raceStats.Stamina;
-        this.strength = raceStats.Strength;
-        this.intelligence = raceStats.Intelligence;
-        this.luck = raceStats.Luck;
+        this.vigor = (raceStats.Vigor || 0) + (classData?.bonusStats?.Vigor || 0);
+        this.focus = (raceStats.Focus || 0) + (classData?.bonusStats?.Focus || 0);
+        this.stamina = (raceStats.Stamina || 0) + (classData?.bonusStats?.Stamina || 0);
+        this.strength = (raceStats.Strength || 0) + (classData?.bonusStats?.Strength || 0);
+        this.intelligence = (raceStats.Intelligence || 0) + (classData?.bonusStats?.Intelligence || 0);
+        this.luck = (raceStats.Luck || 0) + (classData?.bonusStats?.Luck || 0);
         // --- END FIX ---
 
         // Bonus points from leveling
@@ -1710,12 +1727,26 @@ class NpcAlly extends Entity {
         this.bonusStrength = 0;
         this.bonusIntelligence = 0;
         this.bonusLuck = 0;
+
+        this.bonusHp = 0;
+        this.bonusMp = 0;
+        this.bonusPhysicalDefense = 0;
+        this.bonusMagicalDefense = 0;
+        this.bonusPhysicalDamage = 0;
+        this.bonusMagicalDamage = 0;
+        this.bonusEvasion = 0;
+        this.bonusCritChance = 0;
         
         // --- ADDED: Ability properties ---
         this.racialPassive = (chance) => chance; // Default pass-through function
         this.signatureAbilityData = null; // Reference to the ability data object
-        // --- END ADDED ---
-        
+        this.signatureAbilityUsed = false;
+        this.signatureAbilityToggleActive = false;
+        this.activeModeIndex = -1; // For Magus
+        this.npcAllyMarkedTarget = null; // For Ranger
+        this.knownCookingRecipes = []; // For Cook
+        this.mpToggleThreshold = 0; // For toggle AI
+        this.foodBuffs = {};        
         // --- Stat Allocation ---
         this.calculateStats(playerLevel); // This will set the level and distribute points
         // --- NEW Equipment & Inventory ---
@@ -1754,12 +1785,35 @@ class NpcAlly extends Entity {
             }
         }
 
+        // --- FIX: Correctly check for *starting* recipes, not random ones ---
+        if (classData && classData.startingCookingRecipes) { // Use startingCookingRecipes
+            // We just add the property here. The *hiring* logic in rendering.js
+            // will be responsible for populating this list.
+            // For now, ensure the list exists.
+            this.knownCookingRecipes = [...classData.startingCookingRecipes]; // <-- FIX
+        }
+        // --- END FIX ---
+
         this.updateAbilityReferences();
+
+        // --- NEW: Recalculate derived bonuses from background ---
+        // Ensure seed is set for bonus calculation
+        if (player) {
+            this.seed = player.seed;
+        } else {
+            // Fallback seed if player isn't available (shouldn't happen in normal flow)
+            this.seed = Math.floor(Math.random() * 1000000);
+        }
+        this.recalculateGrowthBonuses();
+        // --- END NEW ---
+
         // Final HP/MP calculation
         this.hp = this.maxHp;
         this.mp = this.maxMp;
+        this.mpToggleThreshold = Math.floor(this.maxMp * 0.25);
     }
     isAlive() { return this.hp > 0; }
+
 
     updateAbilityReferences() {
         console.log(`DEBUG: updateAbilityReferences called for Ally. Race Key: "${this.raceKey}"`);
@@ -1877,7 +1931,7 @@ class NpcAlly extends Entity {
                 }
             } else {
                 // --- CHANCE LOGGING: Log Halfling luck didn't trigger ---
-                if (logChanceCalculations) addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Halfling Reroll Not Triggered. Result = FAIL`, 'text-red-400');
+                if (logChanceCalculations) addToLog(`DEBUG (Chance) [ALLY: ${this.name} - ${debugPurpose}]: Reroll Not Triggered. Result = FAIL`, 'text-red-400');
             }
              // Fall through to standard failure logging if reroll wasn't attempted or failed
         }
@@ -1892,6 +1946,103 @@ class NpcAlly extends Entity {
     }
     // --- END ADDED ---
 
+
+    recalculateGrowthBonuses() {
+        // Reset all derived bonuses before recalculating
+        this.bonusHp = 0;
+        this.bonusMp = 0;
+        this.bonusPhysicalDefense = 0;
+        this.bonusMagicalDefense = 0;
+        this.bonusPhysicalDamage = 0;
+        this.bonusMagicalDamage = 0;
+        this.bonusEvasion = 0;
+        this.bonusCritChance = 0;
+
+        if (!this.backgroundKey || !BACKGROUNDS[this.backgroundKey]) return;
+
+        const backgroundData = BACKGROUNDS[this.backgroundKey];
+        // Ensure seed exists and is valid before creating RNG
+        if (this.seed === null || this.seed === undefined || isNaN(Number(this.seed))) {
+            console.warn("NPC seed is invalid during recalculateGrowthBonuses. Using temp random.");
+            this.seed = Math.floor(Math.random() * 1000000);
+        }
+        const rng = seededRandom(this.seed);
+
+
+        if (backgroundData.growthBonus.wretch) {
+            const totalPointsSpent = (this.bonusVigor || 0) + (this.bonusFocus || 0) + (this.bonusStamina || 0) + (this.bonusStrength || 0) + (this.bonusIntelligence || 0) + (this.bonusLuck || 0);
+            const procs = Math.floor(totalPointsSpent / 2); // Wretch gets bonus every 2 points spent
+            const possibleBonuses = ['vigor', 'focus', 'stamina', 'strength', 'intelligence', 'luck'];
+
+            for (let i = 0; i < procs; i++) {
+                const randomStat = possibleBonuses[Math.floor(rng() * possibleBonuses.length)];
+                this.applyBonusForStat(randomStat, 1, rng, true); // Apply 1 point bonus
+            }
+            // Also apply normal bonuses for the points spent directly
+            this.applyBonusForStat('vigor', this.bonusVigor || 0, rng);
+            this.applyBonusForStat('focus', this.bonusFocus || 0, rng);
+            this.applyBonusForStat('stamina', this.bonusStamina || 0, rng);
+            this.applyBonusForStat('strength', this.bonusStrength || 0, rng);
+            this.applyBonusForStat('intelligence', this.bonusIntelligence || 0, rng);
+            this.applyBonusForStat('luck', this.bonusLuck || 0, rng);
+
+
+            return; // Exit after Wretch logic
+        }
+
+        // Standard background bonus application
+        this.applyBonusForStat('vigor', this.bonusVigor || 0, rng);
+        this.applyBonusForStat('focus', this.bonusFocus || 0, rng);
+        this.applyBonusForStat('stamina', this.bonusStamina || 0, rng);
+        this.applyBonusForStat('strength', this.bonusStrength || 0, rng);
+        this.applyBonusForStat('intelligence', this.bonusIntelligence || 0, rng);
+        this.applyBonusForStat('luck', this.bonusLuck || 0, rng);
+    }
+
+    // --- PASTE `applyBonusForStat` from Player class ---
+    applyBonusForStat(stat, points, rng, isWretchProc = false) {
+         // Ensure points is a non-negative number
+         points = Math.max(0, points || 0);
+        if (!this.backgroundKey || !BACKGROUNDS[this.backgroundKey] || points === 0) return;
+
+
+        const background = BACKGROUNDS[this.backgroundKey];
+        const favoredStats = background.favoredStats.map(s => s.toLowerCase());
+
+        // Wretch procs apply regardless of favored stats
+        // Standard bonuses only apply if the stat is favored (or if background is Wretch itself, handled above)
+        if (!isWretchProc && !background.growthBonus.wretch && !favoredStats.includes(stat)) return;
+
+
+        switch(stat) {
+            case 'vigor': this.bonusHp += 5 * points; break;
+            case 'focus': this.bonusMp += 5 * points; break;
+            case 'stamina':
+                for (let i = 0; i < points; i++) {
+                    if (rng() < 0.5) this.bonusPhysicalDefense += 0.5;
+                    else this.bonusMagicalDefense += 0.5;
+                }
+                break;
+            case 'strength': this.bonusPhysicalDamage += 1 * points; break;
+            case 'intelligence': this.bonusMagicalDamage += 1 * points; break;
+            case 'luck':
+                for (let i = 0; i < points; i++) {
+                    if (rng() < 0.5) this.bonusEvasion += 0.005; // 0.5% per point
+                    else this.bonusCritChance += 0.005; // 0.5% per point
+                }
+                break;
+        }
+         // Ensure derived stats are numbers after calculation
+         this.bonusHp = this.bonusHp || 0;
+         this.bonusMp = this.bonusMp || 0;
+         this.bonusPhysicalDefense = this.bonusPhysicalDefense || 0;
+         this.bonusMagicalDefense = this.bonusMagicalDefense || 0;
+         this.bonusPhysicalDamage = this.bonusPhysicalDamage || 0;
+         this.bonusMagicalDamage = this.bonusMagicalDamage || 0;
+         this.bonusEvasion = this.bonusEvasion || 0;
+         this.bonusCritChance = this.bonusCritChance || 0;
+    }
+
     // --- Stat Calculation Method ---
     calculateStats(playerLevel) {
         this.level = Math.max(1, Math.floor(playerLevel * 0.95)); // 95%
@@ -1901,7 +2052,17 @@ class NpcAlly extends Entity {
 
         const totalPoints = (this.level - 1) * 5;
         const allocation = NPC_STAT_ALLOCATIONS[this._classKey];
-        if (!allocation || totalPoints <= 0) return;
+        if (!allocation || totalPoints <= 0) {
+            // Ensure bonus stats are initialized even if no points are spent
+            this.bonusVigor = 0;
+            this.bonusFocus = 0;
+            this.bonusStamina = 0;
+            this.bonusStrength = 0;
+            this.bonusIntelligence = 0;
+            this.bonusLuck = 0;
+            this.mpToggleThreshold = Math.floor(this.maxMp * 0.25);
+            return;
+        };
 
         // Distribute points based on percentages
         this.bonusVigor = Math.floor(totalPoints * allocation.Vigor);
@@ -1911,27 +2072,89 @@ class NpcAlly extends Entity {
         this.bonusIntelligence = Math.floor(totalPoints * allocation.Intelligence);
         this.bonusLuck = Math.floor(totalPoints * allocation.Luck);
         
-        // Distribute any remaining points (due to flooring)
+        // --- MODIFIED: Distribute remaining points based on allocation weight ---
         let remainingPoints = totalPoints - (this.bonusVigor + this.bonusFocus + this.bonusStamina + this.bonusStrength + this.bonusIntelligence + this.bonusLuck);
         
-        if (allocation.Vigor > 0.3) this.bonusVigor += remainingPoints;
-        else if (allocation.Strength > 0.3) this.bonusStrength += remainingPoints;
-        else if (allocation.Intelligence > 0.3) this.bonusIntelligence += remainingPoints;
-        else if (allocation.Stamina > 0.2) this.bonusStamina += remainingPoints;
-        else if (allocation.Focus > 0.2) this.bonusFocus += remainingPoints;
-        else this.bonusLuck += remainingPoints;
+        // Sort stats by allocation percentage, descending
+        const allocationEntries = Object.entries(allocation);
+        allocationEntries.sort((a, b) => b[1] - a[1]); // Sort by percentage
+        
+        // Give remaining points to the highest-allocation stats
+        for (let i = 0; i < remainingPoints; i++) {
+            const statToBuff = allocationEntries[i % allocationEntries.length][0]; // Cycle through top stats
+            switch(statToBuff) {
+                case 'Vigor': this.bonusVigor++; break;
+                case 'Focus': this.bonusFocus++; break;
+                case 'Stamina': this.bonusStamina++; break;
+                case 'Strength': this.bonusStrength++; break;
+                case 'Intelligence': this.bonusIntelligence++; break;
+                case 'Luck': this.bonusLuck++; break;
+            }
+        }
+        this.mpToggleThreshold = Math.floor(this.maxMp * 0.25);
     }
 
-    // --- Derived Stat Getters (Copied from Player) ---
-    get maxHp() { return Math.floor((this.vigor + this.bonusVigor) * 5); }
-    get maxMp() { return Math.floor((this.focus + this.bonusFocus) * 5); }
-    get physicalDefense() { return Math.floor((this.stamina + this.bonusStamina + this.vigor + this.bonusVigor) / 2); }
-    get magicalDefense() { return Math.floor((this.stamina + this.bonusStamina + this.focus + this.bonusFocus) / 2); }
-    get physicalDamageBonus() { return (this.strength + this.bonusStrength); }
-    get magicalDamageBonus() { return (this.intelligence + this.bonusIntelligence); }
-    get critChance() { return Math.min(0.3, (((this.luck + this.bonusLuck) * 0.5) / 100)); }
-    get evasionChance() { return Math.min(0.2, (((this.luck + this.bonusLuck) * 0.5) / 100)); }
-    get resistanceChance() { return Math.min(0.5, ((this.luck + this.bonusLuck) / 100)); }
+    _calculateClericHealAvg() {
+        if (this._classKey !== 'cleric' || !this.signatureAbilityData) {
+            return 0;
+        }
+        
+        const ability = this.signatureAbilityData;
+        const catalyst = this.equippedCatalyst;
+        
+        // Cleric ability requires a catalyst
+        if (!catalyst || catalyst.name === 'None') {
+            return 0;
+        }
+        
+        // Calculate healing dice (scales with level, caps at 7)
+        const baseDice = 3;
+        let healDiceCount = Math.min(7, baseDice + Math.floor(this.level / 10));
+        
+        // Add catalyst bonus
+        const spellAmp = catalyst.effect?.spell_amp || 0;
+        healDiceCount = Math.min(7, healDiceCount + spellAmp); // Apply amp, still cap at 7
+        
+        // Calculate average heal amount (base)
+        // (1+8) / 2 = 4.5
+        let avgHeal = healDiceCount * 4.5; 
+        
+        // Apply magical damage bonus
+        const statBonus = this.magicalDamageBonus;
+        const statMultiplier = 1 + statBonus / 20;
+        avgHeal = Math.floor(avgHeal * statMultiplier);
+        
+        // --- MODIFIED: Use total intelligence for flat bonus ---
+        const intFlatBonus = Math.floor((this.intelligence + this.bonusIntelligence) / 5);
+        avgHeal += intFlatBonus;
+
+        // Apply Ally's racial passives (Dragonborn, Elemental[healing])
+        if (this.race === 'Dragonborn') {
+            const damageBonus = (this.level >= 20) ? 1.20 : 1.10;
+            avgHeal = Math.floor(avgHeal * damageBonus);
+        }
+        // Note: Allies don't have elemental affinity, so no 'Elementals' check for healing.
+
+        return Math.floor(avgHeal);
+    }
+    // --- MODIFIED: Derived Stat Getters (to include background bonuses) ---
+    get maxHp() { 
+        let finalHp = ((this.vigor + this.bonusVigor) * 5) + this.bonusHp;
+        // Allies don't get food buffs
+        return Math.floor(finalHp);
+    }
+    get maxMp() { 
+        let finalMp = ((this.focus + this.bonusFocus) * 5) + this.bonusMp;
+        // Allies don't get food buffs
+        return Math.floor(finalMp);
+    }
+    get physicalDefense() { return Math.floor(((this.stamina + this.bonusStamina) + (this.vigor + this.bonusVigor)) / 2) + this.bonusPhysicalDefense; }
+    get magicalDefense() { return Math.floor(((this.stamina + this.bonusStamina) + (this.focus + this.bonusFocus)) / 2) + this.bonusMagicalDefense; }
+    get physicalDamageBonus() { return (this.strength + this.bonusStrength) + this.bonusPhysicalDamage; }
+    get magicalDamageBonus() { return (this.intelligence + this.bonusIntelligence) + this.bonusMagicalDamage; }
+    get critChance() { return Math.min(0.3, (((this.luck + this.bonusLuck) * 0.5) / 100) + this.bonusCritChance); }
+    get evasionChance() { return Math.min(0.2, (((this.luck + this.bonusLuck) * 0.5) / 100) + this.bonusEvasion); }
+
 
     _calculateAvoidanceChances() {
         const shield = this.equippedShield;
@@ -2303,75 +2526,169 @@ class NpcAlly extends Entity {
         if (!target || !target.isAlive()) return;
         
         const weapon = this.equippedWeapon;
+        let messageLog = []; // For crit messages, etc.
+
+        // --- Dwarf: Craftsmen's Intuition (Evolution) ---
         let attackDamageDice = [...weapon.damage]; // [numDice, sides]
         if (this.race === 'Dwarf' && this.level >= 20) {
             if (attackDamageDice[1] === 6) { attackDamageDice[1] = 8; }
             else if (attackDamageDice[1] === 8) { attackDamageDice[1] = 10; }
         }
-        // --- MODIFIED: Use attackDamageDice (for Dwarf passive) ---
+
         let rollResult = rollDice(attackDamageDice[0], attackDamageDice[1], `${this.name} Attack`);
-        let baseDamage = rollResult.total;
+        let baseWeaponDamage = rollResult.total;
         
-        const statBonus = this.physicalDamageBonus;
+        // --- START: Full Damage Calculation (Copied from Parry) ---
+        let statBonus = this.physicalDamageBonus;
+
+        let damage = baseWeaponDamage; // <-- THIS IS THE FIX (defining 'damage')
         const statMultiplier = 1 + statBonus / 20;
-        // --- MODIFIED: Initialize 'damage' variable ---
-        let damage = Math.floor(baseDamage * statMultiplier);
-        
-        // --- MODIFIED: Use base stat for flat bonus, just like player ---
+        damage = Math.floor(damage * statMultiplier);
+
         const strengthFlatBonus = Math.floor(this.strength / 5);
         damage += strengthFlatBonus;
 
+        let attackEffects = { element: this.weaponElement };
+
+        // --- DRAGONBORN: Bloodline Attunement (Damage) ---
         if (this.race === 'Dragonborn') {
             const damageBonus = (this.level >= 20) ? 1.20 : 1.10;
             damage = Math.floor(damage * damageBonus);
         }
 
-        if (Math.random() < this.critChance) {
-            const critMultiplier = weapon.effect?.critMultiplier || 1.5;
-            damage = Math.floor(damage * critMultiplier);
-            addToLog(`${this.name} lands a CRITICAL HIT!`);
+        // Critical Hit Calculation (Simplified)
+        let critChance = this.critChance;
+        const canWeaponCrit = weapon.class === 'Dagger' || weapon.effect?.critChance;
+
+        // --- NEW: Ranger Mark crit enable ---
+        if (target.isNpcMarked && target === this.npcAllyMarkedTarget) {
+            const markBonusDamage = rollDice(1, 8, 'Ally Hunters Mark Bonus').total;
+            damage += markBonusDamage;
+            messageLog.push(`Hunter's Mark adds ${markBonusDamage} damage!`);
+            // allowCrit = true; // This isn't defined here, but just enabling crit chance is fine
+            critChance += 0.10; // Add 10% crit chance for marked
         }
-        
-        let attackEffects = { element: this.weaponElement };
+        // --- END NEW ---
+
+        if (canWeaponCrit || (target.isNpcMarked && target === this.npcAllyMarkedTarget)) { // Allow crit if marked
+            if (weapon.class === 'Dagger') critChance += 0.1;
+            if (weapon.effect?.critChance) critChance += weapon.effect.critChance;
+
+            if (this.rollForEffect(critChance, 'Ally Attack Crit')) {
+                let critMultiplier = weapon.effect?.critMultiplier || 1.5;
+                damage = Math.floor(damage * critMultiplier);
+                messageLog.push(`CRITICAL HIT!`);
+            }
+        }
+
+        // Armor Pierce
         if (weapon.class === 'Thrusting Sword') attackEffects.armorPierce = 0.2;
         if (weapon.effect?.armorPierce) attackEffects.armorPierce = (attackEffects.armorPierce || 0) + weapon.effect.armorPierce;
+        // --- END: Full Damage Calculation ---
 
-        const { damageDealt } = target.takeDamage(damage, attackEffects);
+        // Pass 'this' as the attacker
+        const { damageDealt } = target.takeDamage(damage, attackEffects, this); 
         
-        addToLog(`${this.name} attacks ${target.name} with ${weapon.name} for <span class="font-bold text-yellow-300">${damageDealt}</span> damage.`);
+        let logMessagesCombined = messageLog.join(' ');
+        addToLog(`${this.name} attacks ${target.name} with ${weapon.name} for <span class="font-bold text-yellow-300">${damageDealt}</span> damage. ${logMessagesCombined}`);
+
+        // --- Lifesteal (Copied from Parry) ---
+        if (damageDealt > 0) {
+            let lifestealAmount = 0;
+            if (weapon.class === 'Reaper') lifestealAmount += damageDealt * 0.1;
+            if (weapon.effect?.lifesteal) lifestealAmount += damageDealt * weapon.effect.lifesteal;
+            if (lifestealAmount > 0 && target.speciesData.class !== 'Undead') {
+                const healedAmount = Math.floor(lifestealAmount);
+                if (healedAmount > 0) {
+                    this.hp = Math.min(this.maxHp, this.hp + healedAmount);
+                    addToLog(`${this.name} drains <span class="font-bold text-green-400">${healedAmount}</span> HP.`);
+                }
+            }
+        }
+        // --- End Lifesteal ---
+        // --- NEW: Paladin Divine Smite ---
+        if (this._classKey === 'paladin' && this.signatureAbilityToggleActive && damageDealt > 0) {
+            const catalyst = this.equippedCatalyst;
+            if (catalyst && catalyst.name !== 'None') {
+                const smiteCost = 15;
+                if (this.mp >= smiteCost) {
+                    this.mp -= smiteCost;
+                    
+                    // Calculate smite damage (scales with catalyst spell_amp)
+                    const baseDice = 2;
+                    const maxDice = 6;
+                    const spellAmp = catalyst.effect?.spell_amp || 0;
+                    const smiteDiceCount = Math.min(maxDice, baseDice + spellAmp);
+                    const smiteDamage = rollDice(smiteDiceCount, 8, `${this.name} Divine Smite`).total;
+
+                    // Deconstruct the result object
+                    const { damageDealt: finalSmiteDamage } = target.takeDamage(smiteDamage, { isMagic: true, element: 'light' });
+                    addToLog(`${this.name}'s Divine Smite erupts, dealing an extra <span class="font-bold text-yellow-200">${finalSmiteDamage}</span> Light damage! (Cost: ${smiteCost} MP)`, 'text-yellow-100');
+                    
+                    if (!target.isAlive()) checkBattleStatus(true); // Check if smite killed
+                } else {
+                    addToLog(`${this.name} is too low on MP for Divine Smite.`, 'text-blue-400');
+                }
+            }
+        }
+        // --- END NEW ---
     }
 
     async moveTowards(target) {
-        const path = findPath({x: this.x, y: this.y}, {x: target.x, y: target.y}, false); // Allies can't fly
+        if (!target) {
+             addToLog(`${this.name} has no one to move towards!`);
+             return;
+        }
+        
+        const isFlying = (this.race === 'Pinionfolk'); // Use this.race
+        let moveDistance = 2; // Base ally move
+        
+        // --- ELF: Nature's Madness (Movement) ---
+        if (this.race === 'Elf' && (!this.equippedArmor || !this.equippedArmor.metallic)) {
+            moveDistance += (this.level >= 20 ? 2 : 1);
+        }
+        // --- Status Effects (Simplified for ally) ---
+        if(this.statusEffects.bonus_speed) moveDistance += this.statusEffects.bonus_speed.move;
+        if(this.statusEffects.slowed) moveDistance = Math.max(1, moveDistance + this.statusEffects.slowed.move);
+        // (No food buffs for ally)
+
+        const path = findPath({x: this.x, y: this.y}, {x: target.x, y: target.y}, isFlying);
 
         if (path && path.length > 1) {
-            addToLog(`${this.name} moves towards ${target.name}!`);
-            let moveDistance = 2; // Base move distance for ally
-            if (this.race === 'Elf' && (!this.equippedArmor || !this.equippedArmor.metallic)) {
-                moveDistance += (this.level >= 20 ? 2 : 1);
-            }
-            const stepsToTake = Math.min(path.length - 1, moveDistance); // <-- MODIFIED
+            // addToLog(`${this.name} moves towards ${target.name}!`); // This log is already in battle.js
+            const stepsToTake = Math.min(path.length - 1, moveDistance); // Use calculated move distance
 
             for (let i = 1; i <= stepsToTake; i++) {
                 const nextStep = path[i];
-                // --- OVERLAP FIX: Call isCellBlocked for the ally's move ---
-                if (isCellBlocked(nextStep.x, nextStep.y, false, false, true)) { // Check for player/obstacles/enemies, isAllyMoving = true
-                    addToLog(`${this.name} encounters an obstacle and stops.`);
-                    break; // Path blocked
+
+                // Check if the next step is valid before moving
+                // Use the isAllyMoving flag (true)
+                if (isCellBlocked(nextStep.x, nextStep.y, false, isFlying, true)) {
+                     addToLog(`${this.name} encounters an obstacle and stops.`);
+                    break; // Stop if the path becomes blocked
                 }
+
+                // Check if moving into this cell would put it in attack range
+                // (Need to decide if attacking or casting)
+                const distanceAfterMove = Math.abs(nextStep.x - target.x) + Math.abs(nextStep.y - target.y);
+                const weaponRange = this.equippedWeapon.range || 1;
+                const catalystRange = this.equippedCatalyst.range || 3;
+
                 this.x = nextStep.x;
                 this.y = nextStep.y;
                 renderBattleGrid();
-                await new Promise(resolve => setTimeout(resolve, 300));
-                
-                const distanceAfterMove = Math.abs(this.x - target.x) + Math.abs(this.y - target.y);
-                if (distanceAfterMove <= (this.equippedWeapon.range || 1)) {
-                    break; // In range
+                await new Promise(resolve => setTimeout(resolve, 300)); // Delay between steps
+
+                // Stop if in range of *either* weapon or catalyst
+                if (distanceAfterMove <= weaponRange || distanceAfterMove <= catalystRange) {
+                    break; // In range, stop moving
                 }
             }
+        } else {
+            addToLog(`${this.name} is blocked and cannot move!`);
         }
     }
-    
+
     clearBattleBuffs() {
         const buffsToClear = [
             'buff_strength', 'buff_chaos_strength', 'buff_titan',
@@ -2452,7 +2769,7 @@ class NpcAlly extends Entity {
                 
                 if (this.equipmentOrder.length >= 2) {
                     const typeToUnequip = this.equipmentOrder.shift(); // Get oldest
-                    if (typeToUnequip) { // Ensure it's not undefined
+                    if (typeToUnequip && typeToUnequip !== itemType) { // Ensure it's not undefined and not the same type
                         unequippedItemKey = this.unequipItem(typeToUnequip, silent);
                     }
                 }
@@ -2463,15 +2780,28 @@ class NpcAlly extends Entity {
             if (isEquippedWeaponTwoHanded && this.equippedWeapon?.class === 'Hand-to-Hand' && this.race === 'Beastkin' && this.level >= 20) isEquippedWeaponTwoHanded = false;
             if ((itemType === 'shield' || itemType === 'catalyst') && isEquippedWeaponTwoHanded) {
                 if (!silent) addToLog(`${this.name} cannot use a ${itemType} while using ${this.equippedWeapon.name}.`, 'text-red-400');
+                // Don't add to equipment order if it failed
+                const failedTypeIndex = this.equipmentOrder.indexOf(itemType);
+                if (failedTypeIndex > -1) this.equipmentOrder.splice(failedTypeIndex, 1);
                 return null;
             }
             // Now, equip the new item
+            // Check for replacing same type
             if (itemType === 'weapon') {
+                if (this.equippedWeapon.name !== WEAPONS['fists'].name && !unequippedItemKey) {
+                    unequippedItemKey = findKeyByInstance(WEAPONS, this.equippedWeapon);
+                }
                 this.equippedWeapon = details;
                 this.weaponElement = 'none';
             } else if (itemType === 'catalyst') {
+                 if (this.equippedCatalyst.name !== CATALYSTS['no_catalyst'].name && !unequippedItemKey) {
+                    unequippedItemKey = findKeyByInstance(CATALYSTS, this.equippedCatalyst);
+                }
                 this.equippedCatalyst = details;
             } else if (itemType === 'shield') {
+                 if (this.equippedShield.name !== SHIELDS['no_shield'].name && !unequippedItemKey) {
+                    unequippedItemKey = findKeyByInstance(SHIELDS, this.equippedShield);
+                }
                 this.equippedShield = details;
                 this.shieldElement = 'none';
             }
@@ -2481,6 +2811,7 @@ class NpcAlly extends Entity {
         }
         return null;
     }
+
 
     /**
      * Unequips an item from a specific slot.
@@ -2705,7 +3036,6 @@ class NpcAlly extends Entity {
     // --- END NEW AI METHODS ---
 }
 
-
 class Enemy extends Entity {
     constructor(speciesData, rarityData, playerLevel, elementData = { key: 'none', adjective: '' }) {
         const statMultiplier = rarityData.multiplier;
@@ -2775,6 +3105,7 @@ class Enemy extends Entity {
             }
         }
         this.hasDealtDamageThisEncounter = false;
+        this.isNpcMarked = false;
 
         if (this.speciesData.class === 'Undead') {
             this.revived = false;
@@ -2988,7 +3319,10 @@ class Enemy extends Entity {
 
 
         // Apply damage to target (this is where parry/dodge/block checks happen inside Player.takeDamage)
-        damageDealt = target.takeDamage(totalDamage, !!this.statusEffects.ultra_focus, this, attackOptions);
+        // --- MODIFIED: Store object from takeDamage ---
+        const damageResult = target.takeDamage(totalDamage, !!this.statusEffects.ultra_focus, this, attackOptions);
+        damageDealt = damageResult.damageDealt; // Get the number
+        // --- END MODIFIED ---
 
         calcLog.finalDamage = damageDealt;
         logDamageCalculation(calcLog);
@@ -3033,8 +3367,9 @@ class Enemy extends Entity {
             }
             if (this.element === 'lightning' && Math.random() < procChance) {
                  const lightningDamageRoll = rollDice(1, 8, 'Enemy Lightning Proc');
-                 const lightningDamage = lightningDamageRoll.total + Math.floor(this.strength / 2);
-                target.takeDamage(lightningDamage, true, this); // True damage ignores defense
+                 // --- MODIFIED: Use damageDealt from object ---
+                 const { damageDealt: lightningDamage } = target.takeDamage(lightningDamageRoll.total + Math.floor(this.strength / 2), true, this, {isMagic: true, element: 'lightning'}); // True damage ignores defense
+                 // --- END MODIFIED ---
                 addToLog(`Lightning arcs from the attack, dealing an extra <span class="font-bold text-blue-400">${lightningDamage}</span> damage!`);
             }
             if (this.element === 'void' && Math.random() < procChance) {
@@ -3059,28 +3394,40 @@ class Enemy extends Entity {
         }
     }
     takeDamage(damage, effects = {}) {
-        let currentDefense = this.defense;
-        // Apply Living Shield buff
-        if (this.statusEffects.living_shield) {
-            currentDefense *= 2;
+        // --- START FIX: Reworked Defense Calculation ---
+        let currentDefense = 0; // Start defense at 0
+        const isMagicAttack = (effects.element && effects.element !== 'none') || effects.isMagic; // Don't include ignore_defense here
+
+        // Check if magic attack
+        if (isMagicAttack) {
+            // Magic attacks use spell_resistance (a 0-1 multiplier)
+            let effectiveSpellResist = this.spell_resistance || 0;
+            // Apply spell penetration *first*
+            if (effects.spell_penetration) {
+                effectiveSpellResist = Math.max(0, effectiveSpellResist - effects.spell_penetration);
+            }
+            // Apply resistance as a damage multiplier
+            damage = Math.floor(damage * (1 - effectiveSpellResist));
+            // Magic attacks ignore base physical defense
+            currentDefense = 0; 
+        } else {
+            // Physical attacks use flat physical defense
+            currentDefense = this.defense;
+            if (this.statusEffects.living_shield) {
+                currentDefense *= 2; // Living shield only affects physical
+            }
         }
-        // Apply ignore defense effect (like Void)
+        
+        // Apply ignore defense / penetration (affects physical defense)
         if (effects.ignore_defense) {
-             // Ensure ignore_defense is treated as a percentage (0 to 1)
              const pierceAmount = Math.max(0, Math.min(1, effects.ignore_defense));
              currentDefense *= (1 - pierceAmount);
         }
-         // Apply Spell Penetration
-         if (effects.isMagic && effects.spell_penetration) {
-             const pierceAmount = Math.max(0, Math.min(1, effects.spell_penetration));
-             currentDefense *= (1 - pierceAmount);
-         }
-         // Apply Armor Pierce from Thrusting Swords / Sunderer
-         if (!effects.isMagic && effects.armorPierce) {
+         if (!isMagicAttack && effects.armorPierce) {
              const pierceAmount = Math.max(0, Math.min(1, effects.armorPierce));
              currentDefense *= (1 - pierceAmount);
          }
-
+        // --- END FIX ---
 
         // Apply Enrage vulnerability
          let damageTaken = this.statusEffects.enrage ? Math.floor(damage * 1.5) : damage;
@@ -3444,14 +3791,85 @@ function generateBarracksRoster() {
         const classKey = availableClasses[Math.floor(rng() * availableClasses.length)];
         const name = availableNames[Math.floor(rng() * availableNames.length)];
         
+        // --- NEW: Determine weighted background ---
+        const { backgroundKey, backgroundName } = _determineWeightedBackground(raceKey, classKey, rng);
+        // --- END NEW ---
+
         player.barracksRoster.push({
             name: name,
             raceKey: raceKey,
-            classKey: classKey
+            classKey: classKey,
+            backgroundKey: backgroundKey,     // <-- ADDED
+            backgroundName: backgroundName  // <-- ADDED
         });
     }
     
     console.log("New Barracks roster generated:", player.barracksRoster);
+}
+
+
+function _determineWeightedBackground(raceKey, classKey, rng) {
+    const raceData = RACES[raceKey] || RACES['Human'];
+    const classData = CLASSES[classKey] || CLASSES['fighter'];
+
+    const statKeys = ['vigor', 'focus', 'stamina', 'strength', 'intelligence', 'luck'];
+    const baseStats = {};
+
+    // 1. Calculate combined Level 1 base stats
+    statKeys.forEach(stat => {
+        const capStat = capitalize(stat); // capitalize() is from ui_helpers.js
+        const raceStat = raceData[capStat] || 0;
+        const classStat = classData.bonusStats[capStat] || 0;
+        baseStats[stat] = raceStat + classStat;
+    });
+
+    // 2. Find highest and second-highest stats
+    const sortedStats = Object.entries(baseStats).sort((a, b) => b[1] - a[1]);
+    const highestStat = sortedStats[0][0];
+    const secondHighestStat = sortedStats[1][0];
+
+    // 3. Create background pools
+    const primaryPool = [];
+    const secondaryPool = [];
+    const tertiaryPool = [];
+
+    Object.keys(BACKGROUNDS).forEach(bgKey => {
+        // Exclude 'wretch' from weighted selection; it's a player-only default/choice
+        if (bgKey === 'wretch') return;
+
+        const favoredStats = BACKGROUNDS[bgKey].favoredStats.map(s => s.toLowerCase());
+        if (favoredStats.includes(highestStat)) {
+            primaryPool.push(bgKey);
+        } else if (favoredStats.includes(secondHighestStat)) {
+            secondaryPool.push(bgKey);
+        } else {
+            tertiaryPool.push(bgKey);
+        }
+    });
+
+    // 4. Perform weighted roll
+    const roll = rng() * 100;
+    let chosenPool;
+
+    // 60% chance for Primary, 30% for Secondary, 10% for Tertiary
+    if (roll < 60 && primaryPool.length > 0) {
+        chosenPool = primaryPool;
+    } else if (roll < 90 && secondaryPool.length > 0) {
+        chosenPool = secondaryPool;
+    } else if (tertiaryPool.length > 0) {
+        chosenPool = tertiaryPool;
+    } else if (secondaryPool.length > 0) {
+        chosenPool = secondaryPool; // Fallback
+    } else if (primaryPool.length > 0) {
+        chosenPool = primaryPool; // Fallback
+    } else {
+        // Ultimate fallback (should only happen if all pools are empty)
+        return { backgroundKey: 'wretch', backgroundName: BACKGROUNDS['wretch'].name };
+    }
+
+    // 5. Select from the chosen pool
+    const chosenKey = chosenPool[Math.floor(rng() * chosenPool.length)];
+    return { backgroundKey: chosenKey, backgroundName: BACKGROUNDS[chosenKey].name };
 }
 
 function generateBlackMarketStock() {
@@ -5511,12 +5929,22 @@ function cookRecipe(recipeKey) {
     }
 
     player.clearFoodBuffs(); // Clear old buffs before applying new ones
+    // --- BUFF SHARING (KITCHEN) ---
+    if (player.npcAlly) {
+        player.npcAlly.clearFoodBuffs(); // Clear ally's old buffs too
+    }
+    // --- END BUFF SHARING ---
 
     const effect = recipeData.effect;
 
     // Apply healing effect first
     if (effect.heal) {
          player.hp = Math.min(player.maxHp, player.hp + effect.heal);
+         // --- BUFF SHARING (KITCHEN) ---
+         if (player.npcAlly) {
+            player.npcAlly.hp = Math.min(player.npcAlly.maxHp, player.npcAlly.hp + effect.heal);
+         }
+         // --- END BUFF SHARING ---
     }
 
     // Apply primary effect (buff, % heal, % mana, full restore)
@@ -5524,6 +5952,12 @@ function cookRecipe(recipeKey) {
         case 'full_restore':
             player.hp = player.maxHp;
             player.mp = player.maxMp;
+            // --- BUFF SHARING (KITCHEN) ---
+            if (player.npcAlly) {
+                player.npcAlly.hp = player.npcAlly.maxHp;
+                player.npcAlly.mp = player.npcAlly.maxMp;
+            }
+            // --- END BUFF SHARING ---
             break;
         case 'buff':
             effect.buffs.forEach(buff => {
@@ -5531,22 +5965,94 @@ function cookRecipe(recipeKey) {
                 if (buff.stat === 'movement_speed') {
                      // Additive movement speed
                      player.foodBuffs[buff.stat] = { value: buff.value, duration: buff.duration };
+                     // --- BUFF SHARING (KITCHEN) ---
+                     if (player.npcAlly) {
+                        player.npcAlly.foodBuffs[buff.stat] = { value: buff.value, duration: buff.duration };
+                     }
+                     // --- END BUFF SHARING ---
                 } else {
                      // Multiplicative/Value-based for others (like damage, max hp/mp, loot, xp, and new regen)
                      player.foodBuffs[buff.stat] = { value: buff.value, duration: buff.duration };
+                     // --- BUFF SHARING (KITCHEN) ---
+                     if (player.npcAlly) {
+                        player.npcAlly.foodBuffs[buff.stat] = { value: buff.value, duration: buff.duration };
+                     }
+                     // --- END BUFF SHARING ---
                 }
             });
              // Re-apply Max HP/MP buffs immediately after applying
              player.hp = Math.min(player.hp, player.maxHp);
              player.mp = Math.min(player.mp, player.maxMp);
+             // --- BUFF SHARING (KITCHEN) ---
+             if (player.npcAlly) {
+                player.npcAlly.hp = Math.min(player.npcAlly.hp, player.npcAlly.maxHp);
+                player.npcAlly.mp = Math.min(player.npcAlly.mp, player.npcAlly.maxMp);
+             }
+             // --- END BUFF SHARING ---
             break;
     }
 
 
     addToLog(`You cooked and ate ${recipeData.name}. You feel its effects!`, "text-green-400 font-bold");
+    // --- BUFF SHARING (KITCHEN) ---
+    if (player.npcAlly) {
+        addToLog(`${player.npcAlly.name} shares in the meal!`, "text-blue-300");
+    }
+    // --- END BUFF SHARING ---
 
     updateStatsView(); // Update UI with new HP/MP and potentially Max HP/MP
     renderKitchen(); // Re-render to update button states and ingredient counts
     saveGame(); // Save after cooking
 }
+
+function processPlantInSeedmaker(plantKey) {
+    if (!player.inventory.items[plantKey] || player.inventory.items[plantKey] < 1) {
+        addToLog("You don't have any of that plant to process.", "text-red-400");
+        return;
+    }
+
+    // Build the reverse map to find the corresponding seed
+    const PLANT_TO_SEED_MAP = {};
+    for (const seedKey in SEEDS) {
+        const plantKey = SEEDS[seedKey].growsInto;
+        PLANT_TO_SEED_MAP[plantKey] = seedKey;
+    }
+
+    const seedKey = PLANT_TO_SEED_MAP[plantKey];
+    if (!seedKey) {
+        console.error(`Could not find corresponding seed for plant: ${plantKey}`);
+        addToLog("An error occurred. Could not find the seed for that plant.", "text-red-500");
+        return;
+    }
+    
+    const plantDetails = getItemDetails(plantKey);
+    const seedDetails = getItemDetails(seedKey);
+    if (!plantDetails || !seedDetails) {
+         addToLog("An error occurred. Item details are missing.", "text-red-500");
+         return;
+    }
+
+    // 1. Consume one plant
+    player.inventory.items[plantKey]--;
+    if (player.inventory.items[plantKey] <= 0) {
+        delete player.inventory.items[plantKey];
+    }
+
+    // 2. Determine seed amount (2, with 10% chance for 3)
+    let seedAmount = 2;
+    // Use rollForEffect to include luck and racial passives
+    if (player.rollForEffect(0.1, 'Seedmaker Bonus')) { 
+        seedAmount = 3;
+        addToLog("Bonus! The seedmaker was extra efficient!", "text-green-300");
+    }
+
+    // 3. Add the seeds
+    player.addToInventory(seedKey, seedAmount, true); // addToInventory will log the item gain
+
+    addToLog(`You processed 1 ${plantDetails.name} into ${seedAmount} ${seedDetails.name}s.`);
+
+    updateStatsView(); // Update inventory counts
+    saveGame(); // Save the change
+}
+
 

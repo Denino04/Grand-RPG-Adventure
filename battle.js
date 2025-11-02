@@ -27,6 +27,7 @@ function startBattle(biomeKey, trainingConfig = null) {
 
     // Reset drone state at start of battle
     gameState.activeDrone = null;
+    gameState.npcActiveDrone = null; // <-- NEW: Add NPC drone state
     // Reset mark state at start of battle
     gameState.markedTarget = null;
     // --- NPC ALLY: Clear Fled Status ---
@@ -39,6 +40,11 @@ function startBattle(biomeKey, trainingConfig = null) {
         // Reset position, will be set during spawn
         player.npcAlly.x = -1;
         player.npcAlly.y = -1;
+        // --- NEW: Reset ability flags ---
+        player.npcAlly.signatureAbilityUsed = false;
+        player.npcAlly.signatureAbilityToggleActive = false;
+        player.npcAlly.activeModeIndex = -1;
+        player.npcAlly.npcAllyMarkedTarget = null;
     }
     // --- END NPC ALLY ---
 
@@ -87,6 +93,7 @@ function startBattle(biomeKey, trainingConfig = null) {
                 player.npcAlly.y = allyCell.y;
                 occupiedCells.add(`${allyCell.x},${allyCell.y}`);
                 validCells.splice(validCells.indexOf(allyCell), 1); // Remove from valid
+                _activateNpcStartOfBattleAbilities(player.npcAlly);
             }
             // If no adjacent cell, ally won't spawn in tutorial
         } else if (player.npcAlly && player.npcAlly.hp > 0) {
@@ -131,6 +138,7 @@ function startBattle(biomeKey, trainingConfig = null) {
                 player.npcAlly.x = allyX;
                 player.npcAlly.y = allyY;
                 occupiedCells.add(`${allyX},${allyY}`);
+                _activateNpcStartOfBattleAbilities(player.npcAlly);
             } // If both blocked, ally doesn't spawn
         } else if (player.npcAlly && player.npcAlly.hp > 0) {
             // <<< NEW: Log why ally didn't spawn in training
@@ -219,6 +227,7 @@ function startBattle(biomeKey, trainingConfig = null) {
                 player.npcAlly.x = allyCell.x;
                 player.npcAlly.y = allyCell.y;
                 occupiedCells.add(`${allyCell.x},${allyCell.y}`);
+                _activateNpcStartOfBattleAbilities(player.npcAlly);
             } else {
                 addToLog("There was no room for your ally to join the fight!", "text-yellow-400");
                 // Ally just doesn't spawn this fight
@@ -353,6 +362,79 @@ function startBattle(biomeKey, trainingConfig = null) {
         advanceTutorial();
     }
 }
+
+function spawnNpcDrone(ally) {
+    if (!ally || !ally.isAlive() || gameState.npcActiveDrone) return;
+
+    // 1. Create Drone (using ally's stats)
+    const drone = new Drone(ally);
+    // 2. Find Spawn Cell
+    const potentialSpawns = [
+        {x: ally.x+1, y: ally.y}, {x: ally.x-1, y: ally.y},
+        {x: ally.x, y: ally.y+1}, {x: ally.x, y: ally.y-1}
+    ];
+    let spawnCell = null;
+    for(const cell of potentialSpawns) {
+        // Drone can't fly, check for blockage
+        if (!isCellBlocked(cell.x, cell.y, false, false)) { 
+            spawnCell = cell;
+            break;
+        }
+    }
+
+    if (spawnCell) {
+        drone.x = spawnCell.x;
+        drone.y = spawnCell.y;
+        gameState.npcActiveDrone = drone; // Store drone instance
+        addToLog(`A whirring drone materializes beside ${ally.name}!`, "text-cyan-400");
+        renderBattleGrid(); // Update grid to show drone
+    } else {
+        addToLog(`No space for ${ally.name} to summon their drone!`, 'text-red-400');
+        // Refund cost/use
+        ally.mp += ally.signatureAbilityData.cost;
+        ally.signatureAbilityUsed = false;
+    }
+}
+
+// --- NEW: Helper for start-of-battle abilities ---
+function _activateNpcStartOfBattleAbilities(ally) {
+    if (!ally || !ally.signatureAbilityData) return;
+
+    const ability = ally.signatureAbilityData;
+    const cost = ability.cost || 0;
+
+    if (ability.type === 'toggle') {
+        // Activate toggles if MP is above 25% threshold
+        if (ally.mp >= ally.mpToggleThreshold) {
+            ally.signatureAbilityToggleActive = true;
+            addToLog(`${ally.name} activates ${ability.name}!`, 'text-blue-300');
+            // Magus starts in 'Off' state
+            if (ally._classKey === 'magus') {
+                ally.activeModeIndex = -1;
+            }
+        } else {
+            addToLog(`${ally.name} is too low on MP to activate ${ability.name}.`, 'text-blue-400');
+        }
+    } else if (ability.type === 'signature') {
+        // Only activate Barbarian and Artificer at the start
+        if (ally._classKey === 'barbarian' || ally._classKey === 'artificer') {
+            if (ally.mp >= cost) {
+                ally.mp -= cost;
+                ally.signatureAbilityUsed = true;
+                addToLog(`${ally.name} uses ${ability.name}!`, 'text-blue-300 font-bold');
+                
+                if (ally._classKey === 'barbarian') {
+                    ally.statusEffects.buff_enrage = { duration: ability.duration };
+                    addToLog(`${ally.name} flies into a rage!`, 'text-red-400');
+                } else if (ally._classKey === 'artificer') {
+                    spawnNpcDrone(ally); // Attempt to spawn
+                }
+            } else {
+                addToLog(`${ally.name} lacks the MP to use ${ability.name}.`, 'text-blue-400');
+            }
+        }
+    }
+}
 /**
  * Handles returning to the battle screen after closing the inventory mid-battle.
  * Does NOT advance the turn.
@@ -432,6 +514,12 @@ function renderBattleGrid(highlightTargets = false, highlightType = 'magic') { /
                     // Add tooltip or click info for drone stats later if needed
                 }
                 
+                // --- NEW: Render NPC Drone ---
+                if (gameState.npcActiveDrone && gameState.npcActiveDrone.isAlive() && gameState.npcActiveDrone.x === x && gameState.npcActiveDrone.y === y) {
+                    cell.classList.add('ally'); // Style like ally
+                    cell.textContent = '🤖'; // Drone emoji
+                }
+                
                 // --- NPC ALLY: Render Ally ---
                 if (allyIsAlive && ally.x === x && ally.y === y) {
                     cell.classList.add('ally'); // Use new 'ally' CSS class
@@ -458,6 +546,7 @@ function renderBattleGrid(highlightTargets = false, highlightType = 'magic') { /
                     cell.classList.add('enemy');
                     // Add mark indicator if marked
                     const markIndicator = enemy.isMarked ? '<span class="absolute top-0 right-1 text-red-500 font-bold text-lg">🎯</span>' : '';
+                    const npcMarkIndicator = enemy.isNpcMarked ? '<span class="absolute top-0 left-1 text-blue-400 font-bold text-lg">🎯</span>' : '';
                     cell.innerHTML = `
                         ${markIndicator}
                         <div class="enemy-emoji">${enemy.speciesData.emoji}</div>
@@ -667,9 +756,7 @@ function handleCellClick(x, y) {
     const isFlying = (player.race === 'Pinionfolk');
 
     if (gameState.action === 'move') {
-        // ... existing move code ...
-        // This part remains unchanged.
-        isProcessingAction = true; // Lock actions
+     isProcessingAction = true; // Lock actions
         cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable')); // Clear item highlight too
         movePlayer(x, y);
     } else if (gameState.action === 'attack') {
@@ -681,20 +768,20 @@ function handleCellClick(x, y) {
             performAttack(targetIndex);
         } else if (clickedObstacle) {
             performAttackOnObstacle(clickedObstacle);
-        } else {
+        } else  {
              // If we are flying, we can't click an empty ground/terrain cell to cancel
-             if (isFlying && gameState.gridObjects.some(o => o.x === x && o.y === y && o.type === 'terrain')) {
+            if (isFlying && (gameState.gridObjects.some(o => o.x === x && o.y === y && o.type === 'terrain') || (gameState.npcActiveDrone && gameState.npcActiveDrone.x === x && gameState.npcActiveDrone.y === y))) {
                  isProcessingAction = false;
                  return; // Do nothing, keep action active
-             }
+            } else {
              gameState.action = null; // Cancel action if clicking empty space
              cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable')); // Clear item highlight too
              isProcessingAction = false; // Unlock actions
              renderBattleGrid(); // Re-render actions to show default buttons
+            }
         }
     } else if (gameState.action === 'magic_cast') {
-        // ... existing magic code ...
-        // This part remains unchanged.
+
         isProcessingAction = true; // Lock actions
         if (clickedEnemy && clickedEnemy.isAlive()) { // Ensure target is alive
             const targetIndex = currentEnemies.indexOf(clickedEnemy);
@@ -833,6 +920,8 @@ function isCellBlocked(x, y, forEnemy = false, canFly = false, isAllyMoving = fa
         if (allyIsAlive && ally.x === x && ally.y === y) return true;
         // Also blocked by drone
         if (gameState.activeDrone && gameState.activeDrone.isAlive() && gameState.activeDrone.x === x && gameState.activeDrone.y === y) return true;
+        // --- NEW: Also blocked by NPC drone ---
+        if (gameState.npcActiveDrone && gameState.npcActiveDrone.isAlive() && gameState.npcActiveDrone.x === x && gameState.npcActiveDrone.y === y) return true;
     
     } else if (isAllyMoving) {
         // The ally is checking. It's blocked by the Player and living Enemies.
@@ -847,6 +936,8 @@ function isCellBlocked(x, y, forEnemy = false, canFly = false, isAllyMoving = fa
         if (allyIsAlive && ally.x === x && ally.y === y) return true;
         // Also blocked by drone
         if (gameState.activeDrone && gameState.activeDrone.isAlive() && gameState.activeDrone.x === x && gameState.activeDrone.y === y) return true;
+        // --- NEW: Also blocked by NPC drone ---
+        if (gameState.npcActiveDrone && gameState.npcActiveDrone.isAlive() && gameState.npcActiveDrone.x === x && gameState.npcActiveDrone.y === y) return true;
     }
     // --- END OVERLAP FIX ---
 
@@ -1361,7 +1452,7 @@ function performAttack(targetIndex) {
                      const smiteDiceCount = Math.min(maxDice, baseDice + spellAmp);
                      const smiteDamage = rollDice(smiteDiceCount, 8, 'Divine Smite').total;
 
-                     const finalSmiteDamage = attackTarget.takeDamage(smiteDamage, { isMagic: true, element: 'light' });
+                     const { damageDealt: finalSmiteDamage } = attackTarget.takeDamage(smiteDamage, { isMagic: true, element: 'light' });
                      addToLog(`Divine Smite erupts, dealing an extra <span class="font-bold text-yellow-200">${finalSmiteDamage}</span> Light damage! (Cost: ${smiteCost} MP)`, 'text-yellow-100');
                      // Check if smite killed the target immediately (isReaction = true)
                      if (!attackTarget.isAlive()) checkBattleStatus(true); // Only check if smite killed
@@ -2562,7 +2653,8 @@ function checkBattleStatus(isReaction = false) {
             if (player.level >= 4) {
                 player.killsSinceLevel4++;
                 console.log(`Kills since Level 4: ${player.killsSinceLevel4}`); // Debug log
-                if (player.killsSinceLevel4 === 5) {
+                // --- THIS IS THE FIX: Changed '===' to '>=' ---
+                if (player.killsSinceLevel4 >= 5) { 
                     
                     // --- NEW: Randomized logic for Ranger and Cook ---
                     if (player._classKey === 'ranger' || player._classKey === 'cook') {
@@ -2595,7 +2687,8 @@ function checkBattleStatus(isReaction = false) {
             if (player.level >= 7) {
                 player.killsSinceLevel7++;
                  console.log(`Kills since Level 7: ${player.killsSinceLevel7}`); // Debug log
-                if (player.killsSinceLevel7 === 5 && !droppedKey) { // Only drop second key if first didn't drop this kill
+                 // --- THIS IS THE FIX: Changed '===' to '>=' ---
+                if (player.killsSinceLevel7 >= 5 && !droppedKey) { // Only drop second key if first didn't drop this kill
                     if (!player.unlocks.hasBlacksmithKey) {
                         droppedKey = 'blacksmith_key';
                     } else if (!player.unlocks.hasTowerKey) {
@@ -2611,6 +2704,7 @@ function checkBattleStatus(isReaction = false) {
                  addToLog(`The fallen ${enemy.name} dropped a ${getItemDetails(droppedKey).name}! Looks sturdy... wonder what it unlocks back in town?`, 'text-yellow-400 font-bold');
             }
             // --- End Added ---
+
 
             if (preTrainingState === null) {
                 if (enemy.rarityData.name === 'Legendary') {
@@ -2907,7 +3001,7 @@ function handlePlayerEndOfTurnEffects() {
      // If drone exists and is alive, it's the drone's turn next
      // If drone exists and is alive, it's the drone's turn next
     if (gameState.activeDrone && gameState.activeDrone.isAlive()) {
-        setTimeout(droneTurn, 100); // Add slight delay before drone turn
+        setTimeout(() => droneTurn(gameState.activeDrone, 'startNpcTurn'), 100); // Player drone goes, then calls NPC turn
     } 
     // --- NPC ALLY: Check for Ally Turn ---
     else if (player.npcAlly && player.npcAlly.hp > 0 && !player.npcAlly.isFled && player.npcAlly.x !== -1) {
@@ -2917,6 +3011,7 @@ function handlePlayerEndOfTurnEffects() {
     else {
         setTimeout(enemyTurn, 100); // Otherwise, proceed to enemy turn after delay
     }
+    // --- END MODIFIED ---
 }
 
 // Renamed original handlePlayerEndOfTurn to avoid confusion
@@ -2924,13 +3019,13 @@ const handlePlayerEndOfTurn = handlePlayerEndOfTurnEffects;
 
 
 // New function for Drone's turn
-async function droneTurn() { // Made async for movement delay
-    if (gameState.battleEnded || !gameState.activeDrone || !gameState.activeDrone.isAlive()) {
-        setTimeout(enemyTurn, 100); // Drone died or doesn't exist, skip to enemy after delay
+async function droneTurn(droneInstance, nextTurnKey) { // Made async, takes instance and next turn
+    if (gameState.battleEnded || !droneInstance || !droneInstance.isAlive()) {
+        setTimeout(window[nextTurnKey], 100); // Drone died or doesn't exist, skip to next turn
         return;
     }
 
-    const drone = gameState.activeDrone;
+    const drone = droneInstance;
     addToLog(`${drone.name}'s turn! (Range: ${drone.range})`, 'text-cyan-300'); // Log range
 
     // Simple Drone AI: Find nearest living enemy and attack if in range
@@ -2993,7 +3088,7 @@ async function droneTurn() { // Made async for movement delay
 
     // Proceed to enemy turn AFTER drone acts (and after potential delay)
     if (!gameState.battleEnded) {
-         setTimeout(enemyTurn, 200);
+         setTimeout(window[nextTurnKey], 200); // <-- MODIFIED
     }
 }
 
@@ -3094,7 +3189,8 @@ async function enemyTurn() {
 
 async function startNpcTurn() {
     if (gameState.battleEnded || !player.npcAlly || player.npcAlly.hp <= 0 || player.npcAlly.isFled) {
-        setTimeout(enemyTurn, 100); // Ally can't act, skip to enemy
+        // --- MODIFIED: Call droneTurn for player's drone first ---
+        droneTurn(gameState.activeDrone, 'enemy'); // Pass 'enemy' as next turn
         return;
     }
 
@@ -3102,6 +3198,17 @@ async function startNpcTurn() {
     let actionTaken = false; // Flag to track if the ally did something
 
     addToLog(`Your ally ${ally.name}'s turn!`, 'text-blue-300');
+    
+    // --- NEW: Toggle Management ---
+    // Check if toggles should be deactivated due to low MP
+    if (ally.signatureAbilityToggleActive && ally.signatureAbilityData.type === 'toggle') {
+        if (ally.mp < ally.mpToggleThreshold) {
+            ally.signatureAbilityToggleActive = false;
+            ally.activeModeIndex = -1; // Reset Magus mode just in case
+            addToLog(`${ally.name} is low on MP and deactivates ${ally.signatureAbilityData.name}.`, 'text-blue-400');
+        }
+    }
+    // --- END NEW ---
 
     // --- AI Priority Checklist ---
 
@@ -3112,7 +3219,116 @@ async function startNpcTurn() {
         actionTaken = true; // "Action" was to be paralyzed
     }
 
-    // 2. Item Logic (Priority 1: Survival)
+    // --- NEW: Signature Ability (Priority 1: Special Actions) ---
+    if (!actionTaken && ally.signatureAbilityData && ally.signatureAbilityData.type === 'signature' && !ally.signatureAbilityUsed) {
+        const ability = ally.signatureAbilityData;
+        const cost = ability.cost || 0;
+        
+        if (ally.mp >= cost) {
+            // --- Cleric: Holy Blessings ---
+            if (ally._classKey === 'cleric') {
+                const healAvg = ally._calculateClericHealAvg();
+                const playerHPMissing = player.maxHp - player.hp;
+                const allyHPMissing = ally.maxHp - ally.hp;
+                
+                // Use if either ally or player is missing at least the average heal amount
+                if (playerHPMissing >= healAvg || allyHPMissing >= healAvg) {
+                    ally.mp -= cost;
+                    ally.signatureAbilityUsed = true;
+                    addToLog(`${ally.name} uses ${ability.name}!`, 'text-blue-300 font-bold');
+
+                    // Heal self
+                    const selfHeal = rollDice(ally.level >= 20 ? 7 : 3, 8, 'Ally Holy Blessings').total;
+                    ally.hp = Math.min(ally.maxHp, ally.hp + selfHeal);
+                    addToLog(`${ally.name} restores <span class="font-bold text-green-400">${selfHeal}</span> HP!`, 'text-yellow-200');
+                    // Heal player
+                    const playerHeal = rollDice(ally.level >= 20 ? 7 : 3, 8, 'Ally Holy Blessings').total;
+                    player.hp = Math.min(player.maxHp, player.hp + playerHeal);
+                    addToLog(`You are restored for <span class="font-bold text-green-400">${playerHeal}</span> HP!`, 'text-yellow-200');
+
+                    // Cleanse self
+                    const allyDebuffs = Object.keys(ally.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic', 'slowed', 'inaccurate', 'clumsy', 'fumble', 'magic_dampen', 'elemental_vuln'].includes(key));
+                    if (allyDebuffs.length > 0) {
+                        allyDebuffs.forEach(key => delete ally.statusEffects[key]);
+                        addToLog(`The holy energy purges ${ally.name}'s ailments!`, 'text-cyan-300');
+                    }
+                    // Cleanse player
+                    const playerDebuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic', 'slowed', 'inaccurate', 'clumsy', 'fumble', 'magic_dampen', 'elemental_vuln'].includes(key));
+                    if (playerDebuffs.length > 0) {
+                        playerDebuffs.forEach(key => delete player.statusEffects[key]);
+                        addToLog(`The holy energy purges your ailments!`, 'text-cyan-300');
+                    }
+                    
+                    updateStatsView();
+                    actionTaken = true;
+                }
+            }
+            // --- Ranger: Hunter's Mark ---
+            else if (ally._classKey === 'ranger') {
+                let highestHpEnemy = null;
+                let maxHp = 0;
+                currentEnemies.forEach(e => {
+                    if (e.isAlive() && e.hp > maxHp) {
+                        maxHp = e.hp;
+                        highestHpEnemy = e;
+                    }
+                });
+                
+                if (highestHpEnemy) {
+                    ally.mp -= cost;
+                    ally.signatureAbilityUsed = true;
+                    addToLog(`${ally.name} uses ${ability.name}!`, 'text-blue-300 font-bold');
+                    
+                    ally.npcAllyMarkedTarget = highestHpEnemy;
+                    highestHpEnemy.isNpcMarked = true;
+                    addToLog(`${ally.name} marks ${highestHpEnemy.name} as their prey!`, 'text-yellow-400');
+                    actionTaken = true;
+                }
+            }
+            // --- Cook: On-Field Cooking ---
+            else if (ally._classKey === 'cook') {
+                // Find a recipe the *player* knows and the *ally* can cook
+                let recipeToCook = null;
+                // MODIFIED: Check player.knownCookingRecipes, not ally.knownCookingRecipes
+                const availablePlayerRecipes = shuffleArray([...player.knownCookingRecipes]); 
+                
+                let bestCookChoice = { key: null, cost: Infinity, ingredients: {} };
+
+                for (const recipeKey of availablePlayerRecipes) {
+                    const recipe = COOKING_RECIPES[recipeKey];
+                    if (!recipe) continue;
+                    
+                    // Use the _npcCanCook helper, which correctly checks the ALLY'S inventory
+                    const cookCheck = _npcCanCook(ally, recipe); // This now returns { canCook, mpCost, ingredientsToConsume }
+                    
+                    // NEW LOGIC: Check if ally can afford the MP cost and find the 'cheapest' (lowest MP) option
+                    if (cookCheck.canCook && ally.mp >= (cost + cookCheck.mpCost)) {
+                        if (cookCheck.mpCost < bestCookChoice.cost) {
+                            bestCookChoice = {
+                                key: recipeKey,
+                                cost: cookCheck.mpCost,
+                                ingredients: cookCheck.ingredientsToConsume
+                            };
+                        }
+                    }
+                }
+                
+                if (bestCookChoice.key) {
+                    ally.mp -= cost; // Cook ability has 0 cost, but this is future-proof
+                    ally.signatureAbilityUsed = true; // Mark as used
+                    addToLog(`${ally.name} uses ${ability.name}!`, 'text-blue-300 font-bold');
+                    
+                    // Call the _npcUseCookAbility helper, passing in the calculated MP cost and ingredients
+                    await _npcUseCookAbility(ally, bestCookChoice.key, bestCookChoice.cost, bestCookChoice.ingredients); // Make sure to await
+                    
+                    actionTaken = true;
+                }
+                // No 'else' needed, if no recipe is cookable, just proceed to combat logic
+            }
+        }
+    }
+
+    // 2. Item Logic (Priority 2: Survival)
     const lostHp = ally.maxHp - ally.hp;
     const potionEffectiveness = {
         'superior_health_potion': 100,
@@ -3123,11 +3339,12 @@ async function startNpcTurn() {
     if (!actionTaken && lostHp > 0) {
         let potionToUse = null;
         
-        if (ally.inventory.items['superior_health_potion'] > 0 && lostHp >= potionEffectiveness['superior_health_potion']) {
+        // Use best potion possible that doesn't waste *too* much
+        if (ally.inventory.items['superior_health_potion'] > 0 && lostHp >= potionEffectiveness['superior_health_potion'] * 0.8) {
             potionToUse = 'superior_health_potion';
-        } else if (ally.inventory.items['condensed_health_potion'] > 0 && lostHp >= potionEffectiveness['condensed_health_potion']) {
+        } else if (ally.inventory.items['condensed_health_potion'] > 0 && lostHp >= potionEffectiveness['condensed_health_potion'] * 0.8) {
             potionToUse = 'condensed_health_potion';
-        } else if (ally.inventory.items['health_potion'] > 0 && lostHp >= potionEffectiveness['health_potion']) {
+        } else if (ally.inventory.items['health_potion'] > 0 && lostHp >= potionEffectiveness['health_potion'] * 0.8) {
             potionToUse = 'health_potion';
         }
 
@@ -3147,11 +3364,11 @@ async function startNpcTurn() {
     if (!actionTaken && lostMp > 0) {
         let potionToUse = null;
         
-        if (ally.inventory.items['superior_mana_potion'] > 0 && lostMp >= manaPotionEffectiveness['superior_mana_potion']) {
+        if (ally.inventory.items['superior_mana_potion'] > 0 && lostMp >= manaPotionEffectiveness['superior_mana_potion'] * 0.8) {
             potionToUse = 'superior_mana_potion';
-        } else if (ally.inventory.items['condensed_mana_potion'] > 0 && lostMp >= manaPotionEffectiveness['condensed_mana_potion']) {
+        } else if (ally.inventory.items['condensed_mana_potion'] > 0 && lostMp >= manaPotionEffectiveness['condensed_mana_potion'] * 0.8) {
             potionToUse = 'condensed_mana_potion';
-        } else if (ally.inventory.items['mana_potion'] > 0 && lostMp >= manaPotionEffectiveness['mana_potion']) {
+        } else if (ally.inventory.items['mana_potion'] > 0 && lostMp >= manaPotionEffectiveness['mana_potion'] * 0.8) {
             potionToUse = 'mana_potion';
         }
 
@@ -3160,13 +3377,15 @@ async function startNpcTurn() {
             actionTaken = true;
         }
     }
-    // --- END MODIFICATION ---
+    
+    // 3. Spell Logic (Priority 3: Healing)
     if (!actionTaken) {
-        // Check if they *have* healing potions (as per constraint)
+        // Check if they *have* healing potions
         const hasHealingPotion = (ally.inventory.items['health_potion'] || 0) > 0 ||
                                  (ally.inventory.items['condensed_health_potion'] || 0) > 0 ||
                                  (ally.inventory.items['superior_health_potion'] || 0) > 0;
         
+        // Only use healing spells if they are OUT of healing potions
         if (!hasHealingPotion) {
             const healingSpellKey = findBestHealingSpell(ally);
             
@@ -3174,20 +3393,7 @@ async function startNpcTurn() {
                 const spellData = SPELLS[healingSpellKey];
                 const spell = spellData.tiers[ally.spells[healingSpellKey].tier - 1];
                 
-                // --- MODIFIED: Add catalyst bonus to threshold calculation ---
-                const catalyst = ally.equippedCatalyst;
-                const spellAmp = catalyst?.effect?.spell_amp || 0;
-                const diceCount = Math.min(spell.cap, spell.damage[0] + spellAmp);
-                
-                // Calculate average heal amount
-                const avgBaseHeal = (diceCount * (1 + spell.damage[1])) / 2; // Use modified diceCount
-                const statBonus = ally.magicalDamageBonus;
-                const statMultiplier = 1 + statBonus / 20;
-                let healThreshold = Math.floor(avgBaseHeal * statMultiplier) + Math.floor(ally.intelligence / 5);
-                // Apply racial bonuses to the threshold
-                if (ally.race === 'Dragonborn') healThreshold *= (ally.level >= 20) ? 1.20 : 1.10;
-                // (Add Elemental[healing] check here if allies get affinities later)
-                healThreshold = Math.floor(healThreshold);
+                const healThreshold = ally._calculateClericHealAvg(healingSpellKey); // Use helper
 
                 // Calculate cost
                 let finalSpellCost = spell.cost;
@@ -3214,9 +3420,8 @@ async function startNpcTurn() {
             }
         }
     }
-    // --- END NEW HEALING LOGIC ---
 
-    // 3. Buff Item Logic (Low Priority)
+    // 4. Buff Item Logic (Low Priority)
     if (!actionTaken && Math.random() < 0.15) { // 15% chance to check for buffs
         if (ally.inventory.items['whetstone'] > 0 && !ally.statusEffects['buff_whetstone']) {
             // Only use whetstone if weapon is physical
@@ -3229,39 +3434,70 @@ async function startNpcTurn() {
         // (Add other buff item logic here, e.g., magic_rock_dust for mages)
     }
 
-    // 4. Combat Logic (If no item was used)
+    // 5. Combat Logic (If no item/ability was used)
     if (!actionTaken) {
         // Find nearest living enemy
         let target = null;
         let minDistance = Infinity;
-        currentEnemies.forEach(enemy => {
-            if (enemy.isAlive()) {
-                const distance = Math.abs(ally.x - enemy.x) + Math.abs(ally.y - enemy.y);
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    target = enemy;
+        
+        // --- NEW: Prioritize Marked Target ---
+        if (ally.npcAllyMarkedTarget && ally.npcAllyMarkedTarget.isAlive()) {
+            target = ally.npcAllyMarkedTarget;
+            minDistance = Math.abs(ally.x - target.x) + Math.abs(ally.y - target.y);
+            addToLog(`${ally.name} focuses on their marked prey, ${target.name}!`, 'text-blue-400');
+        } else {
+            // Clear mark if target is dead or gone
+            if(ally.npcAllyMarkedTarget) ally.npcAllyMarkedTarget = null; 
+            
+            // Find closest target
+            currentEnemies.forEach(enemy => {
+                if (enemy.isAlive()) {
+                    const distance = Math.abs(ally.x - enemy.x) + Math.abs(ally.y - enemy.y);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        target = enemy;
+                    }
                 }
-            }
-        });
+            });
+        }
+        // --- END NEW ---
 
         if (target) {
-            const distance = minDistance;
+            const distance = minDistance; // Use the calculated distance
             const weaponRange = ally.equippedWeapon.range || 1;
             const catalystRange = ally.equippedCatalyst.range || 3;
             
             let bestSpell = null;
             let canCastSpell = false;
+            let spellData = null; // <-- FIX
+            let spell = null; // <-- FIX
             
             // Check for magic action first
             if (MAGIC_CLASSES.includes(ally._classKey)) {
                 bestSpell = findBestSpell(ally, target);
                 if (bestSpell) {
-                    const spellCost = SPELLS[bestSpell].tiers[ally.spells[bestSpell].tier - 1].cost;
+                    // --- FIX: Define spellData and spell here ---
+                    spellData = SPELLS[bestSpell];
+                    spell = spellData.tiers[ally.spells[bestSpell].tier - 1];
+                    // --- END FIX ---
+                    const spellCost = spell.cost; // Use the defined spell
                     if (ally.mp >= spellCost) {
                         canCastSpell = true;
                     }
                 }
             }
+            
+            // --- NEW: Magus Mode Update ---
+            if (ally._classKey === 'magus' && ally.signatureAbilityToggleActive) {
+                if (canCastSpell && spellData.type === 'st') {
+                    ally.activeModeIndex = 0; // Set to Chain Magic
+                } else if (canCastSpell && spellData.type === 'aoe') {
+                    ally.activeModeIndex = 1; // Set to Wide Magic
+                } else {
+                    ally.activeModeIndex = -1; // Not casting or not applicable
+                }
+            }
+            // --- END NEW ---
 
             // --- AI Decision Tree ---
             if (MAGIC_CLASSES.includes(ally._classKey) && canCastSpell && distance <= catalystRange) {
@@ -3371,6 +3607,7 @@ async function startNpcTurn() {
     }
 }
 
+
 // --- NEW HELPER FUNCTION ---
 /**
  * Finds the best offensive spell for an ally to use.
@@ -3384,8 +3621,10 @@ function findBestSpell(ally, target) {
     
     for (const spellKey in ally.spells) {
         const spellData = SPELLS[spellKey];
-        if (!spellData || spellData.type === 'healing' || spellData.type === 'support') {
-            continue; // Skip non-offensive spells
+        // --- THIS IS THE FIX ---
+        // Skip non-offensive spells AND HEALING SPELLS
+        if (!spellData || spellData.element === 'healing' || spellData.type === 'support') {
+            continue; 
         }
         
         const spellElement = spellData.element;
@@ -3438,16 +3677,199 @@ function findBestHealingSpell(ally) {
     return bestHeal;
 }
 
+async function _npcUseClericAbility(ally, ability) {
+    ally.mp -= ability.cost;
+    ally.signatureAbilityUsed = true;
+    updateStatsView(); // Update player UI if ally is player (shouldn't be, but good practice)
+    
+    addToLog(`${ally.name} invokes ${ability.name}!`, 'text-yellow-300 font-bold');
+
+    // Calculate healing dice (scales with level, caps at 7)
+    const healAmount = ally._calculateClericHealAvg(); // Use the helper we already built
+    
+    // Heal Ally
+    ally.hp = Math.min(ally.maxHp, ally.hp + healAmount);
+    addToLog(`Divine light washes over ${ally.name}, restoring <span class="font-bold text-green-400">${healAmount}</span> HP!`, 'text-yellow-200');
+    
+    // Heal Player
+    player.hp = Math.min(player.maxHp, player.hp + healAmount);
+    addToLog(`Divine light washes over you, restoring <span class="font-bold text-green-400">${healAmount}</span> HP!`, 'text-yellow-200');
+
+    // Cleanse debuffs for Ally
+    const allyDebuffs = Object.keys(ally.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic', 'slowed', 'inaccurate', 'clumsy', 'fumble', 'magic_dampen', 'elemental_vuln'].includes(key));
+    if (allyDebuffs.length > 0) {
+        allyDebuffs.forEach(key => delete ally.statusEffects[key]);
+        addToLog(`The holy energy purges ${ally.name}'s ailments!`, 'text-cyan-300');
+    }
+    
+    // Cleanse debuffs for Player
+    const playerDebuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic', 'slowed', 'inaccurate', 'clumsy', 'fumble', 'magic_dampen', 'elemental_vuln'].includes(key));
+    if (playerDebuffs.length > 0) {
+        playerDebuffs.forEach(key => delete player.statusEffects[key]);
+        addToLog(`The holy energy purges your ailments!`, 'text-cyan-300');
+    }
+    
+    updateStatsView();
+    renderBattleGrid();
+}
+
+function _npcCanCook(ally, recipe) {
+    const required = recipe.ingredients;
+    const availableIngredients = { meat: [], veggie: [], seasoning: [] };
+    const specificInventory = { ...ally.inventory.items }; // Use ally's inventory
+
+    // 1. Populate ally's available generic ingredients, sorted by price (cheapest first)
+    Object.keys(specificInventory).forEach(itemKey => {
+        const details = getItemDetails(itemKey);
+        if (details && details.cookingType) {
+            const count = specificInventory[itemKey];
+            if (count > 0) {
+                for (let i = 0; i < count; i++) {
+                    availableIngredients[details.cookingType].push({ key: itemKey, price: details.price, rarity: details.rarity || 'Common' });
+                }
+            }
+        }
+    });
+    for(const type in availableIngredients) {
+        availableIngredients[type].sort((a,b) => a.price - b.price);
+    }
+
+    const ingredientsToConsume = {};
+    let mpCost = 0;
+    const mpCosts = { 'Common': 5, 'Uncommon': 10, 'Rare': 15, 'Epic': 20, 'Legendary': 25, 'Broken': 0 };
+
+    // 2. Check requirements and calculate MP cost
+    for (const reqKey in required) {
+        const requiredAmount = required[reqKey];
+        let itemsUsedCount = 0;
+        const isGeneric = ['meat', 'veggie', 'seasoning'].includes(reqKey);
+
+        if (isGeneric) {
+            const availableCount = availableIngredients[reqKey].length;
+            itemsUsedCount = Math.min(availableCount, requiredAmount);
+
+            for(let i = 0; i < itemsUsedCount; i++) {
+                const itemToUse = availableIngredients[reqKey][i].key;
+                ingredientsToConsume[itemToUse] = (ingredientsToConsume[itemToUse] || 0) + 1;
+            }
+
+            const missingAmount = requiredAmount - itemsUsedCount;
+            if (missingAmount > 0) {
+                 mpCost += missingAmount * mpCosts['Common'];
+            }
+        } else { // Specific ingredient
+            const currentAmount = specificInventory[reqKey] || 0;
+            itemsUsedCount = Math.min(currentAmount, requiredAmount);
+
+            if (itemsUsedCount > 0) {
+                 ingredientsToConsume[reqKey] = (ingredientsToConsume[reqKey] || 0) + itemsUsedCount;
+            }
+            const missingAmount = requiredAmount - itemsUsedCount;
+            if (missingAmount > 0) {
+                const details = getItemDetails(reqKey);
+                const rarityCost = mpCosts[details?.rarity || 'Common'] || mpCosts['Common'];
+                mpCost += missingAmount * rarityCost;
+            }
+        }
+    }
+
+    // 3. Return the result
+    return {
+        canCook: true, // It's always "possible" if they have the MP
+        mpCost: mpCost,
+        ingredientsToConsume: ingredientsToConsume
+    };
+}
+
+async function _npcUseCookAbility(ally, recipeKey, mpCost, ingredientsToConsume) {
+    const recipe = COOKING_RECIPES[recipeKey];
+    if (!recipe) return;
+    
+    // --- Consume Resources ---
+    ally.mp -= mpCost;
+    if (mpCost > 0) addToLog(`${ally.name} substituted missing ingredients for ${mpCost} MP.`, 'text-blue-300');
+
+    for (const itemKey in ingredientsToConsume) {
+        if (ally.inventory.items[itemKey]) { // Check if item exists
+            ally.inventory.items[itemKey] -= ingredientsToConsume[itemKey];
+            if (ally.inventory.items[itemKey] <= 0) {
+                delete ally.inventory.items[itemKey];
+            }
+        }
+    }
+    
+    // --- Apply Buffs to Ally AND Player ---
+    ally.foodBuffs = {}; // Clear old buffs
+    if (player) player.clearFoodBuffs(); // Clear player's old buffs
+    
+    const effect = recipe.effect;
+    
+    if (effect.heal) {
+        ally.hp = Math.min(ally.maxHp, ally.hp + effect.heal);
+        if (player) player.hp = Math.min(player.maxHp, player.hp + effect.heal);
+    }
+    
+    switch (effect.type) {
+        case 'full_restore':
+            ally.hp = ally.maxHp; ally.mp = ally.maxMp;
+            if (player) { player.hp = player.maxHp; player.mp = player.maxMp; }
+            break;
+        case 'heal_percent': // Added this case
+             ally.hp = Math.min(ally.maxHp, ally.hp + Math.floor(ally.maxHp * effect.heal_percent));
+             if (player) player.hp = Math.min(player.maxHp, player.hp + Math.floor(player.maxHp * effect.heal_percent));
+            break;
+        case 'mana_percent': // Added this case
+             ally.mp = Math.min(ally.maxMp, ally.mp + Math.floor(ally.maxMp * effect.mana_percent));
+             if (player) player.mp = Math.min(player.maxMp, player.mp + Math.floor(player.maxMp * effect.mana_percent));
+            break;
+        case 'buff':
+            effect.buffs.forEach(buff => {
+                const buffData = { value: buff.value, duration: 3 }; // 3 encounters
+                ally.foodBuffs[buff.stat] = buffData;
+                if (player) player.foodBuffs[buff.stat] = buffData;
+            });
+            // Re-apply Max HP/MP buffs
+            ally.hp = Math.min(ally.hp, ally.maxHp);
+            ally.mp = Math.min(ally.mp, ally.maxMp);
+            if (player) {
+                player.hp = Math.min(player.hp, player.maxHp);
+                player.mp = Math.min(player.mp, player.maxMp);
+            }
+            break;
+    }
+    
+    addToLog(`${ally.name} quickly cooked and ate ${recipe.name}!`, "text-green-400 font-bold");
+    if (player) {
+        addToLog(`You share in the meal!`, "text-green-300");
+        updateStatsView(); // Update player UI
+    }
+    renderBattleGrid(); // Update ally HP/MP bars
+}
+
+// --- END NEW HELPERS ---
+
 // --- New Function: finalizeNpcTurn ---
 function finalizeNpcTurn() {
     if (gameState.battleEnded || !player.npcAlly) {
-        setTimeout(enemyTurn, 100); // Proceed to enemy turn
+        // --- MODIFIED: Check for NPC drone before enemy turn ---
+        if (gameState.npcActiveDrone && gameState.npcActiveDrone.isAlive()) {
+            setTimeout(() => droneTurn(gameState.npcActiveDrone, 'enemyTurn'), 100);
+        } else {
+            setTimeout(enemyTurn, 100); // Proceed to enemy turn
+        }
+        // --- END MODIFIED ---
         return;
     }
     
     const ally = player.npcAlly;
     if (ally.hp <= 0 || ally.isFled) {
-         setTimeout(enemyTurn, 100); // Ally is out, proceed to enemy
+         // --- MODIFIED: Check for NPC drone before enemy turn ---
+        if (gameState.npcActiveDrone && gameState.npcActiveDrone.isAlive()) {
+            setTimeout(() => droneTurn(gameState.npcActiveDrone, 'enemyTurn'), 100);
+        } else {
+            setTimeout(enemyTurn, 100); // Ally is out, proceed to enemy
+        }
+         // --- END MODIFIED ---
          return;
     }
 
@@ -3494,8 +3916,13 @@ function finalizeNpcTurn() {
 
     renderBattleGrid(); // Update ally HP bar from DoTs
 
-    // Proceed to enemy turn
-    setTimeout(enemyTurn, 100);
+    // --- MODIFIED: Check for NPC drone before enemy turn ---
+    if (gameState.npcActiveDrone && gameState.npcActiveDrone.isAlive()) {
+        setTimeout(() => droneTurn(gameState.npcActiveDrone, 'enemyTurn'), 100);
+    } else {
+        setTimeout(enemyTurn, 100); // Proceed to enemy turn
+    }
+    // --- END MODIFIED ---
 }
 
 function beginPlayerTurn() {
@@ -3782,33 +4209,80 @@ function executeOnFieldCooking(recipeKey) {
         }
 
         player.clearFoodBuffs(); // Clear old buffs
+        // --- BUFF SHARING (PLAYER) START ---
+        if (player.npcAlly) {
+            player.npcAlly.clearFoodBuffs();
+        }
+        // --- BUFF SHARING (PLAYER) END ---
 
         const effect = recipeData.effect;
-        if (effect.heal) player.hp = Math.min(player.maxHp, player.hp + effect.heal);
+        if (effect.heal) {
+            player.hp = Math.min(player.maxHp, player.hp + effect.heal);
+            // --- BUFF SHARING (PLAYER) START ---
+            if (player.npcAlly) {
+                player.npcAlly.hp = Math.min(player.npcAlly.maxHp, player.npcAlly.hp + effect.heal);
+            }
+            // --- BUFF SHARING (PLAYER) END ---
+        }
 
         switch (effect.type) {
             case 'full_restore':
                 player.hp = player.maxHp; player.mp = player.maxMp;
+                // --- BUFF SHARING (PLAYER) START ---
+                if (player.npcAlly) {
+                    player.npcAlly.hp = player.npcAlly.maxHp;
+                    player.npcAlly.mp = player.npcAlly.maxMp;
+                }
+                // --- BUFF SHARING (PLAYER) END ---
                 break;
             case 'heal_percent':
                 player.hp = Math.min(player.maxHp, player.hp + Math.floor(player.maxHp * effect.heal_percent));
+                // --- BUFF SHARING (PLAYER) START ---
+                if (player.npcAlly) {
+                    player.npcAlly.hp = Math.min(player.npcAlly.maxHp, player.npcAlly.hp + Math.floor(player.npcAlly.maxHp * effect.heal_percent));
+                }
+                // --- BUFF SHARING (PLAYER) END ---
                 break;
             case 'mana_percent':
                 player.mp = Math.min(player.maxMp, player.mp + Math.floor(player.maxMp * effect.mana_percent));
+                // --- BUFF SHARING (PLAYER) START ---
+                if (player.npcAlly) {
+                    player.npcAlly.mp = Math.min(player.npcAlly.maxMp, player.npcAlly.mp + Math.floor(player.npcAlly.maxMp * effect.mana_percent));
+                }
+                // --- BUFF SHARING (PLAYER) END ---
                 break;
             case 'buff':
                 effect.buffs.forEach(buff => {
                     // Ensure duration is 3 encounters for On-Field Cooking
-                    player.foodBuffs[buff.stat] = { value: buff.value, duration: 3 };
+                    const buffData = { value: buff.value, duration: 3 }; // Create data once
+                    player.foodBuffs[buff.stat] = buffData;
+                    // --- BUFF SHARING (PLAYER) START ---
+                    if (player.npcAlly) {
+                        player.npcAlly.foodBuffs[buff.stat] = buffData;
+                    }
+                    // --- BUFF SHARING (PLAYER) END ---
                 });
                 // Re-apply Max HP/MP buffs
                 player.hp = Math.min(player.hp, player.maxHp);
                 player.mp = Math.min(player.mp, player.maxMp);
+                // --- BUFF SHARING (PLAYER) START ---
+                if (player.npcAlly) {
+                    player.npcAlly.hp = Math.min(player.npcAlly.hp, player.npcAlly.maxHp);
+                    player.npcAlly.mp = Math.min(player.npcAlly.mp, player.npcAlly.maxMp);
+                }
+                // --- BUFF SHARING (PLAYER) END ---
                 break;
         }
 
         addToLog(`You quickly cook and eat ${recipeData.name}!`, "text-green-400 font-bold");
+        // --- BUFF SHARING (PLAYER) START ---
+        if (player.npcAlly) {
+            addToLog(`${player.npcAlly.name} shares in the meal!`, "text-blue-300");
+            renderBattleGrid(); // Update ally HP bar
+        }
+        // --- BUFF SHARING (PLAYER) END ---
         updateStatsView();
+
 
         // End the turn
         gameState.isPlayerTurn = false;
