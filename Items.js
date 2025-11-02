@@ -216,29 +216,29 @@ const ITEMS = {
 
 const SEEDS = {
     // Common - 15 mins (900 seconds)
-    'blackwheat_seed': { growsInto: 'blackwheat', growthTime: 15 * 60 * 1000 },
-    'cinnamonwood_seed': { growsInto: 'cinnamonwood_log', growthTime: 15 * 60 * 1000 },
-    'beetsnip_seed': { growsInto: 'beetsnip_carrot', growthTime: 15 * 60 * 1000 },
-    'screaming_lotus_seed': { growsInto: 'screaming_lotus', growthTime: 15 * 60 * 1000 },
+    'blackwheat_seed': { growsInto: 'blackwheat', growthTime: 15 * 60 * 1000, harvestEmoji: '🌾' },
+    'cinnamonwood_seed': { growsInto: 'cinnamonwood_log', growthTime: 15 * 60 * 1000, harvestEmoji: '🍂' },
+    'beetsnip_seed': { growsInto: 'beetsnip_carrot', growthTime: 15 * 60 * 1000, harvestEmoji: '🥕' },
+    'screaming_lotus_seed': { growsInto: 'screaming_lotus', growthTime: 15 * 60 * 1000, harvestEmoji: '🌸' },
 
     // Uncommon - 1 hour (3600 seconds)
-    'brineflower_seed': { growsInto: 'brineflower_leaf', growthTime: 60 * 60 * 1000 },
-    'sunshine_flower_seed': { growsInto: 'sunshine_flower', growthTime: 60 * 60 * 1000 },
-    'sealotus_lily_seed': { growsInto: 'sealotus_pad', growthTime: 60 * 60 * 1000 },
-    'sweet_dandelion_seed': { growsInto: 'sweet_dandelion', growthTime: 60 * 60 * 1000 },
-    'ground_tater_seed': { growsInto: 'ground_tater', growthTime: 60 * 60 * 1000 },
-    'fulgurbloom_seed': { growsInto: 'fulgurbloom', growthTime: 60 * 60 * 1000 },
-    'orchidvine_seed': { growsInto: 'orchidvine_fruit', growthTime: 60 * 60 * 1000 },
-    'lantern_rose_seed': { growsInto: 'lantern_rose', growthTime: 60 * 60 * 1000 },
-    'blackleaf_seed': { growsInto: 'blackleaf', growthTime: 60 * 60 * 1000 },
-    'koriandre_seed': { growsInto: 'koriandre_sprig', growthTime: 60 * 60 * 1000 },
-    'jet_pepper_seed': { growsInto: 'jet_pepper', growthTime: 60 * 60 * 1000 },
-    'dragon_chili_seed': { growsInto: 'dragon_chili', growthTime: 60 * 60 * 1000 },
+    'brineflower_seed': { growsInto: 'brineflower_leaf', growthTime: 60 * 60 * 1000, harvestEmoji: '🧂' },
+    'sunshine_flower_seed': { growsInto: 'sunshine_flower', growthTime: 60 * 60 * 1000, harvestEmoji: '🌻' },
+    'sealotus_lily_seed': { growsInto: 'sealotus_pad', growthTime: 60 * 60 * 1000, harvestEmoji: '💮' },
+    'sweet_dandelion_seed': { growsInto: 'sweet_dandelion', growthTime: 60 * 60 * 1000, harvestEmoji: '🌼' },
+    'ground_tater_seed': { growsInto: 'ground_tater', growthTime: 60 * 60 * 1000, harvestEmoji: '🥔' },
+    'fulgurbloom_seed': { growsInto: 'fulgurbloom', growthTime: 60 * 60 * 1000, harvestEmoji: '⚡' },
+    'orchidvine_seed': { growsInto: 'orchidvine_fruit', growthTime: 60 * 60 * 1000, harvestEmoji: '🍇' },
+    'lantern_rose_seed': { growsInto: 'lantern_rose', growthTime: 60 * 60 * 1000, harvestEmoji: '🌹' },
+    'blackleaf_seed': { growsInto: 'blackleaf', growthTime: 60 * 60 * 1000, harvestEmoji: '🍃' },
+    'koriandre_seed': { growsInto: 'koriandre_sprig', growthTime: 60 * 60 * 1000, harvestEmoji: '🌿' },
+    'jet_pepper_seed': { growsInto: 'jet_pepper', growthTime: 60 * 60 * 1000, harvestEmoji: '🌶️' },
+    'dragon_chili_seed': { growsInto: 'dragon_chili', growthTime: 60 * 60 * 1000, harvestEmoji: '🔥' },
 
     // Rare - 3 hours (10800 seconds)
-    'maizemother_seed': { growsInto: 'maizemother_cob', growthTime: 3 * 60 * 60 * 1000 },
-    'crystal_apple_sapling': { growsInto: 'crystal_apple', growthTime: 3 * 60 * 60 * 1000 },
-    'exploding_citrus_sapling': { growsInto: 'exploding_citrus', growthTime: 3 * 60 * 60 * 1000 },
-    'blood_peach_sapling': { growsInto: 'blood_peach', growthTime: 3 * 60 * 60 * 1000 },
-    'ice_cherry_sapling': { growsInto: 'ice_cherry', growthTime: 3 * 60 * 60 * 1000 }
+    'maizemother_seed': { growsInto: 'maizemother_cob', growthTime: 3 * 60 * 60 * 1000, harvestEmoji: '🌽' },
+    'crystal_apple_sapling': { growsInto: 'crystal_apple', growthTime: 3 * 60 * 60 * 1000, harvestEmoji: '🍏' },
+    'exploding_citrus_sapling': { growsInto: 'exploding_citrus', growthTime: 3 * 60 * 60 * 1000, harvestEmoji: '🍋' },
+    'blood_peach_sapling': { growsInto: 'blood_peach', growthTime: 3 * 60 * 60 * 1000, harvestEmoji: '🍑' },
+    'ice_cherry_sapling': { growsInto: 'ice_cherry', growthTime: 3 * 60 * 60 * 1000, harvestEmoji: '🍒' }
 };

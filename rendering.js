@@ -4770,7 +4770,10 @@ function renderPlot(plot, index, isTreePlot) {
             case 1: content = isTreePlot ? '🌳' : '🌿'; title += ' (Sprout)'; break;
             case 2: content = isTreePlot ? '🌳' : '🌿'; plotClass='garden-plot-growing'; title += ' (Growing)'; break;
             case 3:
-                content = isTreePlot ? '🌲' : '🌻';
+                // --- MODIFICATION START ---
+                // Use the custom harvestEmoji from SEEDS, fallback to old emojis
+                content = seedInfo.harvestEmoji || (isTreePlot ? '🌲' : '🌻');
+                // --- MODIFICATION END ---
                 plotClass='garden-plot-ready';
                 action = `harvestPlant(${index}, ${isTreePlot})`;
                 title = 'Ready to Harvest!';
