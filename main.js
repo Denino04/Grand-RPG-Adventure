@@ -29,7 +29,8 @@ let isDebugVisible = false;
 let realTimeInterval = null;
 let gardenInterval = null;
 let isTutorialEnabled = true;
-
+const IDLE_TIMEOUT_MS = 60000; // 60 seconds of inactivity to trigger idle dialogue
+let lastUserActivity = Date.now();
 // --- INITIALIZATION ---
 // Fallback config for local development if not provided by the environment
 const fallbackFirebaseConfig = {
@@ -303,6 +304,19 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey, di
 }
     
 
+function checkIdleDialogue() {
+    if (player && gameState.currentView !== 'battle' && Date.now() - lastUserActivity > IDLE_TIMEOUT_MS) {
+        // Only trigger if an ally exists and isn't fighting
+        if (player.npcAlly && player.npcAlly._getDialogue) {
+            // Log dialogue if roll is successful
+            logAllyDialogueChance(player.npcAlly, 'ON_IDLE');
+        }
+    }
+}
+
+function resetActivityTimer() {
+    lastUserActivity = Date.now();
+}
 
 function generateRandomizedBiomeOrder() {
     // Make sure player exists before seeding
@@ -1035,7 +1049,7 @@ window.addEventListener('load', async () => {
     // Start intervals after Firebase is ready
     if (!realTimeInterval) realTimeInterval = setInterval(updateRealTimePalette, 60000);
     if (!gardenInterval) gardenInterval = setInterval(updateGarden, 1000); // Check garden every second
-
+    setInterval(checkIdleDialogue, 15000); // Check every 15 seconds
     window.addEventListener('hashchange', handleRouteChange); // Listen for navigation changes
 
     // Load tutorial preference
@@ -1049,4 +1063,10 @@ window.addEventListener('load', async () => {
     // but ensure it runs if auth state is already known or doesn't change quickly.
     // handleRouteChange(); // Let onAuthStateChanged handle the initial route
      console.log("Initial setup complete.");
+
+    document.addEventListener('mousemove', resetActivityTimer, { passive: true });
+    document.addEventListener('keydown', resetActivityTimer, { passive: true });
+    document.addEventListener('mousedown', resetActivityTimer, { passive: true });
+
+
 });

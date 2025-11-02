@@ -516,94 +516,33 @@ const BLACK_MARKET_INVENTORY = {
     'Lures': ['goblin_scent_gland', 'sweet_grass_scent', 'rotten_cheese', 'chemical_lure', 'bandit_coin', 'wolf_musk', 'war_horn_fragment', 'silken_cocoon', 'petrified_field_mouse', 'grave_dust']
 };
 
-const NPC_RANDOM_NAMES = [
-    // Original List
-    "Grog", "Elara", "Bork", "Seraphina", "Rolf", "Kaelen", "Brynn", "Orion", 
-    "Tusk", "Lyra", "Garrick", "Faye", "Jorn", "Thistle", "Vance", "Gwendolyn",
-    "Stig", "Rowan", "Draven", "Anya", "Borin", "Cerys", "Zane", "Fen",
-    "Kael", "Miri", "Rook", "Talia", "Huck", "Lyris", "Grak", "Sylas",
-
-    // Common Human (Peasant)
-    "Albin", "Barney", "Cade", "Diggory", "Edwin", "Finn", "Giles", "Hal",
-    "Jem", "Kester", "Larkin", "Milo", "Ned", "Orin", "Piers", "Quinn",
-    "Rafe", "Sim", "Tobin", "Ulric", "Viggo", "Walt", "Yorick", "Zev",
-    "Ada", "Bess", "Cora", "Della", "Elsa", "Flora", "Greta", "Hazel",
-    "Ida", "Joss", "Kira", "Lena", "Mab", "Nora", "Orla", "Pippa",
-    "Rose", "Sadie", "Tess", "Una", "Willa", "Yara", "Zara",
-
-    // Noble Human
-    "Alastair", "Balthazar", "Caspian", "Darian", "Everard", "Fabian", "Gideon", "Helios",
-    "Ignatius", "Julian", "Leander", "Maximilian", "Percival", "Quinten",
-    "Reginald", "Sebastian", "Thaddeus", "Ullyses", "Valerius", "Willoughby", "Xavier",
-    "Anastasia", "Beatrix", "Cressida", "Delphine", "Evangeline", "Felicity", "Genevieve",
-    "Isolde", "Jocasta", "Katarina", "Lavinia", "Ophelia", "Persephone",
-    "Quintessa", "Rosalind", "Theodora", "Ursula", "Victoria", "Wilhelmina", "Yseult",
-
-    // Martial / "Strong" (Good for Barbarian, Fighter)
-    "Ajax", "Breaker", "Cinder", "Dread", "Ember", "Fang", "Grit", "Husk",
-    "Ironfist", "Jarl", "Krieg", "Mace", "Nyx", "Obsidian", "Pyre", "Rage",
-    "Scar", "Torque", "Ursa", "Vex", "Wulf", "Zar", "Skorn", "Krull",
-
-    // Arcane / "Smart" (Good for Magus, Warlock, Artificer)
-    "Alcuin", "Azimuth", "Corvus", "Eldrin", "Gallus", "Hesper", "Icarus",
-    "Jorin", "Lumin", "Merlin", "Octavius", "Pellinor", "Quill", "Sorin",
-    "Thoth", "Umbra", "Veridian", "Zosimus", "Sprocket", "Jinx", "Hex",
-
-    // Elven
-    "Adran", "Aelar", "Carric", "Erdan", "Galinndan", "Hadir", "Immeral",
-    "Laucian", "Mindartis", "Paelias", "Quarion", "Riardon", "Thamior", "Varis",
-    "Adrie", "Althaea", "Caelynn", "Elora", "Ielenia", "Jelenneth", "Keyleth",
-    "Leshanna", "Meriele", "Naivara", "Quelenna", "Sariel", "Tava", "Valanthe",
-
-    // Dwarven
-    "Adrik", "Baern", "Brottor", "Dain", "Ebrok", "Fargrim", "Gloin",
-    "Harbek", "Kildrak", "Morgran", "Orsik", "Rurik", "Taklinn", "Thoradin",
-    "Amber", "Artin", "Diesa", "Eldeth", "Falkrunn", "Gunnloda", "Hlin",
-    "Kathra", "Liftrasa", "Mardred", "Riswynn", "Sannl", "Torbera", "Vistra",
-
-    // Orc
-    "Grash", "Urzog", "Bagra", "Snarl", "Durg", "Ghorza", "Murbul", "Oglub",
-    "Sharn", "Yazgash", "Zul", "Azog", "Gor", "Krug", "Varok",
-
-    // Halfling (Good for Cook)
-    "Pippin", "Tuck", "Rosie", "Marigold", "Samwise", "Merla", "Bingo", "Cora",
-    "Filbert", "Lila", "Norbert", "Odo", "Poppy", "Saffron", "Tansy",
-
-    // Tiefling
-    "Malakor", "Akmenos", "Creed", "Damakos", "Sorrow", "Torment", "Hope",
-    "Despair", "Iados", "Kairon", "Melech", "Rieta", "Valerius", "Neph",
-
-    // Dragonborn
-    "Arjhan", "Balasar", "Bharash", "Donaar", "Ghesh", "Heskan", "Kriv",
-    "Medrash", "Nalaar", "Patrin", "Rhogar", "Shamash", "Torinn", "Varuun",
-    "Akra", "Biri", "Daar", "Farideh", "Harann", "Jheri", "Kava",
-    "Korinn", "Mishann", "Nala", "Perra", "Raiann", "Sora", "Surina",
-
-    // Aasimar (Good for Cleric, Paladin)
-    "Seraphiel", "Gavriel", "Liyana", "Celestine", "Ezra", "Mikael", "Amara",
-    "AnKiel", "Dina", "Ithuriel", "Jophiel", "Lailah", "Raziel", "Zadkiel",
-
-    // Beastkin
-    "Vulf", "Kodiak", "Sabra", "Terra", "Leo", "Talon", "Fang", "Ursus",
-    "Renn", "Lupa", "Kit", "Corax", "Arac", "Chirp", "Skitter",
-
-    // Clankers (Constructs)
-    "Unit-7", "Cog", "Bolt", "Prime", "Axiom", "Vanilla", "Decimal", "Gear",
-    "Piston", "Rivet", "Socket", "Vector", "Byte", "CircuiT", "Patch",
-
-    // Pinionfolk (Avians)
-    "Aerie", "Cirrus", "Gale", "Corvus", "Kestrel", "Skye", "Talon", "Zephyr",
-    "Crest", "Jib", "Quill", "Stratus", "Ikarus", "Alula", "Roc",
-
-    // Elementals
-    "Ignis", "Cinder", "Aqua", "Terra", "Zephyr", "Volt", "Shard", "Magmus",
-    "Wisp", "Nix", "Tidal", "Gravel", "Pyre", "Static", "Mica",
-
-    // Goblinoid
-    "Zilch", "Snag", "Griz", "Nott", "Wix", "Squee", "Gob", "Knott",
-    "Snik", "Rek", "Yarp", "Kleb", "Grib", "Zeb", "Pip", "Flix", "Mogg"
-];
-
+const NPC_RANDOM_NAMES = {
+    // Total Names: 180 (Male: 80, Female: 80, Neutral: 20)
+    'Male': [
+        "Grog", "Bork", "Rolf", "Kaelen", "Orion", "Tusk", "Garrick", "Jorn", "Vance", "Stig", "Rowan", "Draven",
+        "Borin", "Zane", "Kael", "Rook", "Huck", "Grak", "Sylas", "Albin", "Barney", "Cade", "Diggory", "Edwin",
+        "Finn", "Giles", "Hal", "Jem", "Kester", "Larkin", "Milo", "Ned", "Orin", "Piers", "Quinn", "Rafe",
+        "Sim", "Tobin", "Ulric", "Viggo", "Walt", "Yorick", "Zev", "Alastair", "Balthazar", "Caspian", "Darian",
+        "Everard", "Fabian", "Gideon", "Helios", "Ignatius", "Julian", "Leander", "Maximilian", "Percival",
+        "Quinten", "Reginald", "Sebastian", "Thaddeus", "Ullyses", "Valerius", "Willoughby", "Xavier", "Ajax",
+        "Breaker", "Fang", "Grit", "Husk", "Ironfist", "Jarl", "Krieg", "Mace", "Obsidian", "Pyre", "Rage", 
+        "Scar", "Torque", "Ursa", "Vex", "Wulf", "Zar", "Krull"
+    ],
+    'Female': [
+        "Elara", "Seraphina", "Brynn", "Lyra", "Faye", "Gwendolyn", "Anya", "Cerys", "Miri", "Talia", "Lyris", 
+        "Ada", "Bess", "Cora", "Della", "Elsa", "Flora", "Greta", "Hazel", "Ida", "Joss", "Kira", "Lena", 
+        "Mab", "Nora", "Orla", "Pippa", "Rose", "Sadie", "Tess", "Una", "Willa", "Yara", "Zara", "Anastasia", 
+        "Beatrix", "Cressida", "Delphine", "Evangeline", "Felicity", "Genevieve", "Isolde", "Jocasta", 
+        "Katarina", "Lavinia", "Ophelia", "Persephone", "Quintessa", "Rosalind", "Theodora", "Ursula", 
+        "Victoria", "Wilhelmina", "Yseult", "Adrie", "Althaea", "Caelynn", "Elora", "Ielenia", "Jelenneth", 
+        "Keyleth", "Leshanna", "Meriele", "Naivara", "Quelenna", "Sariel", "Tava", "Valanthe", "Amber", 
+        "Artin", "Diesa", "Eldeth", "Falkrunn", "Gunnloda", "Hlin", "Kathra", "Liftrasa", "Mardred", "Riswynn" 
+    ],
+    'Neutral': [
+        "Fen", "Thistle", "Nyx", "Void", "Ash", "Blaze", "Glimmer", "Pax", "Stone", "Storm", 
+        "Cinder", "Ember", "Dread", "Wisp", "Magmus", "Tidal", "Hope", "Sorrow", "Torment", "Despair"
+    ]
+};
 const CHANGELOG_DATA = [
     {
         version: "v0.6.3 - Ally & Progression Refactor",

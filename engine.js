@@ -599,30 +599,33 @@ class Player extends Entity {
 
     // Derived Stats using Getters
     get maxHp() {
-        let finalHp = (this.vigor * 5) + this.bonusHp;
+        // (Base Vigor + Spent Vigor) * 5 + Derived Bonus HP (from background)
+        let finalHp = ((this.vigor + this.bonusVigor) * 5) + this.bonusHp;
         if (this.foodBuffs?.max_hp) {
             finalHp *= this.foodBuffs.max_hp.value;
         }
         return Math.floor(finalHp);
     }
     get maxMp() {
-        let finalMp = (this.focus * 5) + this.bonusMp;
+        // (Base Focus + Spent Focus) * 5 + Derived Bonus MP (from background)
+        let finalMp = ((this.focus + this.bonusFocus) * 5) + this.bonusMp;
         if (this.foodBuffs?.max_mp) {
             finalMp *= this.foodBuffs.max_mp.value;
         }
         return Math.floor(finalMp);
     }
-    get physicalDefense() { return Math.floor((this.stamina + this.vigor) / 2) + this.bonusPhysicalDefense; }
-    get magicalDefense() { return Math.floor((this.stamina + this.focus) / 2) + this.bonusMagicalDefense; }
-    get physicalDamageBonus() { return this.strength + this.bonusPhysicalDamage; }
-    get magicalDamageBonus() { return this.intelligence + this.bonusMagicalDamage; }
+    get physicalDefense() { return Math.floor(((this.stamina + this.bonusStamina) + (this.vigor + this.bonusVigor)) / 2) + this.bonusPhysicalDefense; }
+    get magicalDefense() { return Math.floor(((this.stamina + this.bonusStamina) + (this.focus + this.bonusFocus)) / 2) + this.bonusMagicalDefense; }
+    get physicalDamageBonus() { return (this.strength + this.bonusStrength) + this.bonusPhysicalDamage; }
+    get magicalDamageBonus() { return (this.intelligence + this.bonusIntelligence) + this.bonusMagicalDamage; }
     // Split Luck contributions for clarity
-    get critChance() { return Math.min(0.3, ((this.luck * 0.5) / 100) + this.bonusCritChance); }
-    get evasionChance() { return Math.min(0.2, ((this.luck * 0.5) / 100) + this.bonusEvasion); }
+    get critChance() { return Math.min(0.3, (((this.luck + this.bonusLuck) * 0.5) / 100) + this.bonusCritChance); }
+    get evasionChance() { return Math.min(0.2, (((this.luck + this.bonusLuck) * 0.5) / 100) + this.bonusEvasion); }
     get resistanceChance() {
-        let baseResist = Math.min(0.5, (this.luck / 100)); // Debuff resist only from base Luck for now
+        let baseResist = Math.min(0.5, ((this.luck + this.bonusLuck) / 100)); // Use total luck
         // --- CLANKERS: Absolute Logic ---
         if (this.race === 'Clankers') {
+
             const multiplier = (this.level >= 20) ? 2.0 : 1.5; // 100% or 50% relative bonus
             baseResist = Math.min(0.80, baseResist * multiplier); // Cap at 80%
         }
@@ -1481,6 +1484,28 @@ class Player extends Entity {
         return finalDamage;
     }
 
+    clone(snapshot = null) {
+        // Create a new Player instance from core data (name, raceKey, classKey)
+        const clonedPlayer = new Player(this.name, this.race, this._classKey);
+
+        // Copy all properties from current instance to clone (including current derived values)
+        Object.assign(clonedPlayer, this);
+        
+        // Revert bonus stats and recalculate derived stats if a snapshot is provided
+        if (snapshot) {
+            clonedPlayer.bonusVigor = snapshot.bonusVigor || 0;
+            clonedPlayer.bonusFocus = snapshot.bonusFocus || 0;
+            clonedPlayer.bonusStamina = snapshot.bonusStamina || 0;
+            clonedPlayer.bonusStrength = snapshot.bonusStrength || 0;
+            clonedPlayer.bonusIntelligence = snapshot.bonusIntelligence || 0;
+            clonedPlayer.bonusLuck = snapshot.bonusLuck || 0;
+
+            // Re-run the core stat calculation to derive maxHp/maxMp/etc based on original snapshot
+            clonedPlayer.recalculateGrowthBonuses();
+        }
+
+        return clonedPlayer;
+    }
     /** Handles all damage reflection effects. */
     _handleReflectEffects(finalDamageDealt, originalDamage, attacker) {
         if (!attacker || !attacker.isAlive()) return; // Don't reflect if attacker is dead
@@ -1671,6 +1696,67 @@ class Drone extends Entity {
         // --- END MODIFICATION ---
     }
 }
+
+function _determineDialogueType(name) {
+    // Find the base gender category for the name
+    let baseGender = 'Neutral';
+    // Access the gender arrays directly from the global NPC_RANDOM_NAMES object
+    if (NPC_RANDOM_NAMES.Male.includes(name)) {
+        baseGender = 'Male';
+    } else if (NPC_RANDOM_NAMES.Female.includes(name)) {
+        baseGender = 'Female';
+    }
+
+    // Apply spice chance (10% chance to flip to another gender type)
+    if (Math.random() < NPC_DIALOGUE.spiceChance) {
+        const options = ['Male', 'Female', 'Neutral'].filter(g => g !== baseGender);
+        return options[Math.floor(Math.random() * options.length)];
+    }
+    
+    return baseGender;
+}
+
+
+// --- New: Global Dialogue Helper Method (Used by NpcAlly class) ---
+function _getDialogue(ally, type, playerName = 'Adventurer') {
+    const dialogueList = NPC_DIALOGUE[type] || [];
+    
+    // 1. Try to find the exact dialogueType (Male, Female, or Spiced)
+    let genderedLines = dialogueList.find(d => d.gender === ally.dialogueType);
+
+    // 2. Fallback to Neutral if the specific type is missing or null.
+    if (!genderedLines) {
+        genderedLines = dialogueList.find(d => d.gender === 'Neutral');
+    }
+    
+    // 3. Extract lines array, falling back to a single generic line if all else fails.
+    const lines = genderedLines ? genderedLines.lines : ["I am currently unavailable."]; // Fixed fallback text
+    
+    // Select a random line
+    let line = lines[Math.floor(Math.random() * lines.length)];
+    
+    // Replace placeholders
+    line = line.replace(/<AllyName>/g, ally.name);
+    // --- ADDED: Replace PlayerName placeholder ---
+    line = line.replace(/<PlayerName>/g, playerName);
+    // --- END ADDED ---
+    
+    return line;
+}
+
+
+function logAllyDialogueChance(ally, type) {
+    if (!ally || !NPC_DIALOGUE.random_chance || !ally._getDialogue) return false;
+
+    const chance = NPC_DIALOGUE.random_chance[type] || 0;
+    if (Math.random() < chance) {
+        const dialogue = ally._getDialogue(type, player.name);
+        addToLog(`(${ally.name})<br>"${dialogue}"`, 'text-gray-400');
+        return true;
+    }
+    return false;
+}
+
 // --- END Drone Class ---
 class NpcAlly extends Entity {
     // --- CONSTRUCTOR MODIFIED to accept raceKey ---
@@ -1736,8 +1822,13 @@ class NpcAlly extends Entity {
         this.bonusMagicalDamage = 0;
         this.bonusEvasion = 0;
         this.bonusCritChance = 0;
+        this._50PercentLogged = false;
+        this._10PercentLogged = false;
+        this.dialogueType = _determineDialogueType(name); 
+        // --- END FIXED ---
+        // --- END ADDED ---
         
-        // --- ADDED: Ability properties ---
+        // Abilities (References set by updateAbilityReferences)
         this.racialPassive = (chance) => chance; // Default pass-through function
         this.signatureAbilityData = null; // Reference to the ability data object
         this.signatureAbilityUsed = false;
@@ -2045,9 +2136,15 @@ class NpcAlly extends Entity {
 
     // --- Stat Calculation Method ---
     calculateStats(playerLevel) {
+        const oldLevel = this.level;
         this.level = Math.max(1, Math.floor(playerLevel * 0.95)); // 95%
         if (playerLevel > 1 && this.level === playerLevel) {
              this.level--; // Ensure at least 1 level discrepancy
+        }
+
+        if (this.level > oldLevel) {
+            const dialogue = this._getDialogue('LEVEL_UP', player.name);
+            addToLog(`Your ally, ${this.name}, has grown stronger! They are now level ${this.level}.<br>"${dialogue}"`, 'text-blue-300');
         }
 
         const totalPoints = (this.level - 1) * 5;
@@ -2093,6 +2190,31 @@ class NpcAlly extends Entity {
         }
         this.mpToggleThreshold = Math.floor(this.maxMp * 0.25);
     }
+
+    _getDialogue(type, playerName) { // Accepts playerName
+        const dialogueList = NPC_DIALOGUE[type] || [];
+        
+        // 1. Try to find the exact dialogueType (Male, Female, or Spiced)
+        let genderedLines = dialogueList.find(d => d.gender === this.dialogueType);
+
+        // 2. Fallback to Neutral if the specific type is missing or null.
+        if (!genderedLines) {
+            genderedLines = dialogueList.find(d => d.gender === 'Neutral');
+        }
+        
+        // 3. Extract lines array, falling back to a single generic line if all else fails.
+        const lines = genderedLines ? genderedLines.lines : ["I am currently unavailable."]; // Fixed fallback text
+        
+        // Select a random line
+        let line = lines[Math.floor(Math.random() * lines.length)];
+        
+        // Replace placeholders
+        line = line.replace(/<AllyName>/g, this.name);
+        line = line.replace(/<PlayerName>/g, playerName || 'Adventurer'); // Replace Player Name
+        
+        return line;
+    }
+
 
     _calculateClericHealAvg() {
         if (this._classKey !== 'cleric' || !this.signatureAbilityData) {
@@ -2491,9 +2613,26 @@ class NpcAlly extends Entity {
         // 8. Check for Flee state
         if (this.hp <= 0 && !this.isFled) {
             this.isFled = true;
-            addToLog(`<span class="font-bold text-red-500">${this.name} has been defeated and fled the battle!</span>`, "text-red-500");
+            const fleeDialogue = this._getDialogue('FLEE');
+            addToLog(`<span class="font-bold text-red-500">${this.name} has been defeated and fled!</span> "${fleeDialogue}"`, "text-red-500");
         }
         
+        const hpPercent = this.hp / this.maxHp;
+        if (hpPercent <= 0.10 && !this._10PercentLogged) {
+            const dialogue = this._getDialogue('HP_10', player.name);
+            addToLog(`(${this.name}) CRITICAL HEALTH WARNING!<br>"${dialogue}"`, 'text-red-500');
+            this._10PercentLogged = true;
+            this._50PercentLogged = true; // Prevents 50% from firing if 10% is reached first
+        } else if (hpPercent <= 0.50 && !this._50PercentLogged) {
+            const dialogue = this._getDialogue('HP_50', player.name);
+            addToLog(`(${this.name}) HEALTH ALERT!<br>"${dialogue}"`, 'text-yellow-400');
+            this._50PercentLogged = true;
+        } else if (hpPercent > 0.50) {
+            // Reset flags if healed above 50%
+            this._10PercentLogged = false;
+            this._50PercentLogged = false;
+        }
+
         if (gameState.currentView === 'battle') {
             renderBattleGrid();
         }
@@ -2541,14 +2680,18 @@ class NpcAlly extends Entity {
         // --- START: Full Damage Calculation (Copied from Parry) ---
         let statBonus = this.physicalDamageBonus;
 
-        let damage = baseWeaponDamage; // <-- THIS IS THE FIX (defining 'damage')
+        let damage = baseWeaponDamage; 
+        
+        // --- NEW UNIFIED DAMAGE FORMULA ---
         const statMultiplier = 1 + statBonus / 20;
-        damage = Math.floor(damage * statMultiplier);
+        const statFlatBonus = Math.floor(statBonus / 5); // <-- USES TOTAL BONUS
 
-        const strengthFlatBonus = Math.floor(this.strength / 5);
-        damage += strengthFlatBonus;
+        damage = Math.floor(damage * statMultiplier);
+        damage += statFlatBonus;
+        // --- END NEW FORMULA ---
 
         let attackEffects = { element: this.weaponElement };
+
 
         // --- DRAGONBORN: Bloodline Attunement (Damage) ---
         if (this.race === 'Dragonborn') {
@@ -2953,14 +3096,15 @@ class NpcAlly extends Entity {
                 const spellAmp = catalyst.effect?.spell_amp || 0;
             diceCount = Math.min(spell.cap, diceCount + spellAmp);
 
-            let healAmount = rollDice(diceCount, spell.damage[1], `Ally Heal: ${spell.name}`).total;
+            let baseHeal = rollDice(diceCount, spell.damage[1], `Ally Heal: ${spell.name}`).total;
             
-            // Apply Ally's magical damage bonus (Intelligence)
+            // --- NEW UNIFIED HEAL FORMULA ---
             const statBonus = this.magicalDamageBonus;
             const statMultiplier = 1 + statBonus / 20;
-            healAmount = Math.floor(healAmount * statMultiplier);
-            const intFlatBonus = Math.floor(this.intelligence / 5);
-            healAmount += intFlatBonus;
+            const statFlatBonus = Math.floor(statBonus / 5); // <-- USES TOTAL BONUS
+            
+            let healAmount = Math.floor(baseHeal * statMultiplier) + statFlatBonus;
+            // --- END NEW FORMULA ---
 
             // Apply Ally's racial passives (Dragonborn, Elemental[healing])
             if (this.race === 'Elementals' && spellData.element === this.elementalAffinity) { // Assuming ally can have affinity
@@ -2996,17 +3140,15 @@ class NpcAlly extends Entity {
         const spellAmp = catalyst.effect?.spell_amp || 0;
         diceCount = Math.min(spell.cap, diceCount + spellAmp);
         
-        let damage = rollDice(diceCount, spell.damage[1], `${this.name} Spell`).total;
+        let baseDamage = rollDice(diceCount, spell.damage[1], `${this.name} Spell`).total;
         
-        // --- MODIFIED: Apply same formula as player ---
+        // --- NEW UNIFIED DAMAGE FORMULA ---
         const statBonus = this.magicalDamageBonus;
         const statMultiplier = 1 + statBonus / 20;
-        damage = Math.floor(damage * statMultiplier);
-        
-        // --- MODIFIED: Use base stat for flat bonus, just like player ---
-        const intFlatBonus = Math.floor(this.intelligence / 5);
-        damage += intFlatBonus;
-        // --- END MODIFIED ---
+        const statFlatBonus = Math.floor(statBonus / 5); // <-- USES TOTAL BONUS
+
+        let damage = Math.floor(baseDamage * statMultiplier) + statFlatBonus;
+        // --- END NEW FORMULA ---
         
         if (this.race === 'Dragonborn') {
             const damageBonus = (this.level >= 20) ? 1.20 : 1.10;
@@ -3258,12 +3400,14 @@ class Enemy extends Entity {
 
         // Apply stat multiplier and flat bonus
         const statMultiplier = 1 + statBonus / 20;
+        const statFlatBonus = Math.floor(statBonus / 5); // <-- USES TOTAL BONUS
+
         totalDamage = Math.floor(totalDamage * statMultiplier);
         calcLog.steps.push({ description: `Stat Multiplier (1 + ${statBonus}/20)`, value: `x${statMultiplier.toFixed(2)}`, result: totalDamage });
-
-        const strengthFlatBonus = Math.floor(this.strength / 5);
-        totalDamage += strengthFlatBonus;
-        calcLog.steps.push({ description: "Strength Flat Bonus (Str/5)", value: `+${strengthFlatBonus}`, result: totalDamage });
+        
+        totalDamage += statFlatBonus;
+        calcLog.steps.push({ description: "Stat Flat Bonus (Bonus/5)", value: `+${statFlatBonus}`, result: totalDamage });
+        // --- END NEW FORMULA ---
 
         // Apply Drenched debuff
         if (this.statusEffects.drenched) {
@@ -3786,21 +3930,40 @@ function generateBarracksRoster() {
     
     player.barracksRoster = []; // Clear the old roster
     
+    const namesMale = NPC_RANDOM_NAMES.Male.map(n => ({ name: n, gender: 'Male' }));
+    const namesFemale = NPC_RANDOM_NAMES.Female.map(n => ({ name: n, gender: 'Female' }));
+    const namesNeutral = NPC_RANDOM_NAMES.Neutral.map(n => ({ name: n, gender: 'Neutral' }));
+
+    const allNames = shuffleArray([...namesMale, ...namesFemale, ...namesNeutral], rng);
+
     for (let i = 0; i < 5; i++) {
+        if (allNames.length === 0) break; // Stop if no names left
+
+        const recruitData = allNames.pop(); // Get a name and its gender category
+
+        const availableRaces = Object.keys(RACES);
+        const availableClasses = Object.keys(CLASSES);
+
         const raceKey = availableRaces[Math.floor(rng() * availableRaces.length)];
         const classKey = availableClasses[Math.floor(rng() * availableClasses.length)];
-        const name = availableNames[Math.floor(rng() * availableNames.length)];
         
         // --- NEW: Determine weighted background ---
         const { backgroundKey, backgroundName } = _determineWeightedBackground(raceKey, classKey, rng);
         // --- END NEW ---
 
+        // We use the recruitData.name, but also need to store the determined dialogue type
+        const dialogueType = player.npcAlly ? player.npcAlly._determineDialogueType(recruitData.name) : _determineDialogueType(recruitData.name);
+
+
         player.barracksRoster.push({
-            name: name,
+            name: recruitData.name,
             raceKey: raceKey,
             classKey: classKey,
-            backgroundKey: backgroundKey,     // <-- ADDED
-            backgroundName: backgroundName  // <-- ADDED
+            backgroundKey: backgroundKey,
+            backgroundName: backgroundName,
+            // --- ADDED: Store the determined gender type here ---
+            // This is the BASE category for the name, used for display/recruitment UI clarity.
+            baseGender: recruitData.gender 
         });
     }
     

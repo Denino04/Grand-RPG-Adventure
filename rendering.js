@@ -169,6 +169,10 @@ function _buildCharSheetMainStats(currentStatPoints) {
     const mainStats = ['vigor', 'focus', 'stamina', 'strength', 'intelligence', 'luck'];
     return mainStats.map(stat => {
         const bonusStatKey = 'bonus' + capitalize(stat);
+        // *** MODIFICATION: Calculate total stat (Base + Bonus) ***
+        const totalStat = (player[stat] || 0) + (player[bonusStatKey] || 0);
+        // *** END MODIFICATION ***
+
         const pointsSpentThisSession = (player[bonusStatKey] || 0) - (characterSheetOriginalStats[bonusStatKey] || 0);
         const canDecrease = pointsSpentThisSession >= statAllocationAmount;
         const canIncrease = currentStatPoints >= statAllocationAmount;
@@ -177,7 +181,8 @@ function _buildCharSheetMainStats(currentStatPoints) {
                     <span class="font-semibold capitalize text-sm col-span-1">${stat}</span>
                     <div class="col-span-2 flex items-center justify-end">
                         <button onclick="deallocatePoint('${stat}', statAllocationAmount)" class="btn btn-action text-sm py-0 px-2 leading-none w-7 h-7" ${!canDecrease ? 'disabled' : ''}>-</button>
-                        <span class="text-sm mx-1 w-8 text-center font-semibold">${player[stat]}</span>
+                        <!-- *** MODIFICATION: Display totalStat *** -->
+                        <span class="text-sm mx-1 w-8 text-center font-semibold">${totalStat}</span>
                         <button onclick="allocatePoint('${stat}', statAllocationAmount)" class="btn btn-primary text-sm py-0 px-2 leading-none w-7 h-7" ${!canIncrease ? 'disabled' : ''}>+</button>
                     </div>
                  </div>`;
@@ -196,18 +201,57 @@ function _buildCharSheetDerivedStats() {
         'Crit Chance': 'critChance', 'Evasion Chance': 'evasionChance', 'Debuff Resist': 'resistanceChance'
     };
 
+    // Store a reference to a temporary player object with original stats calculated
+    // *** MODIFIED: Use the new Player.clone() method to create a functional clone. ***
+    let originalPlayerState = player; 
+    if (characterSheetOriginalStats) {
+        // Clone the player and revert the bonus stats to the original snapshot before allocation
+        originalPlayerState = player.clone(characterSheetOriginalStats);
+    }
+    // *** END MODIFIED ***
+
+
     return Object.entries(derivedStats).map(([label, key]) => {
-        let value = player[key];
-        if (typeof value === 'number') {
+        let currentValue = player[key];
+        let originalValue = originalPlayerState[key]; // Value from the original state clone
+
+        let valueDisplay;
+        let changeDetected = false;
+
+        if (typeof currentValue === 'number') {
             if (key.includes('Chance') || key.includes('Resist')) {
-                 value = `${(value * 100).toFixed(1)}%`;
+                 // Convert to integer percentage for comparison
+                 const currentPercent = Math.round(currentValue * 1000);
+                 const originalPercent = Math.round(originalValue * 1000);
+                 if (currentPercent !== originalPercent) {
+                    changeDetected = true;
+                 }
+                 valueDisplay = `${(currentValue * 100).toFixed(1)}%`;
             } else {
-                 value = Math.floor(value);
+                 currentValue = Math.floor(currentValue);
+                 originalValue = Math.floor(originalValue);
+                 if (currentValue !== originalValue) {
+                    changeDetected = true;
+                 }
+                 valueDisplay = currentValue;
             }
          } else {
-             value = 'N/A';
+             valueDisplay = 'N/A';
          }
-        return `<div class="flex justify-between text-xs"><span>${label}:</span><span class="font-semibold">${value}</span></div>`;
+        
+        // Apply highlight class if change is detected AND if we are in the character sheet view (where changes matter)
+        let highlightClass = '';
+        if (changeDetected && (gameState.currentView === 'character_sheet_levelup' || gameState.currentView === 'character_sheet')) {
+             highlightClass = 'text-green-400 font-bold';
+        }
+
+
+        // *** MODIFICATION: Apply highlight class to the span containing both label and value ***
+        return `<div class="flex justify-between text-xs">
+                    <span class="${highlightClass}">${label}:</span>
+                    <span class="font-semibold ${highlightClass}">${valueDisplay}</span>
+                </div>`;
+        // *** END MODIFICATION ***
     }).join('');
 }
 
@@ -282,6 +326,7 @@ function renderCharacterSheet(isLevelUp = false) {
 
     // Snapshot current stats if opening the sheet for allocation
     if (!characterSheetOriginalStats) {
+        // *** MODIFICATION START: Save Base Stat values as well for accurate reversion ***
         characterSheetOriginalStats = {
             vigor: player.vigor, focus: player.focus, stamina: player.stamina,
             strength: player.strength, intelligence: player.intelligence, luck: player.luck,
@@ -289,6 +334,7 @@ function renderCharacterSheet(isLevelUp = false) {
             bonusVigor: player.bonusVigor || 0, bonusFocus: player.bonusFocus || 0, bonusStamina: player.bonusStamina || 0,
             bonusStrength: player.bonusStrength || 0, bonusIntelligence: player.bonusIntelligence || 0, bonusLuck: player.bonusLuck || 0
         };
+        // *** MODIFICATION END ***
     }
 
     lastViewBeforeInventory = 'character_sheet'; // Set the return view
@@ -465,9 +511,28 @@ function renderCharacterCreation() {
         const raceDetailsBox = $('#race-details'); // Details box for this step
 
         button.addEventListener('mouseenter', () => {
+            // *** MODIFICATION START ***
+            // Define the descriptions for the tooltips
+            const statDescriptions = {
+                'Vigor': "Vigor represents the vitality stored inside you. In charge of Max HP and physical defense.",
+                'Focus': "Focus represents how deep your spiritual well is. In charge of Max MP and magical defense.",
+                'Stamina': "Stamina represents how durable you are. In charge of physical and magical defense.",
+                'Strength': "Strength represents the explosive power of your body. In charge of Physical Damage.",
+                'Intelligence': "Intelligence represents your understanding of the world. In charge of Magical Damage.",
+                'Luck': "Luck represents the dice of life that you are playing with. In charge of all thing chance based."
+            };
+
             let statsHtml = Object.entries(raceData)
                 .filter(([key]) => key !== 'description' && key !== 'passive')
-                .map(([stat, value]) => `<div class="grid grid-cols-2"><span>${stat}</span><span class="font-bold text-yellow-300 text-right">${value}</span></div>`)
+                .map(([stat, value]) => {
+                    // Get the corresponding description, or an empty string if none exists
+                    const description = statDescriptions[stat] || '';
+                    // Add the title attribute for the tooltip and cursor-help for visual feedback
+                    return `<div class="grid grid-cols-2">
+                                <span title="${description}" class="cursor-help">${stat}</span>
+                                <span class="font-bold text-yellow-300 text-right">${value}</span>
+                            </div>`;
+                })
                 .join('');
 
             let abilityHtml = '';
@@ -666,16 +731,15 @@ window.allocatePoint = function(stat, amount) {
         // --- Store current and max values BEFORE changes ---
         const oldHp = player.hp;
         const oldMp = player.mp;
-        const oldMaxHp = player.maxHp;
-        const oldMaxMp = player.maxMp;
-
-        player[stat]+= amount;
+        // *** MODIFICATION: DO NOT modify player[stat] (the base stat) ***
+        // player[stat]+= amount; 
         const bonusStatKey = 'bonus' + capitalize(stat);
          // Ensure bonus stat exists before adding
          player[bonusStatKey] = (player[bonusStatKey] || 0) + amount;
-
+        // *** END MODIFICATION ***
 
         player.recalculateGrowthBonuses(); // Recalculate derived stats (updates maxHp/maxMp)
+
 
         player.statPoints = currentStatPoints - amount; // Update points
 
@@ -732,9 +796,10 @@ window.deallocatePoint = function(stat, amount) {
         const oldHp = player.hp;
         const oldMp = player.mp;
 
-        player[stat] -= amount; // Decrease base stat
+        // *** MODIFICATION: DO NOT modify player[stat] (the base stat) ***
+        // player[stat] -= amount; 
         player[bonusStatKey] = currentBonusStat - amount; // Decrease bonus stat
-
+        // *** END MODIFICATION ***
 
         player.recalculateGrowthBonuses(); // Recalculate derived (updates maxHp/maxMp)
 
@@ -760,16 +825,7 @@ function resetStatAllocation() {
     const oldHp = player.hp;
     const oldMp = player.mp;
 
-    // Reset base stats by subtracting the difference added this session
-    player.vigor -= ((player.bonusVigor || 0) - (characterSheetOriginalStats.bonusVigor || 0));
-    player.focus -= ((player.bonusFocus || 0) - (characterSheetOriginalStats.bonusFocus || 0));
-    player.stamina -= ((player.bonusStamina || 0) - (characterSheetOriginalStats.bonusStamina || 0));
-    player.strength -= ((player.bonusStrength || 0) - (characterSheetOriginalStats.bonusStrength || 0));
-    player.intelligence -= ((player.bonusIntelligence || 0) - (characterSheetOriginalStats.bonusIntelligence || 0));
-    player.luck -= ((player.bonusLuck || 0) - (characterSheetOriginalStats.bonusLuck || 0));
-
-
-    // Reset bonus stats to original values
+    // Reset base stats by subtracting the difference added this session    // Reset bonus stats to original values
     player.bonusVigor = characterSheetOriginalStats.bonusVigor || 0;
     player.bonusFocus = characterSheetOriginalStats.bonusFocus || 0;
     player.bonusStamina = characterSheetOriginalStats.bonusStamina || 0;
@@ -795,6 +851,7 @@ function resetStatAllocation() {
     updateStatsView(); // Update main UI
     renderCharacterSheet(gameState.currentView === 'character_sheet_levelup'); // Re-render sheet
 }
+
 function confirmStatAllocation() {
     if (!player) return;
     characterSheetOriginalStats = null; // Clear the original stats snapshot
@@ -807,7 +864,7 @@ function confirmStatAllocation() {
         renderTownSquare(); // Go to town after level up allocation
     } else {
         returnFromInventory(); // Go back to the previous view if just checking sheet
-    }
+    }   
 }
 
 // ... (rest of the functions remain the same) ...
@@ -1468,7 +1525,10 @@ function hireNpc(recruitIndex) {
     // Remove the recruit from the roster
     player.barracksRoster.splice(recruitIndex, 1);
 
-    addToLog(`You hired ${recruit.name}, the ${capitalize(recruit.raceKey)} ${CLASSES[recruit.classKey].name}, for ${cost} G!`, "text-green-400");
+    const recruitDialogue = player.npcAlly._getDialogue('RECRUIT', player.name);
+    addToLog(`You hired ${recruit.name}, the ${capitalize(recruit.raceKey)} ${CLASSES[recruit.classKey].name}, for ${cost} G!<br>"${recruitDialogue}"`, "text-green-400");
+    // --- END DIALOGUE INTEGRATION ---
+
     updateStatsView();
     renderBarracks(); // Re-render to show the manage screen
     saveGame();
@@ -1484,12 +1544,22 @@ function dismissNpc(wasFired = false) {
     const allyName = player.npcAlly.name;
     const ally = player.npcAlly; // Get ally object
     
+    // --- DIALOGUE INTEGRATION: Upon Dismissal/Firing ---
+    // Pass player.name as the second argument to _getDialogue
+    const dialogueMessage = wasFired ? ally._getDialogue('FIRED', player.name) : ally._getDialogue('DISMISS', player.name);
+    // --- END DIALOGUE INTEGRATION ---
+
     if (wasFired) {
-        addToLog(`You refused to pay ${allyName}, and they left your service in disgust.`, 'text-red-500 font-bold');
+        // --- MODIFIED: Added <br> for line break ---
+        addToLog(`You refused to pay ${allyName}, and they left your service in disgust.<br>"${dialogueMessage}"`, 'text-red-500 font-bold');
+        // --- END MODIFIED ---
         // No items are returned
     } else {
-        addToLog(`You have dismissed ${allyName}. They return their equipment and depart.`, 'text-yellow-400');
+        // --- MODIFIED: Added <br> for line break ---
+        addToLog(`You have dismissed ${allyName}. They return their equipment and depart.<br>"${dialogueMessage}"`, 'text-yellow-400');
+        // --- END MODIFIED ---
         
+        // --- UPDATED: Return ally's equipped items to player inventory ---
         // --- UPDATED: Return ally's equipped items to player inventory ---
         const itemsToReturn = [
             ally.equippedWeapon.name !== 'Fists' ? findKeyByInstance(WEAPONS, ally.equippedWeapon) : null,
@@ -4208,6 +4278,14 @@ function renderPostBattleMenu() {
         }
     }
     // --- END NPC ALLY ---
+
+    if (player.npcAlly && player.npcAlly.x !== -1 && preTrainingState === null) {
+        const dialogue = player.npcAlly._getDialogue('END_BATTLE', player.name);
+        addToLog(`(${player.npcAlly.name})<br>"${dialogue}"`, 'text-gray-400');
+    } else if (player.npcAlly && player.npcAlly.x !== -1 && preTrainingState !== null) {
+         const dialogue = player.npcAlly._getDialogue('END_TRAIN', player.name);
+        addToLog(`(${player.npcAlly.name})<br>"${dialogue}"`, 'text-gray-400');
+    }
 
     // If it was a training battle, restore state and go back to training grounds
     if (preTrainingState !== null) {
