@@ -4630,7 +4630,7 @@ function renderBettyQuestProposal() {
 
 function formatTime(ms) {
     if (ms <= 0) return "Ready!";
-    let seconds = Math.floor(ms / 1000);
+        let seconds = Math.floor(ms / 1000);
     let minutes = Math.floor(seconds / 60);
     let hours = Math.floor(minutes / 60);
 

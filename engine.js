@@ -5897,10 +5897,13 @@ function purchaseHouseUpgrade(categoryKey) {
 // --- GARDEN FUNCTIONS ---
 
 function updateGarden() {
-    if (!player || !player.house.owned || player.house.gardenTier === 0) return;
-    // Added check for game view
-    if (gameState.currentView !== 'garden') return;
-
+    // 1. Basic checks to see if we should run at all.
+    if (!player || !player.house.owned || player.house.gardenTier === 0) {
+        return; // No player, no house, or no garden plot = do nothing.
+    }
+    
+    // 2. Data validation. If garden arrays are broken, fix them.
+    // This stops the game from crashing if an old save loads without these arrays.
     if (!Array.isArray(player.house.garden)) {
         console.error("Garden data was not an array! Resetting to prevent crash.");
         player.house.garden = [];
@@ -5909,32 +5912,43 @@ function updateGarden() {
         player.house.treePlots = [];
     }
 
-
+    // 3. Set up variables for the check.
     const now = Date.now();
-    let needsRender = false;
+    let needsRender = false; // Flag to track if the screen needs to be redrawn.
 
+    /**
+     * Helper function to check a set of plots (garden or tree) for growth.
+     * This is defined *inside* updateGarden to keep it clean.
+     * @param {Array} plots - The array of plot objects (e.g., player.house.garden).
+     */
     const checkPlots = (plots) => {
-        if (!Array.isArray(plots)) return;
+        if (!Array.isArray(plots)) return; // Safety check
+
         plots.forEach(plot => {
-            if (plot && plot.seed && plot.plantedAt > 0 && plot.growthStage < 3) { // Only check growing plants
+            // Only check plots that have a seed, have a valid plant time, and aren't fully grown (stage 3).
+            if (plot && plot.seed && plot.plantedAt > 0 && plot.growthStage < 3) {
                 const seedInfo = SEEDS[plot.seed];
-                if (!seedInfo) return; // Skip if seed data is invalid
+                if (!seedInfo) return; // Skip if seed data is invalid (e.g., removed from game)
 
                 const timePassed = now - plot.plantedAt;
+                const totalGrowthTime = seedInfo.growthTime;
                 const currentStage = plot.growthStage;
-                let newStage = 0;
-                if (timePassed >= seedInfo.growthTime) {
-                    newStage = 3; // Fully grown
-                } else if (timePassed >= seedInfo.growthTime * 0.66) {
-                    newStage = 2; // Sprout -> Growing
-                } else if (timePassed >= seedInfo.growthTime * 0.33) {
-                    newStage = 1; // Seedling -> Sprout
-                } else {
-                     newStage = 0; // Still seedling
+                
+                let newStage = 0; // Default: seedling
+
+                if (timePassed >= totalGrowthTime * 0.33) {
+                    newStage = 1; // Stage 1: Sprout
                 }
+                if (timePassed >= totalGrowthTime * 0.66) {
+                    newStage = 2; // Stage 2: Growing
+                }
+                if (timePassed >= totalGrowthTime) {
+                    newStage = 3; // Stage 3: Fully grown
+                }
+                // --- MODIFICATION END ---
 
-
-                if (newStage > currentStage) { // Only update if stage *increased*
+                // 5. If the stage has advanced, update the plot and flag a re-render.
+                if (newStage > currentStage) {
                     plot.growthStage = newStage;
                     needsRender = true;
                 }
@@ -5942,16 +5956,19 @@ function updateGarden() {
         });
     };
 
+    // 6. Run the check on both plot types.
     checkPlots(player.house.garden);
     checkPlots(player.house.treePlots);
 
-
-    if (needsRender) {
+    // 7. THE FIX: Only re-render the screen if the player is *actually looking at it*.
+    // This function (updateGarden) runs every second in the background.
+    // The logic above will run and update the plant stages.
+    // This `if` block ensures we only *draw* the changes if the garden is the current view.
+    if (needsRender && gameState.currentView === 'garden') {
          console.log("Garden state updated, re-rendering.");
-        renderGarden(); // Re-render if any plot changed stage
+        renderGarden(); // Re-render because a plot changed stage and we're looking at it.
     }
 }
-
 
 function plantSeed(plotIndex, seedKey, isTreePlot) {
      const targetArray = isTreePlot ? player.house.treePlots : player.house.garden;
