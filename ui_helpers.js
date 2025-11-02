@@ -271,6 +271,60 @@ function createSelectionListWithDetails(config) {
 // =================================================================================
 
 let activeTooltipItem = null;
+let simpleTooltipTimer = null; // Timer for the simple tooltip
+
+/**
+ * Shows a simple text-only tooltip.
+ * @param {string} text - The text to display.
+ * @param {Event} event - The mouse event.
+ */
+function showSimpleTooltip(text, event) {
+    if (simpleTooltipTimer) clearTimeout(simpleTooltipTimer); // Clear any pending hide
+    
+    const tooltipElement = $('#tooltip'); // Use the existing tooltip element
+    if (!text || !event) {
+        hideTooltip(); // Use the main hider
+        return;
+    }
+
+    // Set simple content
+    tooltipElement.innerHTML = `<p class="text-gray-300 text-sm">${text}</p>`;
+    tooltipElement.style.display = 'block';
+    activeTooltipItem = `simple-tooltip-${text.substring(0, 10)}`; // Give it a temporary active ID
+
+    // *** MODIFICATION START: Handle both Mouse and Touch events for positioning ***
+    let x, y;
+    if (event.touches) {
+        // Touch event
+        x = event.touches[0].clientX + 15;
+        y = event.touches[0].clientY + 15;
+    } else {
+        // Mouse event
+        x = event.clientX + 15;
+        y = event.clientY + 15;
+    }
+    // *** MODIFICATION END ***
+
+    // Keep in viewport
+    if (x + tooltipElement.offsetWidth > window.innerWidth) x = event.clientX - tooltipElement.offsetWidth - 15;
+    if (y + tooltipElement.offsetHeight > window.innerHeight) y = event.clientY - tooltipElement.offsetHeight - 15;
+    tooltipElement.style.left = `${x}px`;
+    tooltipElement.style.top = `${y}px`;
+}
+
+/**
+ * Hides the simple tooltip after a short delay.
+ */
+function hideSimpleTooltip() {
+    // Use a short delay so the tooltip doesn't vanish if you barely mouse-out
+    simpleTooltipTimer = setTimeout(() => {
+        // Only hide if the active item is a simple tooltip
+        if (activeTooltipItem && activeTooltipItem.startsWith('simple-tooltip-')) {
+            $('#tooltip').style.display = 'none';
+            activeTooltipItem = null;
+        }
+    }, 100); // 100ms delay
+}
 
 /**
  * Shows a detailed tooltip for an item, spell, or enemy.
@@ -432,6 +486,9 @@ function showTooltip(itemKey, event) {
 
 /** Hides the main tooltip. */
 function hideTooltip() {
+    // *** MODIFICATION: Clear simple tooltip timer as well ***
+    if (simpleTooltipTimer) clearTimeout(simpleTooltipTimer);
+    // *** END MODIFICATION ***
     $('#tooltip').style.display = 'none';
     activeTooltipItem = null;
 }
@@ -783,10 +840,20 @@ function advanceTutorial(param = '') {
     // --- Handle Standard Steps (Modal, Tooltip) ---
     // Process content (e.g., replace <Charname>)
     let content = step.content;
-    const charName = player ? player.name : param; // Use param if player not loaded yet (creation)
+    
+    // *** MODIFICATION START: Grab name from tempCreationState if player isn't loaded ***
+    let charName = player ? player.name : param; // Use param as a fallback
+    if (!charName && window.tempCreationState && window.tempCreationState.name) {
+        // This handles the finalize modal, grabbing the name from the state
+        // set by the 'finalize-creation-btn' click.
+        charName = window.tempCreationState.name;
+    }
+    // *** MODIFICATION END ***
+
     if (charName && content && content.includes('<Charname>')) {
         content = content.replace(/<Charname>/g, charName);
     }
+
 
     // Execute preAction if defined
     if (step.preAction && typeof window[step.preAction] === 'function') {
@@ -1012,6 +1079,31 @@ function completeBattleTutorial() {
     renderTownSquare(); // Navigate to town
 }
 
+/**
+ * Bridge function called by the creation_finalize tutorial modal.
+ * Grabs the temporary creation state and calls the async initGame.
+ */
+function tutorial_callInitGame() {
+    if (window.tempCreationState) {
+        const state = window.tempCreationState;
+        
+        // 1. End the current tutorial sequence immediately.
+        endTutorial(); 
+
+        // 2. Yield control to browser to ensure DOM update finishes (modal closes), then call initGame asynchronously.
+        setTimeout(async () => {
+            // initGame saves the character and sets window.location.hash = 'game'.
+            await initGame(state.name, state.gender, state.race, state.class, state.background, state.difficulty, state.elementalAffinity);
+            window.tempCreationState = null; // Clear the temp state
+        }, 0);
+        
+        // No hash change needed here, initGame handles it after the save is complete.
+    } else {
+        console.error("Failed to finalize creation: tempCreationState not found.");
+        // If state is missing, force navigation anyway.
+        window.location.hash = 'menu';
+    }
+}
 
 function endTutorial() {
     const box = $('#tutorial-box');

@@ -421,11 +421,23 @@ function renderCharacterCreation() {
     $('#creation-step-0').classList.remove('hidden'); // Show difficulty selection first
 
     if (isTutorialEnabled) {
-        startTutorialSequence('creation_welcome');
+        // Start the *single, continuous* creation flow
+        startTutorialSequence('character_creation_flow');
     }
 
     // Initialize creationState, including elementalAffinity
     let creationState = { name: '', gender: null, race: null, class: null, background: null, difficulty: 'hardcore', elementalAffinity: null };
+
+    // *** MODIFICATION START: Define statDescriptions here for correct scope ***
+    const statDescriptions = {
+        'Vigor': "Vigor represents the vitality stored inside you. In charge of Max HP and physical defense.",
+        'Focus': "Focus represents how deep your spiritual well is. In charge of Max MP and magical defense.",
+        'Stamina': "Stamina represents how durable you are. In charge of physical and magical defense.",
+        'Strength': "Strength represents the explosive power of your body. In charge of Physical Damage.",
+        'Intelligence': "Intelligence represents your understanding of the world. In charge of Magical Damage.",
+        'Luck': "Luck represents the dice of life that you are playing with. In charge of all thing chance based."
+    };
+    // *** END MODIFICATION 1 ***
 
     const switchStep = (from, to) => {
         $(`#creation-step-${from}`)?.classList.add('hidden'); // Add safety check
@@ -434,15 +446,7 @@ function renderCharacterCreation() {
         // Focus the name input if switching to Step 1
         if (to === 1) {
              $('#new-char-name')?.focus(); // Add safety check
-        }
 
-        if (isTutorialEnabled) {
-            // Trigger tutorial steps based on the step being switched *to*
-            if (to === 1) startTutorialSequence('creation_step1'); // Covers Name/Gender
-            // Note: Race, Class, Background tutorials are handled within their respective steps if needed
-            // else if (to === 2) { /* Maybe trigger race tutorial? */ }
-            // else if (to === 3) startTutorialSequence('creation_step2'); // Class
-            // else if (to === 4) startTutorialSequence('creation_step3'); // Background
         }
     };
 
@@ -450,6 +454,11 @@ function renderCharacterCreation() {
     $('#difficulty-easy').onclick = () => { creationState.difficulty = 'easy'; switchStep(0, 1); };
     $('#difficulty-medium').onclick = () => { creationState.difficulty = 'medium'; switchStep(0, 1); };
     $('#difficulty-hardcore').onclick = () => { creationState.difficulty = 'hardcore'; switchStep(0, 1); };
+    // *** MODIFICATION START: Add class to the clickable divs for the trigger ***
+    $('#difficulty-easy').classList.add('tutorial-difficulty-btn');
+    $('#difficulty-medium').classList.add('tutorial-difficulty-btn');
+    $('#difficulty-hardcore').classList.add('tutorial-difficulty-btn');
+    // *** MODIFICATION END ***
     $('#creation-back-to-start-btn').onclick = showStartScreen; // Back to main menu
 
     // --- Name & Gender Step (1) ---
@@ -511,29 +520,27 @@ function renderCharacterCreation() {
         const raceDetailsBox = $('#race-details'); // Details box for this step
 
         button.addEventListener('mouseenter', () => {
-            // *** MODIFICATION START ***
-            // Define the descriptions for the tooltips
-            const statDescriptions = {
-                'Vigor': "Vigor represents the vitality stored inside you. In charge of Max HP and physical defense.",
-                'Focus': "Focus represents how deep your spiritual well is. In charge of Max MP and magical defense.",
-                'Stamina': "Stamina represents how durable you are. In charge of physical and magical defense.",
-                'Strength': "Strength represents the explosive power of your body. In charge of Physical Damage.",
-                'Intelligence': "Intelligence represents your understanding of the world. In charge of Magical Damage.",
-                'Luck': "Luck represents the dice of life that you are playing with. In charge of all thing chance based."
-            };
-
+            // *** MODIFICATION 2: Removed statDescriptions definition from here ***
             let statsHtml = Object.entries(raceData)
                 .filter(([key]) => key !== 'description' && key !== 'passive')
                 .map(([stat, value]) => {
                     // Get the corresponding description, or an empty string if none exists
                     const description = statDescriptions[stat] || '';
-                    // Add the title attribute for the tooltip and cursor-help for visual feedback
+                    // Escape single quotes and newlines for the HTML attribute
+                    const escapedDescription = description.replace(/'/g, "\\'").replace(/\n/g, ' '); 
+                    
+                    // Add all three event handlers: mouseenter/mouseleave for desktop, touchstart for mobile
                     return `<div class="grid grid-cols-2">
-                                <span title="${description}" class="cursor-help">${stat}</span>
+                                <span onmouseenter="showSimpleTooltip('${escapedDescription}', event)" 
+                                      onmouseleave="hideSimpleTooltip()" 
+                                      ontouchstart="showSimpleTooltip('${escapedDescription}', event)"
+                                      oncontextmenu="(e) => e.preventDefault()"
+                                      class="cursor-help">${stat}</span>
                                 <span class="font-bold text-yellow-300 text-right">${value}</span>
                             </div>`;
                 })
                 .join('');
+            // *** END MODIFICATION 2 ***
 
             let abilityHtml = '';
             if (raceData.passive) {
@@ -556,7 +563,7 @@ function renderCharacterCreation() {
             });
             button.classList.add('bg-yellow-600', 'border-yellow-800');
             button.classList.remove('btn-primary');
-            creationState.race = raceKey;
+            creationState.race = raceKey;   
 
             // Show/Hide Affinity Dropdown
             if (raceKey === 'Elementals') {
@@ -605,12 +612,17 @@ function renderCharacterCreation() {
         button.addEventListener('mouseenter', () => {
             let statsHtml = '<h5 class="font-bold mt-3 mb-1 text-yellow-300">Stat Bonuses</h5>';
             statsHtml += '<div class="grid grid-cols-2">';
+            // *** MODIFICATION 3: Removed statDescriptions definition from here ***
             statsHtml += Object.entries(classData.bonusStats).map(([stat, value]) => {
                 const sign = value > 0 ? '+' : '';
                 const color = value > 0 ? 'text-green-400' : 'text-red-400';
-                return `<span>${capitalize(stat)}</span><span class="${color} text-right">${sign}${value}</span>`;
+                const description = statDescriptions[stat] || '';
+                const escapedDescription = description.replace(/'/g, "\\'").replace(/\n/g, ' ');
+
+                return `<span onmouseenter="showSimpleTooltip('${escapedDescription}', event)" onmouseleave="hideSimpleTooltip()" ontouchstart="showSimpleTooltip('${escapedDescription}', event)" oncontextmenu="(e) => e.preventDefault()" class="cursor-help">${capitalize(stat)}</span><span class="${color} text-right">${sign}${value}</span>`;
             }).join('');
             statsHtml += '</div>';
+            // *** END MODIFICATION 3 ***
 
             let gearHtml = '<h5 class="font-bold mt-3 mb-1 text-yellow-300">Starting Gear</h5>';
             const gear = Object.values(classData.startingEquipment)
@@ -676,7 +688,13 @@ function renderCharacterCreation() {
 
         button.addEventListener('mouseenter', () => {
             let detailsHtml = '<h5 class="font-bold mt-3 mb-1 text-yellow-300">Favored Stats</h5>';
-            const favoredStats = bgData.favoredStats.map(s => capitalize(s)).join(', ') || 'All';
+            const favoredStats = bgData.favoredStats.map(s => {
+                // *** MODIFICATION 4: Removed statDescriptions definition from here ***
+                const stat = capitalize(s);
+                const description = (statDescriptions[stat] || '').replace(/'/g, "\\'").replace(/\n/g, ' ');
+                return `<span onmouseenter="showSimpleTooltip('${description}', event)" onmouseleave="hideSimpleTooltip()" ontouchstart="showSimpleTooltip('${description}', event)" oncontextmenu="(e) => e.preventDefault()" class="cursor-help">${stat}</span>`;
+            }).join(', ') || 'All';
+            
             detailsHtml += `<p class="text-xs">${favoredStats}</p>`;
 
             backgroundDetailsBox.innerHTML = `
@@ -700,6 +718,8 @@ function renderCharacterCreation() {
     });
 
     $('#back-to-step-3-btn').onclick = () => switchStep(4, 3); // Back to Class
+    
+    // *** MODIFICATION START: Simplify finalize-creation-btn logic ***
     $('#finalize-creation-btn').onclick = () => { // Finalize
         if (!creationState.background) {
             $('#background-label').classList.add('animate-pulse', 'text-red-400');
@@ -707,15 +727,18 @@ function renderCharacterCreation() {
             return;
         }
 
-        if (isTutorialEnabled) {
-            startTutorialSequence('creation_finalize');
-            advanceTutorial(creationState.name); // Pass name to final message
-        }
+        // Store state globally. The tutorial trigger (if active) will read this.
+        window.tempCreationState = creationState; 
 
-        setTimeout(() => {
+        if (!isTutorialEnabled) {
+            // If tutorial is off, just init the game immediately
             initGame(creationState.name, creationState.gender, creationState.race, creationState.class, creationState.background, creationState.difficulty, creationState.elementalAffinity);
-        }, isTutorialEnabled ? 2500 : 0);
+        }
+        // If tutorial IS enabled, the 'click' trigger on this button (from dialogue.js)
+        // will fire, calling advanceTutorial() and moving to the final modal.
+        // That modal's button then calls tutorial_callInitGame().
     };
+    // *** MODIFICATION END ***
 }
 
 
@@ -4230,10 +4253,9 @@ function renderBattle(subView = 'main', actionData = null) {
 
         // --- Combine HTML ---
         let html = `<div class="w-full text-center">
-                        <h2 class="font-medieval text-3xl mb-4">Use Item</h2> {/* Updated Title */}
                         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 mb-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                ${itemsHtml} {/* Only items are shown now */}
+                                ${itemsHtml}
                             </div>
                         </div>
                         <button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>

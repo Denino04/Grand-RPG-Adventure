@@ -36,44 +36,66 @@ const BETTY_DIALOGUE = {
 };
 
 const TUTORIAL_SEQUENCES = {
-    creation_welcome: [
+    // --- NEW CONTINUOUS CREATION FLOW ---
+    character_creation_flow: [
+        // Step 0: Welcome Modal
         {
             id: 'welcome',
             type: 'modal',
-            content: "Welcome to the Chronicles of Cocytus. You are one of the first adventurers to set foot in this foreign land, where a new life awaits. Here, you are free to become whoever you wish. So, tell us… who are you?"
-        }
-    ],
-    creation_step1: [
-         {
+            content: "Welcome to Cocytus. Let's create your adventurer. First, choose your difficulty."
+            // No trigger, user clicks "Next" (from tutorial box) to advance
+        },
+        // Step 1: Difficulty
+        {
+            id: 'difficulty_guide',
+            targetId: '#creation-step-0',
+            position: 'bottom',
+            content: "Choose your difficulty. 'Hardcore' is the intended experience, but 'Medium' is fine if you're... cautious.",
+            // This trigger will listen for a click on any of the three difficulty divs
+            trigger: { type: 'click', targetId: '.tutorial-difficulty-btn' } 
+        },
+        // Step 2: Name/Gender
+        {
             id: 'step1_guide',
-            content: "First, choose your Name, Gender, and Race. When you're done, hit Next.",
+            content: "Enter your Name and select a Gender. When you're done, hit Next.",
             targetId: '#creation-step-1',
-            position: 'bottom'
-        }
-    ],
-    creation_step2: [
+            position: 'bottom',
+            trigger: { type: 'click', targetId: '#to-step-2-btn' }
+        },
+        // Step 3: Race
         {
-            id: 'class',
-            content: "Your class grants bonus stats and starting equipment. What is your chosen profession?",
+            id: 'step2_guide',
+            content: "Select your Race. Details appear on the right. If you pick 'Elementals', you must also choose an Affinity.",
+            targetId: '#race-selection-list',
+            position: 'right',
+            trigger: { type: 'click', targetId: '#to-step-3-btn' }
+        },
+        // Step 4: Class
+        {
+            id: 'step3_guide',
+            content: "Select your Class. This determines your starting stats, gear, and unique Signature Ability.",
             targetId: '#class-selection-list',
-            position: 'left'
-        }
-    ],
-    creation_step3: [
+            position: 'right',
+            trigger: { type: 'click', targetId: '#to-step-4-btn' }
+        },
+        // Step 5: Background
         {
-            id: 'background',
-            content: "Finally, your background provides unique stat bonuses. What life did you lead before coming to this frigid land?",
+            id: 'step4_guide',
+            content: "Finally, select your Background. This gives small bonuses as you level up.",
             targetId: '#background-selection-list',
-            position: 'left'
-        }
-    ],
-    creation_finalize: [
+            position: 'right',
+            trigger: { type: 'click', targetId: '#finalize-creation-btn' }
+        },
+        // Step 6: Final Modal
         {
             id: 'finalize',
             type: 'modal',
-            content: "I see… so this is the face of our future hero. Very well. Welcome, <Charname>, to the Frigid Land of Cocytus, where your chronicles will be written in ice."
+            content: "I see… so this is the face of our future hero. Very well. Welcome, <Charname>, to the Frigid Land of Cocytus, where your chronicles will be written in ice.",
+            // This button will call the helper function that actually creates the character
+            nextButtonAction: 'tutorial_callInitGame()' 
         }
     ],
+
     main_game_screen: [
         { id: 'start', type: 'modal', content: "Alright, chump! So you're the new adventurer, eh? Don't look like much. Listen up. I'm gonna hold your hand through the basics so you don't get yourself killed on day one. Pay attention." },
         { id: 'stats_screen', targetId: '#stats-screen-tutorial-target', position: 'right', content: "First things first, this is your Stat Screen. Everything you need to know about yourself is right here. That's your name, and below it, all your details—gender, race, class, background, the whole lot." },
