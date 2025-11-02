@@ -380,7 +380,7 @@ function showTooltip(itemKey, event) {
             if (effect.lootBonus) content += `<li>On Kill: Increases chance of finding rare materials.</li>`;
             if (effect.spell_amp) content += `<li>Spell Power: +${effect.spell_amp} Dice</li>`;
             if (effect.mana_discount) content += `<li>Spell Cost: -${effect.mana_discount} MP</li>`;
-            if (effect.mana_regen) content += `<li>Regen: +${effect.mana_regen} MP/turn</li>`;
+            if (effect.mp_regen_percent) content += `<li>Regen: +${effect.mp_regen_percent * 100}% MP/turn</li>`;
             if (effect.spell_crit_chance) content += `<li>Spell Crit: ${effect.spell_crit_chance * 100}% chance, x${effect.spell_crit_multiplier || 1.5} Dmg</li>`;
             if (effect.spell_vamp) content += `<li>Spell Vamp: Killing with a spell restores ${effect.spell_vamp * 100}% of enemy's max HP and MP.</li>`;
             if (effect.spell_penetration) content += `<li>Spell Pen: Spells ignore ${effect.spell_penetration * 100}% of enemy magic resist.</li>`;
@@ -401,6 +401,8 @@ function showTooltip(itemKey, event) {
             if (effect.type === 'reflect') content += `<li>Reflects ${effect.amount * 100}% of damage taken</li>`;
             if (effect.type === 'dodge') content += `<li>Dodge Chance: +${Math.round(effect.chance * 100)}%</li>`;
             if (effect.reflect_damage) content += `<li>Reflects ${effect.reflect_damage * 100}% of damage taken</li>`;
+            if (effect.hp_regen_percent) content += `<li>Regen: +${effect.hp_regen_percent * 100}% HP/turn</li>`;
+            if (effect.mp_regen_percent) content += `<li>Regen: +${effect.mp_regen_percent * 100}% MP/turn</li>`;
             if (details.type === 'buff') {
                 if (effect.type.startsWith('temp_')) {
                     const statName = { 'maxHp': 'Max HP', 'maxMp': 'Max MP', 'physicalDefense': 'Physical Defense', 'magicalDefense': 'Magical Defense', 'physicalDamageBonus': 'Physical Damage', 'magicalDamageBonus': 'Magical Damage' }[effect.stat] || capitalize(effect.stat);

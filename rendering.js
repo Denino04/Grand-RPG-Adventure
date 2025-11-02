@@ -40,8 +40,8 @@ function getCatalystStatsString(catalyst) {
     let stats = [];
     if (catalyst.effect?.spell_amp) stats.push(`+${catalyst.effect.spell_amp} Dice`);
     if (catalyst.effect?.mana_discount) stats.push(`-${catalyst.effect.mana_discount} Cost`);
-    if (catalyst.effect?.hp_regen) stats.push(`+${catalyst.effect.hp_regen}HP/t`);
-    if (catalyst.effect?.mana_regen) stats.push(`+${catalyst.effect.mana_regen}MP/t`);
+    if (catalyst.effect?.hp_regen_percent) stats.push(`+${catalyst.effect.hp_regen_percent * 100}% HP/t`);
+    if (catalyst.effect?.mp_regen_percent) stats.push(`+${catalyst.effect.mp_regen_percent * 100}% MP/t`);
     if (catalyst.effect?.spell_crit_chance) stats.push(`${catalyst.effect.spell_crit_chance * 100}% Crit`);
     if (catalyst.effect?.spell_vamp) stats.push(`Vamp`);
     if (catalyst.effect?.spell_penetration) stats.push(`Pen`);

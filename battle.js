@@ -2960,6 +2960,30 @@ function handlePlayerEndOfTurnEffects() {
             addToLog(`Your meal restores <span class="font-bold text-blue-300">${regenAmount}</span> MP.`, 'text-blue-300');
         }
     }
+
+    const weaponEffect = player.equippedWeapon.effect;
+    const shieldEffect = player.equippedShield.effect;
+    const armorEffect = player.equippedArmor.effect;
+    const catalystEffect = player.equippedCatalyst.effect;
+
+    const hpRegenPercent = (weaponEffect?.hp_regen_percent || 0) + (shieldEffect?.hp_regen_percent || 0) + (armorEffect?.hp_regen_percent || 0) + (catalystEffect?.hp_regen_percent || 0);
+    const mpRegenPercent = (weaponEffect?.mp_regen_percent || 0) + (shieldEffect?.mp_regen_percent || 0) + (armorEffect?.mp_regen_percent || 0) + (catalystEffect?.mp_regen_percent || 0);
+
+    if (hpRegenPercent > 0 && player.hp < player.maxHp) {
+         const healAmount = Math.floor(player.maxHp * hpRegenPercent);
+         if (healAmount > 0) {
+            player.hp = Math.min(player.maxHp, player.hp + healAmount);
+            addToLog(`Your gear regenerates <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-yellow-300');
+         }
+    }
+    if (mpRegenPercent > 0 && player.mp < player.maxMp) {
+         const regenAmount = Math.floor(player.maxMp * mpRegenPercent);
+         if (regenAmount > 0) {
+            player.mp = Math.min(player.maxMp, player.mp + regenAmount);
+            addToLog(`Your gear restores <span class="font-bold text-blue-400">${regenAmount}</span> MP.`, 'text-blue-300');
+         }
+    }
+    // --- END NEW ---
     // Handle status effect durations and DoTs
     const effects = player.statusEffects;
     for (const effectKey in effects) {
@@ -3464,136 +3488,114 @@ async function startNpcTurn() {
 
         if (target) {
             const distance = minDistance; // Use the calculated distance
+            const hasWeapon = ally.equippedWeapon.name !== WEAPONS['fists'].name;
+            const hasCatalyst = ally.equippedCatalyst.name !== CATALYSTS['no_catalyst'].name;
+            
             const weaponRange = ally.equippedWeapon.range || 1;
             const catalystRange = ally.equippedCatalyst.range || 3;
             
+            const canAttack = distance <= weaponRange;
+            
             let bestSpell = null;
             let canCastSpell = false;
-            let spellData = null; // <-- FIX
-            let spell = null; // <-- FIX
-            
-            // Check for magic action first
-            if (MAGIC_CLASSES.includes(ally._classKey)) {
+            let finalSpellCost = Infinity;
+
+            // Check if spellcasting is possible/viable
+            if (hasCatalyst) {
                 bestSpell = findBestSpell(ally, target);
                 if (bestSpell) {
-                    // --- FIX: Define spellData and spell here ---
-                    spellData = SPELLS[bestSpell];
-                    spell = spellData.tiers[ally.spells[bestSpell].tier - 1];
-                    // --- END FIX ---
-                    const spellCost = spell.cost; // Use the defined spell
-                    if (ally.mp >= spellCost) {
-                        canCastSpell = true;
+                    const spellData = SPELLS[bestSpell];
+                    const spell = spellData.tiers[ally.spells[bestSpell].tier - 1];
+                    
+                    // Calculate final MP cost (simplified for AI)
+                    finalSpellCost = spell.cost;
+                    if (ally.equippedCatalyst.effect?.mana_discount) {
+                        finalSpellCost = Math.max(1, finalSpellCost - ally.equippedCatalyst.effect.mana_discount);
+                    }
+                    
+                    if (ally.mp >= finalSpellCost) {
+                        canCastSpell = distance <= catalystRange;
                     }
                 }
             }
             
-            // --- NEW: Magus Mode Update ---
-            if (ally._classKey === 'magus' && ally.signatureAbilityToggleActive) {
-                if (canCastSpell && spellData.type === 'st') {
-                    ally.activeModeIndex = 0; // Set to Chain Magic
-                } else if (canCastSpell && spellData.type === 'aoe') {
-                    ally.activeModeIndex = 1; // Set to Wide Magic
-                } else {
-                    ally.activeModeIndex = -1; // Not casting or not applicable
+            // --- NEW AI PRIORITY LOGIC ---
+            
+            let actionType = 'move'; // Default action
+
+            // 1. Determine Ally Role
+            const isMartial = MARTIAL_CLASSES.includes(ally._classKey);
+            const isMagic = MAGIC_CLASSES.includes(ally._classKey);
+            
+            // 2. Set Priority based on Gear and Role
+            if (hasWeapon && hasCatalyst) {
+                if (isMartial) { // Martial (e.g., Paladin): Weapon > Magic
+                    actionType = canAttack ? 'attack' : (canCastSpell ? 'spell' : 'move');
+                } else if (isMagic) { // Magical (e.g., Magus): Magic > Weapon
+                    actionType = canCastSpell ? 'spell' : (canAttack ? 'attack' : 'move');
+                } else { // Should not happen for current classes, fallback to Martial
+                     actionType = canAttack ? 'attack' : (canCastSpell ? 'spell' : 'move');
                 }
+            } else if (hasWeapon) {
+                // Only weapon equipped: Weapon > Move
+                actionType = canAttack ? 'attack' : 'move';
+            } else if (hasCatalyst) {
+                // Only catalyst equipped: Magic > Weapon (Fists) > Move
+                actionType = canCastSpell ? 'spell' : (canAttack ? 'attack' : 'move');
+            } else {
+                 // Fists only: Attack > Move
+                 actionType = canAttack ? 'attack' : 'move';
             }
-            // --- END NEW ---
 
-            // --- AI Decision Tree ---
-            if (MAGIC_CLASSES.includes(ally._classKey) && canCastSpell && distance <= catalystRange) {
-                // --- MAGE: In spell range & can cast ---
-                if (distance === 1) {
-                    // Too close, fall back
-                    addToLog(`${ally.name} is too close and tries to fall back!`); // <-- MODIFIED LOG
-
-                    // --- NEW FALLBACK LOGIC (Simple) ---
-                    let moveDistance = 2; // Base ally move
-                    if (ally.race === 'Elf' && (!ally.equippedArmor || !ally.equippedArmor.metallic)) {
-                        moveDistance += (ally.level >= 20 ? 2 : 1);
+            // 3. Execute Chosen Action
+            switch (actionType) {
+                case 'spell':
+                    // --- Magus Mode Update (Only if casting spell) ---
+                    if (ally._classKey === 'magus' && ally.signatureAbilityToggleActive) {
+                        const spellData = SPELLS[bestSpell];
+                        if (spellData.type === 'st') { ally.activeModeIndex = 0; } // Chain Magic
+                        else if (spellData.type === 'aoe') { ally.activeModeIndex = 1; } // Wide Magic
+                        else { ally.activeModeIndex = -1; }
                     }
+                    // --- End Magus Update ---
 
-                    // Find all adjacent cells
-                    const neighbors = [
-                        { x: ally.x, y: ally.y - 1 }, { x: ally.x, y: ally.y + 1 },
-                        { x: ally.x - 1, y: ally.y }, { x: ally.x + 1, y: ally.y }
-                    ];
+                    await ally.castSpell(bestSpell, target);
+                    actionTaken = true;
+                    break;
 
-                    let bestCell = null;
-                    let maxDistFromEnemy = distance; // Current distance is 1
+                case 'attack':
+                    // If out of movement range, still try to attack (e.g. fists in close range)
+                    await ally.attack(target); 
+                    actionTaken = true;
+                    break;
 
-                    for (const cell of neighbors) {
-                        // Check if cell is valid and not blocked *for an ally*
-                        // isCellBlocked(x, y, forEnemy = false, canFly = false, isAllyMoving = false)
-                        if (!isCellBlocked(cell.x, cell.y, false, false, true)) { // isAllyMoving = true
-                            const distFromEnemy = Math.abs(cell.x - target.x) + Math.abs(cell.y - target.y);
-                            
-                            // We want a cell that is > 1 distance from the enemy
-                            if (distFromEnemy > maxDistFromEnemy) {
-                                bestCell = cell;
-                                maxDistFromEnemy = distFromEnemy;
-                                // break; // Found one, that's good enough
-                            }
-                        }
-                    }
-
-                    if (bestCell) {
-                        // Found a cell to move to.
-                        // `moveTowards` will pathfind. We just give it the target coordinates.
-                        await ally.moveTowards(bestCell);
+                case 'move':
+                default:
+                    // Only move if out of range of *all* primary attacks
+                    // Re-check distance needed for both:
+                    const bestRange = Math.max(weaponRange, canCastSpell ? catalystRange : 0);
+                    if (distance > bestRange) {
+                        addToLog(`${ally.name} moves towards ${target.name}.`);
+                        await ally.moveTowards(target); 
                         actionTaken = true;
                     } else {
-                        // Trapped! No adjacent cell to move to.
-                        addToLog(`${ally.name} is trapped and casts the spell anyway!`);
-                        ally.castSpell(bestSpell, target);
-                        actionTaken = true;
+                        // This case should ideally only happen if moveTarget exists but distance <= maxRange,
+                        // meaning the AI is already optimally positioned but chose 'move' due to missing mana/weapon.
+                        // Since we prioritized attack/spell above, this is the fall-through for "nothing to do but wait."
+                        addToLog(`${ally.name} is optimally positioned but cannot act this turn.`);
+                        actionTaken = true; // Still consumes the turn
                     }
-                    // --- END NEW FALLBACK LOGIC ---
-
-                } else {
-                    // Good range, cast spell
-                    ally.castSpell(bestSpell, target);
-                    actionTaken = true;
-                }
-            } else if (MARTIAL_CLASSES.includes(ally._classKey)) {
-                // --- MARTIAL: Logic ---
-                const isRangedWeapon = (weaponRange > 4);
-                if (isRangedWeapon && distance === 1) {
-                    // Too close with ranged, move away
-                    addToLog(`${ally.name} repositions for a better shot!`);
-                    await ally.moveTowards(player); // Move towards player
-                    actionTaken = true;
-                } else if (distance <= weaponRange) {
-                    // In range, attack
-                    await ally.attack(target); // Await attack (which is just the attack part)
-                    actionTaken = true;
-                } else {
-                    // Out of range, move closer
-                    addToLog(`${ally.name} moves towards ${target.name}.`);
-                    await ally.moveTowards(target); // Await movement
-                    actionTaken = true;
-                }
-            } else if (distance > weaponRange && distance > catalystRange) {
-                // --- ALL: Out of range for everything ---
-                addToLog(`${ally.name} moves towards ${target.name}.`);
-                await ally.moveTowards(target); // Await movement
-                actionTaken = true;
-            } else if (distance <= weaponRange) {
-                // --- FALLBACK: In weapon range (e.g., Mage out of mana) ---
-                addToLog(`${ally.name} falls back on their weapon!`);
-                await ally.attack(target);
-                actionTaken = true;
-            } else {
-                // --- FINAL FALLBACK (e.g., in spell range but not weapon range, but can't cast) ---
-                addToLog(`${ally.name} moves to attack ${target.name}.`);
-                await ally.moveTowards(target);
-                actionTaken = true;
+                    break;
             }
+
+            // --- END NEW AI PRIORITY LOGIC ---
 
         } else {
             addToLog(`${ally.name} has no targets.`);
             actionTaken = true; // "Action" was to do nothing
         }
     }
+    
     
     // Check if ally's action ended the battle
     if (!gameState.battleEnded) {
@@ -3882,6 +3884,28 @@ function finalizeNpcTurn() {
             addToLog(`${ally.name}'s divine nature regenerates <span class="font-bold text-green-300">${healAmount}</span> HP.`, 'text-yellow-200');
         }
     }
+    const weaponEffect = ally.equippedWeapon.effect;
+    const shieldEffect = ally.equippedShield.effect;
+    const armorEffect = ally.equippedArmor.effect;
+    const catalystEffect = ally.equippedCatalyst.effect;
+
+    const hpRegenPercent = (weaponEffect?.hp_regen_percent || 0) + (shieldEffect?.hp_regen_percent || 0) + (armorEffect?.hp_regen_percent || 0) + (catalystEffect?.hp_regen_percent || 0);
+    const mpRegenPercent = (weaponEffect?.mp_regen_percent || 0) + (shieldEffect?.mp_regen_percent || 0) + (armorEffect?.mp_regen_percent || 0) + (catalystEffect?.mp_regen_percent || 0);
+
+    if (hpRegenPercent > 0 && ally.hp < ally.maxHp) {
+         const healAmount = Math.floor(ally.maxHp * hpRegenPercent);
+         if (healAmount > 0) {
+            ally.hp = Math.min(ally.maxHp, ally.hp + healAmount);
+            addToLog(`${ally.name}'s gear regenerates <span class="font-bold text-green-400">${healAmount}</span> HP.`, 'text-yellow-300');
+         }
+    }
+    if (mpRegenPercent > 0 && ally.mp < ally.maxMp) {
+         const regenAmount = Math.floor(ally.maxMp * mpRegenPercent);
+         if (regenAmount > 0) {
+            ally.mp = Math.min(ally.maxMp, ally.mp + regenAmount);
+            addToLog(`${ally.name}'s gear restores <span class="font-bold text-blue-400">${regenAmount}</span> MP.`, 'text-blue-300');
+         }
+    }   
 
     // Handle ally's status effects (DoTs, durations)
     const effects = ally.statusEffects;
