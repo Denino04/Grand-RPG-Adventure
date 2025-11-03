@@ -3344,6 +3344,28 @@ async function startNpcTurn() {
             }
         }
     }
+
+    const needsMana = ally.mp < ally.mpToggleThreshold || (ally.maxMp - ally.mp) >= 50;
+
+    if (!actionTaken && needsMana) {
+        let manaPotionToUse = null;
+        
+        // Find the best potion they *have*
+        if ((ally.inventory.items['superior_mana_potion'] || 0) > 0) {
+            manaPotionToUse = 'superior_mana_potion';
+        } else if ((ally.inventory.items['condensed_mana_potion'] || 0) > 0) {
+            manaPotionToUse = 'condensed_mana_potion';
+        } else if ((ally.inventory.items['mana_potion'] || 0) > 0) {
+            manaPotionToUse = 'mana_potion';
+        }
+        
+        if (manaPotionToUse) {
+            ally.useItem(manaPotionToUse); // This will log and update UI
+            logAllyDialogueChance(ally, 'ON_HEAL'); // Use the same dialogue type
+            actionTaken = true;
+        }
+    }
+
     
     // --- 3. Combat Logic (Prioritized by Role) ---
     if (!actionTaken) {
