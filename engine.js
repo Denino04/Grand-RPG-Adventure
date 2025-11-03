@@ -3247,10 +3247,18 @@ class Enemy extends Entity {
         if (this.speciesData.class === 'Undead') {
             this.revived = false;
         }
+        // --- ADDED: Ability cooldown/tracking flags ---
+        if (this.ability === 'enrage') {
+            this.enrageUsed = false;
+        }
         if (this.ability === 'necromancy') {
             this.summonedAt50 = false;
             this.summonedAt10 = false;
         }
+        if (this.ability === 'ultra_focus') {
+            this.ultraFocusTurns = 0; // NEW: Track turns for Ultra-Focus
+        }
+        // --- END ADDED ---
         if (this.ability === 'alive_again') {
             this.reviveChance = 1.0;
         }
@@ -3324,6 +3332,16 @@ class Enemy extends Entity {
         // --- END AI LOGIC ---
         
         // 5. Execute Action
+        const abilityTarget = target || moveTarget;
+        // Check if a target exists (player or ally)
+        if (abilityTarget) {
+            // _tryUseAbility is now on the enemy object (this)
+            // It will return 'true' if it used an action (like Swallow or Summon)
+            // It will return 'false' if it just applied a buff (like Enrage) or did nothing
+            if (await this._tryUseAbility(abilityTarget)) {
+                return; // Ability was used and it replaced the turn
+            }
+        }
         if (target) {
             // --- Perform Attack ---
             addToLog(`${this.name} attacks ${target.name}!`);
@@ -3458,8 +3476,17 @@ class Enemy extends Entity {
 
 
         // Apply damage to target (this is where parry/dodge/block checks happen inside Player.takeDamage)
-        // --- MODIFIED: Store object from takeDamage ---
-        const damageResult = target.takeDamage(totalDamage, !!this.statusEffects.ultra_focus, this, attackOptions);
+        // --- MODIFIED: Check for Ultra Focus ---
+        const ignoreDefense = !!this.statusEffects.ultra_focus; // MODIFIED: 'enemy' to 'this'
+        if (ignoreDefense) {
+            this.ultraFocusTurns--; // MODIFIED: 'enemy' to 'this'
+            if (this.ultraFocusTurns <= 0) { // MODIFIED: 'enemy' to 'this'
+                delete this.statusEffects.ultra_focus; // MODIFIED: 'enemy' to 'this'
+                addToLog(`${this.name}'s eye dims.`, 'text-yellow-600'); // MODIFIED: 'enemy' to 'this'
+            }
+        }
+        // --- END MODIFIED ---
+        const damageResult = target.takeDamage(totalDamage, ignoreDefense, this, attackOptions); // MODIFIED: 'enemy' to 'this'
         damageDealt = damageResult.damageDealt; // Get the number
         // --- END MODIFIED ---
 
@@ -3521,18 +3548,23 @@ class Enemy extends Entity {
         }
 
         // Apply ability-based effects (only if damage was dealt or ability is not on-hit based)
+        // Apply ability-based effects (only if damage was dealt or ability is not on-hit based)
         if (this.ability === 'life_drain' && damageDealt > 0) {
             const drainAmount = Math.floor(damageDealt / 2);
             this.hp = Math.min(this.maxHp, this.hp + drainAmount);
             addToLog(`${this.name} drains <span class="font-bold text-green-400">${drainAmount}</span> HP!`);
         }
-        if (this.ability === 'earthshaker' && Math.random() < 0.3) { // Chance independent of hit
+        const paralyzeChance = 0.15 + (Math.max(0, this.rarityData.rarityIndex - 1) * 0.05); // 15% base + 5% per rarity > common
+        if (this.ability === 'earthshaker' && damageDealt > 0 && Math.random() < paralyzeChance) { // MODIFIED: Use 'this' and new chance
             if (!target.statusEffects.paralyzed) {
-                applyStatusEffect(target, 'paralyzed', { duration: 1 }, this.name); // Shorter duration than elemental proc
+                // applyStatusEffect is global (engine.js)
+                applyStatusEffect(target, 'paralyzed', { duration: 2 }, this.name); // MODIFIED: duration 2 (for 1 turn)
             }
         }
-    }
-    takeDamage(damage, effects = {}) {
+        // --- END MODIFIED ---
+}
+// --- END NEW/RE-ADDED FUNCTION ---
+    takeDamage(damageTaken, effects = {}) {
         // --- START FIX: Reworked Defense Calculation ---
         let currentDefense = 0; // Start defense at 0
         const isMagicAttack = (effects.element && effects.element !== 'none') || effects.isMagic; // Don't include ignore_defense here
@@ -3546,31 +3578,42 @@ class Enemy extends Entity {
                 effectiveSpellResist = Math.max(0, effectiveSpellResist - effects.spell_penetration);
             }
             // Apply resistance as a damage multiplier
-            damage = Math.floor(damage * (1 - effectiveSpellResist));
+            damageTaken = Math.floor(damageTaken * (1 - effectiveSpellResist));
             // Magic attacks ignore base physical defense
             currentDefense = 0; 
         } else {
             // Physical attacks use flat physical defense
             currentDefense = this.defense;
+            // --- MODIFIED: Living Shield defense double ---
             if (this.statusEffects.living_shield) {
-                currentDefense *= 2; // Living shield only affects physical
+                currentDefense *= 2.0; // Double defense
+                addToLog(`${this.name}'s shield is hardened!`, 'text-gray-300');
             }
+            // --- END MODIFIED ---
         }
         
         // Apply ignore defense / penetration (affects physical defense)
-        if (effects.ignore_defense) {
-             const pierceAmount = Math.max(0, Math.min(1, effects.ignore_defense));
-             currentDefense *= (1 - pierceAmount);
-        }
-         if (!isMagicAttack && effects.armorPierce) {
+        // --- MODIFIED: Check for Ultra Focus ---
+        if (effects.ignore_defense || (this.statusEffects.ultra_focus && this.statusEffects.ultra_focus.duration > 0)) {
+             const pierceAmount = 1.0; // Full defense pierce
+             currentDefense = 0; // Set defense to 0
+             if(this.statusEffects.ultra_focus) {
+                 addToLog(`The focused attack bypasses all defense!`, 'text-yellow-500');
+             }
+        // --- END MODIFIED ---
+         } else if (!isMagicAttack && effects.armorPierce) {
              const pierceAmount = Math.max(0, Math.min(1, effects.armorPierce));
              currentDefense *= (1 - pierceAmount);
          }
         // --- END FIX ---
 
         // Apply Enrage vulnerability
-         let damageTaken = this.statusEffects.enrage ? Math.floor(damage * 1.5) : damage;
-
+        // --- MODIFIED: Enrage vulnerability ---
+        if (this.statusEffects.enrage) {
+            damageTaken = Math.floor(damageTaken * 2.0); // Take 2x damage
+            addToLog(`${this.name} takes a heavy blow in its rage!`, 'text-red-500');
+        }
+        // --- END MODIFIED ---
         // --- Elemental Calculation & Debuff Interactions ---
         let knockbackAmount = 0; // Initialize knockback amount for this damage instance
         if (effects.element && effects.element !== 'none') {
@@ -3617,8 +3660,230 @@ class Enemy extends Entity {
         // Return an object containing final damage and any triggered effects like knockback
         return { damageDealt: finalDamage, knockback: knockbackAmount };
     }
+    _findEmptyAdjacentCell() {
+        const neighbors = [ 
+            { x: this.x, y: this.y - 1 }, { x: this.x, y: this.y + 1 },
+            { x: this.x - 1, y: this.y }, { x: this.x + 1, y: this.y }
+        ];
+        
+        // Shuffle neighbors to make summon position random
+        // Note: shuffleArray is in engine.js, so this is safe to call
+        if (typeof shuffleArray === 'function') {
+            shuffleArray(neighbors);
+        }
 
+        for (const cell of neighbors) {
+            // Check if cell is valid and not blocked by anything (for an enemy, not flying)
+            // We pass 'true' for 'forEnemy'
+            if (!isCellBlocked(cell.x, cell.y, true, false)) {
+                return cell; // Return the first valid, empty cell
+            }
+        }
+        return null; // No empty adjacent cells
+    }
+
+    // --- NEW: Helper function to spawn a skeleton ---
+    _summonSkeleton(rarityKey) {
+        const cell = this._findEmptyAdjacentCell();
+        if (!cell) {
+            addToLog(`${this.name} tries to summon, but there is no space!`, 'text-gray-400');
+            return;
+        }
+
+        // --- MODIFIED: Use the provided rarityKey ---
+        const species = MONSTER_SPECIES['skeleton'];
+        const rarity = MONSTER_RARITY[rarityKey] || MONSTER_RARITY['common'];
+        if (!species || !rarity) {
+            console.error("Could not find skeleton monster data to summon!");
+            return;
+        }
+        // --- END MODIFIED ---
+
+        const skeleton = new Enemy(species, rarity, player.level);
+        
+        skeleton.x = cell.x;
+        skeleton.y = cell.y;
+        
+        currentEnemies.push(skeleton); // Add to the global enemy list
+        addToLog(`${this.name} raises a Skeleton from the grave!`, 'text-purple-400');
+        renderBattleGrid(); // Redraw the grid to show the new enemy
+    }
+
+
+    // --- NEW: Ability logic check ---
+    async _tryUseAbility(target) {
+        // target can be player or ally
+        if (!this.ability || !target || !target.isAlive()) {
+            return false; // No ability or no target, proceed to normal attack
+        }
+
+        // --- ABILITY: Enrage (Orc Berserker) ---
+        if (this.ability === 'enrage' && !this.enrageUsed && this.hp < this.maxHp * 0.5) {
+            // Orc enrages at 50% HP, once per battle
+            this.enrageUsed = true;
+            // --- MODIFIED: Apply 3-turn buff (duration 4) ---
+            this.statusEffects.enrage = { duration: 4 }; // Lasts for 3 turns *after* this one
+            addToLog(`${this.name} flies into a primal RAGE! Its attacks are stronger but it's reckless!`, 'text-red-600 font-bold');
+            // Does not consume the turn, allows attack immediately after
+            return false; // Return false to allow the attack to continue
+        }
+
+        // --- ABILITY: Swallow (Livyatan) ---
+        // Will try to swallow player or ally
+        if (this.ability === 'swallow' && !target.statusEffects.swallowed && Math.random() < 0.25) {
+            // 25% chance to use Swallow instead of a normal attack
+            // applyStatusEffect is global (engine.js)
+            applyStatusEffect(target, 'swallowed', { duration: Infinity, source: this }, this.name);
+            
+            // Swallow *replaces* the attack
+            return true; // Return true to indicate an action was taken
+        }
+
+        // --- ABILITY: Necromancy (Necromancer) ---
+        if (this.ability === 'necromancy') {
+            const hpPercent = this.hp / this.maxHp;
+            const rarityKey = this.rarityData.key; // Get the Necromancer's rarity
+            
+            // --- MODIFIED: Summons 2 at 10% ---
+            if (hpPercent <= 0.1 && !this.summonedAt10) {
+                // At 10% HP, summon 2 skeletons
+                this.summonedAt10 = true;
+                this.summonedAt50 = true; // Also set 50, so it doesn't trigger if healed
+                addToLog(`${this.name} desperately calls for aid!`, 'text-purple-500');
+                this._summonSkeleton(rarityKey); // Summon first
+                await new Promise(resolve => setTimeout(resolve, 250)); // Short delay
+                if (gameState.battleEnded) return true; // Stop if battle ended mid-summon
+                this._summonSkeleton(rarityKey); // Summon second
+                return true; // Replaces attack
+            }
+            
+            // --- MODIFIED: Summons 1 at 50% ---
+            if (hpPercent <= 0.5 && !this.summonedAt50) {
+                // At 50% HP, summon 1 skeleton
+                this.summonedAt50 = true;
+                addToLog(`${this.name} calls a minion to its side!`, 'text-purple-400');
+                this._summonSkeleton(rarityKey); // Summon first
+                // await new Promise(resolve => setTimeout(resolve, 250)); // REMOVED
+                // if (gameState.battleEnded) return true; // REMOVED
+                // this._summonSkeleton(rarityKey); // REMOVED
+                return true; // Replaces attack
+            }
+        }
+        
+        // --- ABILITY: Poison Web (Cave Spider) ---
+        if (this.ability === 'poison_web' && Math.random() < 0.3) { // 30% chance
+            addToLog(`${this.name} spits a sticky, venomous web!`, 'text-green-700');
+            
+            // --- MODIFIED: Requested Damage Formula ---
+            const targetStamina = (target.stamina || 0) + (target.bonusStamina || 0);
+            const percentDamage = Math.max(0.05, 0.10 - (targetStamina * 0.01)); // 10% - 1% per Stamina, min 5%
+            const poisonDamage = Math.floor(target.maxHp * percentDamage);
+            // --- END MODIFICATION ---
+
+            // applyStatusEffect is global (engine.js)
+            applyStatusEffect(target, 'poison', { duration: 6, damage: poisonDamage, source: this.name }, this.name); // MODIFIED: duration 6 (for 5 turns)
+            
+            // This REPLACES the attack
+            return true; // MODIFIED: return true
+        }
+
+        // --- ABILITY: Petrification (Cockatrice) ---
+        // MODIFIED: Rarity-scaling chance
+        const petrifyChance = 0.10 + (Math.max(0, this.rarityData.rarityIndex - 1) * 0.05); // 10% base + 5% per rarity > common
+        if (this.ability === 'petrification' && Math.random() < petrifyChance) { // MODIFIED: Use calculated chance
+            if (!target.statusEffects.petrified) {
+                addToLog(`${this.name} unleashes a terrifying gaze!`, 'text-gray-400');
+                // --- MODIFIED: Duration 2 (for 1 turn) ---
+                applyStatusEffect(target, 'petrified', { duration: 2 }, this.name);
+            }
+            // This does NOT replace the attack
+            return false;
+        }
+
+        // --- ABILITY: Healing (Unicorn) ---
+        // MODIFIED: Trigger at 50% HP
+        if (this.ability === 'healing' && this.hp < this.maxHp * 0.5 && Math.random() < 0.3) { // 30% chance if hurt
+            
+            // MODIFIED: Rarity-scaling heal amount
+            const healPercent = 0.20 + (Math.max(0, this.rarityData.rarityIndex - 1) * 0.05); // 20% base + 5% per rarity > common
+            const healAmount = Math.floor(this.maxHp * healPercent); 
+            // --- END MODIFICATION ---
+
+            // Heal self
+            this.hp = Math.min(this.maxHp, this.hp + healAmount);
+            addToLog(`${this.name} radiates a holy light, healing itself for ${healAmount} HP!`, 'text-green-400');
+
+            // --- MODIFIED: Heal allies in 2-grid radius ---
+            const otherAllies = currentEnemies.filter(e => 
+                e.isAlive() && 
+                e !== this &&
+                (Math.abs(this.x - e.x) + Math.abs(this.y - e.y) <= 2) // Check Manhattan distance
+            );
+            otherAllies.forEach(ally => {
+                const allyHealAmount = Math.floor(ally.maxHp * healPercent); // Heal based on *ally's* max HP
+                ally.hp = Math.min(ally.maxHp, ally.hp + allyHealAmount);
+                addToLog(`${this.name}'s light heals ${ally.name} for ${allyHealAmount} HP!`, 'text-green-300');
+            });
+            // --- END MODIFIED ---
+            
+            renderBattleGrid(); // Update its HP bar
+            return true; // Replaces attack
+        }
+        
+        // --- ABILITY: Ultra Focus (Troll) ---
+        if (this.ability === 'ultra_focus' && this.ultraFocusTurns <= 0 && Math.random() < 0.25) { // 25% chance
+            addToLog(`${this.name}'s eye glows with power! Its next attacks will ignore defenses!`, 'text-yellow-500');
+            // --- MODIFIED: Set 3 turns ---
+            this.ultraFocusTurns = 3; 
+            // This REPLACES the attack (it's charging up)
+            return true;
+        }
+
+        // --- ABILITY: Scorch Earth (Dragon) ---
+        if (this.ability === 'scorch_earth' && Math.random() < 0.2) { // 20% chance
+            // --- MODIFIED: Deal heavy damage ---
+            const scorchDamage = rollDice(this.rarityData.rarityIndex, 6, 'Scorch Earth').total + this.strength; // Rarity d6 + Str
+            addToLog(`${this.name} breathes a plume of fire at ${target.name}!`, 'text-orange-500');
+            // applyStatusEffect is global (engine.js)
+            target.takeDamage(scorchDamage, { isMagic: true, element: 'fire', ignore_defense: 0.25, attacker: this }); // 25% defense pierce
+            // --- END MODIFIED ---
+            // This does NOT replace the attack
+            return false;
+        }
+        
+        // --- ABILITY: Living Shield (Living Armor) ---
+        if (this.ability === 'living_shield' && !this.statusEffects.living_shield && Math.random() < 0.3) { // 30% chance
+            addToLog(`${this.name} braces itself, its armor hardening!`, 'text-gray-300');
+            // --- MODIFIED: Duration 4 (for 3 turns) ---
+            this.statusEffects.living_shield = { duration: 4 }; 
+            // This REPLACES the attack
+            return true;
+        }
+
+        // --- NEW ABILITY: True Poison (Chimera) ---
+        if (this.ability === 'true_poison' && Math.random() < 0.3) { // 30% chance
+            addToLog(`${this.name} sinks its fangs into ${target.name}, inflicting a true poison!`, 'text-green-800');
+            
+            // --- MODIFIED: Requested Damage Formula ---
+            const targetStamina = (target.stamina || 0) + (target.bonusStamina || 0);
+            const percentDamage = Math.max(0.10, 0.20 - (targetStamina * 0.01)); // 20% - 1% per Stamina, min 10%
+            const poisonDamage = Math.floor(target.maxHp * percentDamage);
+            // --- END MODIFICATION ---
+
+            // applyStatusEffect is global (engine.js)
+            applyStatusEffect(target, 'toxic', { duration: 6, damage: poisonDamage, source: this.name }, this.name); // MODIFIED: duration 6 (for 5 turns)
+            
+            // This REPLACES the attack
+            return true; // MODIFIED: return true
+        }
+        // --- END NEW ---
+
+
+    } // <<< --- ADD THIS BRACE. AGAIN.
+
+    // --- END NEW: Ability logic check ---
     async moveTowards(target) {
+        // --- NEW MOVE LOGIC ---
         // --- NEW MOVE LOGIC ---
         // If a specific target is provided (e.g., by the attack logic), move to it.
         // If not, find the closest target (player or ally).

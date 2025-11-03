@@ -2575,11 +2575,12 @@ function struggleSwallow() {
     }
 
     // Calculate struggle damage (scales with player strength)
-    const struggleDamage = rollDice(1, 6, 'Struggle').total + Math.floor(player.strength / 2);
+    const struggleDamage = Math.floor((rollDice(1, 6, 'Struggle').total + Math.floor(player.strength / 2)) * 0.5);
 
     addToLog(`You struggle violently inside the beast!`, 'text-yellow-300');
-    const finalDamage = swallower.takeDamage(struggleDamage, { ignore_defense: 0.5 }); // Bypasses 50% defense
-    addToLog(`You dealt <span class="font-bold text-yellow-300">${finalDamage}</span> damage from the inside!`);
+    // --- MODIFIED: Use damageDealt ---
+    const { damageDealt } = swallower.takeDamage(struggleDamage, { ignore_defense: 0.5 }); // Bypasses 50% defense
+    addToLog(`You dealt <span class="font-bold text-yellow-300">${damageDealt}</span> damage from the inside!`);
 
     // Check status immediately after dealing damage
     if (!gameState.battleEnded) {
@@ -2593,18 +2594,21 @@ function struggleSwallow() {
          // No need to call finalizePlayerAction here, checkBattleStatus handles end state
          isProcessingAction = false; // Unlock actions
     } else {
-        // 20% chance to escape
-        if (player.rollForEffect(0.2, 'Struggle Escape')) {
+        // --- MODIFIED: INT-based escape ---
+        const escapeChance = 0.05 + (player.intelligence / 100); // 5% base + 1% per INT
+        addToLog(`You try to find a weak point... (Escape Chance: ${(escapeChance * 100).toFixed(0)}%)`, 'text-gray-400');
+        
+        if (player.rollForEffect(escapeChance, 'Struggle Escape')) {
+        // --- END MODIFIED ---
             delete player.statusEffects.swallowed;
-            addToLog("You manage to squirm free!", 'text-green-300');
+            addToLog("You find an opening and squirm free!", 'text-green-300');
              finalizePlayerAction(); // Go to next phase
         } else {
             addToLog("You fail to escape!", 'text-red-400');
              finalizePlayerAction(); // Go to next phase
         }
     }
-
-    gameState.isPlayerTurn = false;
+        gameState.isPlayerTurn = false;
 }
 
 
@@ -3158,22 +3162,20 @@ function handleEnemyEndOfTurn(enemy) {
                 delete effects[effectKey];
             }
         }
-
-        // --- MODIFIED POISON LOGIC ---
+        // --- MODIFIED: Handle new poison specs ---
         if (effectKey === 'poison' && effects[effectKey]) {
-            // Check if damage value exists (from grease) otherwise use % based
-            const poisonDmg = effects[effectKey].damage
-                                ? effects[effectKey].damage
-                                : Math.floor(enemy.maxHp * 0.05); // Default 5% HP
+            // This is 'Poison Web' (rarity d4)
+            const poisonDmg = effects[effectKey].damage || Math.floor(enemy.maxHp * 0.05); // Use specific damage if available
             enemy.hp -= poisonDmg;
             addToLog(`${enemy.name} takes <span class="font-bold text-green-600">${poisonDmg}</span> poison damage.`, 'text-green-600');
         }
-        // --- END MODIFIED POISON LOGIC ---
         if (effectKey === 'toxic' && effects[effectKey]) {
-            const toxicDmg = Math.floor(enemy.maxHp * 0.1);
+            // This is 'True Poison' (rarity d8)
+            const toxicDmg = effects[effectKey].damage || Math.floor(enemy.maxHp * 0.1); // Use specific damage if available
             enemy.hp -= toxicDmg;
             addToLog(`${enemy.name} takes <span class="font-bold text-green-800">${toxicDmg}</span> damage from the toxin!`, 'text-green-800');
         }
+        // --- END MODIFIED ---
     }
 }
 
