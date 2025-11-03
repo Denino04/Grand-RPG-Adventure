@@ -2359,47 +2359,58 @@ function renderBook(bookKey, chapterIndex = 0) {
         book.chapters = [...bookData.chapters]; // Copy static chapters like 'Introduction'
 
         if (book.recipeType === 'cooking') {
-            player.knownCookingRecipes.sort((a,b) => COOKING_RECIPES[a].name.localeCompare(COOKING_RECIPES[b].name)).forEach(recipeKey => {
-                const recipe = COOKING_RECIPES[recipeKey];
-                const chapterContent = recipe.library_description; // Correctly pull from the recipe object
-                if (chapterContent) {
-                    book.chapters.push({
-                        title: recipe.name,
-                        content: chapterContent
-                    });
-                } else {
-                    // Fallback for any recipes that might not have a detailed entry
-                    const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => {
-                        const details = getItemDetails(key);
-                        return `${val}x ${details ? details.name : capitalize(key)}`;
-                    }).join(', ');
-                    book.chapters.push({
-                        title: recipe.name,
-                        content: `<p class="italic mb-2">${recipe.description}</p><p><strong>Requires:</strong> ${ingredients}</p>`
-                    });
+            // --- MODIFICATION: Iterate over master list, not player's list ---
+            COOKING_RECIPES_ORDER.forEach(recipeKey => {
+                // Only add a chapter if the player knows this recipe
+                if (player.knownCookingRecipes.includes(recipeKey)) {
+            // --- END MODIFICATION ---
+                    const recipe = COOKING_RECIPES[recipeKey];
+                    const chapterContent = recipe.library_description; // Correctly pull from the recipe object
+                    if (chapterContent) {
+                        book.chapters.push({
+                            title: recipe.name,
+                            content: chapterContent
+                        });
+                    } else {
+                        // Fallback for any recipes that might not have a detailed entry
+                        const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => {
+                            const details = getItemDetails(key);
+                            return `${val}x ${details ? details.name : capitalize(key)}`;
+                        }).join(', ');
+                        book.chapters.push({
+                            title: recipe.name,
+                            content: `<p class="italic mb-2">${recipe.description}</p><p><strong>Requires:</strong> ${ingredients}</p>`
+                        });
+                    }
                 }
             });
         } else if (book.recipeType === 'alchemy') {
-            player.knownAlchemyRecipes.filter(r => ALCHEMY_RECIPES[r].tier === book.tier).sort((a,b) => getItemDetails(ALCHEMY_RECIPES[a].output).name.localeCompare(getItemDetails(ALCHEMY_RECIPES[b].output).name)).forEach(recipeKey => {
+            // --- MODIFICATION: Iterate over master list, not player's list ---
+            ALCHEMY_RECIPES_ORDER.forEach(recipeKey => {
                 const recipe = ALCHEMY_RECIPES[recipeKey];
-                const chapterContent = recipe.library_description;
-                if (chapterContent) {
-                    book.chapters.push({
-                        title: getItemDetails(recipe.output).name,
-                        content: chapterContent
-                    });
-                } else {
-                    const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => `${val}x ${getItemDetails(key).name}`).join(', ');
-                    book.chapters.push({
-                        title: getItemDetails(recipe.output).name,
-                        content: `<p><strong>Requires:</strong> ${ingredients}</p>`
-                    });
+                // Check if player knows it AND it matches the book's tier
+                if (player.knownAlchemyRecipes.includes(recipeKey) && recipe && recipe.tier === book.tier) {
+            // --- END MODIFICATION ---
+                    const chapterContent = recipe.library_description;
+                    if (chapterContent) {
+                        book.chapters.push({
+                            title: getItemDetails(recipe.output).name,
+                            content: chapterContent
+                        });
+                    } else {
+                        const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => `${val}x ${getItemDetails(key).name}`).join(', ');
+                        book.chapters.push({
+                            title: getItemDetails(recipe.output).name,
+                            content: `<p><strong>Requires:</strong> ${ingredients}</p>`
+                        });
+                    }
                 }
             });
         }
     }
 
     const contentArea = $('#library-content-view');
+
     let html = `<div class="text-left">
         <h3 class="font-bold text-xl text-yellow-300 mb-1">${book.title}</h3>
         <p class="text-xs text-gray-400 mb-4">By ${book.author}</p>
@@ -4926,46 +4937,49 @@ function renderKitchen() {
             availableIngredients[type].sort((a,b) => a.price - b.price);
         }
 
-        player.knownCookingRecipes.forEach(recipeKey => {
-            const recipe = COOKING_RECIPES[recipeKey];
-            if (!recipe) return;
+        // --- MODIFICATION: Iterate over master list, not player's list ---
+        COOKING_RECIPES_ORDER.forEach(recipeKey => {
+            if (player.knownCookingRecipes.includes(recipeKey)) {
+        // --- END MODIFICATION ---
+                const recipe = COOKING_RECIPES[recipeKey];
+                if (!recipe) return;
 
-            let ingredientsHtml = [];
-            let canCook = true;
+                let ingredientsHtml = [];
+                let canCook = true;
 
-            for (const reqKey in recipe.ingredients) {
-                const requiredAmount = recipe.ingredients[reqKey];
-                let currentAmount = 0;
-                let ingredientName = '';
-                const isGeneric = ['meat', 'veggie', 'seasoning'].includes(reqKey);
+                for (const reqKey in recipe.ingredients) {
+                    const requiredAmount = recipe.ingredients[reqKey];
+                    let currentAmount = 0;
+                    let ingredientName = '';
+                    const isGeneric = ['meat', 'veggie', 'seasoning'].includes(reqKey);
 
-                if (isGeneric) {
-                    currentAmount = availableIngredients[reqKey].length;
-                    ingredientName = capitalize(reqKey);
-                } else { // Specific ingredient
-                    currentAmount = player.inventory.items[reqKey] || 0;
-                    const details = getItemDetails(reqKey);
-                    ingredientName = details ? details.name : reqKey;
+                    if (isGeneric) {
+                        currentAmount = availableIngredients[reqKey].length;
+                        ingredientName = capitalize(reqKey);
+                    } else { // Specific ingredient
+                        currentAmount = player.inventory.items[reqKey] || 0;
+                        const details = getItemDetails(reqKey);
+                        ingredientName = details ? details.name : reqKey;
+                    }
+
+                    if (currentAmount < requiredAmount) {
+                        canCook = false;
+                        ingredientsHtml.push(`<span class="text-red-400">${ingredientName} (${currentAmount}/${requiredAmount})</span>`);
+                    } else {
+                         ingredientsHtml.push(`<span class="text-gray-400">${ingredientName} (${currentAmount}/${requiredAmount})</span>`);
+                    }
                 }
 
-                if (currentAmount < requiredAmount) {
-                    canCook = false;
-                    ingredientsHtml.push(`<span class="text-red-400">${ingredientName} (${currentAmount}/${requiredAmount})</span>`);
-                } else {
-                     ingredientsHtml.push(`<span class="text-gray-400">${ingredientName} (${currentAmount}/${requiredAmount})</span>`);
-                }
+                html += `<div class="p-3 bg-slate-800 rounded-lg ${!canCook ? 'opacity-60' : ''}">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-bold text-lg ${!canCook ? 'text-gray-500' : 'text-yellow-300'}" onmouseover="showTooltip('${recipeKey}', event)" onmouseout="hideTooltip()">${recipe.name}</h4>
+                        <button onclick="cookRecipe('${recipeKey}')" class="btn btn-primary" ${!canCook ? 'disabled' : ''}>Cook</button>
+                    </div>
+                    <p class="text-sm">Requires: ${ingredientsHtml.join(', ')}</p>
+                </div>`;
             }
-
-            html += `<div class="p-3 bg-slate-800 rounded-lg ${!canCook ? 'opacity-60' : ''}">
-                <div class="flex justify-between items-center">
-                    <h4 class="font-bold text-lg ${!canCook ? 'text-gray-500' : 'text-yellow-300'}" onmouseover="showTooltip('${recipeKey}', event)" onmouseout="hideTooltip()">${recipe.name}</h4>
-                    <button onclick="cookRecipe('${recipeKey}')" class="btn btn-primary" ${!canCook ? 'disabled' : ''}>Cook</button>
-                </div>
-                <p class="text-sm">Requires: ${ingredientsHtml.join(', ')}</p>
-            </div>`;
         });
     }
-
 
     html += `</div>
         <div class="mt-6">
@@ -5327,69 +5341,73 @@ function renderOnFieldCookingUI() {
         });
         for(const type in availableIngredients) availableIngredients[type].sort((a,b) => a.price - b.price);
 
-        player.knownCookingRecipes.forEach(recipeKey => {
-            const recipe = COOKING_RECIPES[recipeKey];
-            if (!recipe) return;
+        // --- MODIFICATION: Iterate over master list, not player's list ---
+        COOKING_RECIPES_ORDER.forEach(recipeKey => {
+            if (player.knownCookingRecipes.includes(recipeKey)) {
+        // --- END MODIFICATION ---
+                const recipe = COOKING_RECIPES[recipeKey];
+                if (!recipe) return;
 
-            let ingredientsHtml = [];
-            let mpCostForMissing = 0;
-            const mpCosts = { 'Common': 5, 'Uncommon': 10, 'Rare': 15, 'Epic': 20, 'Legendary': 25, 'Broken': 0 };
+                let ingredientsHtml = [];
+                let mpCostForMissing = 0;
+                const mpCosts = { 'Common': 5, 'Uncommon': 10, 'Rare': 15, 'Epic': 20, 'Legendary': 25, 'Broken': 0 };
 
-            // Create temporary copies for checking availability without consuming yet
-            let tempAvailable = JSON.parse(JSON.stringify(availableIngredients));
-            let tempInventory = JSON.parse(JSON.stringify(player.inventory.items));
+                // Create temporary copies for checking availability without consuming yet
+                let tempAvailable = JSON.parse(JSON.stringify(availableIngredients));
+                let tempInventory = JSON.parse(JSON.stringify(player.inventory.items));
 
 
-            for (const reqKey in recipe.ingredients) {
-                const requiredAmount = recipe.ingredients[reqKey];
-                let usedCount = 0;
-                let ingredientName = '';
-                const isGeneric = ['meat', 'veggie', 'seasoning'].includes(reqKey);
+                for (const reqKey in recipe.ingredients) {
+                    const requiredAmount = recipe.ingredients[reqKey];
+                    let usedCount = 0;
+                    let ingredientName = '';
+                    const isGeneric = ['meat', 'veggie', 'seasoning'].includes(reqKey);
 
-                if (isGeneric) {
-                    ingredientName = capitalize(reqKey);
-                    for (let i = 0; i < requiredAmount; i++) {
-                        if (tempAvailable[reqKey].length > 0) {
-                            const itemUsed = tempAvailable[reqKey].shift(); // Use the cheapest available
-                             // Decrement count in temp inventory to track specifics
-                             if(tempInventory[itemUsed.key]) tempInventory[itemUsed.key]--;
-                            usedCount++;
-                        } else {
-                            mpCostForMissing += mpCosts['Common']; // Assume Common for generic missing
+                    if (isGeneric) {
+                        ingredientName = capitalize(reqKey);
+                        for (let i = 0; i < requiredAmount; i++) {
+                            if (tempAvailable[reqKey].length > 0) {
+                                const itemUsed = tempAvailable[reqKey].shift(); // Use the cheapest available
+                                 // Decrement count in temp inventory to track specifics
+                                 if(tempInventory[itemUsed.key]) tempInventory[itemUsed.key]--;
+                                usedCount++;
+                            } else {
+                                mpCostForMissing += mpCosts['Common']; // Assume Common for generic missing
+                            }
                         }
+                         ingredientsHtml.push(`${ingredientName} (${usedCount}/${requiredAmount})`);
+                    } else { // Specific ingredient
+                        const details = getItemDetails(reqKey);
+                        ingredientName = details ? details.name : reqKey;
+                        const currentAmount = tempInventory[reqKey] || 0;
+                        const amountToUse = Math.min(currentAmount, requiredAmount);
+                        if (amountToUse > 0) {
+                            tempInventory[reqKey] -= amountToUse; // Decrement from temp
+                            usedCount = amountToUse;
+                        }
+                        const missingAmount = requiredAmount - usedCount;
+                        if (missingAmount > 0) {
+                            const rarityCost = mpCosts[details?.rarity || 'Common'] || mpCosts['Common'];
+                            mpCostForMissing += missingAmount * rarityCost;
+                        }
+                        ingredientsHtml.push(`${ingredientName} (${usedCount}/${requiredAmount})`);
                     }
-                     ingredientsHtml.push(`${ingredientName} (${usedCount}/${requiredAmount})`);
-                } else { // Specific ingredient
-                    const details = getItemDetails(reqKey);
-                    ingredientName = details ? details.name : reqKey;
-                    const currentAmount = tempInventory[reqKey] || 0;
-                    const amountToUse = Math.min(currentAmount, requiredAmount);
-                    if (amountToUse > 0) {
-                        tempInventory[reqKey] -= amountToUse; // Decrement from temp
-                        usedCount = amountToUse;
-                    }
-                    const missingAmount = requiredAmount - usedCount;
-                    if (missingAmount > 0) {
-                        const rarityCost = mpCosts[details?.rarity || 'Common'] || mpCosts['Common'];
-                        mpCostForMissing += missingAmount * rarityCost;
-                    }
-                    ingredientsHtml.push(`${ingredientName} (${usedCount}/${requiredAmount})`);
                 }
+
+                const canAfford = player.mp >= mpCostForMissing;
+                const costText = mpCostForMissing > 0 ? `<span class="text-blue-400">(${mpCostForMissing} MP)</span>` : '';
+
+                html += `<div class="p-3 bg-slate-800 rounded-lg ${!canAfford ? 'opacity-60' : ''}">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-bold text-lg ${!canAfford ? 'text-gray-500' : 'text-yellow-300'}" onmouseover="showTooltip('${recipeKey}', event)" onmouseout="hideTooltip()">${recipe.name} ${costText}</h4>
+                        <button onclick="executeOnFieldCooking('${recipeKey}')" class="btn btn-primary" ${!canAfford ? 'disabled' : ''}>Cook</button>
+                    </div>
+                    <p class="text-sm text-gray-500">Requires: ${ingredientsHtml.join(', ')}</p>
+                </div>`;
             }
-
-            const canAfford = player.mp >= mpCostForMissing;
-            const costText = mpCostForMissing > 0 ? `<span class="text-blue-400">(${mpCostForMissing} MP)</span>` : '';
-
-            html += `<div class="p-3 bg-slate-800 rounded-lg ${!canAfford ? 'opacity-60' : ''}">
-                <div class="flex justify-between items-center">
-                    <h4 class="font-bold text-lg ${!canAfford ? 'text-gray-500' : 'text-yellow-300'}" onmouseover="showTooltip('${recipeKey}', event)" onmouseout="hideTooltip()">${recipe.name} ${costText}</h4>
-                    <button onclick="executeOnFieldCooking('${recipeKey}')" class="btn btn-primary" ${!canAfford ? 'disabled' : ''}>Cook</button>
-                </div>
-                <p class="text-sm text-gray-500">Requires: ${ingredientsHtml.join(', ')}</p>
-            </div>`;
         });
     }
-
+    
     html += `</div>
         <div class="mt-6">
             <button onclick="renderBattleGrid()" class="btn btn-action">Cancel</button>

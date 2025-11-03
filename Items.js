@@ -1,5 +1,5 @@
 const ITEMS = {
-    // --- Recipe Scrolls ---
+    // --- 1. Recipe Scrolls ---
     'recipe_rabbit_roast': { name: 'Recipe: Rabbit Roast', type: 'recipe', price: 100, description: 'A recipe for a simple but effective meal.', recipeType: 'cooking', recipeKey: 'rabbit_roast' },
     'recipe_humming_medley': { name: 'Recipe: Humming Veggie Medley', type: 'recipe', price: 100, description: 'A recipe for a strange, magically-inclined dish.', recipeType: 'cooking', recipeKey: 'humming_medley' },
     'recipe_fortifying_meat_pie': { name: 'Recipe: Fortifying Meat Pie', type: 'recipe', price: 120, description: 'A recipe for a pie that makes you feel tougher.', recipeType: 'cooking', recipeKey: 'fortifying_meat_pie' },
@@ -58,56 +58,56 @@ const ITEMS = {
     'recipe_brew_smitestopper': { name: 'Alchemical Recipe: Smitestopper Potion', type: 'recipe', price: 2000, description: 'A recipe for a masterwork light resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_smitestopper' },
     'recipe_brew_voidshield': { name: 'Alchemical Recipe: Voidshield Potion', type: 'recipe', price: 2000, description: 'A recipe for a masterwork void resistance potion.', recipeType: 'alchemy', recipeKey: 'brew_voidshield' },
 
-     // --- Potions & Consumables ---
+    // --- 2. Potions & Consumables ---
+    // Base Potions
     'health_potion': {name: 'Health Potion', type: 'healing', amount: 20, price: 30, description: "A simple vial that restores a small amount of health.", alchemyType: 'base_potion'},
     'condensed_health_potion': {name: 'Condensed Health Potion', type: 'healing', amount: 50, price: 75, description: "A heavy, concentrated mixture of refined herbs and purified mountain water. This potion is thicker and more potent than its normal counterpart, designed to provide substantial, immediate relief.", alchemyType: 'base_potion'},
     'superior_health_potion': {name: 'Superior Health Potion', type: 'healing', amount: 100, price: 200, description: "A potent draught that restores a moderate amount of health."},
     'mana_potion': {name: 'Mana Potion', type: 'mana_restore', amount: 50, price: 40, description: "A swirling blue liquid that restores magical energy.", alchemyType: 'base_potion'},
     'condensed_mana_potion': {name: 'Condensed Mana Potion', type: 'mana_restore', amount: 100, price: 100, description: "An oxidized flask containing a potent brew of crushed celestial beetles and distilled shadow essence. It provides a sharp, invigorating shock to the mind, clearing the fog of battle-weariness.", alchemyType: 'base_potion'},
     'superior_mana_potion': {name: 'Superior Mana Potion', type: 'mana_restore', amount: 150, price: 250, description: "A masterwork of alchemy. The shimmering liquid is pure, crystallized Arcane Energy, providing not just mana, but a momentary conduit to the raw source of magic itself."},
-
     'cleansing_potion': { name: 'Cleansing Potion', type: 'cleanse', price: 250, description: 'Removes all negative status effects.' },
 
     // Elemental Resistance Potions (Tier 1)
-    'cinderstop_potion': { name: 'Cinderstop Potion', type: 'buff', price: 100, description: 'Grants 5% Fire resistance for 10 turns.', effect: { type: 'resist_fire', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
-    'dampclear_potion': { name: 'Dampclear Potion', type: 'buff', price: 100, description: 'Grants 5% Water resistance for 10 turns.', effect: { type: 'resist_water', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
-    'windwail_potion': { name: 'Windwail Potion', type: 'buff', price: 100, description: 'Grants 5% Wind resistance for 10 turns.', effect: { type: 'resist_wind', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
-    'rockshut_potion': { name: 'Rockshut Potion', type: 'buff', price: 100, description: 'Grants 5% Earth resistance for 10 turns.', effect: { type: 'resist_earth', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
-    'zapsipper_potion': { name: 'Zapsipper Potion', type: 'buff', price: 100, description: 'Grants 5% Lightning resistance for 10 turns.', effect: { type: 'resist_lightning', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
-    'vinekill_potion': { name: 'Vinekill Potion', type: 'buff', price: 100, description: 'Grants 5% Nature resistance for 10 turns.', effect: { type: 'resist_nature', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
-    'lightcloser_potion': { name: 'Lightcloser Potion', type: 'buff', price: 100, description: 'Grants 5% Light resistance for 10 turns.', effect: { type: 'resist_light', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
-    'lampside_potion': { name: 'Lampside Potion', type: 'buff', price: 100, description: 'Grants 5% Void resistance for 10 turns.', effect: { type: 'resist_void', multiplier: 0.95, duration: 10 }, alchemyType: 'base_potion' },
+    'cinderstop_potion': { name: 'Cinderstop Potion', type: 'buff', price: 100, description: 'Grants 15% Fire resistance for 10 cumulative turns.', effect: { type: 'resist_fire', multiplier: 0.85, duration: 10 }, alchemyType: 'base_potion' },
+    'dampclear_potion': { name: 'Dampclear Potion', type: 'buff', price: 100, description: 'Grants 15% Water resistance for 10 cumulative turns.', effect: { type: 'resist_water', multiplier: 0.85, duration: 10 }, alchemyType: 'base_potion' },
+    'windwail_potion': { name: 'Windwail Potion', type: 'buff', price: 100, description: 'Grants 15% Wind resistance for 10 cumulative turns.', effect: { type: 'resist_wind', multiplier: 0.85, duration: 10 }, alchemyType: 'base_potion' },
+    'rockshut_potion': { name: 'Rockshut Potion', type: 'buff', price: 100, description: 'Grants 15% Earth resistance for 10 cumulative turns.', effect: { type: 'resist_earth', multiplier: 0.85, duration: 10 }, alchemyType: 'base_potion' },
+    'zapsipper_potion': { name: 'Zapsipper Potion', type: 'buff', price: 100, description: 'Grants 15% Lightning resistance for 10 cumulative turns.', effect: { type: 'resist_lightning', multiplier: 0.85, duration: 10 }, alchemyType: 'base_potion' },
+    'vinekill_potion': { name: 'Vinekill Potion', type: 'buff', price: 100, description: 'Grants 15% Nature resistance for 10 cumulative turns.', effect: { type: 'resist_nature', multiplier: 0.85, duration: 10 }, alchemyType: 'base_potion' },
+    'lightcloser_potion': { name: 'Lightcloser Potion', type: 'buff', price: 100, description: 'Grants 15% Light resistance for 10 cumulative turns.', effect: { type: 'resist_light', multiplier: 0.85, duration: 10 }, alchemyType: 'base_potion' },
+    'lampside_potion': { name: 'Lampside Potion', type: 'buff', price: 100, description: 'Grants 15% Void resistance for 10 cumulative turns.', effect: { type: 'resist_void', multiplier: 0.85, duration: 10 }, alchemyType: 'base_potion' },
     // Tier 2
-    'hearthstall_potion': { name: 'Hearthstall Potion', type: 'buff', price: 300, description: 'Grants 10% Fire resistance for 10 turns.', effect: { type: 'resist_fire', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
-    'waterdam_potion': { name: 'Waterdam Potion', type: 'buff', price: 300, description: 'Grants 10% Water resistance for 10 turns.', effect: { type: 'resist_water', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
-    'gustshield_potion': { name: 'Gustshield Potion', type: 'buff', price: 300, description: 'Grants 10% Wind resistance for 10 turns.', effect: { type: 'resist_wind', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
-    'quakestable_potion': { name: 'Quakestable Potion', type: 'buff', price: 300, description: 'Grants 10% Earth resistance for 10 turns.', effect: { type: 'resist_earth', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
-    'strikestop_potion': { name: 'Strikestop Potion', type: 'buff', price: 300, description: 'Grants 10% Lightning resistance for 10 turns.', effect: { type: 'resist_lightning', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
-    'growthstall_potion': { name: 'Growthstall Potion', type: 'buff', price: 300, description: 'Grants 10% Nature resistance for 10 turns.', effect: { type: 'resist_nature', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
-    'sundown_potion': { name: 'Sundown Potion', type: 'buff', price: 300, description: 'Grants 10% Light resistance for 10 turns.', effect: { type: 'resist_light', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
-    'sunrise_potion': { name: 'Sunrise Potion', type: 'buff', price: 300, description: 'Grants 10% Void resistance for 10 turns.', effect: { type: 'resist_void', multiplier: 0.90, duration: 10 }, alchemyType: 'base_potion' },
+    'hearthstall_potion': { name: 'Hearthstall Potion', type: 'buff', price: 300, description: 'Grants 25% Fire resistance for 10 cumulative turns.', effect: { type: 'resist_fire', multiplier: 0.75, duration: 10 }, alchemyType: 'base_potion' },
+    'waterdam_potion': { name: 'Waterdam Potion', type: 'buff', price: 300, description: 'Grants 25% Water resistance for 10 cumulative turns.', effect: { type: 'resist_water', multiplier: 0.75, duration: 10 }, alchemyType: 'base_potion' },
+    'gustshield_potion': { name: 'Gustshield Potion', type: 'buff', price: 300, description: 'Grants 25% Wind resistance for 10 cumulative turns.', effect: { type: 'resist_wind', multiplier: 0.75, duration: 10 }, alchemyType: 'base_potion' },
+    'quakestable_potion': { name: 'Quakestable Potion', type: 'buff', price: 300, description: 'Grants 25% Earth resistance for 10 cumulative turns.', effect: { type: 'resist_earth', multiplier: 0.75, duration: 10 }, alchemyType: 'base_potion' },
+    'strikestop_potion': { name: 'Strikestop Potion', type: 'buff', price: 300, description: 'Grants 25% Lightning resistance for 10 cumulative turns.', effect: { type: 'resist_lightning', multiplier: 0.75, duration: 10 }, alchemyType: 'base_potion' },
+    'growthstall_potion': { name: 'Growthstall Potion', type: 'buff', price: 300, description: 'Grants 25% Nature resistance for 10 cumulative turns.', effect: { type: 'resist_nature', multiplier: 0.75, duration: 10 }, alchemyType: 'base_potion' },
+    'sundown_potion': { name: 'Sundown Potion', type: 'buff', price: 300, description: 'Grants 25% Light resistance for 10 cumulative turns.', effect: { type: 'resist_light', multiplier: 0.75, duration: 10 }, alchemyType: 'base_potion' },
+    'sunrise_potion': { name: 'Sunrise Potion', type: 'buff', price: 300, description: 'Grants 25% Void resistance for 10 cumulative turns.', effect: { type: 'resist_void', multiplier: 0.75, duration: 10 }, alchemyType: 'base_potion' },
     // Tier 3
-    'blazeback_potion': { name: 'Blazeback Potion', type: 'buff', price: 800, description: 'Grants 20% Fire resistance for 10 turns.', effect: { type: 'resist_fire', multiplier: 0.80, duration: 10 } },
-    'floodwall_potion': { name: 'Floodwall Potion', type: 'buff', price: 800, description: 'Grants 20% Water resistance for 10 turns.', effect: { type: 'resist_water', multiplier: 0.80, duration: 10 } },
-    'stormsapper_potion': { name: 'Stormsapper Potion', type: 'buff', price: 800, description: 'Grants 20% Wind resistance for 10 turns.', effect: { type: 'resist_wind', multiplier: 0.80, duration: 10 } },
-    'fissurewalker_potion': { name: 'Fissurewalker Potion', type: 'buff', price: 800, description: 'Grants 20% Earth resistance for 10 turns.', effect: { type: 'resist_earth', multiplier: 0.80, duration: 10 } },
-    'thunderground_potion': { name: 'Thunderground Potion', type: 'buff', price: 800, description: 'Grants 20% Lightning resistance for 10 turns.', effect: { type: 'resist_lightning', multiplier: 0.80, duration: 10 } },
-    'jungleward_potion': { name: 'Jungleward Potion', type: 'buff', price: 800, description: 'Grants 20% Nature resistance for 10 turns.', effect: { type: 'resist_nature', multiplier: 0.80, duration: 10 } },
-    'smitestopper_potion': { name: 'Smitestopper Potion', type: 'buff', price: 800, description: 'Grants 20% Light resistance for 10 turns.', effect: { type: 'resist_light', multiplier: 0.80, duration: 10 } },
-    'voidshield_potion': { name: 'Voidshield Potion', type: 'buff', price: 800, description: 'Grants 20% Void resistance for 10 turns.', effect: { type: 'resist_void', multiplier: 0.80, duration: 10 } },
+    'blazeback_potion': { name: 'Blazeback Potion', type: 'buff', price: 800, description: 'Grants 40% Fire resistance for 10 cumulative turns.', effect: { type: 'resist_fire', multiplier: 0.60, duration: 10 } },
+    'floodwall_potion': { name: 'Floodwall Potion', type: 'buff', price: 800, description: 'Grants 40% Water resistance for 10 cumulative turns.', effect: { type: 'resist_water', multiplier: 0.60, duration: 10 } },
+    'stormsapper_potion': { name: 'Stormsapper Potion', type: 'buff', price: 800, description: 'Grants 40% Wind resistance for 10 cumulative turns.', effect: { type: 'resist_wind', multiplier: 0.60, duration: 10 } },
+    'fissurewalker_potion': { name: 'Fissurewalker Potion', type: 'buff', price: 800, description: 'Grants 40% Earth resistance for 10 cumulative turns.', effect: { type: 'resist_earth', multiplier: 0.60, duration: 10 } },
+    'thunderground_potion': { name: 'Thunderground Potion', type: 'buff', price: 800, description: 'Grants 40% Lightning resistance for 10 cumulative turns.', effect: { type: 'resist_lightning', multiplier: 0.60, duration: 10 } },
+    'jungleward_potion': { name: 'Jungleward Potion', type: 'buff', price: 800, description: 'Grants 40% Nature resistance for 10 cumulative turns.', effect: { type: 'resist_nature', multiplier: 0.60, duration: 10 } },
+    'smitestopper_potion': { name: 'Smitestopper Potion', type: 'buff', price: 800, description: 'Grants 40% Light resistance for 10 cumulative turns.', effect: { type: 'resist_light', multiplier: 0.60, duration: 10 } },
+    'voidshield_potion': { name: 'Voidshield Potion', type: 'buff', price: 800, description: 'Grants 40% Void resistance for 10 cumulative turns.', effect: { type: 'resist_void', multiplier: 0.60, duration: 10 } },
 
     // Experimental Potions
     'mysterious_concoction_t1': { name: 'Mysterious Concoction (Tier 1)', type: 'experimental', tier: 1, price: 10, description: 'An unpredictable brew. Who knows what it does? Drink up and find out.' },
     'mysterious_concoction_t2': { name: 'Mysterious Concoction (Tier 2)', type: 'experimental', tier: 2, price: 50, description: 'A complex and unstable mixture. Potentially powerful, potentially poisonous.' },
     'mysterious_concoction_t3': { name: 'Mysterious Concoction (Tier 3)', type: 'experimental', tier: 3, price: 150, description: 'This barely-contained liquid chaos could change your fate... or just give you a stomach ache.' },
 
-    // Tools And Consumables
+    // Tools And Combat Consumables
     'whetstone': { name: 'Whetstone', type: 'buff', price: 100, rarity: 'Common', description: "For the next 3 turns, increase your weapon's damage die by one step (max d12) and enables critical hits. For when you need your blade to be extra pointy.", effect: { type: 'buff_whetstone', duration: 4, critEnable: true, diceStepUp: true } },
     'magic_rock_dust': { name: 'Magic Rock Dust', type: 'buff', price: 150, rarity: 'Uncommon', description: "Consume this suspiciously sparkly dust to briefly expand your consciousness. Your next spell will have its damage die increased by one step (max d12) and its range increased by 2.", effect: { type: 'buff_magic_dust', duration: 2, rangeIncrease: 2, diceStepUp: true } },
     'oil_bomb': { name: 'Oil Bomb', type: 'debuff_apply', price: 75, rarity: 'Common', range: 3, description: "Throws a bomb that deals 1 damage and covers the target in a flammable slick. The next Fire damage they receive is doubled. It's step one of a very bad day for them. Range: 3 tiles.", effect: { type: 'debuff_oiled', duration: Infinity, damage: 1, element: 'none' } },
     'viscous_liquid': { name: 'Viscous Liquid', type: 'debuff_apply', price: 75, rarity: 'Common', range: 3, description: "Throws a vial that deals 1 damage. The next effect that applies the 'drenched' status to the target is doubled in both duration and magnitude, ensuring they aren't just soaked, but achieve a new state of sogginess. Range: 3 tiles.", effect: { type: 'debuff_viscous', duration: Infinity, damage: 1, element: 'none' } },
     'pocket_cragblade': { name: 'Pocket Cragblade', type: 'buff', price: 200, rarity: 'Uncommon', description: "Apply this chunky rock to a weapon. Your next attack that deals Earth damage will deal 1.5x damage and is guaranteed to paralyze the target. A good way to hit someone so hard they forget how to move.", effect: { type: 'buff_cragblade', duration: 2, damageMultiplier: 1.5, guaranteeParalyze: true } },
-    'artificial_light_stone': { name: 'Artificial Light Stone', type: 'debuff_apply', price: 200, rarity: 'Uncommon', range: 3, description: "Throws a stone that deals 1 damage and primes the target. Your next attack that deals Wind damage to them will deal 1.5x damage and rudely violate their personal space by knocking them back 2 tiles. Range: 3 tiles.", effect: { type: 'debuff_lightstone_primed', duration: Infinity, damageMultiplier: 1.5, knockback: 2, damage: 1, element: 'none' } }, // <-- Single Line Change
+    'artificial_light_stone': { name: 'Artificial Light Stone', type: 'debuff_apply', price: 200, rarity: 'Uncommon', range: 3, description: "Throws a stone that deals 1 damage and primes the target. Your next attack that deals Wind damage to them will deal 1.5x damage and rudely violate their personal space by knocking them back 2 tiles. Range: 3 tiles.", effect: { type: 'debuff_lightstone_primed', duration: Infinity, damageMultiplier: 1.5, knockback: 2, damage: 1, element: 'none' } },
     'lightning_rod': { name: 'Lightning Rod', type: 'buff', price: 250, rarity: 'Rare', description: "Attach to a weapon. For the next 3 turns, your attacks are guaranteed to trigger a follow-up strike that deals an additional 25% of the initial damage as Lightning damage to a random enemy within range. Because why should only one person enjoy a sudden, unexpected electrocution?", effect: { type: 'buff_lightning_rod', duration: 4, chainChance: 1.0, chainMultiplier: 0.25 } },
     'fertilized_seed': { name: 'Fertilized Seed', type: 'buff', price: 100, rarity: 'Uncommon', description: "Consume this suspiciously energetic seed. For the next 3 turns, any healing you receive from Nature-based effects is increased by 50%. Tastes like dirt, heals like a hyperactive forest spirit.", effect: { type: 'buff_fertilized', duration: 4, healMultiplier: 1.5 } },
     'natural_antidote': { name: 'Natural Antidote', type: 'cleanse_specific', effects_to_cleanse: ['poison', 'toxic'], price: 120, rarity: 'Common', description: 'A simple herbal remedy that removes all types of poison effects. Tastes like bitter leaves and righteous indignation, but it gets the job done. Stop dying, you\'ve got things to do.' },
@@ -115,22 +115,21 @@ const ITEMS = {
     'poisonous_grease': { name: 'Poisonous Grease', type: 'buff', price: 200, rarity: 'Uncommon', description: 'Smear this foul-smelling gunk on your weapon. For 3 turns, your attacks have a chance to inflict a nasty poison that deals ¼ of your weapon’s average damage for 3 more turns. The gift that keeps on giving... sepsis. (Chance: 20%+Luck%/2)', effect: { type: 'buff_poison_grease', duration: 4, poisonChance: 0.20 } },
     'paralysis_grease': { name: 'Paralysis Grease', type: 'buff', price: 250, rarity: 'Uncommon', description: 'A sticky paste that makes your weapon shockingly effective. For 3 turns, your attacks have a chance to inflict paralysis for 1 turn, causing enemies to suddenly stop and stare blankly into the middle distance. (Chance: 20%+Luck%/2. Stacks with Earth Element effects for extra stillness.)', effect: { type: 'buff_paralysis_grease', duration: 4, paralyzeChance: 0.20 } },
 
-
-    // --- Ingredients & Materials ---
+    // --- 3. Ingredients & Materials ---
     // Junk (for selling)
     'goblin_ear': {name: 'Goblin Ear', type: 'junk', price: 5, description: "A grotesque trophy."},
     'wolf_pelt': {name: 'Wolf Pelt', type: 'junk', price: 12, description: "A thick and coarse pelt."},
     'rat_tail': {name: 'Rat Tail', type: 'junk', price: 2, description: "It's... a rat tail."},
     'spider_venom': {name: 'Spider Venom', type: 'junk', price: 10, description: "A vial of potent venom."},
     'dragon_scale': {name: 'Dragon Scale', type: 'junk', price: 50, description: "A shimmering, nigh-indestructible scale."},
-    'rock': {name: 'Useless Rock', type: 'junk', price: 0, description: 'It... was probably something more interesting a moment ago.'}, // <-- ADDED Useless Rock
+    'rock': {name: 'Useless Rock', type: 'junk', price: 0, description: 'It... was probably something more interesting a moment ago.'},
 
-    // Food Ingredients (Generic Types)
+    // Food Ingredients
     'rabbit_meat': {name: 'Rabbit Meat', type: 'food_ingredient', price: 4, rarity: 'Common', description: "Could make a good stew.", cookingType: 'meat'},
     'wolf_meat': {name: 'Wolf Meat', type: 'food_ingredient', price: 20, rarity: 'Common', description: 'Tough and gamy, but filling.', cookingType: 'meat'},
     'chicken_meat': {name: 'Chicken Meat', type: 'food_ingredient', price: 15, rarity: 'Uncommon', description: 'Surprisingly normal-tasting meat from a cockatrice.', cookingType: 'meat'},
     'horse_meat': {name: 'Horse Meat', type: 'food_ingredient', price: 30, rarity: 'Uncommon', description: 'Meat from a unicorn. Tastes magical and a little sad.', cookingType: 'meat'},
-    'whale_meat': {name: 'Whale Meat', type: 'food_ingredient', price: 100, rarity: 'Rare', description: 'A massive cut of blubbery meat from a Livyatan.', cookingType: 'meat'}, // Added cookingType
+    'whale_meat': {name: 'Whale Meat', type: 'food_ingredient', price: 100, rarity: 'Rare', description: 'A massive cut of blubbery meat from a Livyatan.', cookingType: 'meat'},
     'blackwheat': {name: 'Blackwheat', type: 'food_ingredient', price: 45, sellPrice: 45, rarity: 'Common', description: 'A dark, hardy grain.', alchemyType: 'secondary_reagent', cookingType: 'veggie'},
     'cinnamonwood_log': {name: 'Cinnamonwood Log', type: 'food_ingredient', price: 45, sellPrice: 45, rarity: 'Common', description: 'A fragrant log.', alchemyType: 'secondary_reagent', cookingType: 'veggie'},
     'brineflower_leaf': {name: 'Brineflower Leaf', type: 'food_ingredient', price: 300, sellPrice: 300, rarity: 'Uncommon', description: 'A salty leaf.', alchemyType: 'secondary_reagent', cookingType: 'seasoning'},
@@ -146,22 +145,20 @@ const ITEMS = {
     'crystal_apple': {name: 'Crystal Apple', type: 'food_ingredient', price: 750, sellPrice: 750, rarity: 'Rare', description: 'A crisp apple with translucent, crystalline flesh.', alchemyType: 'secondary_reagent'},
     'blood_peach': {name: 'Blood Peach', type: 'food_ingredient', price: 750, sellPrice: 750, rarity: 'Rare', description: 'A juicy peach with deep red flesh that invigorates the body.', alchemyType: 'secondary_reagent'},
     'ice_cherry': {name: 'Ice Cherry', type: 'food_ingredient', price: 750, sellPrice: 750, rarity: 'Rare', description: 'A cherry that is perpetually cold to the touch.', alchemyType: 'secondary_reagent'},
-    'wild_wine': {name: 'Wild Wine', type: 'food_ingredient', price: 25, rarity: 'Uncommon', description: 'A rough, potent wine favored by bandits and outlaws.', alchemyType: 'catalyst', cookingType: 'seasoning'}, // Added cookingType
+    'wild_wine': {name: 'Wild Wine', type: 'food_ingredient', price: 25, rarity: 'Uncommon', description: 'A rough, potent wine favored by bandits and outlaws.', alchemyType: 'catalyst', cookingType: 'seasoning'},
 
-
-    // Alchemy Ingredients (Specific)
-    'chimera_claw': {name: 'Chimera Claw', type: 'alchemy', price: 200, rarity: 'Epic', description: 'A razor-sharp claw from a Chimera, still dripping with poison.'}, // Rarity increased
-    'orc_liver': { name: 'Orc Liver', type: 'alchemy', price: 25, rarity: 'Uncommon', description: 'A key ingredient for strength potions.' }, // Added rarity
-    'cockatrice_venom_gland': { name: 'Cockatrice Venom Gland', type: 'alchemy', price: 40, rarity: 'Uncommon', description: 'Can be used to create potions that harden the skin.' }, // Added rarity
-    'unicorn_horn_fragment': { name: 'Unicorn Horn Fragment', type: 'alchemy', price: 100, rarity: 'Rare', description: 'A shard of a unicorn horn, brimming with purifying magic.' }, // Added rarity
+    // Alchemy-Specific Ingredients
+    'chimera_claw': {name: 'Chimera Claw', type: 'alchemy', price: 200, rarity: 'Epic', description: 'A razor-sharp claw from a Chimera, still dripping with poison.'},
+    'orc_liver': { name: 'Orc Liver', type: 'alchemy', price: 25, rarity: 'Uncommon', description: 'A key ingredient for strength potions.' },
+    'cockatrice_venom_gland': { name: 'Cockatrice Venom Gland', type: 'alchemy', price: 40, rarity: 'Uncommon', description: 'Can be used to create potions that harden the skin.' },
+    'unicorn_horn_fragment': { name: 'Unicorn Horn Fragment', type: 'alchemy', price: 100, rarity: 'Rare', description: 'A shard of a unicorn horn, brimming with purifying magic.' },
     'slime_glob': { name: 'Slime Glob', type: 'alchemy', price: 8, rarity: 'Common', description: 'A versatile, gelatinous substance.', alchemyType: 'catalyst' },
-    'soul_armor_shard': { name: 'Soul Armor Shard', type: 'alchemy', price: 500, rarity: 'Epic', description: 'A fragment of a Living Armor, humming with contained spiritual energy.' }, // Rarity increased
-    'vacuum_lining': { name: 'Vacuum Lining', type: 'alchemy', price: 1500, rarity: 'Legendary', description: 'A strange, reality-warping membrane from inside a Livyatan.'}, // Rarity increased
-    'mountain_rock': { name: 'Mountain Rock', type: 'alchemy', price: 1000, rarity: 'Legendary', description: 'A chunk of rock humming with the power of a mountain.'}, // Rarity increased
-    'dragon_heart_item': { name: 'Dragon Heart', type: 'alchemy', price: 2000, rarity: 'Legendary', description: 'The still-warm heart of a slain dragon.'}, // Rarity increased
-    'void_heart': { name: 'Void Heart', type: 'alchemy', price: 2000, rarity: 'Legendary', description: 'A pulsating shard of darkness from a Dullahan.'}, // Rarity increased
+    'soul_armor_shard': { name: 'Soul Armor Shard', type: 'alchemy', price: 500, rarity: 'Epic', description: 'A fragment of a Living Armor, humming with contained spiritual energy.' },
+    'vacuum_lining': { name: 'Vacuum Lining', type: 'alchemy', price: 1500, rarity: 'Legendary', description: 'A strange, reality-warping membrane from inside a Livyatan.'},
+    'mountain_rock': { name: 'Mountain Rock', type: 'alchemy', price: 1000, rarity: 'Legendary', description: 'A chunk of rock humming with the power of a mountain.'},
+    'dragon_heart_item': { name: 'Dragon Heart', type: 'alchemy', price: 2000, rarity: 'Legendary', description: 'The still-warm heart of a slain dragon.'},
+    'void_heart': { name: 'Void Heart', type: 'alchemy', price: 2000, rarity: 'Legendary', description: 'A pulsating shard of darkness from a Dullahan.'},
     'troll_blood': {name: 'Troll Blood', type: 'alchemy', price: 50, rarity: 'Rare', description: 'Viscous, green blood that slowly regenerates. A powerful alchemical ingredient.', alchemyType: 'catalyst'},
-    // Adding remaining specific alchemy ingredients
     'sunshine_flower': {name: 'Sunshine Flower', type: 'alchemy', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A flower that radiates warmth.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
     'sealotus_pad': {name: 'Sealotus Pad', type: 'alchemy', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A lily pad with calming properties.', alchemyType: 'primary_reagent', cookingType: 'veggie'},
     'fulgurbloom': {name: 'Fulgurbloom', type: 'alchemy', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A flower that crackles with electrical energy.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
@@ -169,23 +166,23 @@ const ITEMS = {
     'blackleaf': {name: 'Blackleaf', type: 'alchemy', price: 150, sellPrice: 150, rarity: 'Uncommon', description: 'A leaf used in shadowy concoctions.', alchemyType: 'primary_reagent', cookingType: 'seasoning'},
     'exploding_citrus': {name: 'Exploding Citrus', type: 'alchemy', price: 750, sellPrice: 750, rarity: 'Rare', description: 'A citrus fruit that fizzes and pops. Handle with care.', alchemyType: 'secondary_reagent'},
 
-    // --- Special & Crafting Items ---
-    'undying_heart': { name: 'Undying Heart', type: 'special', price: 1000, sellPrice: 100, rarity: 'Rare', description: 'A pulsating heart that refuses to stop beating. Used in powerful rituals.' }, // Added sellPrice
-    'fire_essence': { name: 'Fire Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, searing essence of fire.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'water_essence': { name: 'Water Essence', type: 'enchant', price: 500,  rarity: 'Uncommon', description: 'The pure, flowing essence of water.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'earth_essence': { name: 'Earth Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, stoic essence of earth.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'wind_essence': { name: 'Wind Essence', type: 'enchant', price: 500,  rarity: 'Uncommon', description: 'The pure, rushing essence of wind.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'lightning_essence': { name: 'Lightning Essence', type: 'enchant', price: 500,  rarity: 'Uncommon', description: 'The pure, crackling essence of lightning.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'nature_essence': { name: 'Nature Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, vibrant essence of nature.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'light_essence': { name: 'Light Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, radiant essence of light.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
-    'void_essence': { name: 'Void Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, silent essence of the void.', alchemyType: 'secondary_reagent' }, // Adjusted price, added sellPrice
+    // --- 4. Special & Crafting Items ---
+    'undying_heart': { name: 'Undying Heart', type: 'special', price: 1000, sellPrice: 100, rarity: 'Rare', description: 'A pulsating heart that refuses to stop beating. Used in powerful rituals.' },
+    'fire_essence': { name: 'Fire Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, searing essence of fire.', alchemyType: 'secondary_reagent' },
+    'water_essence': { name: 'Water Essence', type: 'enchant', price: 500,  rarity: 'Uncommon', description: 'The pure, flowing essence of water.', alchemyType: 'secondary_reagent' },
+    'earth_essence': { name: 'Earth Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, stoic essence of earth.', alchemyType: 'secondary_reagent' },
+    'wind_essence': { name: 'Wind Essence', type: 'enchant', price: 500,  rarity: 'Uncommon', description: 'The pure, rushing essence of wind.', alchemyType: 'secondary_reagent' },
+    'lightning_essence': { name: 'Lightning Essence', type: 'enchant', price: 500,  rarity: 'Uncommon', description: 'The pure, crackling essence of lightning.', alchemyType: 'secondary_reagent' },
+    'nature_essence': { name: 'Nature Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, vibrant essence of nature.', alchemyType: 'secondary_reagent' },
+    'light_essence': { name: 'Light Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, radiant essence of light.', alchemyType: 'secondary_reagent' },
+    'void_essence': { name: 'Void Essence', type: 'enchant', price: 500, rarity: 'Uncommon', description: 'The pure, silent essence of the void.', alchemyType: 'secondary_reagent' },
 
-    // --- Key Items ---
+    // --- 5. Key Items ---
     'bestiary_notebook': {name: 'Bestiary Notebook', type: 'key', price: 0, description: "A leather-bound book from a nervous researcher named Betty. Used to catalogue monster observations."},
     'blacksmith_key': {name: 'Blacksmith\'s Key', type: 'key', price: 0, description: "A sturdy iron key, smelling faintly of soot and metal. Looks like it unlocks something important in the Commercial District."},
     'tower_key': {name: 'Tower Key', type: 'key', price: 0, description: "An ornate key humming with faint magical energy. Seems attuned to the Arcane Quarter."},
 
-    // --- Gardening Items ---
+    // --- 6. Gardening Items ---
     // Seeds
     'blackwheat_seed': {name: 'Blackwheat Seed', type: 'seed', price: 15, rarity: 'Common', description: 'A common seed for a hardy grain.'},
     'cinnamonwood_seed': {name: 'Cinnamonwood Seed', type: 'seed', price: 15, rarity: 'Common', description: 'A common seed for a fragrant tree.'},
@@ -210,10 +207,11 @@ const ITEMS = {
     'exploding_citrus_sapling': { name: 'Exploding Citrus Sapling', type: 'sapling', price: 250, rarity: 'Rare', description: 'A rare sapling for a tree with... volatile fruit.' },
     'blood_peach_sapling': { name: 'Blood Peach Sapling', type: 'sapling', price: 250, rarity: 'Rare', description: 'A rare sapling for a tree that produces deep red, life-giving peaches.' },
     'ice_cherry_sapling': { name: 'Ice Cherry Sapling', type: 'sapling', price: 250, rarity: 'Rare', description: 'A rare sapling that grows cherries with a chilling effect.' },
-
-    // Harvested Plants (Already defined above in Food/Alchemy sections)
 };
 
+// --- Gardening Growth Data ---
+// This object defines the growth properties for seeds and saplings.
+// It is kept separate from ITEMS as it's for game logic, not just item definition.
 const SEEDS = {
     // Common - 15 mins (900 seconds)
     'blackwheat_seed': { growsInto: 'blackwheat', growthTime: 15 * 60 * 1000, harvestEmoji: '🌾' },

@@ -832,10 +832,7 @@ class Player extends Entity {
             'buff_defense', 'stonehide', 'buff_shroud', 'buff_voidwalker',
             'buff_haste', 'buff_hermes', 'buff_ion_self', 'buff_ion_other',
             'buff_magic_defense', 'buff_divine', 'buff_enrage', // Added enrage
-             // Keep resist buffs? Debatable. Clearing them for now for simplicity.
-             'resist_fire', 'resist_water', 'resist_earth', 'resist_wind',
-             'resist_lightning', 'resist_nature', 'resist_light', 'resist_void',
-             // Debuffs applied by enemies
+
              'drenched', 'paralyzed', 'petrified', 'toxic', 'poison', 'swallowed',
              // Clear temporary alchemy buffs/debuffs
              'bonus_crit', 'bonus_speed', 'bonus_range', 'alchemical_barrier',
@@ -2838,8 +2835,6 @@ class NpcAlly extends Entity {
             'buff_defense', 'stonehide', 'buff_shroud', 'buff_voidwalker',
             'buff_haste', 'buff_hermes', 'buff_ion_self', 'buff_ion_other',
             'buff_magic_defense', 'buff_divine', 'buff_enrage',
-             'resist_fire', 'resist_water', 'resist_earth', 'resist_wind',
-             'resist_lightning', 'resist_nature', 'resist_light', 'resist_void',
              'drenched', 'paralyzed', 'petrified', 'toxic', 'poison', 'swallowed',
              'bonus_crit', 'bonus_speed', 'bonus_range', 'alchemical_barrier',
              'magic_dampen', 'elemental_vuln', 'slowed', 'inaccurate',
