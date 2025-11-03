@@ -3947,7 +3947,7 @@ function generateBarracksRoster() {
         // --- END NEW ---
 
         // We use the recruitData.name, but also need to store the determined dialogue type
-        const dialogueType = player.npcAlly ? player.npcAlly._determineDialogueType(recruitData.name) : _determineDialogueType(recruitData.name);
+        const dialogueType = _determineDialogueType(recruitData.name);
 
 
         player.barracksRoster.push({
