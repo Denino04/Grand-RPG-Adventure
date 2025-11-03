@@ -1776,7 +1776,8 @@ async function castSpell(spellKey, targetIndex) { // Make async
 
     // Handle Healing and Support spells
     // --- NPC ALLY: Modified Healing Logic ---
-    if (spellData.type === 'healing') {
+if (spellData.element === 'healing') {
+    // --- END FIX ---
         let diceCount = spell.damage[0];
         const spellAmp = catalyst.effect?.spell_amp || 0;
         diceCount = Math.min(spell.cap, diceCount + spellAmp);

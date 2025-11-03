@@ -1504,8 +1504,9 @@ class Player extends Entity {
         return clonedPlayer;
     }
     /** Handles all damage reflection effects. */
-    _handleReflectEffects(finalDamageDealt, originalDamage, attacker) {
-        if (!attacker || !attacker.isAlive()) return; // Don't reflect if attacker is dead
+_handleReflectEffects(finalDamageDealt, originalDamage, attacker) {
+        if (!attacker || typeof attacker.isAlive !== 'function' || !attacker.isAlive()) return;
+        // --- END FIX ---
 
         const armor = this.equippedArmor;
         const shield = this.equippedShield;
