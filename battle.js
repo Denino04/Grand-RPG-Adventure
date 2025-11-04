@@ -1,6 +1,113 @@
 let preTrainingState = null;
 let isProcessingAction = false; // Flag to prevent action spamming
 
+async function applyKnockback(target, source, distance) {
+    if (!target || !target.isAlive() || !source || distance <= 0) return;
+
+    // 1. Determine direction (from source to target)
+    let dx = target.x - source.x;
+    let dy = target.y - source.y;
+
+    // Normalize to get a primary direction (or 0 if on same tile)
+    let dirX = 0;
+    let dirY = 0;
+    
+    if (Math.abs(dx) > Math.abs(dy)) {
+        dirX = dx > 0 ? 1 : -1;
+    } else if (Math.abs(dy) > 0) {
+        dirY = dy > 0 ? 1 : -1;
+    } else {
+        // Target and source are on the same tile? Pick a random direction.
+        const randDir = [ {x:0, y:1}, {x:0, y:-1}, {x:1, y:0}, {x:-1, y:0} ];
+        const dir = randDir[Math.floor(Math.random() * randDir.length)];
+        dirX = dir.x;
+        dirY = dir.y;
+    }
+
+    // 2. Find final landing spot
+    let finalX = target.x;
+    let finalY = target.y;
+    let collisionDamage = 0;
+    let hitObstacle = false;
+
+    // Check if target can fly (applies to enemies or flying players)
+    const canFly = (target === player) ? (player.race === 'Pinionfolk') : (target.movement?.type === 'flying');
+
+    for (let i = 0; i < distance; i++) {
+        let nextX = finalX + dirX;
+        let nextY = finalY + dirY;
+
+        // Check for grid boundaries or inactive cells
+        if (nextX < 0 || nextX >= gameState.gridWidth || nextY < 0 || nextY >= gameState.gridHeight || 
+            !gameState.gridLayout || gameState.gridLayout[nextY * gameState.gridWidth + nextX] !== 1) {
+            addToLog(`${target.name} is knocked against the edge of the arena!`);
+            collisionDamage = rollDice(1, 6, 'Knockback Wall Collision').total;
+            hitObstacle = true;
+            break; // Stop moving
+        }
+
+        // Check for obstacles/terrain (if not flying)
+        if (!canFly) {
+            const gridObject = gameState.gridObjects.find(o => o.x === nextX && o.y === nextY);
+            if (gridObject && (gridObject.type === 'obstacle' || gridObject.type === 'terrain')) {
+                addToLog(`${target.name} slams into a ${gridObject.name || 'barrier'}!`);
+                collisionDamage = rollDice(1, 6, 'Knockback Obstacle Collision').total;
+                hitObstacle = true;
+                if (gridObject.type === 'obstacle' && target === player) {
+                     // If player hits obstacle, damage it
+                     // We can't await this, so just call it
+                     performAttackOnObstacle(gridObject); 
+                }
+                break; // Stop moving
+            }
+        }
+        
+        // Check for other entities (Player, Ally, other Enemies)
+        let isBlockedByEntity = false;
+        if (target !== player && (player.x === nextX && player.y === nextY)) {
+             isBlockedByEntity = true;
+        } else if (player.npcAlly && player.npcAlly.isAlive() && !player.npcAlly.isFled && target !== player.npcAlly && (player.npcAlly.x === nextX && player.npcAlly.y === nextY)) {
+             isBlockedByEntity = true;
+        } else if (currentEnemies.some(e => e.isAlive() && e !== target && (e.x === nextX && e.y === nextY))) {
+             isBlockedByEntity = true;
+        }
+
+        if (isBlockedByEntity) {
+             addToLog(`${target.name} is knocked into another combatant!`);
+             collisionDamage = rollDice(1, 4, 'Knockback Entity Collision').total; // Less damage for hitting someone
+             hitObstacle = true;
+             break; // Stop moving
+        }
+
+        // Cell is clear, update final position
+        finalX = nextX;
+        finalY = nextY;
+    }
+
+    // 3. Animate movement
+    if (finalX !== target.x || finalY !== target.y) {
+        // For simplicity, just teleport them to the final spot with a delay
+        target.x = finalX;
+        target.y = finalY;
+        renderBattleGrid(); // Re-draw the grid
+        await new Promise(resolve => setTimeout(resolve, 200)); // Short pause
+    }
+
+    // 4. Apply collision damage
+    if (collisionDamage > 0) {
+        // Apply damage (as true damage, no element)
+        // takeDamage returns an object, so we apply it and check results
+        const { damageDealt } = target.takeDamage(collisionDamage, { ignore_defense: true, isMagic: false, attacker: source }); 
+        addToLog(`The collision deals <span class="font-bold text-red-400">${damageDealt}</span> damage to ${target.name}!`);
+        
+        // Check if collision was fatal
+        if (target === player && !player.isAlive()) {
+             checkPlayerDeath(); // This will stop turns
+        } else if (target !== player && !target.isAlive()) {
+            if (!gameState.battleEnded) checkBattleStatus(true); // Check for enemy death
+        }
+    }
+}
 // --- BATTLE FUNCTIONS ---
 function startBattle(biomeKey, trainingConfig = null) {
     if (trainingConfig) {
@@ -1235,6 +1342,17 @@ function performAttack(targetIndex) {
         let baseWeaponDamage = rollResult.total;
         calcLog.baseDamage = baseWeaponDamage;
 
+        // --- MODIFICATION: Add bonus 1d8 elemental damage if enchanted ---
+        // Only apply on the first strike of a multi-hit, or on a single hit
+        if (player.weaponElement !== 'none' && !isSecondStrike) {
+            const elementalBonusRoll = rollDice(1, 8, `Enchantment Bonus (${player.weaponElement})`);
+            const elementalBonusDamage = elementalBonusRoll.total;
+            baseWeaponDamage += elementalBonusDamage;
+            messageLog.push(`+${elementalBonusDamage} ${player.weaponElement} damage!`);
+            calcLog.steps.push({ description: `Enchantment Bonus (1d8)`, value: `+${elementalBonusDamage}`, result: baseWeaponDamage });
+        }
+        // --- END MODIFICATION --- 
+
         // --- Fighter: Weapon Mastery Reroll ---
         if (player._classKey === 'fighter' && player.signatureAbilityToggleActive && rollResult.rolls.includes(1)) {
             const diceSize = attackDamageDice[1]; // Use the (potentially modified) dice size
@@ -1436,7 +1554,7 @@ function performAttack(targetIndex) {
         const damageResult = attackTarget.takeDamage(damage, attackEffects);
         const finalDamage = damageResult.damageDealt; // Get actual damage dealt
         const knockbackAmountFromAttack = damageResult.knockback; // Get knockback triggered by this hit (e.g., from Lightstone debuff)
-
+        
         calcLog.finalDamage = finalDamage;
         logDamageCalculation(calcLog);
 
@@ -1447,6 +1565,61 @@ function performAttack(targetIndex) {
         // Append messageLog content here if needed, or integrate messages earlier
         let logMessagesCombined = messageLog.join(' '); // Combine messages collected so far
         addToLog(`You attack ${attackTarget.name} with ${weapon.name}, dealing <span class="font-bold text-yellow-300">${finalDamage}</span> ${damageType} damage. ${logMessagesCombined}`);
+
+
+        // --- NEW: APPLY ELEMENTAL SECONDARY EFFECTS FROM ENCHANTED WEAPONS ---
+        if (finalDamage > 0 && attackTarget.isAlive() && attackEffects.element !== 'none') {
+            // const tierIndex = Math.floor(player.level / 10); // Use player level to approximate "tier" // OLD
+            // --- NEW: Use Weapon Rarity Tier ---
+            const rarityMap = { 'Broken': 0, 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Epic': 4, 'Legendary': 5 };
+            const weaponRarity = player.equippedWeapon.rarity || 'Common';
+            const tierIndex = rarityMap[weaponRarity] || 1; // Default to 1 if rarity is weird
+            // --- END NEW ---
+            const attackElement = attackEffects.element;
+
+            switch (attackElement) {
+                case 'water':
+                    addToLog(`Your weapon's magic leaves ${attackTarget.name} drenched! (-1 Move, -25% Dmg)`, 'text-blue-400');
+                    applyStatusEffect(attackTarget, 'drenched', { duration: 3, move: -1, multiplier: 0.75 }, player.name);
+                    break;
+                case 'earth':
+                    const earthParalyzeChance = 0.10 + (tierIndex * 0.05); // 10% base + 5% per tier
+                    if (player.rollForEffect(earthParalyzeChance, 'Weapon Earth Paralyze')) {
+                        if (!attackTarget.statusEffects.paralyzed) {
+                            applyStatusEffect(attackTarget, 'paralyzed', { duration: 2 }, player.name);
+                            addToLog(`${attackTarget.name} is paralyzed by the blow!`, 'text-yellow-500');
+                        }
+                    }
+                    break;
+                case 'wind':
+                    await applyKnockback(attackTarget, player, 1); // 1 tile knockback
+                    addToLog(`${attackTarget.name} is blasted back by the gale!`, 'text-cyan-400');
+                    // Re-check target status after knockback
+                    if (!attackTarget.isAlive()) { if (!gameState.battleEnded) checkBattleStatus(true); }
+                    break;
+                case 'nature':
+                    const natureLifestealPercent = 0.10 + (tierIndex * 0.02); // 10% base + 2% per tier
+                    const lifestealAmount = Math.floor(finalDamage * natureLifestealPercent);
+                    if (lifestealAmount > 0) {
+                        player.hp = Math.min(player.maxHp, player.hp + lifestealAmount);
+                        addToLog(`Your weapon drains <span class="font-bold text-green-400">${lifestealAmount}</span> HP.`, 'text-green-300');
+                        updateStatsView(); // Update immediately
+                    }
+                    break;
+                case 'light':
+                    const lightCleanseChance = 0.20 + (tierIndex * 0.05); // 20% base + 5% per tier
+                    if (player.rollForEffect(lightCleanseChance, 'Weapon Light Cleanse')) {
+                        const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic'].includes(key));
+                        if (debuffs.length > 0) {
+                            const effectToCleanse = debuffs[0];
+                            delete player.statusEffects[effectToCleanse];
+                            addToLog(`Your weapon's holy energy cleanses you of ${effectToCleanse}!`, 'text-yellow-200');
+                        }
+                    }
+                    break;
+            }
+        }
+        // --- END NEW ELEMENTAL EFFECTS ---
 
 
         // --- POST-ATTACK EFFECTS ---
@@ -1949,11 +2122,24 @@ if (spellData.element === 'healing') {
              addToLog(`Spellweaver! The spell also carries the essence of ${randomElement}!`, 'text-cyan-300');
          }
 
+        if (spellData.element === 'fire') {
+            const fireMultiplier = 1 + (Math.random() * 0.2); // 1.0 to 1.2
+            damage = Math.floor(damage * fireMultiplier);
+            addToLog(`The fire spell burns hotter! (x${fireMultiplier.toFixed(2)})`, 'text-orange-300');
+        }
+
         const spellEffects = {
             isMagic: true,
             element: spellData.element,
             spell_penetration: catalyst.effect?.spell_penetration || 0
         };
+        
+        // --- NEW: Void Bypass (Player Spell) ---
+        const voidBypassChance = 0.20 + (tierIndex * 0.05); // 20% base + 5% per tier > 1
+        if (spellData.element === 'void' && player.rollForEffect(voidBypassChance, 'Spell Void Bypass')) {
+            spellEffects.ignore_defense = true; // Set ignore defense flag
+            addToLog(`Your void spell tears a hole in reality, bypassing defenses!`, 'text-purple-500');
+        }
 
         // --- Apply Damage to Primary Target ---
         // *** MODIFICATION: Store return value from takeDamage ***
@@ -1964,64 +2150,68 @@ if (spellData.element === 'healing') {
         addToLog(`It hits ${target.name} for <span class="font-bold text-purple-400">${finalDamage}</span> ${spellData.element} damage.`);
         console.log(`DEBUG: Final Damage Dealt to ${target.name}: ${finalDamage}. Target HP: ${target.hp}/${target.maxHp}`);
 
-        if (spellData.element === 'nature' && finalDamage > 0) { // Check damage was dealt
-            const lifestealAmount = Math.floor(finalDamage * (0.1 + (tierIndex * 0.05)));
-            console.log(`DEBUG: Applying Nature Lifesteal. Amount: ${lifestealAmount}`); // <-- DEBUG LOG
-            if (lifestealAmount > 0) {
-                player.hp = Math.min(player.maxHp, player.hp + lifestealAmount);
-                addToLog(`You drain <span class="font-bold text-green-400">${lifestealAmount}</span> HP.`, 'text-green-300');
-                updateStatsView(); // Update immediately after healing
-            }
-        }
-        // --- Apply primary target elemental effects (Water Drench, Earth Paralyze, Nature Lifesteal, Light Cleanse) ---
+        // --- Apply primary target elemental effects ---
         if (finalDamage > 0 && target.isAlive()) { // Check target alive before applying status
-             console.log(`DEBUG: Target ${target.name} is alive and took damage. Checking elemental effects...`);
-             if (spellData.element === 'water') {
-                console.log("DEBUG: Applying Water Drench effect."); // <-- DEBUG LOG
-                addToLog(`The water from your spell drenches ${target.name}!`, 'text-blue-400');
-                applyStatusEffect(target, 'drenched', { duration: 2 + tierIndex, multiplier: 0.9 - (tierIndex * 0.05) }, player.name);
+            
+            // --- Water Drench ---
+            if (spellData.element === 'water') {
+                addToLog(`The water attack leaves ${target.name} drenched! (-1 Move, -25% Dmg)`, 'text-blue-400');
+                // New debuff: -1 move, 25% attack reduction (multiplier 0.75)
+                // Duration 3 (2 turns after this one)
+                applyStatusEffect(target, 'drenched', { duration: 3, move: -1, multiplier: 0.75 }, player.name);
             }
 
-            const earthParalyzeChance = 0.2 + (tierIndex * 0.1);
-            if (spellData.element === 'earth') {
-                console.log(`DEBUG: Checking Earth Paralyze. Chance: ${earthParalyzeChance}`); // <-- DEBUG LOG
-                if(player.rollForEffect(earthParalyzeChance, 'Spell Earth Paralyze')) {
-                    console.log("DEBUG: Earth Paralyze Proc'd!"); // <-- DEBUG LOG
-                    if (!target.statusEffects.paralyzed) {
-                        applyStatusEffect(target, 'paralyzed', { duration: 2 + tierIndex }, player.name);
-                    } else {
-                         console.log("DEBUG: Target already paralyzed."); // <-- DEBUG LOG
-                    }
-                } else {
-                     console.log("DEBUG: Earth Paralyze Failed Roll."); // <-- DEBUG LOG
+            // --- Earth Paralyze ---
+            const earthParalyzeChance = 0.10 + (tierIndex * 0.05); // 10% base + 5% per tier > 1
+            if (spellData.element === 'earth' && player.rollForEffect(earthParalyzeChance, 'Spell Earth Paralyze')) {
+                if (!target.statusEffects.paralyzed) {
+                    applyStatusEffect(target, 'paralyzed', { duration: 2 }, player.name); // 1 turn duration
+                    addToLog(`${target.name} is paralyzed by the blow!`, 'text-yellow-500');
                 }
             }
 
-            const lightCleanseChance = 0.2 + (tierIndex * 0.15);
-            if (spellData.element === 'light') {
-                console.log(`DEBUG: Checking Light Cleanse. Chance: ${lightCleanseChance}`); // <-- DEBUG LOG
-                if(player.rollForEffect(lightCleanseChance, 'Spell Light Cleanse')) {
-                    console.log("DEBUG: Light Cleanse Proc'd!"); // <-- DEBUG LOG
-                    const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic'].includes(key));
-                    if (debuffs.length > 0) {
-                        const effectToCleanse = debuffs[0];
-                        delete player.statusEffects[effectToCleanse];
-                        addToLog(`Your spell's light energy cleanses you of ${effectToCleanse}!`, 'text-yellow-200');
-                         console.log(`DEBUG: Cleansed ${effectToCleanse}.`); // <-- DEBUG LOG
-                    } else {
-                         console.log("DEBUG: No debuffs to cleanse."); // <-- DEBUG LOG
-                    }
-                } else {
-                    console.log("DEBUG: Light Cleanse Failed Roll."); // <-- DEBUG LOG
+            // --- Wind Knockback ---
+            if (spellData.element === 'wind') {
+                // applyKnockback is async, so we await it
+                await applyKnockback(target, player, 1); // 1 tile knockback
+                addToLog(`${target.name} is blasted back by the gale!`, 'text-cyan-400');
+                // Re-check target status after knockback
+                if (!target.isAlive()) { if (!gameState.battleEnded) checkBattleStatus(true); }
+            }
+
+            // --- Nature Lifesteal ---
+            const natureLifestealPercent = 0.10 + (tierIndex * 0.02); // 10% base + 2% per tier > 1
+            if (spellData.element === 'nature') {
+                const lifestealAmount = Math.floor(finalDamage * natureLifestealPercent);
+                if (lifestealAmount > 0) {
+                    player.hp = Math.min(player.maxHp, player.hp + lifestealAmount);
+                    addToLog(`You drain <span class="font-bold text-green-400">${lifestealAmount}</span> HP.`, 'text-green-300');
+                    updateStatsView(); // Update immediately
                 }
             }
-        } else {
-            console.log(`DEBUG: Elemental effects skipped. finalDamage=${finalDamage}, target.isAlive()=${target.isAlive()}`);
-        } // End primary target effects
 
+            // --- Light Cleanse ---
+            const lightCleanseChance = 0.20 + (tierIndex * 0.05); // 20% base + 5% per tier > 1
+            if (spellData.element === 'light' && player.rollForEffect(lightCleanseChance, 'Spell Light Cleanse')) {
+                const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic'].includes(key));
+                if (debuffs.length > 0) {
+                    const effectToCleanse = debuffs[0];
+                    delete player.statusEffects[effectToCleanse];
+                    addToLog(`Your spell's light energy cleanses you of ${effectToCleanse}!`, 'text-yellow-200');
+                }
+            }
+            
+            // --- Fire damage ---
+            // (Handled before takeDamage)
+            
+            // --- Void Bypass ---
+            // (Handled before takeDamage)
+
+        } // End if(damageDealt > 0)
 
         // --- Magus: Arcane Manipulation Logic ---
         if (target.isAlive() && player._classKey === 'magus' && player.activeModeIndex > -1) {
+
             const mode = player.signatureAbilityData.modes[player.activeModeIndex];
             // Chain Magic (Mode 0) - ST Only
             if (mode === "Chain Magic" && spellData.type === 'st') { // <-- ADDED ST CHECK
@@ -2119,75 +2309,58 @@ if (spellData.element === 'healing') {
 
 
         // --- Handle Lightning Chaining ---
-        const lightningChainChance = 0.3 + (tierIndex * 0.1); // Base 30% + 10% per tier
+        const lightningChainChance = 0.10 + (tierIndex * 0.05); // 10% base + 5% per tier > 1
         console.log(`DEBUG: Checking Lightning Chain. Chance: ${lightningChainChance}`); // <-- DEBUG LOG
         if (!gameState.battleEnded && spellData.element === 'lightning' && player.rollForEffect(lightningChainChance, 'Spell Lightning Chain')) {
             console.log("DEBUG: Lightning Chain Proc'd!"); // <-- DEBUG LOG
-            // --- MODIFIED: Start chain FROM the original target's position ---
+            
             let chainSourceX = target.x;
             let chainSourceY = target.y;
-            let currentChainTargetObject = target; // Track the object of the last successful hit for logging
-            // --- END MODIFICATION ---
-            let chainDamage = Math.floor(finalDamage * 0.5); // Start chain damage based on primary hit
+            let currentChainTargetObject = target; 
+            let chainDamage = Math.floor(finalDamage * 0.5); // 50% of primary hit
+            
             console.log(`DEBUG: Initial Chain Damage: ${chainDamage}`); // <-- DEBUG LOG
-            for (let i = 0; i < tierIndex + 1; i++) { // Chains = tier number
-                // --- MODIFIED: Find targets near the LAST hit position ---
-                const potentialTargets = currentEnemies.filter(e => e.isAlive() && (e.x !== chainSourceX || e.y !== chainSourceY)); // Find LIVING targets NOT at the source pos
-                console.log(`DEBUG: Chain ${i+1}/${tierIndex+1}. Potential targets from (${chainSourceX},${chainSourceY}): ${potentialTargets.map(e=>e.name).join(', ')}`); // <-- DEBUG LOG
-                if (potentialTargets.length > 0) {
-                    // Find the closest valid target to the last hit position
-                    let nextTarget = null;
-                    let minDist = Infinity;
-                    potentialTargets.forEach(pTarget => {
-                        const dist = Math.abs(chainSourceX - pTarget.x) + Math.abs(chainSourceY - pTarget.y);
-                        if (dist < minDist) {
-                            minDist = dist;
-                            nextTarget = pTarget;
-                        }
-                    });
-
-                    if (!nextTarget) { // Should not happen if potentialTargets > 0, but safety check
-                         console.log("DEBUG: Chain stopped (Could not find closest target).");
-                         break;
+            
+            // Find the single nearest other target
+            const potentialTargets = currentEnemies.filter(e => e.isAlive() && e !== target);
+            
+            if (potentialTargets.length > 0) {
+                let nextTarget = null;
+                let minDist = Infinity;
+                potentialTargets.forEach(pTarget => {
+                    const dist = Math.abs(chainSourceX - pTarget.x) + Math.abs(chainSourceY - pTarget.y);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nextTarget = pTarget;
                     }
-                    // --- END MODIFICATION ---
+                });
 
+                if (nextTarget) {
                     console.log(`DEBUG: Chaining to ${nextTarget.name}. Damage: ${chainDamage}`); // <-- DEBUG LOG
-                    const damageResultChain = nextTarget.takeDamage(chainDamage, spellEffects); // Store result
+                    const damageResultChain = nextTarget.takeDamage(chainDamage, spellEffects); 
                     const chainFinalDamage = damageResultChain.damageDealt;
-                    const knockbackChain = damageResultChain.knockback; // Check knockback
-                    // Log using the *previous* target's position as the source
-                    addToLog(`Lightning arcs from ${currentChainTargetObject.name}'s position to ${nextTarget.name} for <span class="font-bold text-blue-400">${chainFinalDamage}</span> damage!`);
-                    console.log(`DEBUG: Actual Chain Damage Dealt to ${nextTarget.name}: ${chainFinalDamage}`); // <-- DEBUG LOG
+                    const knockbackChain = damageResultChain.knockback;
+                    
+                    addToLog(`Lightning arcs from ${currentChainTargetObject.name} to ${nextTarget.name} for <span class="font-bold text-blue-400">${chainFinalDamage}</span> damage!`);
+                    
                     if (!gameState.battleEnded && !nextTarget.isAlive()) {
                         console.log(`DEBUG: Chain target ${nextTarget.name} died.`); // <-- DEBUG LOG
-                        checkBattleStatus(true); // Check if chain killed
+                        checkBattleStatus(true);
                     }
-                    // Apply knockback to chain target
+                    
                     if (!gameState.battleEnded && knockbackChain > 0 && nextTarget.isAlive()) {
                          await applyKnockback(nextTarget, player, knockbackChain);
-                         if (!nextTarget.isAlive()) {
-                             console.log(`DEBUG: Chain target ${nextTarget.name} died from knockback.`); // <-- DEBUG LOG
+                         if (!nextTarget.isAlive()) { 
                              if (!gameState.battleEnded) checkBattleStatus(true);
-                         } // Re-check
-                    }
-
-                    // Update source position for the next potential chain
-                    chainSourceX = nextTarget.x;
-                    chainSourceY = nextTarget.y;
-                    currentChainTargetObject = nextTarget; // Update the object reference
-                    chainDamage = Math.floor(chainDamage * 0.5); // Damage halves each jump
-                    console.log(`DEBUG: Next Chain Damage: ${chainDamage}`); // <-- DEBUG LOG
-                    if (chainDamage < 1 || !nextTarget.isAlive()) { // Use nextTarget here
-                        console.log("DEBUG: Chain stopped (Damage too low or target died)."); // <-- DEBUG LOG
-                        break; // Stop if damage too low or target died
+                         } 
                     }
                 } else {
-                    console.log("DEBUG: Chain stopped (No more valid targets)."); // <-- DEBUG LOG
-                    break; // No more targets
+                    console.log("DEBUG: Chain stopped (No valid targets)."); // <-- DEBUG LOG
                 }
+            } else {
+                console.log("DEBUG: Chain stopped (No other targets)."); // <-- DEBUG LOG
             }
-        } else if (!gameState.battleEnded && spellData.element === 'lightning') { // Added else if for logging failure
+        } else if (!gameState.battleEnded && spellData.element === 'lightning') { 
             console.log("DEBUG: Lightning Chain Failed Roll or condition not met."); // <-- DEBUG LOG
         } // End Lightning Chaining
 
@@ -2903,13 +3076,21 @@ function checkBattleStatus(isReaction = false) {
         }
     }
         // --- NPC ALLY: Check if ally fled ---
-    if (player.npcAlly && player.npcAlly.hp <= 0 && !player.npcAlly.isFled) {
-        player.npcAlly.isFled = true;
-        addToLog(`<span class="font-bold text-red-500">${player.npcAlly.name} has been defeated and fled the battle!</span>`, "text-red-500");
-        // We check for this state in renderPostBattleMenu
+    if (player.npcAlly && player.npcAlly.hp <= 0) {
+        // player.npcAlly.isFled = true; // This is redundant, takeDamage handles it.
+        const allyName = player.npcAlly.name; // Get name *before* nulling
+        addToLog(`<span class="font-bold text-red-500">${allyName} has been defeated and fled the battle!</span>`, "text-red-500");
+        addToLog(`<span class="font-bold text-red-700">${allyName} is gone for good, taking all their equipment...</span>`, "text-red-700");
+        
+        player.npcAlly = null; // <<< THIS IS THE FIX: Remove ally from player
+        player.encountersSinceLastPay = 0; // Reset counter
+        
         renderBattleGrid(); // Re-render to remove ally from grid
     }
     // --- END NPC ALLY ---
+
+
+
 
     // MODIFIED: Removed the automatic call to handlePlayerEndOfTurn here.
     // It's now called by finalizePlayerAction after the *entire* player action sequence.
@@ -3209,6 +3390,15 @@ async function enemyTurn() {
                 checkPlayerDeath();
                 return; // Stop the turn sequence
             }
+
+            // --- FIX: CHECK IF ALLY FLED OR BATTLE ENDED ---
+            // Check if the enemy's attack caused the ally to flee or if all enemies were defeated
+            // (e.g., by a reflect effect from the ally)
+            if (!gameState.battleEnded) {
+                checkBattleStatus(true); // isReaction = true
+                if (gameState.battleEnded) return; // Stop if battle ended
+            }
+            // --- END FIX ---
 
             // Handle end-of-turn effects for this enemy
             handleEnemyEndOfTurn(enemy);
@@ -3813,6 +4003,13 @@ function finalizeNpcTurn() {
     }
 
     renderBattleGrid(); // Update ally HP bar from DoTs
+
+    // --- ADD CHECK BATTLE STATUS HERE ---
+    if (!gameState.battleEnded) {
+        checkBattleStatus(true); // Check if ally fled
+        if (gameState.battleEnded) return; // Stop
+    }
+    // --- END ADDED CHECK ---
 
     // --- MODIFIED: Check for NPC drone before enemy turn ---
     if (gameState.npcActiveDrone && gameState.npcActiveDrone.isAlive()) {

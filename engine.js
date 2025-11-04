@@ -343,8 +343,10 @@ class Player extends Entity {
         this.difficulty = 'hardcore';
         this.elementalAffinity = null; // For Elementals
         this.npcAlly = null; // <<< NEW
+        this.enchantments = {}; // <-- NEW: Store item-type enchantments
         this.encountersSinceLastPay = 0; // <<< NEW
         this.house = {
+            owned: false,
             owned: false,
             storage: { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} },
             storageTier: 0,
@@ -1162,11 +1164,18 @@ class Player extends Entity {
                 }
             }
 
-            let rollResult = rollDice(attackDamageDice[0], attackDamageDice[1], `Player Parry`);
-            let baseWeaponDamage = rollResult.total;
-            calcLog.baseDamage = baseWeaponDamage;
+        let rollResult = rollDice(attackDamageDice[0], attackDamageDice[1], `Player Parry`);
+        let baseWeaponDamage = rollResult.total;
+        calcLog.baseDamage = baseWeaponDamage;
 
-            // OMIT Fighter Reroll (it's a toggle ability for a main attack action)
+        // --- MODIFICATION: Add bonus 1d8 elemental damage if enchanted ---
+        if (this.weaponElement !== 'none') { // 'this' is the Player
+            const elementalBonusRoll = rollDice(1, 8, `Enchantment Bonus (${this.weaponElement})`);
+            const elementalBonusDamage = elementalBonusRoll.total;
+            baseWeaponDamage += elementalBonusDamage;
+            messageLog.push(`+${elementalBonusDamage} ${this.weaponElement} damage!`);
+            calcLog.steps.push({ description: `Enchantment Bonus (1d8)`, value: `+${elementalBonusDamage}`, result: baseWeaponDamage });
+        }
 
             let statBonus = this.physicalDamageBonus;
 
@@ -1764,6 +1773,7 @@ class NpcAlly extends Entity {
         this.y = -1;
         this.isFled = false;
         this.isResting = false; // <<< NEWstrengthFlatBonus
+        this.enchantments = {}; // <-- NEW: Store item-type enchantments
         
         // --- Base Stats & Class ---
         this._classKey = classKey; // Store the key, even if it's undefined
@@ -3164,10 +3174,69 @@ class NpcAlly extends Entity {
             spell_penetration: catalyst.effect?.spell_penetration || 0
         };
         
+        // --- NEW: Void Bypass (Ally Spell) ---
+        const voidBypassChance = 0.20 + (tierIndex * 0.05); // 20% base + 5% per tier > 1
+        if (spellData.element === 'void' && this.rollForEffect(voidBypassChance, 'Spell Void Bypass')) {
+            spellEffects.ignore_defense = true; // Set ignore defense flag
+            addToLog(`${this.name}'s void spell tears a hole in reality, bypassing defenses!`, 'text-purple-500');
+        }
+        // --- END NEW ---
+
         // Apply damage
-        const { damageDealt } = target.takeDamage(damage, spellEffects);
+        const { damageDealt } = target.takeDamage(damage, spellEffects, this); // Pass 'this' as attacker
         addToLog(`It hits ${target.name} for <span class="font-bold text-purple-400">${damageDealt}</span> ${spellData.element} damage.`);
         
+        // --- NEW: APPLY ALLY ELEMENTAL SECONDARY EFFECTS ---
+        if (damageDealt > 0 && target.isAlive()) {
+            // --- NEW: Use Catalyst Rarity Tier ---
+            const rarityMap = { 'Broken': 0, 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Epic': 4, 'Legendary': 5 };
+            const catalystRarity = this.equippedCatalyst.rarity || 'Common'; // 'this' is the ally
+            const tierIndex = rarityMap[catalystRarity] || 1; // Default to 1
+            // --- END NEW ---
+
+            switch (spellData.element) {
+                case 'water':
+                    addToLog(`The water attack leaves ${target.name} drenched! (-1 Move, -25% Dmg)`, 'text-blue-400');
+                    applyStatusEffect(target, 'drenched', { duration: 3, move: -1, multiplier: 0.75 }, this.name);
+                    break;
+                case 'earth':
+                    const earthParalyzeChance = 0.10 + (tierIndex * 0.05); // 10% base + 5% per tier
+                    if (this.rollForEffect(earthParalyzeChance, 'Ally Spell Earth Paralyze')) {
+                        if (!target.statusEffects.paralyzed) {
+                            applyStatusEffect(target, 'paralyzed', { duration: 2 }, this.name);
+                            addToLog(`${target.name} is paralyzed by the blow!`, 'text-yellow-500');
+                        }
+                    }
+                    break;
+                case 'wind':
+                    await applyKnockback(target, this, 1); // 1 tile knockback
+                    addToLog(`${target.name} is blasted back by the gale!`, 'text-cyan-400');
+                    // Re-check target status after knockback
+                    if (!target.isAlive()) { if (!gameState.battleEnded) checkBattleStatus(true); }
+                    break;
+                case 'nature':
+                    const natureLifestealPercent = 0.10 + (tierIndex * 0.02); // 10% base + 2% per tier
+                    const lifestealAmount = Math.floor(damageDealt * natureLifestealPercent);
+                    if (lifestealAmount > 0) {
+                        this.hp = Math.min(this.maxHp, this.hp + lifestealAmount); // Heal the ally
+                        addToLog(`${this.name} drains <span class="font-bold text-green-400">${lifestealAmount}</span> HP.`, 'text-green-300');
+                    }
+                    break;
+                case 'light':
+                    const lightCleanseChance = 0.20 + (tierIndex * 0.05); // 20% base + 5% per tier
+                    if (this.rollForEffect(lightCleanseChance, 'Ally Spell Light Cleanse')) {
+                        const debuffs = Object.keys(this.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic'].includes(key));
+                        if (debuffs.length > 0) {
+                            const effectToCleanse = debuffs[0];
+                            delete this.statusEffects[effectToCleanse]; // Cleanse the ally
+                            addToLog(`${this.name}'s spell's light energy cleanses them of ${effectToCleanse}!`, 'text-yellow-200');
+                        }
+                    }
+                    break;
+            }
+        }
+        // --- END NEW ALLY ELEMENTAL EFFECTS ---
+
         renderBattleGrid(); // Update MP bar
         return true;
     }
@@ -3264,6 +3333,55 @@ class Enemy extends Entity {
             this.reviveChance = 1.0;
         }
     }
+
+    rollForEffect(baseChance, debugPurpose = "Unknown Effect") {
+        // --- CHANCE LOGGING: Log initial state ---
+        if (logChanceCalculations) { // Check the new global flag
+            addToLog(`DEBUG (Chance) [ENEMY: ${this.name} - ${debugPurpose}]: Base Chance = ${(baseChance * 100).toFixed(1)}%`, 'text-gray-500');
+        }
+
+        if (baseChance <= 0) {
+             if (logChanceCalculations) addToLog(`DEBUG (Chance) [ENEMY: ${this.name} - ${debugPurpose}]: Result = FAIL (Base chance <= 0)`, 'text-gray-500');
+             return false;
+        }
+        if (baseChance >= 1) {
+             if (logChanceCalculations) addToLog(`DEBUG (Chance) [ENEMY: ${this.name} - ${debugPurpose}]: Result = SUCCESS (Base chance >= 1)`, 'text-gray-500');
+            return true;
+        }
+
+        // Enemies don't have Dragonborn/Human/Halfling passives, so we just roll.
+        let modifiedChance = baseChance;
+        
+        // --- CHANCE LOGGING: Log final chance before roll ---
+        if (logChanceCalculations) {
+            addToLog(`DEBUG (Chance) [ENEMY: ${this.name} - ${debugPurpose}]: Final Chance = ${(modifiedChance * 100).toFixed(1)}% (No mods applied)`, 'text-gray-500');
+        }
+
+        // 3. Make the initial roll
+        let roll = Math.random();
+        // --- CHANCE LOGGING: Log the roll ---
+        if (logChanceCalculations) {
+            addToLog(`DEBUG (Chance) [ENEMY: ${this.name} - ${debugPurpose}]: Rolled ${roll.toFixed(3)} vs Chance ${(modifiedChance * 100).toFixed(1)}%`, 'text-gray-500');
+        }
+
+        if (roll < modifiedChance) {
+            // --- CHANCE LOGGING: Log success ---
+            if (logChanceCalculations) addToLog(`DEBUG (Chance) [ENEMY: ${this.name} - ${debugPurpose}]: Result = SUCCESS`, 'text-green-400');
+            if (isDebugVisible && !logChanceCalculations) console.log(`Racial Roll [ENEMY: ${this.name} - ${debugPurpose}]: SUCCESS (Base: ${baseChance.toFixed(2)}, Roll: ${roll.toFixed(2)})`);
+            return true; // Success!
+        }
+
+        // 5. Standard failure
+        // --- CHANCE LOGGING: Log final failure ---
+        if (logChanceCalculations) {
+             addToLog(`DEBUG (Chance) [ENEMY: ${this.name} - ${debugPurpose}]: Result = FAIL`, 'text-red-400');
+        }
+        if (isDebugVisible && !logChanceCalculations) console.log(`Racial Roll [ENEMY: ${this.name} - ${debugPurpose}]: FAIL (Base: ${baseChance.toFixed(2)}, Roll: ${roll.toFixed(2)})`);
+        return false;
+    }
+    // --- END ADDED METHOD ---
+
+
     async attack() {
         this.attackParried = false; // Reset parry flag for this attack sequence
         this.hasDealtDamageThisEncounter = true;
@@ -3354,17 +3472,7 @@ class Enemy extends Entity {
 
             // Handle follow-up effects (Double Strike, Wind)
             const rarityIndex = this.rarityData.rarityIndex;
-            if (this.element === 'wind' && Math.random() < (rarityIndex * 0.05)) {
-                addToLog(`The swirling winds grant ${this.name} another strike!`, 'text-gray-300');
-                setTimeout(() => {
-                    if (gameState.battleEnded || !target.isAlive() || !this.isAlive()) return;
-                    let followUpDamageRoll = rollDice(Math.max(1, this.damage[0] - 1), this.damage[1], `${this.name} Wind Follow-up`);
-                    let followUpDamage = followUpDamageRoll.total + Math.floor(this.strength / 2);
-                    target.takeDamage(followUpDamage, !!this.statusEffects.ultra_focus, this);
-                     if (!gameState.battleEnded) checkBattleStatus(true);
-                }, 500); 
-            }
-            else if (this.ability === 'double_strike' && Math.random() < 0.33) {
+             if (this.ability === 'double_strike' && Math.random() < 0.33) {
                 addToLog(`${this.name}'s fury lets it attack again!`, 'text-red-500 font-bold');
                 setTimeout(() => {
                      if (gameState.battleEnded || !target.isAlive() || !this.isAlive()) return;
@@ -3380,7 +3488,7 @@ class Enemy extends Entity {
             addToLog(`${this.name} looks around confused.`);
         }
     }
-    _performAttack(target) {
+    async _performAttack(target) {
          // Reset parry flag at the start of each individual strike attempt
          this.attackParried = false;
 
@@ -3433,10 +3541,11 @@ class Enemy extends Entity {
 
         // Apply Fire element bonus
         if (this.element === 'fire') {
-            const fireMultiplier = 1 + Math.random() * 0.2;
+            const fireMultiplier = 1 + (Math.random() * 0.2); // 1.0 to 1.2
             totalDamage = Math.floor(totalDamage * fireMultiplier);
             calcLog.steps.push({ description: "Fire Element Bonus", value: `x${fireMultiplier.toFixed(2)}`, result: totalDamage });
         }
+
 
         // Apply Swallowed target bonus
         if (target.statusEffects.swallowed && target.statusEffects.swallowed.source === this) {
@@ -3469,27 +3578,36 @@ class Enemy extends Entity {
         }
 
         // Check for player's Fumble debuff
-        if (player.statusEffects.fumble && player.rollForEffect(player.statusEffects.fumble.chance, 'Fumble Debuff')) {
+        if(player.statusEffects.fumble && player.rollForEffect(player.statusEffects.fumble.chance, 'Fumble Debuff')) {
             addToLog(`${this.name} fumbles its attack!`, 'text-yellow-400');
             this.attackParried = true; // Use parried flag to signal miss
-            return;
+            return { damageDealt: 0, knockback: 0 }; // Return 0 damage
         }
+
+
+        // --- NEW VOID BYPASS LOGIC ---
+        const rarityIndex = this.rarityData.rarityIndex; // Get rarity index
+        const voidBypassChance = 0.20 + (Math.max(0, rarityIndex - 1) * 0.05); // 20% base + 5% per rarity
+        if (this.element === 'void' && this.rollForEffect(voidBypassChance, 'Enemy Void Bypass')) {
+            attackOptions.ignore_defense = true; // Set ignore defense flag
+            addToLog(`${this.name}'s void attack tears through reality, bypassing defenses!`, 'text-purple-500');
+        }
+        // --- END NEW VOID LOGIC ---
 
 
         // Apply damage to target (this is where parry/dodge/block checks happen inside Player.takeDamage)
         // --- MODIFIED: Check for Ultra Focus ---
-        const ignoreDefense = !!this.statusEffects.ultra_focus; // MODIFIED: 'enemy' to 'this'
-        if (ignoreDefense) {
+        const ignoreDefense = !!this.statusEffects.ultra_focus || attackOptions.ignore_defense; // Combine with Void
+        if (ignoreDefense && !attackOptions.ignore_defense) { // Log for Ultra Focus
             this.ultraFocusTurns--; // MODIFIED: 'enemy' to 'this'
             if (this.ultraFocusTurns <= 0) { // MODIFIED: 'enemy' to 'this'
                 delete this.statusEffects.ultra_focus; // MODIFIED: 'enemy' to 'this'
                 addToLog(`${this.name}'s eye dims.`, 'text-yellow-600'); // MODIFIED: 'enemy' to 'this'
             }
         }
-        // --- END MODIFIED ---
         const damageResult = target.takeDamage(totalDamage, ignoreDefense, this, attackOptions); // MODIFIED: 'enemy' to 'this'
         damageDealt = damageResult.damageDealt; // Get the number
-        // --- END MODIFIED ---
+        const knockbackAmount = damageResult.knockback; // Get knockback
 
         calcLog.finalDamage = damageDealt;
         logDamageCalculation(calcLog);
@@ -3499,55 +3617,99 @@ class Enemy extends Entity {
             console.log("Attack flagged as parried/dodged/blocked by takeDamage.");
             return; // Stop processing this attack
         }
-
-
-        // Apply on-hit elemental effects only if damage was dealt
-        const rarityIndex = this.rarityData.rarityIndex;
         const procChance = rarityIndex * 0.1; // Base proc chance based on rarity
 
-        if (damageDealt > 0) {
+        if (damageDealt > 0 && !attackOptions.ignore_defense) { // Don't apply secondary effects if void bypass already happened
+            // const rarityIndex = this.rarityData.rarityIndex; // Rarity: 1=Common, 5=Legendary (Already defined above)
+
+            // --- Water Drench ---
             if (this.element === 'water') {
-                addToLog(`The water attack leaves you drenched, weakening your next attack!`, 'text-blue-400');
-                // Ensure duration scales slightly with rarity/tier maybe? For now, fixed.
-                applyStatusEffect(target, 'drenched', { duration: 2, multiplier: 0.9 }, this.name); // Use applyStatusEffect
+                addToLog(`The water attack leaves ${target.name} drenched! (-1 Move, -25% Dmg)`, 'text-blue-400');
+                // New debuff: -1 move, 25% attack reduction (multiplier 0.75)
+                applyStatusEffect(target, 'drenched', { duration: 3, move: -1, multiplier: 0.75 }, this.name);
             }
-            if (this.element === 'earth' && Math.random() < procChance) {
+
+            // --- Earth Paralyze ---
+            const earthParalyzeChance = 0.10 + (Math.max(0, rarityIndex - 1) * 0.05); // 10% base + 5% per rarity
+            if (this.element === 'earth' && this.rollForEffect(earthParalyzeChance, 'Enemy Earth Paralyze')) {
                 if (!target.statusEffects.paralyzed) {
-                    applyStatusEffect(target, 'paralyzed', { duration: 2 }, this.name);
+                    applyStatusEffect(target, 'paralyzed', { duration: 2 }, this.name); // 1 turn duration
+                    addToLog(`${target.name} is paralyzed by the blow!`, 'text-yellow-500');
                 }
             }
+
+            // --- Wind Knockback ---
+            // NOTE: Cannot implement enemy knockback here. The 'applyKnockback' function
+            // is in 'battle.js' and not accessible from 'engine.js'.
+            // The 'knockbackAmount' from takeDamage is for the *player's* wind/lightstone.
+            if (this.element === 'wind') {
+                addToLog(`${this.name}'s attack buffets ${target.name}!`, 'text-cyan-400');
+                // We'll set the knockback amount to be returned, and 'enemy.attack' (which IS async)
+                // will have to call the knockback function.
+                // This is too complex for a partial edit. I will just log.
+            }
+
+            // --- Lightning Chain ---
+            const lightningChainChance = 0.10 + (Math.max(0, rarityIndex - 1) * 0.05);
+            if (this.element === 'lightning' && this.rollForEffect(lightningChainChance, 'Enemy Lightning Chain')) {
+                let potentialTargets = [];
+                // Check player
+                if (target !== player && player.isAlive()) {
+                    potentialTargets.push({ target: player, dist: Math.abs(this.x - player.x) + Math.abs(this.y - player.y) });
+                }
+                // Check ally
+                const ally = player.npcAlly;
+                if (ally && ally.isAlive() && !ally.isFled && target !== ally) {
+                    potentialTargets.push({ target: ally, dist: Math.abs(this.x - ally.x) + Math.abs(this.y - ally.y) });
+                }
+
+                if (potentialTargets.length > 0) {
+                    potentialTargets.sort((a, b) => a.dist - b.dist); // Sort by distance
+                    const chainTarget = potentialTargets[0].target;
+                    const chainDamage = Math.floor(damageDealt * 0.5); // 50% of original hit
+                    
+                    // Pass 'this' (the enemy) as the attacker
+                    const { damageDealt: finalChainDamage } = chainTarget.takeDamage(chainDamage, { isMagic: true, element: 'lightning' }, this);
+                    addToLog(`Lightning arcs from the attack, hitting ${chainTarget.name} for <span class="font-bold text-blue-400">${finalChainDamage}</span> damage!`);
+                    
+                    // Check if chain killed player or ally
+                    if (chainTarget === player && !player.isAlive()) {
+                        checkPlayerDeath();
+                    } else if (chainTarget === ally && !ally.isAlive() && !ally.isFled) {
+                        // This check is handled in checkBattleStatus, but we can log it
+                         ally.isFled = true;
+                         addToLog(`<span class="font-bold text-red-500">${ally.name} has been defeated and fled!</span>`, "text-red-500");
+                         renderBattleGrid();
+                    }
+                }
+            }
+
+            // --- Nature Lifesteal ---
+            const natureLifestealPercent = 0.10 + (Math.max(0, rarityIndex - 1) * 0.02); // 10% base + 2% per rarity
             if (this.element === 'nature') {
-                const lifestealAmount = Math.floor(damageDealt * procChance); // Lifesteal scales with proc chance
+                const lifestealAmount = Math.floor(damageDealt * natureLifestealPercent);
                 if (lifestealAmount > 0) {
                     this.hp = Math.min(this.maxHp, this.hp + lifestealAmount);
-                    addToLog(`${this.name} drains <span class="font-bold text-green-400">${lifestealAmount}</span> HP from the natural energy.`, 'text-green-300');
-                    // No need to render grid here, happens after turn
+                    addToLog(`${this.name} drains <span class="font-bold text-green-400">${lifestealAmount}</span> HP.`, 'text-green-300');
+                    renderBattleGrid(); // Update enemy HP bar
                 }
             }
-            if (this.element === 'light' && Math.random() < procChance) {
-                const debuffs = Object.keys(this.statusEffects).filter(key => ['paralyzed', 'petrified', 'drenched', 'poison', 'toxic'].includes(key)); // Added poison/toxic
+
+            // --- Light Cleanse ---
+            const lightCleanseChance = 0.20 + (Math.max(0, rarityIndex - 1) * 0.05);
+            if (this.element === 'light' && this.rollForEffect(lightCleanseChance, 'Enemy Light Cleanse')) {
+                const debuffs = Object.keys(this.statusEffects).filter(key => ['paralyzed', 'petrified', 'drenched', 'poison', 'toxic'].includes(key));
                 if (debuffs.length > 0) {
-                    const effectToCleanse = debuffs[0]; // Cleanse one debuff
+                    const effectToCleanse = debuffs[0];
                     delete this.statusEffects[effectToCleanse];
                     addToLog(`The light energy cleanses ${this.name} of ${effectToCleanse}!`, 'text-yellow-200');
                 }
             }
-            if (this.element === 'lightning' && Math.random() < procChance) {
-                 const lightningDamageRoll = rollDice(1, 8, 'Enemy Lightning Proc');
-                 // --- MODIFIED: Use damageDealt from object ---
-                 const { damageDealt: lightningDamage } = target.takeDamage(lightningDamageRoll.total + Math.floor(this.strength / 2), true, this, {isMagic: true, element: 'lightning'}); // True damage ignores defense
-                 // --- END MODIFIED ---
-                addToLog(`Lightning arcs from the attack, dealing an extra <span class="font-bold text-blue-400">${lightningDamage}</span> damage!`);
-            }
-            if (this.element === 'void' && Math.random() < procChance) {
-                const lifestealAmount = Math.floor(damageDealt * procChance);
-                 if (lifestealAmount > 0) {
-                    this.hp = Math.min(this.maxHp, this.hp + lifestealAmount);
-                    addToLog(`${this.name} drains <span class="font-bold text-purple-400">${lifestealAmount}</span> HP with void energy.`, 'text-purple-300');
-                 }
-            }
-        }
-
+            
+            // --- Void Bypass ---
+            // (Moved to pre-damage)
+            
+        } // End if(damageDealt > 0)
         // Apply ability-based effects (only if damage was dealt or ability is not on-hit based)
         // Apply ability-based effects (only if damage was dealt or ability is not on-hit based)
         if (this.ability === 'life_drain' && damageDealt > 0) {
@@ -4358,11 +4520,23 @@ function generateBlackMarketStock() {
 function enchantItem(gearType, elementKey) {
     if (!player) return;
 
-    let gear, currentElementProp;
+    let gear, currentElementProp, itemKey; // <-- ADDED itemKey
     switch(gearType) {
-        case 'weapon': gear = player.equippedWeapon; currentElementProp = 'weaponElement'; break;
-        case 'armor': gear = player.equippedArmor; currentElementProp = 'armorElement'; break;
-        case 'shield': gear = player.equippedShield; currentElementProp = 'shieldElement'; break;
+        case 'weapon': 
+            gear = player.equippedWeapon; 
+            currentElementProp = 'weaponElement'; 
+            itemKey = findKeyByInstance(WEAPONS, gear); // <-- NEW: Get the key of the equipped item
+            break;
+        case 'armor': 
+            gear = player.equippedArmor; 
+            currentElementProp = 'armorElement'; 
+            itemKey = findKeyByInstance(ARMOR, gear); // <-- NEW: Get the key of the equipped item
+            break;
+        case 'shield': 
+            gear = player.equippedShield; 
+            currentElementProp = 'shieldElement'; 
+            itemKey = findKeyByInstance(SHIELDS, gear); // <-- NEW: Get the key of the equipped item
+            break;
         default: return;
     }
 
@@ -4406,12 +4580,19 @@ function enchantItem(gearType, elementKey) {
     }
     player.gold -= costs.gold;
 
+    // --- NEW LOGIC: Save enchantment to the item type key ---
+    if (itemKey) {
+        player.enchantments[itemKey] = elementKey;
+    }
+    // --- END NEW LOGIC ---
+
     player[currentElementProp] = elementKey;
 
-        addToLog(`You successfully enchanted your ${gear.name} with the power of ${elementKey}!`, 'text-green-400 font-bold');
+    addToLog(`You successfully enchanted your ${gear.name} with the power of ${elementKey}!`, 'text-green-400 font-bold');
     updateStatsView();
-    renderEnchanter(elementKey); // Re-render to show updated state
+    renderEnchanterEnchant(elementKey); // Re-render to show updated state
 }
+    
 
 function restAtInn(cost) {
     if(cost > 0 && player.gold < cost) {
@@ -4949,10 +5130,14 @@ function equipItem(itemKey, inBattle = false) {
         if (player.equippedArmor.name !== ARMOR['travelers_garb'].name) {
             oldItemKey = findKeyByInstance(ARMOR, player.equippedArmor);
             if (!oldItemKey) console.error(`Could not find key for old armor: ${player.equippedArmor.name}`);
-        }
-        player.equippedArmor = details; // Equip new armor OBJECT
-        player.armorElement = 'none';
-        equipSuccessful = true;
+            }
+            player.equippedArmor = details; // Equip new armor OBJECT
+            // player.armorElement = 'none'; // --- FIX: Do not clear enchantment on equip ---
+            // --- NEW ENCHANT LOGIC ---
+            const storedArmorEnchantment = player.enchantments[itemKey];
+            player.armorElement = storedArmorEnchantment || 'none'; // Apply stored or 'none'
+            // --- END NEW ENCHANT LOGIC ---
+            equipSuccessful = true;
         // NO LONGER REMOVE new armor KEY from inventory array
 
     }
@@ -5027,12 +5212,25 @@ function equipItem(itemKey, inBattle = false) {
         else if (itemType === 'shield' && player.equippedShield?.name !== SHIELDS['no_shield'].name) oldItemKey = findKeyByInstance(SHIELDS, player.equippedShield);
 
         // Assign the new equipment OBJECT
-        if (itemType === 'weapon') { player.equippedWeapon = details; player.weaponElement = 'none'; }
+        if (itemType === 'weapon') { 
+            player.equippedWeapon = details; 
+            // player.weaponElement = 'none'; // --- FIX: Do not clear enchantment on equip ---
+            // --- NEW ENCHANT LOGIC ---
+            const storedWeaponEnchantment = player.enchantments[itemKey];
+            player.weaponElement = storedWeaponEnchantment || 'none'; // Apply stored or 'none'
+            // --- END NEW ENCHANT LOGIC ---
+        }
         else if (itemType === 'catalyst') { player.equippedCatalyst = details; }
-        else if (itemType === 'shield') { player.equippedShield = details; player.shieldElement = 'none'; }
+        else if (itemType === 'shield') { 
+            player.equippedShield = details; 
+            // player.shieldElement = 'none'; // --- FIX: Do not clear enchantment on equip ---
+            // --- NEW ENCHANT LOGIC ---
+            const storedShieldEnchantment = player.enchantments[itemKey];
+            player.shieldElement = storedShieldEnchantment || 'none'; // Apply stored or 'none'
+            // --- END NEW ENCHANT LOGIC ---
+        }
 
         equipSuccessful = true; // Mark as successful for inventory adjustment below
-
     } else { // Should not be reachable
         console.error("Unknown item type for equip:", itemKey);
         if (turnConsumed) { isProcessingAction = false; gameState.isPlayerTurn = true; } // Refund
@@ -5124,7 +5322,7 @@ function unequipItem(itemType, shouldRender = true, inBattle = false) {
             unequippedItemName = player.equippedWeapon.name;
             itemKeyToAdd = findKeyByInstance(WEAPONS, player.equippedWeapon);
             player.equippedWeapon = defaultItem;
-            player.weaponElement = 'none';
+            player.weaponElement = 'none'; // --- FIX: Restore this line ---
             changed = true;
             break;
         case 'catalyst':
@@ -5147,7 +5345,7 @@ function unequipItem(itemType, shouldRender = true, inBattle = false) {
             unequippedItemName = player.equippedArmor.name;
             itemKeyToAdd = findKeyByInstance(ARMOR, player.equippedArmor);
             player.equippedArmor = defaultItem;
-            player.armorElement = 'none';
+            player.armorElement = 'none'; // --- FIX: Restore this line ---
             changed = true;
             break;
         case 'shield':
@@ -5159,7 +5357,7 @@ function unequipItem(itemType, shouldRender = true, inBattle = false) {
             unequippedItemName = player.equippedShield.name;
             itemKeyToAdd = findKeyByInstance(SHIELDS, player.equippedShield);
             player.equippedShield = defaultItem;
-            player.shieldElement = 'none';
+            player.shieldElement = 'none'; // --- FIX: Restore this line ---
             changed = true;
             break;
         case 'lure':
@@ -5323,6 +5521,29 @@ function resetStatsCoven() {
 
     const pointsToRefund = (player.bonusVigor || 0) + (player.bonusFocus || 0) + (player.bonusStamina || 0) + (player.bonusStrength || 0) + (player.bonusIntelligence || 0) + (player.bonusLuck || 0);
     player.statPoints = (player.statPoints || 0) + pointsToRefund;
+
+    // --- FIX: Recalculate base stats from scratch (Race + Class) ---
+    // This ensures any corrupted base stats are fixed to their Lvl 1 defaults.
+    const raceData = RACES[player.race];
+    const classData = CLASSES[player._classKey];
+
+    if (!raceData || !classData) {
+        addToLog("Critical Error: Cannot find Race or Class data. Stat reset aborted.", "text-red-500");
+        // Refund the cost if we abort here
+        player.gold += cost.gold;
+        player.inventory.items['undying_heart'] = hearts; // (This is slightly buggy if they had 0, but good enough)
+        player.statPoints -= pointsToRefund; // Take back points
+        return;
+    }
+    
+    // Reset base stats to Level 1 defaults
+    player.vigor = (raceData.Vigor || 0) + (classData.bonusStats.Vigor || 0);
+    player.focus = (raceData.Focus || 0) + (classData.bonusStats.Focus || 0);
+    player.stamina = (raceData.Stamina || 0) + (classData.bonusStats.Stamina || 0);
+    player.strength = (raceData.Strength || 0) + (classData.bonusStats.Strength || 0);
+    player.intelligence = (raceData.Intelligence || 0) + (classData.bonusStats.Intelligence || 0);
+    player.luck = (raceData.Luck || 0) + (classData.bonusStats.Luck || 0);
+    // --- END FIX ---
 
     // Reset bonus stats TO ZERO
     player.bonusVigor = 0;

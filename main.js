@@ -179,6 +179,7 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey, di
         dialogueFlags: {},
         knownCookingRecipes: [],
         knownAlchemyRecipes: [],
+        enchantments: {}, // <-- NEW: Initialize enchantments
         seed: Math.floor(Math.random() * 1000000),
         // --- Initialize Progression Properties ---
         killsSinceLevel4: 0,
@@ -601,6 +602,7 @@ async function loadGameFromKey(docId, isImport = false) {
             if (!newAlly.inventory) newAlly.inventory = { items: {}, size: 10, stack: 10 };
             if (!newAlly.equipmentOrder) newAlly.equipmentOrder = [];
             if (newAlly.isResting === undefined) newAlly.isResting = false; // <<< NEW
+            if (!newAlly.enchantments) newAlly.enchantments = {}; // <-- NEW: Ally enchantment migration
 
             // --- END MIGRATION ---
             
@@ -632,10 +634,14 @@ async function loadGameFromKey(docId, isImport = false) {
         ['storageTier', 'gardenTier', 'kitchenTier', 'alchemyTier', 'trainingTier'].forEach(tier => {
             if (player.house[tier] === undefined) player.house[tier] = 0;
         });
+        if (player.house.alchemyTier === undefined) player.house.alchemyTier = 0;
+        if (player.house.trainingTier === undefined) player.house.trainingTier = 0;
         if (!Array.isArray(player.house.garden)) player.house.garden = [];
+        if (!player.house.treePlots || !Array.isArray(player.house.treePlots)) player.house.treePlots = [];
         if (!player.difficulty) player.difficulty = 'hardcore';
         if (!player.knownCookingRecipes) player.knownCookingRecipes = [];
         if (!player.knownAlchemyRecipes) player.knownAlchemyRecipes = [];
+        if (!player.enchantments) player.enchantments = {}; // <-- NEW: Player enchantment migration
         if (!player.seed) player.seed = Math.floor(Math.random() * 1000000);
         if (player.elementalAffinity === undefined) player.elementalAffinity = null; // Add default for old saves
         // --- NPC ALLY: Migration for Player ---

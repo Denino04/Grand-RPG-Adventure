@@ -24,14 +24,22 @@ function getWeaponStatsString(weapon) {
     if (!weapon || !weapon.name) return 'None';
 
     let stats = [];
-    stats.push(`${weapon.damage[0]}d${weapon.damage[1]}`);
+    // --- MODIFICATION: Add bonus 1d8 to stats string if enchanted ---
+    let damageString = `${weapon.damage[0]}d${weapon.damage[1]}`;
+    const elementText = player.weaponElement !== 'none' ? ` <span class="font-bold text-cyan-300">[${capitalize(player.weaponElement)}]</span>` : '';
+
+    if (player.weaponElement !== 'none') {
+        damageString += ' + 1d8'; // Add the bonus dice string
+    }
+    stats.push(damageString);
+    // --- END MODIFICATION ---
 
     // Add specific weapon effect stats
     if(weapon.effect?.critChance) stats.push(`Crit: ${weapon.effect.critChance*100}%`);
     if(weapon.effect?.armorPierce) stats.push(`Pierce: ${weapon.effect.armorPierce*100}%`);
 
 
-    const elementText = player.weaponElement !== 'none' ? ` <span class="font-bold text-cyan-300">[${capitalize(player.weaponElement)}]</span>` : '';
+    // --- REMOVED old elementText line ---
     return `${weapon.name} (${stats.join(', ')})${elementText}`;
 }
 
@@ -4300,13 +4308,12 @@ function renderPostBattleMenu() {
             // Do not increment encountersSinceLastPay
         }
         // --- END NEW ---
-        else if (player.npcAlly.isFled) {
-            addToLog(`<span class="font-bold text-red-700">${player.npcAlly.name} has fled and is gone for good, taking all their equipment...</span>`, "text-red-700");
-            player.npcAlly = null; // Ally is permanently gone
-            player.encountersSinceLastPay = 0; // Reset counter
-        } else if (preTrainingState === null) { // Don't increment salary for training
+        // --- REMOVED REDUNDANT 'isFled' BLOCK ---
+        // else if (player.npcAlly.isFled) { ... } // This block is GONE.
+        else if (preTrainingState === null) { // Don't increment salary for training
             player.encountersSinceLastPay++;
             addToLog(`${player.npcAlly.name} looks weary, but stands ready. (HP: ${player.npcAlly.hp}/${player.npcAlly.maxHp})`, "text-blue-200");
+
             // HP/MP are *not* restored
         }
     }
