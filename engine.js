@@ -2866,8 +2866,19 @@ class NpcAlly extends Entity {
             addToLog(`Temporary effects on ${this.name} wear off.`, "text-gray-400");
         }
     }
-    
-    // --- 2-of-3 RULE FIX ---
+
+    // --- NEWLY ADDED METHOD TO FIX CRASH ---
+    clearFoodBuffs() {
+        // Check if foodBuffs exists and has keys
+        if (this.foodBuffs && Object.keys(this.foodBuffs).length > 0) {
+            this.foodBuffs = {};
+            addToLog(`The effects of ${this.name}'s last meal have worn off.`, "text-gray-400");
+            // Recalculate max HP/MP just in case (getters do this), then clamp
+            this.hp = Math.min(this.hp, this.maxHp);
+            this.mp = Math.min(this.mp, this.maxMp);
+            // No updateStatsView() needed here, ally stats aren't in the main UI
+        }
+    }
     
     /**
      * Equips an item to the ally, handling 2-of-3 rule.
