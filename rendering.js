@@ -2826,28 +2826,34 @@ function renderEnchanterMenu() {
 }
 
 function renderArcaneCasino() {
-    applyTheme('casino'); // Use our new theme
+    applyTheme('casino');
     lastViewBeforeInventory = 'casino_hub';
     gameState.currentView = 'casino_hub';
 
-    // --- NEW: Reset secret code sequence when entering casino
+    // Reset secret code sequence when entering casino
     if (typeof casinoSecretCode !== 'undefined') {
         casinoSecretCode = [];
     }
-    // --- END NEW
 
     let html = `
     <div class="w-full text-center">
-        <h2 class="font-medieval text-3xl mb-4 text-center">The Crooked C<span data-char="A" class="casino-secret-char cursor-pointer hover:text-yellow-300">a</span>rd</h2>
-        <!-- --- FIX: Removed extra newlines and spaces to keep words intact --- -->
+        <h2 class="font-medieval text-3xl mb-4 text-center">
+            The Crooked C<span data-char="A" class="casino-secret-char cursor-pointer hover:text-yellow-300">a</span>rd
+        </h2>
+        
+        <p class="text-gray-400 mb-6 max-w-md mx-auto">
+            "Welcome. Only the truly <span data-char="B" class="casino-secret-char cursor-pointer hover:text-yellow-300">B</span>old win big here.
+            This is no p<span data-char="L" class="casino-secret-char cursor-pointer hover:text-yellow-300">l</span><span data-char="A" class="casino-secret-char cursor-pointer hover:text-yellow-300">a</span>ce 
+            for the timid. The Pa<span data-char="T" class="casino-secret-char cursor-pointer hover:text-yellow-300">t</span>ron 
+            watches all, fav<span data-char="O" class="casino-secret-char cursor-pointer hover:text-yellow-300">o</span>ring those 
+            who <span data-char="R" class="casino-secret-char cursor-pointer hover:text-yellow-300">r</span>isk everything."
+        </p>
         <div class="flex flex-col justify-center items-center gap-4">
-            <!-- Row 1: Main Games -->
             <div class="flex flex-col md:flex-row justify-center items-center gap-4">
                 <button onclick="renderBlackjack()" class="btn btn-primary w-full md:w-auto">Play "Arcane 21"</button>
                 <button onclick="renderPoker()" class="btn btn-primary w-full md:w-auto">Play 5-Card Draw</button>
             </div>
             
-            <!-- Row 2: Secret Game (conditionally rendered) -->
             <button id="roguelike-game-btn" onclick="renderRoguelikeGame()" 
                     class="btn btn-primary w-full md:w-auto ${!player.unlocks.roguelikeCardGame ? 'hidden' : ''} border-2 border-purple-500 hover:bg-purple-700 hover:border-purple-400 focus:ring-2 focus:ring-purple-300">
                 Play ???
@@ -2861,10 +2867,10 @@ function renderArcaneCasino() {
     container.innerHTML = html;
     render(container);
     
-    // --- NEW: Initialize secret click listeners ---
-    console.log("[CASINO DEBUG] Calling initCasinoSecret()..."); // <-- ADDED DEBUG
+    // This function will now find all 7 new spans
     initCasinoSecret();
 }
+
 // --- END NEW FUNCTION ---
 function initCasinoSecret() {
     console.log("[CASINO DEBUG] initCasinoSecret() called.");
