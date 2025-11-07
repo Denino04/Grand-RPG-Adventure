@@ -545,6 +545,16 @@ const NPC_RANDOM_NAMES = {
 };
 const CHANGELOG_DATA = [
     {
+        version: "v0.7.1 - Den of Sinners",
+        date: "2025-11-07",
+        changes: [
+            "Adds Crooked Card for those who wants to gamble",
+            "Crooked Card comes with 2 games, Arcane 21 and 5-Draw Card",
+            "Add a secrets",
+            "General Bug Fixing"
+        ]
+    },
+    {
         version: "v0.6.3 - Ally & Progression Refactor",
         date: "2025-10-31",
         changes: [

@@ -373,8 +373,11 @@ class Player extends Entity {
             witchCoven: false,
             barracks: false, // <<< NEW
             hasBlacksmithKey: false,
-            hasTowerKey: false
+            hasTowerKey: false,
+            roguelikeCardGame: false // <-- NEW FLAG
         };
+        this.lastCasinoBet = 10; // <-- NEW
+        this.lastCasinoAnte = 10; // <-- NEW
         // --- End Added ---
 
 
@@ -1023,6 +1026,10 @@ class Player extends Entity {
         if (this.level === 5 && !this.unlocks.blackMarket) {
             this.unlocks.blackMarket = true;
             addToLog("The whispers of shady dealings start to fly around. It looks like the black market has reached this frontier town.");
+        }
+        if (this.level >= 10 && !this.unlocks.arcaneCasino) { // Changed === to >=
+            this.unlocks.arcaneCasino = true;
+            addToLog("You've heard whispers of a new 'entertainment' venue opening in the Arcane Quarter. Might be worth a look.");
         }
         // --- End Added ---
                 // --- NEW: Level up NPC Ally ---

@@ -200,6 +200,7 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey, di
         // --- NEW: Roster for Barracks ---
         barracksRoster: [],
         // --- END NEW ---
+        arcaneCasino: false // Add casino unlock flag
     });
      console.log("Player object base created:", player);
 
@@ -677,8 +678,11 @@ async function loadGameFromKey(docId, isImport = false) {
             if (player.unlocks.hasTowerKey === undefined) player.unlocks.hasTowerKey = !!player.inventory?.items?.['tower_key'];
             // --- NPC ALLY: Barracks migration ---
             if (player.unlocks.barracks === undefined) player.unlocks.barracks = (player.level >= 8);
-            // --- END NPC ALLY ---
+            if (player.unlocks.roguelikeCardGame === undefined) player.unlocks.roguelikeCardGame = false; // <-- NEW FLAG MIGRATION
+            if (player.lastCasinoBet === undefined) player.lastCasinoBet = 10; // <-- NEW
+            if (player.lastCasinoAnte === undefined) player.lastCasinoAnte = 10; // <-- NEW
         }
+            // --- END NPC ALLY ---
         // --- End Added ---
                 // --- NEW: Retroactive Unlock Fix for saves that have 'false' ---
         // This runs *after* the initial migration, catching old saves
@@ -693,6 +697,10 @@ async function loadGameFromKey(docId, isImport = false) {
         if (player.level >= 8 && !player.unlocks.barracks) {
             player.unlocks.barracks = true;
             console.log("Retroactively unlocked Barracks.");
+        }
+        if (player.level >= 10 && !player.unlocks.arcaneCasino) {
+            player.unlocks.arcaneCasino = true;
+            console.log("Retroactively unlocked Arcane Casino.");
         }
         // Check for keys, then unlock the location
         if (player.inventory?.items?.['blacksmith_key'] && !player.unlocks.blacksmith) {

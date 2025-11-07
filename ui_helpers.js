@@ -1374,7 +1374,20 @@ const PALETTES = {
     'magic': { '--bg-main': '#2c1b47', '--bg-secondary': '#1a102d', '--bg-log': 'rgba(10, 5, 20, 0.5)', '--bg-tooltip': '#1a102d', '--border-main': '#4a3a6b', '--text-main': '#e6defe', '--text-accent': '#f0abfc', '--btn-primary-bg': '#4a3a6b', '--btn-primary-bg-hover': '#6a5a8b', '--btn-primary-border': '#2c215d', '--btn-primary-border-hover': '#4a3a6b' },
     'noon': { '--bg-main': '#2aa198', '--bg-secondary': '#248d84', '--bg-log': 'rgba(36, 141, 132, 0.6)', '--bg-tooltip': '#248d84', '--border-main': '#47b5ab', '--text-main': '#fdf6e3', '--text-accent': '#facc15', '--btn-primary-bg': '#073642', '--btn-primary-bg-hover': '#586e75', '--btn-primary-border': '#93a1a1', '--btn-primary-border-hover': '#eee8d5', '--btn-primary-text': '#fdf6e3' },
     'sunset': { '--bg-main': '#d35400', '--bg-secondary': '#aa4400', '--bg-log': 'rgba(255, 240, 230, 0.3)', '--bg-tooltip': '#aa4400', '--border-main': '#f39c12', '--text-main': '#fdf6e3', '--text-accent': '#e74c3c', '--btn-primary-bg': '#8e44ad', '--btn-primary-bg-hover': '#9b59b6', '--btn-primary-border': '#6c3483', '--btn-primary-border-hover': '#8e44ad' },
-    'midnight': { '--bg-main': '#0c0c1d', '--bg-secondary': '#05050f', '--bg-log': 'rgba(20, 20, 40, 0.5)', '--bg-tooltip': '#05050f', '--border-main': '#2d2d5a', '--text-main': '#bdc3c7', '--text-accent': '#1abc9c', '--btn-primary-bg': '#2d2d5a', '--btn-primary-bg-hover': '#4a4a8c', '--btn-primary-border': '#1c1c3a', '--btn-primary-border-hover': '#2d2d5a' }
+    'midnight': { '--bg-main': '#0c0c1d', '--bg-secondary': '#05050f', '--bg-log': 'rgba(20, 20, 40, 0.5)', '--bg-tooltip': '#05050f', '--border-main': '#2d2d5a', '--text-main': '#bdc3c7', '--text-accent': '#1abc9c', '--btn-primary-bg': '#2d2d5a', '--btn-primary-bg-hover': '#4a4a8c', '--btn-primary-border': '#1c1c3a', '--btn-primary-border-hover': '#2d2d5a' },
+    'casino': { 
+        '--bg-main': '#4a1d68', // Deep Purple
+        '--bg-secondary': '#2b103d',
+        '--bg-log': 'rgba(20, 10, 30, 0.5)',
+        '--bg-tooltip': '#2b103d',
+        '--border-main': '#7a3ea5',
+        '--text-main': '#e9d5ff',
+        '--text-accent': '#fcd34d', // Gold
+        '--btn-primary-bg': '#7a3ea5',
+        '--btn-primary-bg-hover': '#9333ea',
+        '--btn-primary-border': '#581c87',
+        '--btn-primary-border-hover': '#6b21a8'
+    }
 };
 
 /**

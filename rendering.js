@@ -944,11 +944,12 @@ function returnFromInventory() {
          case 'enchanter_menu': renderArcaneQuarter(); break; // Back from main enchanter menu
          case 'enchanter_shop': renderEnchanterMenu(); break; // Back from shop goes to enchanter menu
          case 'enchanter_enchant': renderEnchanterMenu(); break; // Back from enchant goes to enchanter menu
-         // --- END MODIFICATION ---
+         case 'casino_hub': renderArcaneQuarter(); break;
+         case 'blackjack': renderArcaneCasino(); break;
+         case 'poker': renderArcaneCasino(); break; // <-- ADD THIS
         default: renderTownSquare();
     }
 }
-
 
 function exitGame() {
     addToLog('Saving your progress...');
@@ -2411,11 +2412,30 @@ function renderBook(bookKey, chapterIndex = 0) {
                             title: getItemDetails(recipe.output).name,
                             content: `<p><strong>Requires:</strong> ${ingredients}</p>`
                         });
-                    }
+                    } 
+                }
+            });
+        }  else if (book.recipeType === 'clues') {
+            const clues = [
+                { key: 'ripped_paper_1', text: '"Click"' },
+                { key: 'ripped_paper_2', text: '"Bal"' },
+                { key: 'ripped_paper_3', text: '"At"' },
+                { key: 'ripped_paper_4', text: '"Ro"' },
+                { key: 'ripped_paper_5', text: '"Casino"' }
+            ];
+
+            clues.forEach(clue => {
+                if (player.inventory.items[clue.key]) {
+                    book.chapters.push({
+                        title: clue.text,
+                        content: `<p class="text-2xl font-medieval text-center italic">${clue.text}</p>`
+                    });
                 }
             });
         }
+        // --- END NEW ---
     }
+
 
     const contentArea = $('#library-content-view');
 
@@ -2627,7 +2647,8 @@ function renderArcaneQuarter() {
     const locations = [
         { name: "Sage's Tower", action: "renderSageTowerMenu()", unlocked: player.unlocks.sageTower },
         { name: 'Enchanter', action: "renderEnchanterMenu()", unlocked: player.unlocks.enchanter },
-        { name: "Witch's Coven", action: "renderWitchsCoven()", unlocked: player.unlocks.witchCoven }
+        { name: "Witch's Coven", action: "renderWitchsCoven()", unlocked: player.unlocks.witchCoven },
+        { name: 'The Crooked Card', action: "renderArcaneCasino()", unlocked: player.unlocks.arcaneCasino }
     ];
 
     let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Arcane Quarter</h2>
@@ -2804,6 +2825,866 @@ function renderEnchanterMenu() {
     render(container);
 }
 
+function renderArcaneCasino() {
+    applyTheme('casino'); // Use our new theme
+    lastViewBeforeInventory = 'casino_hub';
+    gameState.currentView = 'casino_hub';
+
+    // --- NEW: Reset secret code sequence when entering casino
+    if (typeof casinoSecretCode !== 'undefined') {
+        casinoSecretCode = [];
+    }
+    // --- END NEW
+
+    let html = `
+    <div class="w-full text-center">
+        <h2 class="font-medieval text-3xl mb-4 text-center">The Crooked C<span data-char="A" class="casino-secret-char cursor-pointer hover:text-yellow-300">a</span>rd</h2>
+        <!-- --- FIX: Removed extra newlines and spaces to keep words intact --- -->
+        <div class="flex flex-col justify-center items-center gap-4">
+            <!-- Row 1: Main Games -->
+            <div class="flex flex-col md:flex-row justify-center items-center gap-4">
+                <button onclick="renderBlackjack()" class="btn btn-primary w-full md:w-auto">Play "Arcane 21"</button>
+                <button onclick="renderPoker()" class="btn btn-primary w-full md:w-auto">Play 5-Card Draw</button>
+            </div>
+            
+            <!-- Row 2: Secret Game (conditionally rendered) -->
+            <button id="roguelike-game-btn" onclick="renderRoguelikeGame()" 
+                    class="btn btn-primary w-full md:w-auto ${!player.unlocks.roguelikeCardGame ? 'hidden' : ''} border-2 border-purple-500 hover:bg-purple-700 hover:border-purple-400 focus:ring-2 focus:ring-purple-300">
+                Play ???
+            </button>
+        </div>
+            <div class="mt-8">
+            <button onclick="renderArcaneQuarter()" class="btn btn-action">Back to Arcane Quarter</button>
+        </div>
+    </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+    
+    // --- NEW: Initialize secret click listeners ---
+    console.log("[CASINO DEBUG] Calling initCasinoSecret()..."); // <-- ADDED DEBUG
+    initCasinoSecret();
+}
+// --- END NEW FUNCTION ---
+function initCasinoSecret() {
+    console.log("[CASINO DEBUG] initCasinoSecret() called.");
+    // --- FIX: Corrected unlock key name ---
+    if (player.unlocks.roguelikeCardGame) {
+    // --- END FIX ---
+        console.log("[CASINO DEBUG] Game already unlocked. Skipping listeners.");
+        return; // Don't attach if already unlocked
+    }
+
+    const secretSpans = document.querySelectorAll('.casino-secret-char');
+    console.log(`[CASINO DEBUG] Found ${secretSpans.length} clickable secret spans.`);
+
+    secretSpans.forEach(span => {
+        span.addEventListener('click', (e) => {
+            // Prevent click from bubbling if needed
+            e.stopPropagation(); 
+            
+            const char = e.target.dataset.char;
+            console.log(`[CASINO DEBUG] Click detected on: ${char}`);
+            if (char) {
+                checkCasinoCode(char); // Call the logic function in casino.js
+                
+                // Optional: visual feedback on click
+                e.target.style.transition = 'color 0.3s ease';
+                e.target.style.color = '#facc15'; // Bright gold
+                setTimeout(() => {
+                    e.target.style.color = ''; // Reset to default (or hover color)
+                }, 300);
+            }
+        });
+    });
+}
+
+function evaluateRoguelikeHand(hand) {
+    const counts = {};
+    let aceCount = 0;
+    let initialValue = 0;
+
+    hand.forEach(card => {
+        counts[card.weight] = (counts[card.weight] || 0) + 1;
+        initialValue += card.weight;
+        if (card.value === 'A') aceCount++;
+    });
+
+    let pairs = 0;
+    let isThreeOfAKind = false;
+    let isFourOfAKind = false;
+    for (const weight in counts) {
+        if (counts[weight] === 4) isFourOfAKind = true;
+        if (counts[weight] === 3) isThreeOfAKind = true;
+        if (counts[weight] === 2) pairs++;
+    }
+
+    let acesDevalued = 0;
+    let tempValue = initialValue;
+    let acesAt11Start = aceCount;
+    while (tempValue > 21 && acesAt11Start > 0) {
+        tempValue -= 10;
+        acesAt11Start--;
+        acesDevalued++;
+    }
+    const acesAt11Final = acesAt11Start;
+    const isTeamOfAce = acesAt11Final > 0 && acesDevalued > 0;
+
+    return {
+        pairs: pairs,
+        isTwoPair: pairs === 2,
+        isThreeOfAKind: isThreeOfAKind,
+        isFourOfAKind: isFourOfAKind,
+        isTeamOfAce: isTeamOfAce
+    };
+}
+// --- END NEW HELPER ---
+
+function renderRoguelikeGame() {
+    const state = roguelikeBlackjackState;
+    
+    if (!state.runActive) {
+        renderRoguelikeBuyInScreen();
+    } else if (state.gamePhase === 'shop') {
+        renderRoguelikeShop();
+    } else if (['player_draft', 'dealer_draft', 'dealer_final_draft', 'bust'].includes(state.gamePhase)) {
+        renderRoguelikeHandUI();
+    } else if (state.gamePhase === 'hand_results') {
+        renderRoguelikeResultsUI();
+    // --- NEW: Added state for starting a new wave ---
+    } else if (state.gamePhase === 'stake_start') {
+        // This is a transition state, just call the function to move to the next stake
+        roguelikeContinueToStake();
+    }
+}
+
+function renderRoguelikeBuyInScreen() {
+    applyTheme('void');
+    lastViewBeforeInventory = 'casino_hub';
+    gameState.currentView = 'roguelike_game';
+    const buyIn = roguelikeBlackjackState.buyIn;
+
+    let html = `
+    <div class="w-full text-center">
+        <h2 class="font-medieval text-3xl mb-4 text-center">Arcane 21: The Endless Run</h2>
+        <p class="mb-2 text-gray-300">Welcome to the high-stakes table. A single run consists of 8 stakes of increasing difficulty.</p>
+        <p class="mb-6 text-gray-300">Beat all 8 stakes to win a massive prize. Fail to meet any stake, and your run is over.</p>
+        <p class="text-2xl font-bold text-yellow-300 mb-6">Buy-in: ${buyIn} G</p>
+        <div class="flex flex-col md:flex-row justify-center items-center gap-4">
+            <button onclick="startRoguelikeRun()" class="btn btn-primary w-full md:w-auto" ${player.gold < buyIn ? 'disabled' : ''}>
+                Start Run (${buyIn} G)
+            </button>
+        </div>
+            <div class="mt-8">
+            <button onclick="renderArcaneCasino()" class="btn btn-action">Back to Casino</button>
+        </div>
+    </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+function renderRoguelikeHandUI() {
+    applyTheme('casino');
+    lastViewBeforeInventory = 'casino_hub';
+    gameState.currentView = 'roguelike_game';
+    
+    const state = roguelikeBlackjackState;
+    const ante = ANTE_STRUCTURE[state.currentAnteIndex];
+    const vingtUn = ante.vingtUns[state.currentVingtUnIndex];
+
+    let dealerScoreText = "?";
+    if (state.dealerHand.length > 0) {
+        if (state.gamePhase === 'player_draft' || state.gamePhase === 'dealer_draft') {
+            dealerScoreText = state.dealerHand[0].weight; 
+        } else {
+            dealerScoreText = calculateHandValue(state.dealerHand);
+        }
+    }
+
+    const scoreComponents = getRoguelikeScoreComponents();
+    const displayBase = scoreComponents.base;
+    const displayMult = scoreComponents.mult;
+
+    let patronSkillsHtml = state.patronSkills.map(key => {
+        const skill = PATRON_SKILLS[key];
+        if (!skill) return `<div class="text-xs p-1 bg-slate-800 rounded">Error: Unknown Skill</div>`;
+        return `<div class="text-xs p-1 bg-slate-800 rounded" onmouseover="showSimpleTooltip('${skill.desc}', event)" onmouseout="hideSimpleTooltip()"><strong>${skill.name}</strong></div>`;
+    }).join('') || '<p class="text-xs text-gray-500 text-center">None</p>';
+
+    let html = `
+    <div class="w-full h-full flex flex-col text-center p-2">
+        <div class="flex-shrink-0 flex justify-between items-center mb-2 px-2">
+            <h2 class="font-medieval text-xl">Ante ${state.currentAnteIndex + 1}: ${vingtUn.name} | <span class="text-yellow-300">Crookards: ${state.currentCrookards}</span></h2>
+            <h3 class="font-bold text-lg text-yellow-300">Target: <span class="text-2xl">${state.currentChips} / ${vingtUn.chipsToWin}</span></h3>
+            <h3 class="font-bold text-lg text-white">Hands Left: <span class="text-2xl">${state.currentHandsLeft}</span></h3>
+        </div>
+
+        <div class="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden">
+            
+            <div class="flex flex-col gap-2 overflow-hidden">
+                <div class="bg-slate-900/50 p-2 rounded-lg flex-1 flex flex-col overflow-y-auto inventory-scrollbar">
+                    <h4 class="font-bold text-yellow-300 text-center mb-2 flex-shrink-0">Patron Skills (${state.patronSkills.length})</h4>
+                    <div classs="space-y-1">${patronSkillsHtml}</div>
+                </div>
+                <div class="bg-slate-900/50 p-2 rounded-lg flex-1 flex flex-col overflow-y-auto inventory-scrollbar">
+                    <h4 class="font-bold text-yellow-300 text-center mb-2 flex-shrink-0">Passives (${state.passiveModifiers.length}/${state.runUpgrades.passiveSlots})</h4>
+                    <div classs="space-y-1">
+                        ${state.passiveModifiers.map(key => {
+                            const mod = BJ_PASSIVE_MODIFIERS[key];
+                            if (!mod) return `<div class="text-xs p-1 bg-slate-800 rounded">Error: Unknown Passive</div>`;
+                            return `<div class="text-xs p-1 bg-slate-800 rounded" onmouseover="showSimpleTooltip('${mod.desc}', event)" onmouseout="hideSimpleTooltip()"><strong>${mod.name}</strong></div>`;
+                        }).join('') || '<p class="text-xs text-gray-500 text-center">None</p>'}
+                    </div>
+                </div>
+                <div class="bg-slate-900/50 p-2 rounded-lg flex-1 flex flex-col overflow-y-auto inventory-scrollbar">
+                    <h4 class="font-bold text-yellow-300 text-center mb-2 flex-shrink-0">Consumables (${state.consumables.length}/${state.runUpgrades.consumableSlots})</h4>
+                    <div classs="space-y-1">
+                        ${state.consumables.map(key => {
+                            const item = BJ_CONSUMABLES[key];
+                            if (!item) return `<button class="btn btn-item text-xs w-full mb-1" disabled>Error</button>`;
+                            return `<button class="btn btn-item text-xs w-full mb-1" onmouseover="showSimpleTooltip('${item.desc}', event)" onmouseout="hideSimpleTooltip()"
+                                        onclick="roguelikePlayerDraft(null, '${key}')" ${state.gamePhase !== 'player_draft' ? 'disabled' : ''}>
+                                    ${item.name}
+                                    </button>`;
+                        }).join('') || '<p class="text-xs text-gray-500 text-center">None</p>'}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-col gap-2">
+                <div class="mb-1">
+                    <h3 class="font-bold text-lg text-red-400">Dealer's Hand (<span id="rl-dealer-score">${dealerScoreText}</span>)</h3>
+                    <div id="rl-dealer-hand" class="flex justify-center items-center h-16 bg-black/20 rounded-lg p-2 text-3xl gap-2">
+                        ${state.dealerHand.map((card, index) => {
+                            const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
+                            if (state.gamePhase !== 'player_draft' && state.gamePhase !== 'dealer_draft') {
+                                return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`;
+                            }
+                            if (index === 0) {
+                                return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`;
+                            } else {
+                                return `<div class="bg-red-800 border-2 border-red-900 text-red-400 p-2 rounded-md shadow-inner w-10 h-16 flex items-center justify-center text-2xl">?</div>`;
+                            }
+                        }).join('')}
+                    </div>
+                </div>
+
+                <div class="mb-1">
+                    <h3 class="font-bold text-lg text-green-400">Your Hand (<span id="rl-player-score">${calculateHandValue(state.playerHand)}</span>)</h3>
+                    <div id="rl-player-hand" class="flex justify-center items-center h-16 bg-black/20 rounded-lg p-2 text-3xl gap-2">
+                        ${state.playerHand.map(card => {
+                            const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
+                            return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`;
+                        }).join('')}
+                    </div>
+                </div>
+                
+                <div class="my-1">
+                    <p id="rl-status" class="text-yellow-300 font-bold h-6">${state.statusMessage}</p>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 max-w-md mx-auto mb-1">
+                    <button id="rl-stand-btn" onclick="roguelikePlayerStand()" class="btn btn-primary" ${state.gamePhase !== 'player_draft' ? 'disabled' : ''}>Stand</button>
+                    
+                    <button id="rl-reroll-btn" onclick="roguelikePlayerRerollPool()" class="btn btn-action" ${state.gamePhase !== 'player_draft' || state.currentRerollsLeft <= 0 ? 'disabled' : ''}>
+                        Reroll (x${state.currentRerollsLeft})
+                    </button>
+                    
+                    <div class="col-span-2 bg-slate-900/50 rounded-lg py-1 px-3 flex justify-center items-center">
+                        <span class="text-lg text-white font-bold">Score:
+                            <span class="text-yellow-300">${displayBase}</span> (Chips) x 
+                            <span class="text-cyan-300">${displayMult}</span> (Mult) = 
+                            <span class="text-green-400 text-xl">${displayBase * displayMult}</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-col gap-1 bg-slate-900/50 p-2 rounded-lg overflow-y-auto inventory-scrollbar">
+                <h3 class="font-bold text-lg text-yellow-300 text-center mb-1 flex-shrink-0">Shared Pool</h3>
+                <div id="rl-shared-pool" class="flex flex-col items-center gap-1">
+                    ${state.sharedPool.map((card, index) => {
+                        const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
+                        const maxHandSize = state.runUpgrades.handSize + (state.patronSkills.includes('Jester\'s Gambit') ? 1 : 0);
+                        const isDisabled = state.gamePhase !== 'player_draft' || state.playerHand.length >= maxHandSize;
+                        const clickAction = isDisabled ? '' : `onclick="roguelikePlayerDraft(${index})"`;
+                        return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md w-24 h-32 text-4xl flex flex-col justify-center items-center ${isDisabled ? 'opacity-50' : 'cursor-pointer hover:border-yellow-300 border-2 border-transparent'}" ${clickAction}>
+                                    <span>${card.value}</span>
+                                    <span>${card.suit}</span>
+                                </div>`;
+                    }).join('')}
+                </div>
+            </div>
+        </div>
+    </div>`;
+    
+    const container = document.createElement('div');
+    container.className = 'w-full h-full';
+    container.innerHTML = html;
+    render(container);
+    mainView.classList.remove('items-center', 'p-6');
+    mainView.classList.add('p-2');
+}
+
+function renderRoguelikeResultsUI() {
+    const state = roguelikeBlackjackState;
+    // Get current Vingt-un data
+    const ante = ANTE_STRUCTURE[state.currentAnteIndex];
+    const vingtUn = ante.vingtUns[state.currentVingtUnIndex];
+    const targetChips = vingtUn.chipsToWin;
+    const scoreMet = state.currentChips >= targetChips;
+
+    updateStatsView(); // Update gold if the run ended
+
+    // Evaluate hands for display
+    const playerEval = evaluateRoguelikeHand(state.playerHand);
+    const dealerEval = evaluateRoguelikeHand(state.dealerHand);
+
+    let html = `
+    <div class="w-full h-full flex flex-col text-center justify-center p-4">
+        <h2 class="font-medieval text-3xl mb-4">Hand Complete</h2>
+        
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div class="text-left">
+                <h3 class="font-bold text-xl text-green-400">Your Hand (${calculateHandValue(state.playerHand)})</h3>
+                <p class="text-lg text-green-200 font-bold mb-2">${playerEval.handName}</p>
+                <div class="flex justify-center flex-wrap items-center h-20 bg-black/20 rounded-lg p-2 text-2xl gap-1">
+                    ${state.playerHand.map(card => {
+                        const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
+                        return `<div class="bg-white ${suitColorClass} p-1 rounded-md shadow-md">${card.value}${card.suit}</div>`;
+                    }).join('')}
+                </div>
+            </div>
+            <div class="text-left">
+                <h3 class="font-bold text-xl text-red-400">Dealer's Hand (${calculateHandValue(state.dealerHand)})</h3>
+                <p class="text-lg text-red-200 font-bold mb-2">${dealerEval.handName}</p>
+                <div class="flex justify-center flex-wrap items-center h-20 bg-black/20 rounded-lg p-2 text-2xl gap-1">
+                    ${state.dealerHand.map(card => {
+                        const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
+                        return `<div class="bg-white ${suitColorClass} p-1 rounded-md shadow-md">${card.value}${card.suit}</div>`;
+                    }).join('')}
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <p class="text-lg text-gray-400">Your Score:</p>
+            <p class="text-6xl font-bold ${state.lastScore > 0 ? 'text-green-400' : 'text-red-400'}">${state.lastScore}</p>
+        </div>
+
+        <div class="mb-6">
+            <p class="text-lg text-gray-400">Vingt-un Progress:</p>
+            <p class="text-4xl font-bold text-yellow-300">${state.currentChips} / ${targetChips}</p>
+        </div>
+        
+        ${(() => {
+            if (scoreMet) {
+                // --- VICTORY ---
+                const isPatron = state.currentVingtUnIndex === 2;
+                
+                if (isPatron) {
+                    // Won the Patron, go to Ante completion (which leads to skill choice)
+                    return `<button onclick="completeVingtUn()" class="btn btn-primary text-xl">
+                                Vingt-un Complete! Claim Patron Reward!
+                            </button>`;
+                } else {
+                    // Won Petit or Grand, go to shop
+                    return `<button onclick="completeVingtUn()" class="btn btn-primary text-xl">
+                                Vingt-un Complete! Go to Shop
+                            </button>`;
+                }
+            } else if (state.currentHandsLeft > 0) {
+                // --- CONTINUE ---
+                return `<button onclick="startNextHand()" class="btn btn-action text-xl">
+                            Continue (Next Hand: ${state.currentHandsLeft} left)
+                        </button>`;
+            } else {
+                // --- FAILED ---
+                return `<button onclick="roguelikeLoseRun('out of hands')" class="btn btn-action text-xl">
+                            Out of Hands! Run Over
+                        </button>`;
+            }
+        })()}
+    </div>`;
+
+    const container = document.createElement('div');
+    container.className = 'w-full h-full';
+    container.innerHTML = html;
+    render(container);
+    mainView.classList.remove('items-center', 'p-6');
+    mainView.classList.add('p-2');
+}
+
+function renderPatronSkillChoice(skillPoolKeys) {
+    applyTheme('void');
+    lastViewBeforeInventory = 'casino_hub';
+    gameState.currentView = 'roguelike_game';
+    
+    const state = roguelikeBlackjackState;
+    const ante = ANTE_STRUCTURE[state.currentAnteIndex];
+
+    let html = `
+    <div class="w-full h-full flex flex-col text-center justify-center p-4">
+        <h2 class="font-medieval text-3xl mb-2">Patron Defeated!</h2>
+        <p class="text-lg text-gray-300 mb-6">You have mastered ${ante.anteName}. The House offers you a boon before you proceed.</p>
+        <p class.text-xl font-bold text-yellow-300 mb-4">Choose Your Patron Skill:</p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            ${skillPoolKeys.map(key => {
+                const skill = PATRON_SKILLS[key];
+                if (!skill) return '<div class="btn btn-action" disabled>Error: Skill Not Found</div>';
+                
+                // Don't offer a skill the player already has
+                const isOwned = state.patronSkills.includes(key); 
+                
+                return `<div class="p-4 bg-slate-800 rounded-lg flex flex-col justify-between text-left shadow-lg ${isOwned ? 'opacity-50' : ''}">
+                    <div>
+                        <p class="font-bold text-lg text-white">${skill.name}</p>
+                        <p class="text-sm text-gray-300 italic mb-2">${skill.desc}</p>
+                    </div>
+                    <button onclick="awardPatronSkill('${key}')" class="btn btn-primary w-full mt-2" ${isOwned ? 'disabled' : ''}>
+                        ${isOwned ? 'Already Owned' : 'Select Skill'}
+                    </button>
+                </div>`;
+            }).join('')}
+        </div>
+    </div>`;
+    
+    const container = document.createElement('div');
+    container.className = 'w-full h-full';
+    container.innerHTML = html;
+    render(container);
+    mainView.classList.remove('items-center', 'p-6');
+    mainView.classList.add('p-2');
+}
+
+/**
+ * Renders the prompt to cash out or continue after the shop.
+ */
+function renderCashOutPrompt() {
+    applyTheme('casino');
+    lastViewBeforeInventory = 'casino_hub';
+    gameState.currentView = 'roguelike_game';
+    
+    const state = roguelikeBlackjackState;
+    const currentAnte = ANTE_STRUCTURE[state.currentAnteIndex];
+    const nextAnte = ANTE_STRUCTURE[state.currentAnteIndex + 1]; // This is safe because 'winRun' handles the last ante
+    
+    let html = `
+    <div class="w-full h-full flex flex-col text-center justify-center p-4">
+        <h2 class="font-medieval text-3xl mb-2">Ante Complete!</h2>
+        <p class="text-lg text-gray-300 mb-6">You defeated the Patron of ${currentAnte.anteName}.</p>
+        <p class="text-xl text-white mb-2">You can cash out now and take your winnings:</p>
+        <p class="text-4xl font-bold text-yellow-300 mb-6">${currentAnte.cashOutReward} G</p>
+        
+        <p class="text-xl text-white mb-2">...or risk it all and continue to the next Ante?</p>
+        <p class="text-2xl font-bold text-red-400 mb-6">${nextAnte.name}</p>
+        
+        <div class="flex justify-center gap-6 max-w-md mx-auto">
+            <button onclick="roguelikeCashOut()" class="btn btn-action text-lg flex-1">
+                Cash Out & End Run
+            </button>
+            <button onclick="startNextAnte()" class="btn btn-primary text-lg flex-1">
+                Continue to Ante ${state.currentAnteIndex + 2}
+            </button>
+        </div>
+    </div>`;
+
+    const container = document.createElement('div');
+    container.className = 'w-full h-full';
+    container.innerHTML = html;
+    render(container);
+    mainView.classList.remove('items-center', 'p-6');
+    mainView.classList.add('p-2');
+}
+
+function renderRoguelikeShop() {
+    applyTheme('void');
+    lastViewBeforeInventory = 'casino_hub';
+    gameState.currentView = 'roguelike_game';
+    
+    const state = roguelikeBlackjackState;
+    
+    // Check if the *next* Vingt-un exists
+    const nextVingtUnIndex = state.currentVingtUnIndex; // This was already incremented
+    const nextVingtUn = ANTE_STRUCTURE[state.currentAnteIndex].vingtUns[nextVingtUnIndex];
+    
+    let continueButtonHtml = '';
+    let nextUpText = '';
+
+    if (nextVingtUn) {
+        // This was after Petit or Grand, so we proceed to the next Vingt-un
+        continueButtonHtml = `
+            <button onclick="startVingtUn()" class="btn btn-primary text-lg">
+                Start Vingt-un: ${nextVingtUn.name}
+            </button>`;
+        nextUpText = `Next: ${nextVingtUn.name} (${nextVingtUn.chipsToWin} Chips)`;
+    } else {
+        // This was after the Patron (index 2 was completed, index is now 3)
+        // We go to the cash out prompt
+        continueButtonHtml = `
+            <button onclick="renderCashOutPrompt()" class="btn btn-primary text-lg">
+                Finish Ante
+            </button>`;
+        nextUpText = 'Ante Complete!';
+    }
+
+    let html = `
+    <div class="w-full h-full flex flex-col text-center p-4">
+        <h2 class="font-medieval text-3xl mb-2">The Void Market</h2>
+        <div class="flex justify-between items-center mb-4 px-2">
+            <h3 class="font-bold text-lg text-yellow-300">Crookards: <span class="text-2xl">${state.currentCrookards}</span></h3>
+            <h3 class="font-bold text-lg text-white">${nextUpText}</h3>
+        </div>
+
+        <div class="flex-grow grid grid-cols-1 md:grid-cols-4 gap-3 overflow-y-auto inventory-scrollbar p-2 bg-black/20 rounded-lg">
+            ${state.shopStock.map(key => {
+                const tool = BJ_PASSIVE_MODIFIERS[key] || BJ_CONSUMABLES[key] || BJ_RUN_UPGRADES[key];
+                if (!tool) return '';
+                // MODIFIED: Check against Crookards
+                const canAfford = state.currentCrookards >= tool.cost;
+                let typeColor = 'bg-slate-700';
+                if (tool.type === 'passive') typeColor = 'bg-blue-800';
+                if (tool.type ==='consumable') typeColor = 'bg-purple-800';
+                if (tool.type === 'upgrade') typeColor = 'bg-yellow-800';
+
+                return `<div class="${typeColor} p-3 rounded-lg flex flex-col justify-between text-left shadow-lg">
+                    <div>
+                        <p class="font-bold text-lg text-white">${tool.name}</p>
+                        <p class="text-sm text-gray-300 italic mb-2">${tool.desc}</p>
+                    </div>
+                    <button onclick="buyRoguelikeTool('${key}')" class="btn btn-primary w-full mt-2" ${!canAfford ? 'disabled' : ''}>
+                        Buy (${tool.cost} Crookards)
+                    </button>
+                </div>`;
+            }).join('')}
+        </div>
+
+        <div class="flex justify-center gap-4 mt-4">
+            ${continueButtonHtml}
+            <button onclick="roguelikeRerollShop()" class="btn btn-action" ${state.currentCrookards < state.runUpgrades.shopRerollCost ? 'disabled' : ''}>
+                Reroll (${state.runUpgrades.shopRerollCost} Crookards)
+            </button>
+        </div>
+        <div class="text-center mt-4">
+            <button onclick="roguelikeLoseRun('quit')" class="btn btn-action text-sm py-1 px-3">Quit Run</button>
+        </div>
+    </div>`;
+    
+    const container = document.createElement('div');
+    container.className = 'w-full h-full';
+    container.innerHTML = html;
+    render(container);
+    mainView.classList.remove('items-center', 'p-6');
+    mainView.classList.add('p-2');
+}
+
+// --- NEW BLACKJACK UI FUNCTIONS ---
+function renderBlackjack() {
+    applyTheme('casino');
+    lastViewBeforeInventory = 'casino_hub'; // Go back to the casino hub
+    gameState.currentView = 'blackjack';
+
+    // Reset game state when entering the table
+    blackjackState = { deck: [], playerHand: [], dealerHand: [], bet: 0, gamePhase: 'betting', statusMessage: 'Place your bet to begin.' };
+
+    let html = `
+    <div class="w-full h-full flex flex-col text-center p-4">
+        <h2 class="font-medieval text-3xl mb-2">Arcane 21</h2>
+        
+        <!-- Dealer Area -->
+        <div class="mb-4">
+            <h3 class="font-bold text-xl text-red-400">Dealer's Hand (<span id="blackjack-dealer-score">?</span>)</h3>
+            <div id="blackjack-dealer-hand" class="flex justify-center items-center h-24 bg-black/20 rounded-lg p-2 text-4xl gap-2">
+                <!-- Cards go here -->
+            </div>
+        </div>
+
+        <!-- Player Area -->
+        <div class="mb-4">
+            <h3 class="font-bold text-xl text-green-400">Your Hand (<span id="blackjack-player-score">0</span>)</h3>
+            <div id="blackjack-player-hand" class="flex justify-center items-center h-24 bg-black/20 rounded-lg p-2 text-4xl gap-2">
+                <!-- Cards go here -->
+            </div>
+        </div>
+
+        <!-- Status & Actions -->
+        <div class="my-4">
+            <p id="blackjack-status" class="text-yellow-300 font-bold h-6">${blackjackState.statusMessage}</p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4 max-w-md mx-auto">
+            <!-- Betting (Phase 1) -->
+            <div id="blackjack-betting-area" class="col-span-2 grid grid-cols-3 gap-2">
+                <input type="number" id="blackjack-bet-amount" value="${player.lastCasinoBet || 10}" min="1" max="${player.gold}" class="col-span-2 bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                <button id="blackjack-bet-btn" onclick="startBlackjack(parseInt(document.getElementById('blackjack-bet-amount').value))" class="btn btn-primary">Place Bet</button>
+            </div>
+            
+            <!-- Playing (Phase 2) -->
+            <button id="blackjack-hit-btn" onclick="playerHit()" class="btn btn-action" disabled>Hit</button>
+            <button id="blackjack-stand-btn" onclick="playerStand()" class="btn btn-primary" disabled>Stand</button>
+            
+            <!-- Results (Phase 3) -->
+            <button id="blackjack-play-again-btn" onclick="renderBlackjack()" class="btn btn-primary col-span-2 hidden">Play Again</button>
+        </div>
+
+        <div class="text-center mt-auto pt-4">
+            <button onclick="renderArcaneCasino()" class="btn btn-action">Leave Table</button>
+        </div>
+    </div>`;
+    const container = document.createElement('div');
+    // Ensure full height for the flex layout
+    container.className = 'w-full h-full'; 
+    container.innerHTML = html;
+    render(container);
+    // Custom adjustments for this full-screen-like view
+    mainView.classList.remove('items-center', 'p-6');
+    mainView.classList.add('p-2'); // Use less padding
+    updateBlackjackUI(); // Call once to set initial state
+}
+
+function updateBlackjackUI() {
+    if (gameState.currentView !== 'blackjack') return; // Don't update if not on the screen
+
+    const state = blackjackState;
+    const dealerHandEl = document.getElementById('blackjack-dealer-hand');
+    const playerHandEl = document.getElementById('blackjack-player-hand');
+    const dealerScoreEl = document.getElementById('blackjack-dealer-score');
+    const playerScoreEl = document.getElementById('blackjack-player-score');
+    const statusEl = document.getElementById('blackjack-status');
+    
+    const betArea = document.getElementById('blackjack-betting-area');
+    const hitBtn = document.getElementById('blackjack-hit-btn');
+    const standBtn = document.getElementById('blackjack-stand-btn');
+    const playAgainBtn = document.getElementById('blackjack-play-again-btn');
+
+    // Safety checks
+    if (!dealerHandEl || !playerHandEl || !dealerScoreEl || !playerScoreEl || !statusEl || !betArea || !hitBtn || !standBtn || !playAgainBtn) {
+        console.error("Blackjack UI elements are missing!");
+        return;
+    }
+
+    // Render Player Hand
+    playerHandEl.innerHTML = state.playerHand.map(card => `<div class="bg-white text-black p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`).join('');
+    playerScoreEl.textContent = calculateHandValue(state.playerHand);
+
+    // Render Player Hand
+    playerHandEl.innerHTML = state.playerHand.map(card => {
+        const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
+        return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`;
+    }).join('');
+    playerScoreEl.textContent = calculateHandValue(state.playerHand);
+
+    // Render Dealer Hand
+    if (state.gamePhase === 'playerTurn') {
+        const card = state.dealerHand[0];
+        const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
+        dealerHandEl.innerHTML = `
+            <div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>
+            <div class="bg-red-800 border-2 border-red-900 text-red-400 p-2 rounded-md shadow-inner w-12 h-20 flex items-center justify-center text-2xl">?</div>`;
+        dealerScoreEl.textContent = state.dealerHand[0].weight;
+    } else {
+        dealerHandEl.innerHTML = state.dealerHand.map(card => {
+            const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
+            return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`;
+        }).join('');
+        dealerScoreEl.textContent = calculateHandValue(state.dealerHand);
+    }
+
+    // Update Status
+    statusEl.textContent = state.statusMessage;
+
+    // Update Button States
+    betArea.style.display = (state.gamePhase === 'betting') ? 'grid' : 'none';
+    playAgainBtn.style.display = (state.gamePhase === 'results') ? 'block' : 'none';
+    
+    const isPlaying = state.gamePhase === 'playerTurn';
+    hitBtn.style.display = isPlaying ? 'block' : 'none';
+    standBtn.style.display = isPlaying ? 'block' : 'none';
+    hitBtn.disabled = !isPlaying;
+    standBtn.disabled = !isPlaying;
+
+    // Update bet input max
+    const betInput = document.getElementById('blackjack-bet-amount');
+    if (betInput) betInput.max = player.gold;
+}
+
+function renderPoker() {
+    applyTheme('casino');
+    lastViewBeforeInventory = 'casino_hub'; // Go back to the casino hub
+    gameState.currentView = 'poker';
+
+    // Reset game state when entering the table
+    pokerState = {
+        deck: [], playerHand: [], dealerHand: [], bet: 0, pot: 0,
+        gamePhase: 'betting', statusMessage: 'Place your ante to play.', playerDiscards: []
+    };
+
+    let html = `
+    <div class="w-full h-full flex flex-col text-center p-4">
+        <h2 class="font-medieval text-3xl mb-2">5-Card Draw Poker</h2>
+        
+        <!-- Pot Area -->
+        <div class="my-2">
+            <h3 class="font-bold text-xl text-yellow-300">Pot: <span id="poker-pot">0</span> G</h3>
+        </div>
+
+        <!-- Dealer Area -->
+        <div class="mb-4">
+            <h3 class="font-bold text-xl text-red-400">Dealer's Hand (<span id="poker-dealer-hand-name"></span>)</h3>
+            <div id="poker-dealer-hand" class="flex justify-center items-center h-24 bg-black/20 rounded-lg p-2 text-4xl gap-2">
+                <!-- Dealer cards go here -->
+            </div>
+        </div>
+
+        <!-- Player Area -->
+        <div class="mb-4">
+            <h3 class="font-bold text-xl text-green-400">Your Hand (<span id="poker-player-hand-name"></span>)</h3>
+            <div id="poker-player-hand" class="flex justify-center items-center h-24 bg-black/20 rounded-lg p-2 text-4xl gap-2">
+                <!-- Player cards go here -->
+            </div>
+        </div>
+
+        <!-- Status & Actions -->
+        <div class="my-4">
+            <p id="poker-status" class="text-yellow-300 font-bold h-6">${pokerState.statusMessage}</p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4 max-w-md mx-auto">
+            <!-- Betting (Phase 1) -->
+            <div id="poker-betting-area" class="col-span-2 grid grid-cols-3 gap-2">
+                <input type="number" id="poker-ante-amount" value="${player.lastCasinoAnte || 10}" min="1" max="${player.gold}" class="col-span-2 bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                <button id="poker-ante-btn" onclick="startPoker(parseInt(document.getElementById('poker-ante-amount').value))" class="btn btn-primary">Place Ante</button>
+            </div>  
+            
+            <!-- Drawing (Phase 2) -->
+            <button id="poker-draw-btn" onclick="playerDraw()" class="btn btn-action col-span-2 hidden">Draw Cards</button>
+            
+            <!-- Results (Phase 3) -->
+            <button id="poker-play-again-btn" onclick="renderPoker()" class="btn btn-primary col-span-2 hidden">Play Again</button>
+        </div>
+
+        <div class="text-center mt-auto pt-4">
+            <button onclick="renderArcaneCasino()" class="btn btn-action">Leave Table</button>
+        </div>
+    </div>`;
+    const container = document.createElement('div');
+    container.className = 'w-full h-full'; 
+    container.innerHTML = html;
+    render(container);
+    mainView.classList.remove('items-center', 'p-6');
+    mainView.classList.add('p-2');
+    updatePokerUI(); // Call once to set initial state
+}
+
+/**
+ * Toggles a card for discarding in the poker game.
+ * @param {number} cardIndex - The index of the card (0-4) in the player's hand.
+ */
+
+
+function updatePokerUI() {
+    if (gameState.currentView !== 'poker') return;
+
+    const state = pokerState;
+    const dealerHandEl = document.getElementById('poker-dealer-hand');
+    const playerHandEl = document.getElementById('poker-player-hand');
+    const dealerScoreEl = document.getElementById('poker-dealer-hand-name');
+    const playerScoreEl = document.getElementById('poker-player-hand-name');
+    const statusEl = document.getElementById('poker-status');
+    const potEl = document.getElementById('poker-pot');
+    
+    const betArea = document.getElementById('poker-betting-area');
+    const drawBtn = document.getElementById('poker-draw-btn');
+    const playAgainBtn = document.getElementById('poker-play-again-btn');
+
+    if (!dealerHandEl || !playerHandEl || !dealerScoreEl || !playerScoreEl || !statusEl || !potEl || !betArea || !drawBtn || !playAgainBtn) {
+        console.error("Poker UI elements are missing!");
+        return;
+    }
+
+    // Render Player Hand
+    let playerHandHTML = '';
+    for (let i = 0; i < state.playerHand.length; i++) {
+        const card = state.playerHand[i];
+        const isDiscarded = state.playerDiscards.includes(i);
+        const discardClass = (isDiscarded && state.gamePhase === 'drawing') ? 'opacity-50 border-red-500' : '';
+        const clickAction = (state.gamePhase === 'drawing') ? `onclick="togglePokerDiscard(${i})"` : '';
+        const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black'; // <-- ADDED
+        playerHandHTML += `<div id="player-card-${i}" class="bg-white ${suitColorClass} p-2 rounded-md shadow-md cursor-pointer border-2 border-transparent ${discardClass}" ${clickAction}>${card.value}${card.suit}</div>`; // <-- MODIFIED
+    }
+    playerHandEl.innerHTML = playerHandHTML;
+    
+    // Render Dealer Hand
+    let dealerHandHTML = '';
+    if (state.gamePhase === 'betting') {
+        dealerHandHTML = '<div class="text-gray-500 text-lg">Waiting for ante...</div>';
+    } else if (state.gamePhase === 'drawing' || state.gamePhase === 'playerTurn') {
+        // Show 1 card, 4 hidden
+        const card = state.dealerHand[0]; // <-- ADDED
+        const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black'; // <-- ADDED
+        dealerHandHTML += `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`; // <-- MODIFIED
+        for (let i = 1; i < state.dealerHand.length; i++) {
+            dealerHandHTML += `<div class="bg-red-800 border-2 border-red-900 text-red-400 p-2 rounded-md shadow-inner w-12 h-20 flex items-center justify-center text-2xl">?</div>`;
+        }
+    } else {
+        // Show all cards
+        dealerHandHTML = state.dealerHand.map(card => {
+            const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black'; // <-- ADDED
+            return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`; // <-- MODIFIED
+        }).join('');
+    }
+    dealerHandEl.innerHTML = dealerHandHTML;
+
+    // Update Scores/Hand Names
+    if (state.gamePhase === 'results') {
+        const playerEval = evaluatePokerHand(state.playerHand);
+        const dealerEval = evaluatePokerHand(state.dealerHand);
+        playerScoreEl.textContent = playerEval.handName;
+        dealerScoreEl.textContent = dealerEval.handName;
+    } else {
+        playerScoreEl.textContent = '';
+        dealerScoreEl.textContent = '';
+    }
+
+    // Update Pot
+    potEl.textContent = state.pot;
+
+    // Update Status
+    statusEl.textContent = state.statusMessage;
+
+    // Update Button States
+    betArea.style.display = (state.gamePhase === 'betting') ? 'grid' : 'none';
+    drawBtn.style.display = (state.gamePhase === 'drawing') ? 'block' : 'none';
+    playAgainBtn.style.display = (state.gamePhase === 'results') ? 'block' : 'none';
+    
+    // Update bet input max
+    const betInput = document.getElementById('poker-ante-amount');
+    if (betInput) betInput.max = player.gold;
+}
+function togglePokerDiscard(cardIndex) {
+    if (pokerState.gamePhase !== 'drawing') return;
+
+    const cardEl = document.getElementById(`player-card-${cardIndex}`);
+    const indexInDiscards = pokerState.playerDiscards.indexOf(cardIndex);
+
+    if (indexInDiscards > -1) {
+        // Card is currently marked for discard, so un-mark it
+        pokerState.playerDiscards.splice(indexInDiscards, 1);
+        cardEl.classList.remove('opacity-50', 'border-red-500');
+    } else {
+        // Card is not marked, so mark it
+        pokerState.playerDiscards.push(cardIndex);
+        cardEl.classList.add('opacity-50', 'border-red-500');
+    }
+    
+    // Update status message
+    const statusEl = document.getElementById('poker-status');
+    if (statusEl) {
+        statusEl.textContent = `Selected ${pokerState.playerDiscards.length} card(s) to discard.`;
+    }
+}
 function renderWitchsCoven(subView = 'main') {
     applyTheme('necropolis');
     lastViewBeforeInventory = 'witchs_coven';

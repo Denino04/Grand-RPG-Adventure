@@ -3057,8 +3057,28 @@ function checkBattleStatus(isReaction = false) {
                     player.addToInventory(seedKey, 1, true); // Add and log the seed
                 }
             }
+            // --- NEW: Casino Clue Drop Logic ---
+            if (player.unlocks.arcaneCasino && preTrainingState === null) {
+                const paperClues = [
+                    'ripped_paper_1', 
+                    'ripped_paper_2', 
+                    'ripped_paper_3', 
+                    'ripped_paper_4', 
+                    'ripped_paper_5'
+                ];
+                // Find clues the player does *not* have in their inventory
+                const missingClues = paperClues.filter(clue => !player.inventory.items[clue]);
 
-
+                if (missingClues.length > 0) {
+                    // 5% chance to drop a missing clue
+                    if (player.rollForEffect(0.05, 'Casino Clue Drop')) {
+                        // Drop a random *missing* clue
+                        const clueToDrop = missingClues[Math.floor(Math.random() * missingClues.length)];
+                        player.addToInventory(clueToDrop, 1, true); // This will log the drop
+                    }
+                }
+            }
+            // --- END NEW: Casino Clue Drop Logic --
                 if (player.activeQuest && player.activeQuest.category === 'extermination') {
                     const quest = getQuestDetails(player.activeQuest);
                     if (quest && quest.target === enemy.speciesData.key) {

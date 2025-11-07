@@ -119,7 +119,56 @@
         /* *** SCROLLBAR COLOR FIX: Changed thumb color *** */
         .inventory-scrollbar::-webkit-scrollbar-thumb { background-color: #4a5568; /* Darker gray */ border-radius: 4px; border: 1px solid var(--bg-secondary); }
         .inventory-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #6b7280; /* Slightly lighter on hover */ }
-
+        .card {
+            background-color: white;
+            color: black; /* Default color for spades/clubs */
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            width: 5rem; /* Standard card width */
+            height: 7rem; /* Standard card height */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 2.5rem; /* Larger for value/suit */
+            line-height: 1;
+            font-weight: bold;
+            position: relative; /* For top/bottom alignment */
+        }
+        .card.red-suit {
+            color: red;
+        }
+        .card .card-value-top {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            font-size: 1.2rem;
+        }
+        .card .card-value-bottom {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            transform: rotate(180deg);
+            font-size: 1.2rem;
+        }
+        .card .card-suit-center {
+            font-size: 2.5rem;
+        }
+        /* Hidden card style */
+        .hidden-card {
+            background-color: #333; /* Darker background for hidden cards */
+            border: 2px solid #555;
+            color: #eee;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 5rem;
+            height: 7rem;
+            border-radius: 0.5rem;
+        }
         /* --- Button Styling --- */
         .btn {
             padding: 0.5rem 1rem;
@@ -690,5 +739,6 @@
     <script src="battle.js"></script>
     <script src="rendering.js"></script>
     <script src="main.js"></script>
+    <script src="casino.js"></script>
 </body>
 </html>

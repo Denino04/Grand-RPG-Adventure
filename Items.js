@@ -181,7 +181,11 @@ const ITEMS = {
     'bestiary_notebook': {name: 'Bestiary Notebook', type: 'key', price: 0, description: "A leather-bound book from a nervous researcher named Betty. Used to catalogue monster observations."},
     'blacksmith_key': {name: 'Blacksmith\'s Key', type: 'key', price: 0, description: "A sturdy iron key, smelling faintly of soot and metal. Looks like it unlocks something important in the Commercial District."},
     'tower_key': {name: 'Tower Key', type: 'key', price: 0, description: "An ornate key humming with faint magical energy. Seems attuned to the Arcane Quarter."},
-
+    'ripped_paper_1': {name: 'Ripped Paper ("Click")', type: 'special', price: 0, sellPrice: 1, rarity: 'Common', description: 'A scrap of paper with the word "Click" on it. Seems important?'},
+    'ripped_paper_2': {name: 'Ripped Paper ("Bal")', type: 'special', price: 0, sellPrice: 1, rarity: 'Common', description: 'A scrap of paper with the letters "Bal" on it.'},
+    'ripped_paper_3': {name: 'Ripped Paper ("At")', type: 'special', price: 0, sellPrice: 1, rarity: 'Common', description: 'A scrap of paper with the letters "At" on it.'},
+    'ripped_paper_4': {name: 'Ripped Paper ("Ro")', type: 'special', price: 0, sellPrice: 1, rarity: 'Common', description: 'A scrap of paper with the letters "Ro" on it.'},
+    'ripped_paper_5': {name: 'Ripped Paper ("Casino")', type: 'special', price: 0, sellPrice: 1, rarity: 'Common', description: 'A scrap of paper with the word "Casino" on it.'},
     // --- 6. Gardening Items ---
     // Seeds
     'blackwheat_seed': {name: 'Blackwheat Seed', type: 'seed', price: 15, rarity: 'Common', description: 'A common seed for a hardy grain.'},

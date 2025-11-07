@@ -729,7 +729,21 @@ const LIBRARY_BOOKS = {
                 content: `<p>Masterwork formulas for powerful and volatile potions. Do not attempt without significant experience.</p>`
             }
         ]
+    },
+    'casino_clues': {
+        isDynamic: true,
+        recipeType: 'clues', // Custom type
+        title: "A Scrambled Note",
+        author: "???",
+        chapters: [
+            {
+                title: "Fragments",
+                content: `<p>You smooth out the scraps of paper you've found. It seems to be a code, but the order is jumbled...</p>`
+            }
+            // Dynamic chapters will be added here by renderBook
+        ]
     }
+
 };
 
 
