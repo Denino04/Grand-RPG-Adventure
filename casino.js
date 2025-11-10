@@ -2,7 +2,13 @@
 
 // --- BLACKJACK ("Arcane 21") ---
 let casinoSecretCode = []; // <-- NEW: Track secret code
+let roguelikeShopActiveDrawer = 'passives'; // Default to 'Passives' as it's most common
 const CASINO_SECRET = ['B', 'A', 'L', 'A', 'T', 'R', 'O']; // <-- NEW: The code itself
+
+window.setRoguelikeShopDrawer = function(drawerName) {
+    roguelikeShopActiveDrawer = drawerName;
+    renderRoguelikeShop(); // Re-render the shop to show the new drawer
+}
 
 let blackjackState = {
     deck: [],
@@ -71,8 +77,16 @@ function createDeck() {
             deck.push({ value, suit, weight });
         }
     }
+    
+    // --- NEW: Add Jokers if player has the Patron Skill ---
+    if (player && player.roguelikeBlackjackState.patronSkills.includes('Joker\'s Wild')) {
+        deck.push({ value: 'Joker', suit: '🎭', weight: 12 });
+        deck.push({ value: 'Joker', suit: '🎭', weight: 12 });
+    }
+    // --- END NEW ---
+    
     return deck;
-}
+}   
 
 /**
  * Shuffles a deck using Fisher-Yates.
@@ -584,334 +598,74 @@ function evaluatePokerHand(hand) {
 // --- ARCANE 21: THE ENDLESS RUN (ROGUELIKE BLACKJACK) ---
 // =================================================================================
 
-let roguelikeBlackjackState = {
-    runActive: false,
-    buyIn: 500,
-
-    // --- New Progression Trackers ---
-    currentAnteIndex: 0,
-    currentVingtUnIndex: 0,
-    currentCrookards: 0, // NEW CURRENCY
-
-    // --- Run-Wide Persistent Upgrades ---
-    passiveModifiers: [],
-    consumables: [],
-    patronSkills: [],
-    runUpgrades: {
-        passiveSlots: 5,
-        consumableSlots: 2,
-        handSize: 5, 
-        shopRerollCost: 1, // Was 10 (Chips), now 1 (Crookard)
-        bonusHandsPerVingtUn: 0,
-        bonusRerollsPerVingtUn: 0,
-        baseMultiplier: 0
-    },
-
-    // --- Vingt-un-Specific Trackers (Reset after each win) ---
-    currentChips: 0,
-    currentHandsLeft: 0,
-    currentRerollsLeft: 0,
-    vingtUnBustSafety: true,
-
-    // --- Hand-Specific State ---
-    deck: [],
-    playerHand: [],
-    dealerHand: [],
-    sharedPool: [],
-    lastScore: 0,
-    
-    // --- State Machine & Shop ---
-    gamePhase: 'buy_in',
-    statusMessage: '',
-    shopStock: [],
-};
-
-const ANTE_STRUCTURE = [
-    // --- Ante 1 (Intro) ---
-    { 
-        anteName: "The Entryway",
-        cashOutReward: 100, // Reduced from 150
-        vingtUns: [
-            { name: 'Petit', chipsToWin: 50, hands: 5, rerolls: 3 }, // Your requested 50 start
-            { name: 'Grand', chipsToWin: 100, hands: 5, rerolls: 3 },
-            { name: 'Patron', chipsToWin: 200, hands: 5, rerolls: 3, patronSkillPool: ['Escalating Stakes', 'Ace in the Hole'] }
-        ]
-    },
-    // --- Ante 2 (Easy) ---
-    { 
-        anteName: "The Double Down",
-        cashOutReward: 250, // Reduced from 300
-        vingtUns: [
-            { name: 'Petit', chipsToWin: 100, hands: 5, rerolls: 3 },
-            { name: 'Grand', chipsToWin: 200, hands: 5, rerolls: 3 },
-            { name: 'Patron', chipsToWin: 400, hands: 5, rerolls: 3, patronSkillPool: ['High Roller\'s Intuition', 'Perfect Start'] }
-        ]
-    },
-    // --- Ante 3 (Medium) ---
-    { 
-        anteName: "The High Table",
-        cashOutReward: 500, // Reduced from 600
-        vingtUns: [
-            { name: 'Petit', chipsToWin: 200, hands: 4, rerolls: 3 }, // Fewer hands
-            { name: 'Grand', chipsToWin: 400, hands: 4, rerolls: 3 },
-            { name: 'Patron', chipsToWin: 800, hands: 4, rerolls: 3, patronSkillPool: ['Mulligan', 'The Sixth Card'] }
-        ]
-    },
-    // --- Ante 4 (Medium) ---
-    { 
-        anteName: "The Turn",
-        cashOutReward: 1000, // Reduced from 1200
-        vingtUns: [
-            { name: 'Petit', chipsToWin: 300, hands: 4, rerolls: 3 },
-            { name: 'Grand', chipsToWin: 600, hands: 4, rerolls: 3 },
-            { name: 'Patron', chipsToWin: 1200, hands: 4, rerolls: 3, patronSkillPool: ['Escalating Stakes', 'Minor Miscalculation'] }
-        ]
-    },
-    // --- Ante 5 (Hard) ---
-    { 
-        anteName: "The River",
-        cashOutReward: 2000, // Reduced from 2500
-        vingtUns: [
-            { name: 'Petit', chipsToWin: 400, hands: 4, rerolls: 2 }, // Fewer rerolls
-            { name: 'Grand', chipsToWin: 800, hands: 4, rerolls: 2 },
-            { name: 'Patron', chipsToWin: 1600, hands: 4, rerolls: 2, patronSkillPool: ['High Roller\'s Intuition', 'Jester\'s Gambit'] }
-        ]
-    },
-    // --- Ante 6 (Hard) ---
-    { 
-        anteName: "The All-In",
-        cashOutReward: 4000, // Reduced from 5000
-        vingtUns: [
-            { name: 'Petit', chipsToWin: 600, hands: 4, rerolls: 2 },
-            { name: 'Grand', chipsToWin: 1200, hands: 4, rerolls: 2 },
-            { name: 'Patron', chipsToWin: 2500, hands: 4, rerolls: 2, patronSkillPool: ['Perfect Start', 'The Sixth Card'] }
-        ]
-    },
-    // --- Ante 7 (Very Hard) ---
-    { 
-        anteName: "The Shark Tank",
-        cashOutReward: 8000, // Reduced from 10000
-        vingtUns: [
-            { name: 'Petit', chipsToWin: 1000, hands: 3, rerolls: 2 }, // Fewer hands
-            { name: 'Grand', chipsToWin: 2000, hands: 3, rerolls: 2 },
-            { name: 'Patron', chipsToWin: 4000, hands: 3, rerolls: 2, patronSkillPool: ['Minor Miscalculation', 'Mulligan'] }
-        ]
-    },
-    // --- Ante 8 (Final) ---
-    { 
-        anteName: "The House Always Wins",
-        cashOutReward: 20000, // Reduced from 25000
-        vingtUns: [
-            { name: 'Petit', chipsToWin: 1500, hands: 3, rerolls: 1 }, // Fewer rerolls
-            { name: 'Grand', chipsToWin: 3000, hands: 3, rerolls: 1 },
-            { name: 'Patron', chipsToWin: 6000, hands: 3, rerolls: 1, patronSkillPool: ['Escalating Stakes', 'High Roller\'s Intuition', 'Jester\'s Gambit'] }
-        ]
-    }
-];
-
-// NEW CONSTANT for Patron Skills
-const PATRON_SKILLS = {
-    'Escalating Stakes': {
-        name: 'Escalating Stakes',
-        desc: 'At the start of each new Ante (including this one), gain a permanent +1 base Multiplier for the rest of the run. (Cumulative)'
-    },
-    'High Roller\'s Intuition': {
-        name: 'High Roller\'s Intuition',
-        desc: 'Doubles the chip bonus from all Poker Hands (Pair, Two Pair, 3-of-a-Kind, etc.).'
-    },
-    'Ace in the Hole': {
-        name: 'Ace in the Hole',
-        desc: 'Every hand that includes at least one Ace (used as 1 or 11) gets +50 Base Chips.'
-    },
-    'Perfect Start': {
-        name: 'Perfect Start',
-        desc: 'The first hand of every Vingt-un (Petit, Grand, and Patron) does not consume one of your "Hands Left."'
-    },
-    'Mulligan': {
-        name: 'Mulligan',
-        desc: 'Your first Pool Reroll in every Vingt-un is free and does not consume a reroll charge.'
-    },
-    'The Sixth Card': {
-        name: 'The Sixth Card',
-        desc: 'An extra (7th) card is dealt to the Shared Pool at the start of every hand.'
-    },
-    'Jester\'s Gambit': {
-        name: 'Jester\'s Gambit',
-        desc: 'Your maximum hand size is increased to 6. A "6-Card Charlie" (6 cards, 21 or less) counts as an automatic win and applies the 5-card bonus.'
-    },
-    'Minor Miscalculation': {
-        name: 'Minor Miscalculation',
-        desc: 'Once per Vingt-un, if you Bust, your hand is reset and your turn ends (you do not lose the hand).'
-    }
-};
-
-// --- DATA: Passive Modifiers (Jokers) ---
-const BJ_PASSIVE_MODIFIERS = {
-    // --- Suit Passives (Chips) ---
-    'diamonds_chips': { name: 'Gilded Curse (♦)', desc: '+25 Base Chips for each ♦ card in your hand.', type: 'passive', cost: 6, rarity: 1,
-        check: () => true, logic: (mult, base, hand) => ({ base: base + (hand.filter(c => c.suit === '♦').length * 25), mult: mult }) },
-    'hearts_chips': { name: 'Sanguine Tribute (♥)', desc: '+25 Base Chips for each ♥ card in your hand.', type: 'passive', cost: 6, rarity: 1,
-        check: () => true, logic: (mult, base, hand) => ({ base: base + (hand.filter(c => c.suit === '♥').length * 25), mult: mult }) },
-    'clubs_chips': { name: 'Scholar\'s Sigil (♣)', desc: '+25 Base Chips for each ♣ card in your hand.', type: 'passive', cost: 6, rarity: 1,
-        check: () => true, logic: (mult, base, hand) => ({ base: base + (hand.filter(c => c.suit === '♣').length * 25), mult: mult }) },
-    'spades_chips': { name: 'Reaper\'s Tithe (♠)', desc: '+25 Base Chips for each ♠ card in your hand.', type: 'passive', cost: 6, rarity: 1,
-        check: () => true, logic: (mult, base, hand) => ({ base: base + (hand.filter(c => c.suit === '♠').length * 25), mult: mult }) },
-    
-    // --- Suit Passives (Multiplier) ---
-    'diamonds_mult': { name: 'Crystal Lattice (♦)', desc: '+2 Multiplier for each ♦ card in your hand.', type: 'passive', cost: 5, rarity: 1,
-        check: () => true, logic: (mult, base, hand) => mult + (hand.filter(c => c.suit === '♦').length * 2) },
-    'hearts_mult': { name: 'Heart\'s Echo (♥)', desc: '+2 Multiplier for each ♥ card in your hand.', type: 'passive', cost: 5, rarity: 1,
-        check: () => true, logic: (mult, base, hand) => mult + (hand.filter(c => c.suit === '♥').length * 2) },
-    'clubs_mult': { name: 'Arcane Tome (♣)', desc: '+2 Multiplier for each ♣ card in your hand.', type: 'passive', cost: 5, rarity: 1,
-        check: () => true, logic: (mult, base, hand) => mult + (hand.filter(c => c.suit === '♣').length * 2) },
-    'spades_mult': { name: 'Shadow Weave (♠)', desc: '+2 Multiplier for each ♠ card in your hand.', type: 'passive', cost: 5, rarity: 1,
-        check: () => true, logic: (mult, base, hand) => mult + (hand.filter(c => c.suit === '♠').length * 2) },
-
-    // --- Hand Score Passives (Chips) ---
-    'base_chips_plus': { name: 'Burden of Riches', desc: '+50 Base Chips for every winning hand.', type: 'passive', cost: 10, rarity: 3,
-        check: () => true, logic: (mult, base) => ({ base: base + 50, mult: mult }) },
-    'risky_chips': { name: 'Edge of Madness', desc: 'Standing on 13, 14, 15, or 16 gives +100 Base Chips.', type: 'passive', cost: 8, rarity: 2,
-        check: (hand, score) => [13,14,15,16].includes(score), logic: (mult, base) => ({ base: base + 100, mult: mult }) },
-    'perfect_21_chips': { name: 'Flawless Execution', desc: 'Winning with exactly 21 gives +150 Base Chips.', type: 'passive', cost: 12, rarity: 3,
-        check: (hand, score) => score === 21, logic: (mult, base) => ({ base: base + 150, mult: mult }) },
-    'no_hit_win_chips': { name: 'Silent Victory', desc: 'Winning with your starting 2-card hand gives +200 Base Chips.', type: 'passive', cost: 11, rarity: 3,
-        check: (hand) => hand.length === 2, logic: (mult, base) => ({ base: base + 200, mult: mult }) },
-
-    // --- Hand Score Passives (Multiplier) ---
-    'blackjack_mult': { name: 'Fate\'s Blessing', desc: 'Natural Blackjacks (2-card 21) give +15 Multiplier.', type: 'passive', cost: 9, rarity: 3,
-        check: (hand, score, is5Card, isBlackjack) => isBlackjack, logic: (mult) => mult + 15 },
-    'five_card_mult': { name: 'The Jester\'s Hand', desc: '5-Card Charlies get +10 Multiplier.', type: 'passive', cost: 10, rarity: 3,
-        check: (hand, score, is5Card) => is5Card, logic: (mult) => mult + 10 },
-    
-    // --- Poker Hand Passives (Multiplier) ---
-    'royal_mult': { name: 'Court of the Damned', desc: '+4 Multiplier for each Face card (J,Q,K) in your hand.', type: 'passive', cost: 7, rarity: 2,
-        check: () => true, logic: (mult, base, hand) => mult + (hand.filter(c => ['J','Q','K'].includes(c.value)).length * 4) },
-    'pair_mult': { name: 'Twin Souls', desc: '+2 Multiplier for each Pair in your hand.', type: 'passive', cost: 8, rarity: 2,
-        check: (hand, score, is5Card, isBJ, pokerRank) => pokerRank.pairs > 0, logic: (mult, base, hand, score, is5Card, isBJ, pokerRank) => mult + (pokerRank.pairs * 2) },
-    'two_pair_mult': { name: 'Dual Destinies', desc: '+6 Multiplier for Two Pair.', type: 'passive', cost: 10, rarity: 3,
-        check: (hand, score, is5Card, isBJ, pokerRank) => pokerRank.isTwoPair, logic: (mult) => mult + 6 },
-    'three_kind_mult': { name: 'Coven\'s Pact', desc: '+5 Multiplier for Three of a Kind.', type: 'passive', cost: 9, rarity: 2,
-        check: (hand, score, is5Card, isBJ, pokerRank) => pokerRank.isThreeOfAKind, logic: (mult) => mult + 5 },
-    'four_kind_mult': { name: 'Void\'s Hand', desc: '+10 Multiplier for Four of a Kind.', type: 'passive', cost: 15, rarity: 4,
-        check: (hand, score, is5Card, isBJ, pokerRank) => pokerRank.isFourOfAKind, logic: (mult) => mult + 10 },
-    'team_of_ace_mult': { name: 'Abyssal Duality', desc: '+10 Multiplier if your hand uses one Ace as 1 and another as 11.', type: 'passive', cost: 13, rarity: 4,
-        check: (hand, score, is5Card, isBJ, pokerRank) => pokerRank.isTeamOfAce, logic: (mult) => mult + 10 },
-};
-
-// --- DATA: Consumables (Tarots) ---
-const BJ_CONSUMABLES = {
-    'vial_clarity': { name: 'Oracle\'s Draught', desc: 'Use: The next card you Hit is guaranteed to be a 7, 8, or 9.', type: 'consumable', cost: 3, rarity: 1,
-        use: (state) => {
-            const safeCards = state.deck.filter(c => ['7','8','9'].includes(c.value));
-            if (safeCards.length > 0) {
-                const safeCard = safeCards[0];
-                state.deck = state.deck.filter(c => c !== safeCard); // Remove from deck
-                state.playerHand.push(safeCard); // Add to hand
-                return { success: true, message: 'Drew a safe card.' };
-            }
-            return { success: false, message: 'No safe cards left!' };
-        }},
-    'second_guess': { name: 'Fate\'s Erasure', desc: 'Use: If you Bust, undo your last Hit.', type: 'consumable', cost: 5, rarity: 2,
-        use: (state) => { /* Logic handled at time of bust */ return { success: true, message: 'Token is ready.' }; }},
-    'reshuffle_orb': { name: 'Chaotic Orb', desc: 'Use: Shuffle a new, full deck.', type: 'consumable', cost: 2, rarity: 1,
-        use: (state) => {
-            state.deck = createDeck();
-            shuffleDeck(state.deck);
-            return { success: true, message: 'Deck has been reshuffled.' };
-        }},
-};
-
-// --- DATA: Run Upgrades (Vouchers) ---
-const BJ_RUN_UPGRADES = {
-    'extra_hand': { 
-        name: 'Thickened Resolve', 
-        desc: 'Start each Vingt-un with +1 Hand.', 
-        type: 'upgrade', 
-        cost: 10,
-        apply: (state) => { state.runUpgrades.bonusHandsPerVingtUn++; }
-    },
-    'extra_passive': { 
-        name: 'Expanded Consciousness', 
-        desc: '+1 Passive Modifier slot.', 
-        type: 'upgrade', 
-        cost: 15,
-        apply: (state) => { state.runUpgrades.passiveSlots++; }
-    },
-    'extra_consumable': { 
-        name: 'Occult Satchel', 
-        desc: '+1 Consumable slot.', 
-        type: 'upgrade', 
-        cost: 8,
-        apply: (state) => { state.runUpgrades.consumableSlots++; }
-    },
-    'cheaper_reroll': { 
-        name: 'Silver Tongue', 
-        desc: 'Shop rerolls cost 50% less.', 
-        type: 'upgrade', 
-        cost: 6,
-        apply: (state) => { state.runUpgrades.shopRerollCost = Math.floor(state.runUpgrades.shopRerollCost * 0.5); }
-    },
-    'extra_reroll': { 
-        name: 'Third Eye', 
-        desc: 'Start each Vingt-un with +1 Pool Reroll.', 
-        type: 'upgrade', 
-        cost: 12,
-        apply: (state) => { state.runUpgrades.bonusRerollsPerVingtUn++; }
-    },
-};
-
-
-// --- Core Game Functions ---
 
 function startRoguelikeRun() {
-    if (player.gold < roguelikeBlackjackState.buyIn) {
-        addToLog(`You need ${roguelikeBlackjackState.buyIn}G to start a run.`, 'text-red-400');
-        return;
-    }
-    player.gold -= roguelikeBlackjackState.buyIn;
     
-    // Initialize the new state structure
-    roguelikeBlackjackState = {
-        ...roguelikeBlackjackState, // Keep buyIn, etc.
-        runActive: true,
-        currentAnteIndex: 0,
-        currentVingtUnIndex: 0,
-        passiveModifiers: [],
-        consumables: [],
-        patronSkills: [],
-        runUpgrades: { // Reset all run-specific upgrades
+    // Check if this is a resume or a new run
+    const isResuming = player.roguelikeBlackjackState.runActive === false && (player.roguelikeBlackjackState.currentAnteIndex > 0 || player.roguelikeBlackjackState.currentVingtUnIndex > 0);
+
+    if (isResuming) {
+        player.roguelikeBlackjackState.runActive = true;
+        player.roguelikeBlackjackState.gamePhase = 'shop'; 
+        player.roguelikeBlackjackState.statusMessage = 'Resuming run. Welcome back to the shop.';
+        
+        // --- NEW: Reset shop reroll cost on resume ---
+        player.roguelikeBlackjackState.shopRerollCost = player.roguelikeBlackjackState.runUpgrades.baseShopRerollCost || 2;
+        // --- END NEW ---
+        
+        if (!player.roguelikeBlackjackState.shopStock || player.roguelikeBlackjackState.shopStock.length === 0) {
+            player.roguelikeBlackjackState.shopStock = generateRoguelikeShopStock();
+        }
+        
+        addToLog(`You resume your run at Ante ${player.roguelikeBlackjackState.currentAnteIndex + 1} for free.`, 'text-yellow-300');
+        
+    } else {
+        // This is a NEW run
+        if (player.gold < player.roguelikeBlackjackState.buyIn) {
+            addToLog(`You need ${player.roguelikeBlackjackState.buyIn}G to start a new run.`, 'text-red-400');
+            return;
+        }
+        player.gold -= player.roguelikeBlackjackState.buyIn;
+        
+        // Reset all progress for the new run
+        player.roguelikeBlackjackState.runActive = true;
+        player.roguelikeBlackjackState.currentAnteIndex = 0;
+        player.roguelikeBlackjackState.currentVingtUnIndex = 0;
+        player.roguelikeBlackjackState.currentCrookards = 0; 
+        player.roguelikeBlackjackState.passiveModifiers = [];
+        player.roguelikeBlackjackState.consumables = [];
+        player.roguelikeBlackjackState.patronSkills = [];
+        player.roguelikeBlackjackState.runUpgrades = {
             passiveSlots: 5,
             consumableSlots: 2,
             handSize: 5,
-            shopRerollCost: 10,
+            baseShopRerollCost: 2, // NEW: Base cost
             bonusHandsPerVingtUn: 0,
             bonusRerollsPerVingtUn: 0,
-            baseMultiplier: 0 // For 'Escalating Stakes' skill
-        },
-        currentChips: 0,
-        currentHandsLeft: 0,
-        currentRerollsLeft: 0,
-        vingtUnBustSafety: true,
-        deck: [],
-        playerHand: [],
-        dealerHand: [],
-        sharedPool: [],
-        gamePhase: 'starting_run', // A temp phase
-        statusMessage: 'The run begins. Prepare for the first Vingt-un.',
-        shopStock: [],
-        lastScore: 0,
-    };
+            baseMultiplier: 0,
+            rerollsToHands: false // NEW
+        };
+        // --- NEW: Set initial shop reroll cost ---
+        player.roguelikeBlackjackState.shopRerollCost = player.roguelikeBlackjackState.runUpgrades.baseShopRerollCost;
+        // --- END NEW ---
+
+        player.roguelikeBlackjackState.gamePhase = 'starting_run';
+        player.roguelikeBlackjackState.statusMessage = 'The run begins. Prepare for the first Vingt-un.';
+        
+        addToLog(`You pay the ${player.roguelikeBlackjackState.buyIn}G buy-in. A new run begins.`, 'text-yellow-300');
+    }
     
-    addToLog(`You pay the ${roguelikeBlackjackState.buyIn}G buy-in. The run begins.`, 'text-yellow-300');
     updateStatsView();
     
-    // --- THIS IS THE FIX ---
-    // Call the new starting function, not the old one.
-    startVingtUn(); 
+    if (player.roguelikeBlackjackState.gamePhase === 'starting_run') {
+        startVingtUn();
+    } else if (player.roguelikeBlackjackState.gamePhase === 'shop') {
+        renderRoguelikeShop(); // Render the shop for resumes
+    }
 }
 
 function startRoguelikeHand() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     if (state.deck.length < 10) {
         state.deck = createDeck();
         shuffleDeck(state.deck);
@@ -933,7 +687,7 @@ function startRoguelikeHand() {
 }
 
 function dealRoguelikePool() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     // NEW: Check for 'The Sixth Card'
     const cardsToDeal = 6 + (state.patronSkills.includes('The Sixth Card') ? 1 : 0);
     
@@ -947,7 +701,7 @@ function dealRoguelikePool() {
 }
 
 function roguelikePlayerDraft(poolCardIndex, consumableKey = null) {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     if (state.gamePhase !== 'player_draft') return;
 
     state.gamePhase = 'dealer_draft'; // Lock player actions
@@ -958,6 +712,54 @@ function roguelikePlayerDraft(poolCardIndex, consumableKey = null) {
         addToLog(result.message, result.success ? 'text-green-300' : 'text-red-400');
         // Remove from inventory
         state.consumables.splice(state.consumables.indexOf(consumableKey), 1);
+
+        // --- Handle Escape Rope ---
+        if (state.escapeRopeUsed) {
+            const prevAnteIndex = state.currentAnteIndex - 1;
+            let goldReward = 0;
+            if (prevAnteIndex >= 0) {
+                goldReward = ANTE_STRUCTURE[prevAnteIndex].cashOutReward;
+            }
+            player.gold += goldReward;
+            addToLog(`You use the Escape Rope! You cash out ${goldReward}G and your run ends.`, 'text-yellow-300');
+            
+            state.runActive = false;
+            state.gamePhase = 'buy_in';
+            // FULL RESET ON LOSS/QUIT
+            state.currentAnteIndex = 0;
+            state.currentVingtUnIndex = 0;
+            state.currentCrookards = 0;
+            state.passiveModifiers = [];
+            state.consumables = [];
+            state.patronSkills = [];
+            state.runUpgrades = {
+                passiveSlots: 5,
+                consumableSlots: 2,
+                handSize: 5,
+                baseShopRerollCost: 2,
+                bonusHandsPerVingtUn: 0,
+                bonusRerollsPerVingtUn: 0,
+                baseMultiplier: 0,
+                rerollsToHands: false
+            };
+            
+            // Clear the escape rope flag
+            state.escapeRopeUsed = false;
+
+            renderArcaneCasino(); // Force render
+            updateStatsView();
+            return; // Stop the turn
+        }
+        
+        // --- NEW: Handle Risky Deal ---
+        if (state.riskyDealActive) {
+            state.riskyDealActive = false; // Consume flag
+            renderRoguelikeGame(); // Show new pool
+            setTimeout(() => roguelikeDealerDraft(false), 1500); // Dealer goes first
+            return; // Stop turn
+        }
+        // --- END NEW ---
+
     } else {
         // --- Standard Draft ---
         if (poolCardIndex === null || !state.sharedPool[poolCardIndex]) {
@@ -971,8 +773,19 @@ function roguelikePlayerDraft(poolCardIndex, consumableKey = null) {
     }
 
     const playerValue = calculateHandValue(state.playerHand);
-    if (playerValue > 21) {
-        // --- NEW: Check for 'Minor Miscalculation' Patron Skill ---
+    
+    // --- NEW: Handle Spectral Hand ---
+    const maxHandSize = state.runUpgrades.handSize + (state.patronSkills.includes('Jester\'s Gambit') ? 1 : 0);
+    const isHandFull = state.playerHand.length >= maxHandSize;
+    
+    if (state.spectralHandActive && isHandFull) {
+        // Hand is full, but spectral hand is active, so we *don't* auto-stand
+        state.spectralHandActive = false; // Consumed on first use
+        addToLog("Spectral Hand lets you ignore the hand size limit!", "text-purple-300");
+    } 
+    // --- END NEW ---
+    else if (playerValue > 21) {
+        // --- Check for 'Minor Miscalculation' Patron Skill ---
         if (state.vingtUnBustSafety) { // Check if safety net is active
             state.vingtUnBustSafety = false; // Consume the safety net
             state.statusMessage = "Minor Miscalculation! Your bust is forgiven, but your turn ends.";
@@ -982,7 +795,6 @@ function roguelikePlayerDraft(poolCardIndex, consumableKey = null) {
             setTimeout(() => roguelikeDealerDraft(true), 1500); // Call dealer's final turn
             return; // Stop processing
         }
-        // --- END NEW ---
 
         // Check for 'Second Guess' consumable
         const secondGuessIndex = state.consumables.indexOf('second_guess');
@@ -1007,8 +819,8 @@ function roguelikePlayerDraft(poolCardIndex, consumableKey = null) {
         renderRoguelikeGame();
         setTimeout(() => roguelikePlayerStand(), 1000); // Auto-stand
         return; // Hand continues to dealer's final turn
-    } else if (state.playerHand.length >= (state.runUpgrades.handSize + (state.patronSkills.includes('Jester\'s Gambit') ? 1 : 0))) { // MODIFIED: Check Jester's Gambit
-        state.statusMessage = 'Max Hand Size! You automatically Stand.'; // MODIFIED
+    } else if (isHandFull) { // Check normal hand size limit
+        state.statusMessage = 'Max Hand Size! You automatically Stand.'; 
         renderRoguelikeGame();
         setTimeout(() => roguelikePlayerStand(), 1000); //
         return;
@@ -1026,7 +838,7 @@ function roguelikePlayerDraft(poolCardIndex, consumableKey = null) {
 }
 
 async function roguelikePlayerStand() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     // --- MODIFICATION ---
     // Allow standing if it's the player's turn (manual) OR if an auto-stand was
     // triggered after a draft (which sets the phase to 'dealer_draft').
@@ -1041,7 +853,7 @@ async function roguelikePlayerStand() {
 }
 
 async function roguelikeDealerDraft(isFinalTurn = false) {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     
     // --- AI Decision Logic ---
     let bestCardIndex = -1;
@@ -1050,7 +862,12 @@ async function roguelikeDealerDraft(isFinalTurn = false) {
     
     const currentRawScore = calculateHandValue(state.dealerHand);
     const currentFinalScore = calculateFinalShowdownScore(state.dealerHand); // Get current score + poker bonus
+    
+    // --- THIS IS THE FIX (Part 1) ---
+    // Define playerVisibleCard, which might be undefined if hand is empty
     const playerVisibleCard = state.playerHand[0]; // AI can only see first card
+    // --- END FIX ---
+
 
     // 1. Evaluate all cards in the pool
     for (let i = 0; i < state.sharedPool.length; i++) {
@@ -1071,17 +888,20 @@ async function roguelikeDealerDraft(isFinalTurn = false) {
             cardScore = newRawValue; // OK: 16 is 16
         }
         
-        // --- THIS IS YOUR REQUEST: "Slight recognition" ---
-        // Add the poker bonus on top of the Blackjack score.
         // This makes it a tie-breaker.
         cardScore += newPokerBonus;
-        // --- END REQUEST ---
         
         // Hate-Drafting Logic: Is this card *amazing* for the player?
         // (Simple check: does it give them 21 based on their *one* visible card?)
-        if (playerVisibleCard.weight + card.weight === 21) {
-            cardScore += 25; // Prioritize taking a card that gives player 21
+        
+        // --- THIS IS THE FIX (Part 2) ---
+        // Add a check to make sure playerVisibleCard exists before reading its .weight
+        if (playerVisibleCard) { 
+            if (playerVisibleCard.weight + card.weight === 21) {
+                cardScore += 25; // Prioritize taking a card that gives player 21
+            }
         }
+        // --- END FIX ---
         
         if (cardScore > bestCardFinalScore) {
             bestCardFinalScore = cardScore;
@@ -1165,61 +985,110 @@ async function roguelikeDealerDraft(isFinalTurn = false) {
 }
 
 function roguelikeDetermineWinner(result) {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     state.gamePhase = 'hand_results'; // Set the phase
+    
+    let score = 0;
+    let win = false;
+    let push = false;
 
     if (result === 'win') { // Player wins (e.g., dealer bust)
-        const score = calculateRoguelikeScore();
-        state.lastScore = score;
-        state.currentChips += score; // Add score to wave total
-        state.statusMessage = `You win! Scored ${score} Chips!`;
-        addToLog(state.statusMessage, 'text-green-300');
+        win = true;
     
     } else if (result === 'showdown') { 
         const playerScore = calculateFinalShowdownScore(state.playerHand);
         const dealerScore = calculateFinalShowdownScore(state.dealerHand);
 
-        // ... (log debug scores) ...
+        // --- Joker Win Condition ---
+        const playerHasJoker = state.playerHand.some(c => c.value === 'Joker');
+        const dealerHasJoker = state.dealerHand.some(c => c.value === 'Joker');
+        const playerValue = calculateHandValue(state.playerHand); // Get player's raw score
+        const dealerValue = calculateHandValue(state.dealerHand);
 
-        if (playerScore > dealerScore) { // Player wins showdown
-            const score = calculateRoguelikeScore(); 
-            state.lastScore = score;
-            state.currentChips += score; 
-            state.statusMessage = `You win! (${playerScore} vs ${dealerScore}) Scored ${score} Chips!`;
-            addToLog(state.statusMessage, 'text-green-300');
-        } else if (playerScore === dealerScore) { // Push
-            const score = calculateRoguelikeScore();
-            const halfScore = Math.floor(score / 2); 
-            state.lastScore = halfScore;
-            state.currentChips += halfScore; 
-            state.statusMessage = `Push! (${playerScore} vs ${dealerScore}) Scored ${halfScore} Chips (Half Points)!`;
-            addToLog(state.statusMessage, 'text-yellow-300');
-        } else { // Player loses showdown
-            state.statusMessage = `You lost. (${playerScore} vs ${dealerScore})`;
-            addToLog(state.statusMessage, 'text-red-400');
-            state.lastScore = 0;
+        if (playerHasJoker && !dealerHasJoker && playerValue <= 21) { // Player wins with Joker if not bust
+            win = true;
+            addToLog("Your Joker secures the win!", "text-yellow-300");
+        } else if (!playerHasJoker && dealerHasJoker && dealerValue <= 21) { // Dealer wins with Joker if not bust
+            win = false;
+            addToLog("The Dealer's Joker beats your hand!", "text-red-400");
+        } else {
+            // Original logic if no Jokers or both have Jokers
+            if (playerScore > dealerScore) { win = true; }
+            else if (playerScore === dealerScore) { push = true; }
+            else { win = false; }
         }
-    
-    } else if (result === 'push') { 
-        // This case is technically now handled by 'showdown', but we keep it as a fallback
-        const score = calculateRoguelikeScore();
-        const halfScore = Math.floor(score / 2); 
-        state.lastScore = halfScore;
-        state.currentChips += halfScore;
-        state.statusMessage = `Push! You scored ${halfScore} Chips (Half Points)!`;
-        addToLog(state.statusMessage, 'text-yellow-300');
-    
-    } else { // 'lose' (This now correctly only handles player busts)
+        
+        // Log result
+        if (win) {
+            state.statusMessage = `You win! (${playerScore} vs ${dealerScore})`;
+        } else if (push) {
+            state.statusMessage = `Push! (${playerScore} vs ${dealerScore})`;
+        } else {
+            state.statusMessage = `You lost. (${playerScore} vs ${dealerScore})`;
+        }
+        
+    } else { // 'lose' (Player bust)
+        win = false;
         state.statusMessage = `You lost the hand. (Bust)`; 
-        addToLog(state.statusMessage, 'text-red-400');
-        state.lastScore = 0;
     }
     
-    // Decrement hand *after* all scoring
+    // --- NEW: Score Calculation & Finalization ---
+    const scoreComponents = getRoguelikeScoreComponents();
+
+    if (win) {
+        score = scoreComponents.finalScore;
+        // Handle Double or Nothing
+        if (state.doubleOrNothingActive) {
+            score *= 2;
+            addToLog("Double or Nothing! Your score is doubled!", "text-green-300 font-bold");
+        }
+        state.lastScore = score;
+        state.currentChips += score; 
+        state.statusMessage += ` Scored ${score} Chips!`;
+        addToLog(state.statusMessage, 'text-green-300');
+    } else if (push) {
+        score = Math.floor(scoreComponents.finalScore / 2);
+        // Handle Double or Nothing (Push counts as a loss)
+        if (state.doubleOrNothingActive) {
+            score = 0;
+            addToLog("Double or Nothing! A push counts as a loss. Score is 0.", "text-red-400");
+        }
+        state.lastScore = score;
+        state.currentChips += score; 
+        state.statusMessage += ` Scored ${score} Chips (Half Points)!`;
+        addToLog(state.statusMessage, 'text-yellow-300');
+    } else { // Loss
+        score = 0;
+        // Handle Pity Points
+        if (state.passiveModifiers.includes('pity_points')) {
+            score = Math.floor(scoreComponents.finalScore / 2);
+        }
+        // Handle Double or Nothing (Loss is 0)
+        if (state.doubleOrNothingActive) {
+            score = 0;
+            addToLog("Double or Nothing! You lost. Score is 0.", "text-red-400");
+        }
+        
+        state.lastScore = score;
+        if (score > 0) {
+            state.currentChips += score;
+            state.statusMessage += ` But you get ${score} pity Chips!`;
+            addToLog(state.statusMessage, 'text-yellow-300');
+        } else {
+            addToLog(state.statusMessage, 'text-red-400');
+        }
+    }
+    
+    // Clear one-time flags
+    state.liquidLuckActive = false;
+    state.spectralHandActive = false;
+    state.doubleOrNothingActive = false;
+    
+    // Decrement hand
     state.currentHandsLeft--;
     
-    // Let the results UI handle the next step
-    renderRoguelikeResultsUI(); //
+    // Render results
+    renderRoguelikeResultsUI();
 }
 
 function evaluateRoguelikeHand(hand) {
@@ -1231,6 +1100,7 @@ function evaluateRoguelikeHand(hand) {
     let isStraight = false;
     let isFlush = false;
     let isStraightFlush = false;
+    let isRoyalFlush = false; // <-- NEW
 
     // --- Straights and Flushes MUST be 5-card hands ---
     if (hand.length === 5) {
@@ -1251,6 +1121,13 @@ function evaluateRoguelikeHand(hand) {
         
         isStraight = isAceLowStraight || isStandardStraight;
         isStraightFlush = isStraight && isFlush;
+
+        // --- NEW: Check for Royal Flush ---
+        // Ranks for 10,J,Q,K,A are [8, 9, 10, 11, 12]
+        if (isStraightFlush && ranks.join(',') === '8,9,10,11,12') {
+            isRoyalFlush = true;
+        }
+        // --- END NEW ---
     }
 
     // --- Original logic for pairs, kinds, and Ace teams (works on any hand size) ---
@@ -1287,7 +1164,20 @@ function evaluateRoguelikeHand(hand) {
     const acesAt11Final = acesAt11Start;
     const isTeamOfAce = acesAt11Final > 0 && acesDevalued > 0;
 
-    // --- New return object with all checks ---
+    // --- NEW: Determine handName ---
+    let handName = 'High Card';
+    if (isRoyalFlush) handName = 'Royal Flush';
+    else if (isStraightFlush) handName = 'Straight Flush';
+    else if (isFourOfAKind) handName = 'Four of a Kind';
+    else if (isFullHouse) handName = 'Full House';
+    else if (isFlush) handName = 'Flush';
+    else if (isStraight) handName = 'Straight';
+    else if (isThreeOfAKind) handName = 'Three of a Kind';
+    else if (pairs === 2) handName = 'Two Pair';
+    else if (pairs === 1) handName = 'One Pair';
+    // --- END NEW ---
+
+    // --- New return object with all checks AND handName ---
     return {
         pairs: pairs,
         isTwoPair: pairs === 2,
@@ -1297,7 +1187,9 @@ function evaluateRoguelikeHand(hand) {
         isStraight: isStraight,
         isFlush: isFlush,
         isFullHouse: isFullHouse,
-        isStraightFlush: isStraightFlush
+        isStraightFlush: isStraightFlush,
+        isRoyalFlush: isRoyalFlush, // <-- NEW
+        handName: handName // <-- NEW
     };
 }
 
@@ -1316,7 +1208,7 @@ function getPokerHandBonus(hand) {
     else if (pokerRank.pairs === 1) bonus = 2;
     
     // NEW: Apply 'High Roller's Intuition'
-    if (bonus > 0 && roguelikeBlackjackState.patronSkills.includes('High Roller\'s Intuition')) {
+    if (bonus > 0 && player.roguelikeBlackjackState.patronSkills.includes('High Roller\'s Intuition')) {
         bonus *= 2;
     }
     
@@ -1341,7 +1233,7 @@ function calculateFinalShowdownScore(hand) {
 
 // --- MODIFIED: This function now includes the new passive logic ---
 function getRoguelikeScoreComponents() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     const hand = state.playerHand;
     const score = calculateHandValue(hand);
 
@@ -1349,7 +1241,7 @@ function getRoguelikeScoreComponents() {
     let baseChips = 0;
     const maxHandSize = state.runUpgrades.handSize + (state.patronSkills.includes('Jester\'s Gambit') ? 1 : 0);
     const isBlackjack = hand.length === 2 && score === 21;
-    const is5Card = hand.length >= maxHandSize && score <= 21; // MODIFIED: Checks for Jester's Gambit
+    const is5Card = (hand.length >= maxHandSize && score <= 21) || (state.spectralHandActive && score <= 21); // Check spectral hand
 
     if (isBlackjack) {
         baseChips = 25;
@@ -1363,12 +1255,9 @@ function getRoguelikeScoreComponents() {
         }
     }
 
-    // --- THIS IS THE FIX ---
-    // Add the Poker Hand Bonus to the Base Chips before multipliers
     const pokerRank = evaluateRoguelikeHand(hand);
     const pokerBonus = getPokerHandBonus(hand);
     baseChips += pokerBonus;
-    // --- END FIX ---
 
     // 2. Calculate Multiplier
     let totalMultiplier = 1 + (state.runUpgrades.baseMultiplier || 0);
@@ -1377,14 +1266,26 @@ function getRoguelikeScoreComponents() {
     if (state.patronSkills.includes('Ace in the Hole') && hand.some(c => c.value === 'A')) {
         baseChips += 50;
     }
+    
+    // Apply 'Golden Hand' (Patron Skill)
+    const ante = ANTE_STRUCTURE[state.currentAnteIndex];
+    const vingtUn = ante.vingtUns[state.currentVingtUnIndex];
+    let initialHands = vingtUn.hands + state.runUpgrades.bonusHandsPerVingtUn + (state.runUpgrades.rerollsToHands ? (vingtUn.rerolls + state.runUpgrades.bonusRerollsPerVingtUn) : 0);
+    if (state.patronSkills.includes('Perfect Start')) initialHands++;
+    if (state.currentHandsLeft === initialHands && state.patronSkills.includes('Golden Hand')) {
+        baseChips += 100;
+    }
 
     // Apply standard passives
-    state.passiveModifiers.forEach(modKey => {
+    state.passiveModifiers.forEach((modKey, index) => {
         const mod = BJ_PASSIVE_MODIFIERS[modKey];
         
-        if (mod && mod.check && mod.check(hand, score, is5Card, isBlackjack, pokerRank)) {
+        // --- NEW: Liquid Luck Check ---
+        const canCheck = state.liquidLuckActive ? true : mod.check(hand, score, is5Card, isBlackjack, pokerRank, state, index);
+        
+        if (mod && mod.check && canCheck) {
             if (mod.logic) {
-                const result = mod.logic(totalMultiplier, baseChips, hand, score, is5Card, isBlackjack, pokerRank);
+                const result = mod.logic(totalMultiplier, baseChips, hand, score, is5Card, isBlackjack, pokerRank, state, index);
                 if (typeof result === 'number') {
                     totalMultiplier = result;
                 } else if (typeof result === 'object') {
@@ -1395,7 +1296,13 @@ function getRoguelikeScoreComponents() {
         }
     });
 
-    // 3. Rounding
+    // 3. Final Multipliers/Dividers
+    if (state.patronSkills.includes('Arcane Overcharge')) {
+        totalMultiplier *= 2;
+        baseChips = Math.floor(baseChips / 2);
+    }
+
+    // 4. Rounding
     return { base: Math.floor(baseChips), mult: Math.floor(totalMultiplier), finalScore: Math.floor(baseChips * totalMultiplier) };
 }
 
@@ -1405,31 +1312,50 @@ function calculateRoguelikeScore() {
     const { finalScore } = getRoguelikeScoreComponents();
     return finalScore;
 }
-
 function roguelikeLoseRun(reason = 'out of hands') {
     let msg = '';
     if (reason === 'out of hands') {
         msg = `You ran out of hands and couldn't meet the Chip Target. Your run is over.`;
     } else if (reason === 'quit') {
-        msg = `You quit the run. Your buy-in is lost.`;
+        // This is now only for a "hard quit" or failure
+        msg = `Your run has ended and all progress has been reset.`;
     }
     
     addToLog(msg, 'text-red-500');
-    roguelikeBlackjackState.runActive = false;
-    roguelikeBlackjackState.gamePhase = 'buy_in';
+    player.roguelikeBlackjackState.runActive = false;
+    player.roguelikeBlackjackState.gamePhase = 'buy_in';
+
+    // --- NEW: FULL RESET ON LOSS ---
+    // This ensures that when they call startRoguelikeRun, it's a fresh start.
+    player.roguelikeBlackjackState.currentAnteIndex = 0;
+    player.roguelikeBlackjackState.currentVingtUnIndex = 0;
+    player.roguelikeBlackjackState.currentCrookards = 0;
+    player.roguelikeBlackjackState.passiveModifiers = [];
+    player.roguelikeBlackjackState.consumables = [];
+    player.roguelikeBlackjackState.patronSkills = [];
+    player.roguelikeBlackjackState.runUpgrades = {
+        passiveSlots: 5,
+        consumableSlots: 2,
+        handSize: 5,
+        shopRerollCost: 1, // Keep your change
+        bonusHandsPerVingtUn: 0,
+        bonusRerollsPerVingtUn: 0,
+        baseMultiplier: 0
+    };
+    // --- END NEW ---
+
     renderArcaneCasino(); // Go back to main casino screen
 }
 
 function startVingtUn() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     
-    // Check for win condition (if Ante index is out of bounds)
+    // Check for win condition
     if (state.currentAnteIndex >= ANTE_STRUCTURE.length) {
-        roguelikeWinRun(); // Player has beaten the final ante
+        roguelikeWinRun();
         return;
     }
 
-    // Get current Vingt-un data
     const ante = ANTE_STRUCTURE[state.currentAnteIndex];
     const vingtUn = ante.vingtUns[state.currentVingtUnIndex];
     
@@ -1443,14 +1369,51 @@ function startVingtUn() {
     state.deck = createDeck();
     shuffleDeck(state.deck);
     addToLog("A fresh deck is shuffled for this Vingt-un.", "text-gray-400");
+    
+    // --- NEW: Reset shop reroll cost for the new Ante ---
+    // This happens when Vingt-un 0 starts
+    if (state.currentVingtUnIndex === 0) {
+        state.shopRerollCost = state.runUpgrades.baseShopRerollCost || 2;
+    }
+    // --- END NEW ---
+
+    // --- MODIFIED: Handle all hand/reroll modifiers ---
+    let baseHands = vingtUn.hands + state.runUpgrades.bonusHandsPerVingtUn;
+    let baseRerolls = vingtUn.rerolls + state.runUpgrades.bonusRerollsPerVingtUn;
+
+    // Apply Ante Starter Pack (Passive)
+    if (state.currentVingtUnIndex === 0 && state.passiveModifiers.includes('ante_starter_pack')) {
+        baseHands++;
+        baseRerolls++;
+        addToLog("'Starter Pack' grants +1 Hand and +1 Reroll for this Ante!", "text-green-300");
+    }
+
+    // Apply Iron Will (Passive)
+    if (state.passiveModifiers.includes('iron_will')) {
+        baseHands += 2;
+    }
+    
+    // Apply Rerolls to Hands (Upgrade)
+    if (state.runUpgrades.rerollsToHands) {
+        baseHands += baseRerolls;
+        baseRerolls = 0;
+        addToLog("'Desperate Measures' converts all your rerolls into extra hands!", "text-yellow-300");
+    }
+    
+    // Apply Glass Cannon (Passive)
+    if (state.passiveModifiers.includes('glass_cannon')) {
+        baseHands = Math.floor(baseHands / 2);
+        addToLog("'Glass Cannon' halves your hands!", "text-red-400");
+    }
+    // --- END MODIFIED ---
 
     // Set Vingt-un state
-    state.gamePhase = 'playing'; // This will trigger renderRoguelikeHandUI
-    state.currentHandsLeft = vingtUn.hands + state.runUpgrades.bonusHandsPerVingtUn;
-    state.currentRerollsLeft = vingtUn.rerolls + state.runUpgrades.bonusRerollsPerVingtUn;
-    state.currentChips = 0; // Reset chips for the *start* of the Vingt-un
+    state.gamePhase = 'playing';
+    state.currentHandsLeft = baseHands;
+    state.currentRerollsLeft = baseRerolls;
+    state.currentChips = 0;
     state.lastScore = 0;
-    state.vingtUnBustSafety = state.patronSkills.includes('Minor Miscalculation'); // Reset safety net
+    state.vingtUnBustSafety = state.patronSkills.includes('Minor Miscalculation');
 
     addToLog(`--- Ante ${state.currentAnteIndex + 1}: ${ante.anteName} ---`, 'text-yellow-300 font-bold');
     addToLog(`Starting: ${vingtUn.name}. Target: ${vingtUn.chipsToWin} Chips in ${state.currentHandsLeft} Hands.`, 'text-yellow-300');
@@ -1466,15 +1429,20 @@ function startVingtUn() {
         addToLog("Your 'Mulligan' grants you 1 extra reroll for this Vingt-un!", 'text-green-300');
     }
     
-    startNextHand(); // Call the function to deal the first hand
+    startNextHand();
 }
-
 /**
  * Called when a Vingt-un's chip goal is met.
  * Routes to the shop (for Petit/Grand) or to the Ante completion logic (for Patron).
  */
 function completeVingtUn() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
+
+    // --- NEW: AUTOSAVE ---
+    addToLog("Vingt-un complete! Autosaving run progress...", "text-gray-400");
+    saveGame(); // This saves the entire player object, including the casino state
+    // --- END NEW ---
+
     const ante = ANTE_STRUCTURE[state.currentAnteIndex];
     const vingtUn = ante.vingtUns[state.currentVingtUnIndex];
 
@@ -1529,9 +1497,17 @@ function completeVingtUn() {
     }
 }
 
+function roguelikePauseRun() {
+    addToLog("Run progress saved. You can continue from this point later (after paying the buy-in).", "text-gray-400");
+    saveGame(); // Save the current state (Crookards, Ante/Vingt-un index, etc.)
+
+    player.roguelikeBlackjackState.runActive = false; // Stop the active run
+    player.roguelikeBlackjackState.gamePhase = 'buy_in'; // Send back to buy-in screen
+    renderArcaneCasino(); // Go back to casino hub
+}
 
 function completeAnte() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     const ante = ANTE_STRUCTURE[state.currentAnteIndex];
     const vingtUn = ante.vingtUns[2]; // The Patron
 
@@ -1557,10 +1533,15 @@ function completeAnte() {
 }
 
 function awardPatronSkill(skillKey) {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     if (!skillKey || !PATRON_SKILLS[skillKey] || state.patronSkills.includes(skillKey)) {
         console.error("Invalid or duplicate Patron Skill selected.");
         // Don't halt the game, just proceed to the shop.
+
+        // --- ADD THIS LINE ---
+        state.currentVingtUnIndex++; // Increment to signal Vingt-uns are done
+        // --- END FIX ---
+
         state.gamePhase = 'shop';
         state.shopStock = generateRoguelikeShopStock();
         renderRoguelikeShop();
@@ -1570,17 +1551,33 @@ function awardPatronSkill(skillKey) {
     state.patronSkills.push(skillKey);
     addToLog(`You have acquired the Patron Skill: ${PATRON_SKILLS[skillKey].name}!`, 'text-green-400 font-bold');
     
+    // --- AND ADD THIS LINE ---
+    state.currentVingtUnIndex++; // Increment to signal Vingt-uns are done
+    // --- END FIX ---
+    
     // After selecting the skill, go to the shop
     state.gamePhase = 'shop';
     state.shopStock = generateRoguelikeShopStock();
     renderRoguelikeShop();
 }
 
+function skipPatronSkillChoice() {
+    const state = player.roguelikeBlackjackState;
+    addToLog("You decided to skip the Patron Skill.", "text-gray-400");
+    
+    // Increment Vingt-un index to signal Vingt-uns are done for this Ante
+    state.currentVingtUnIndex++;
+    
+    // Proceed to the shop
+    state.gamePhase = 'shop';
+    state.shopStock = generateRoguelikeShopStock();
+    renderRoguelikeShop();
+}
 /**
  * Ends the run, pays the player, and returns to the casino hub.
  */
 function roguelikeCashOut() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     const ante = ANTE_STRUCTURE[state.currentAnteIndex]; // Get the Ante they just *completed*
     const goldReward = ante.cashOutReward;
 
@@ -1589,8 +1586,27 @@ function roguelikeCashOut() {
     addToLog(`*** Run Complete! ***`, 'text-yellow-200 font-bold text-lg');
     addToLog(`You cashed out after Ante ${state.currentAnteIndex + 1} and won ${goldReward}G!`, 'text-green-400 font-bold');
 
+    // --- THIS IS THE FIX: Full Run Reset ---
+    // Resets all progress so "isResuming" will be false on next entry.
     state.runActive = false;
     state.gamePhase = 'buy_in';
+    state.currentAnteIndex = 0;
+    state.currentVingtUnIndex = 0;
+    state.currentCrookards = 0;
+    state.passiveModifiers = [];
+    state.consumables = [];
+    state.patronSkills = [];
+    state.runUpgrades = {
+        passiveSlots: 5,
+        consumableSlots: 2,
+        handSize: 5,
+        shopRerollCost: 1,
+        bonusHandsPerVingtUn: 0,
+        bonusRerollsPerVingtUn: 0,
+        baseMultiplier: 0
+    };
+    // --- END FIX ---
+
     updateStatsView();
     renderArcaneCasino();
 }
@@ -1598,7 +1614,7 @@ function roguelikeCashOut() {
  * Called only when the final (8th) Ante is beaten.
  */
 function roguelikeWinRun() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     const finalAnte = ANTE_STRUCTURE[ANTE_STRUCTURE.length - 1]; // Get the last Ante
     const goldReward = finalAnte.cashOutReward;
     
@@ -1608,17 +1624,36 @@ function roguelikeWinRun() {
     addToLog(`You defeated all 8 Antes and won the run!`, 'text-green-400 font-bold');
     addToLog(`You are awarded the grand prize of ${goldReward}G!`, 'text-yellow-300');
 
+    // --- THIS IS THE FIX: Full Run Reset ---
+    // Same fix as roguelikeCashOut()
     state.runActive = false;
     state.gamePhase = 'buy_in';
+    state.currentAnteIndex = 0;
+    state.currentVingtUnIndex = 0;
+    state.currentCrookards = 0;
+    state.passiveModifiers = [];
+    state.consumables = [];
+    state.patronSkills = [];
+    state.runUpgrades = {
+        passiveSlots: 5,
+        consumableSlots: 2,
+        handSize: 5,
+        shopRerollCost: 1,
+        bonusHandsPerVingtUn: 0,
+        bonusRerollsPerVingtUn: 0,
+        baseMultiplier: 0
+    };
+    // --- END FIX ---
+
     updateStatsView();
-    renderArcaneCasino(); //
+    renderArcaneCasino();
 }
 
 /**
  * Advances to the next Ante after the cash-out prompt.
  */
 function startNextAnte() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     state.currentAnteIndex++;
     state.currentVingtUnIndex = 0;
     
@@ -1632,30 +1667,162 @@ function startNextAnte() {
     startVingtUn(); // Start the 'Petit' of the new Ante
 }
 
-function generateRoguelikeShopStock() {
-    // This is a simple generator. A better one would weight by rarity.
-    const state = roguelikeBlackjackState;
-    const stock = [];
-    const passivePool = Object.keys(BJ_PASSIVE_MODIFIERS).filter(k => !state.passiveModifiers.includes(k));
-    const consumablePool = Object.keys(BJ_CONSUMABLES);
-    // --- MODIFIED: Use new upgrade keys ---
-    const upgradePool = Object.keys(BJ_RUN_UPGRADES).filter(k => {
-        // This is a placeholder check.
-        // A real check would look at state.runUpgrades to see if a non-stackable upgrade was bought
-        return true; 
-    });
+// NEW function to be added to casino.js
+/**
+ * Sells a Passive Modifier from the player's inventory.
+ * @param {string} key - The key of the passive (e.g., 'diamonds_chips').
+ */
+function sellRoguelikePassive(key) {
+    const state = player.roguelikeBlackjackState;
+    if (state.gamePhase !== 'player_draft') return; // Can only sell on your turn
 
-    // ... (rest of stock generation is unchanged) ...
-    if (passivePool.length > 0) stock.push(passivePool[Math.floor(Math.random() * passivePool.length)]);
-    if (passivePool.length > 1) stock.push(passivePool[Math.floor(Math.random() * passivePool.length)]);
-    if (consumablePool.length > 0) stock.push(consumablePool[Math.floor(Math.random() * consumablePool.length)]);
-    if (upgradePool.length > 0) stock.push(upgradePool[Math.floor(Math.random() * upgradePool.length)]);
+    const mod = BJ_PASSIVE_MODIFIERS[key];
+    if (!mod) {
+        console.error(`Attempted to sell unknown passive: ${key}`);
+        return;
+    }
+
+    const index = state.passiveModifiers.indexOf(key);
+    if (index === -1) {
+        console.error(`Attempted to sell passive not in inventory: ${key}`);
+        return;
+    }
+
+    // Remove the passive
+    state.passiveModifiers.splice(index, 1);
     
-    return [...new Set(stock)];
+    // Grant Crookards (50% of base cost, rounded down)
+    const sellPrice = Math.floor(mod.cost * 0.5);
+    state.currentCrookards += sellPrice;
+    
+    addToLog(`You sold ${mod.name} for ${sellPrice} Crookards.`, 'text-yellow-300');
+    renderRoguelikeHandUI(); // Refresh the UI
+}
+
+// NEW function to be added to casino.js
+/**
+ * Sells a Consumable from the player's inventory.
+ * @param {number} index - The index of the consumable in the state.consumables array.
+ */
+function sellRoguelikeConsumable(index) {
+    const state = player.roguelikeBlackjackState;
+    if (state.gamePhase !== 'player_draft') return; // Can only sell on your turn
+
+    if (index < 0 || index >= state.consumables.length) {
+        console.error(`Attempted to sell invalid consumable index: ${index}`);
+        return;
+    }
+
+    // Remove the consumable by index
+    const key = state.consumables.splice(index, 1)[0]; // This removes and returns the item key
+    const item = BJ_CONSUMABLES[key];
+    
+    if (!item) {
+         console.error(`Sold item key was invalid: ${key}`);
+         return; // Item didn't exist, but it's removed now anyway
+    }
+
+    // Grant Crookards (50% of base cost, rounded down)
+    const sellPrice = Math.floor(item.cost * 0.5);
+    state.currentCrookards += sellPrice;
+
+    addToLog(`You sold ${item.name} for ${sellPrice} Crookards.`, 'text-yellow-300');
+    renderRoguelikeHandUI(); // Refresh the UI
+}
+
+function generateRoguelikeShopStock() {
+    const state = player.roguelikeBlackjackState;
+    const stock = [];
+    
+    // --- NEW: Shopaholic logic ---
+    const itemsToStock = 3 + (state.patronSkills.includes('Shopaholic') ? 1 : 0);
+    // --- END NEW ---
+
+    // Stock 3 (or 4) items
+    for (let i = 0; i < itemsToStock; i++) {
+        // 50% passive, 30% consumable, 20% upgrade
+        const roll = Math.random();
+        let itemKey;
+        if (roll < 0.5) {
+            itemKey = generateWeightedShopItem('passive');
+        } else if (roll < 0.8) {
+            itemKey = generateWeightedShopItem('consumable');
+        } else {
+            itemKey = generateWeightedShopItem('upgrade');
+        }
+        
+        if (itemKey) {
+            stock.push(itemKey);
+        }
+    }
+    
+    // Add 1 guaranteed Common Passive
+    const commonPassive = generateWeightedShopItem('passive', 1); // Force rarity 1
+    if (commonPassive) stock.push(commonPassive);
+
+    // Add 1 guaranteed Common Consumable
+    const commonConsumable = generateWeightedShopItem('consumable', 1); // Force rarity 1
+    if (commonConsumable) stock.push(commonConsumable);
+    
+    return [...new Set(stock)]; // Remove duplicates
+}
+
+function generateWeightedShopItem(type) {
+    const state = player.roguelikeBlackjackState;
+    let sourcePool;
+    let filterPool;
+
+    if (type === 'passive') {
+        sourcePool = BJ_PASSIVE_MODIFIERS;
+        filterPool = k => !state.passiveModifiers.includes(k);
+    } else if (type === 'consumable') {
+        sourcePool = BJ_CONSUMABLES;
+        filterPool = k => true; // Consumables can stack
+    } else if (type === 'upgrade') {
+        sourcePool = BJ_RUN_UPGRADES;
+        // Filter out upgrades that are already acquired and non-stackable
+        filterPool = k => {
+            if (k === 'rerolls_to_hands' && state.runUpgrades.rerollsToHands) return false;
+            if (k === 'cheaper_reroll' && state.runUpgrades.baseShopRerollCost === 1) return false;
+            // Add more checks for future non-stackable upgrades
+            return true;
+        };
+    } else {
+        return null;
+    }
+
+    const availableKeys = Object.keys(sourcePool).filter(filterPool);
+    if (availableKeys.length === 0) return null;
+
+    // Rarity Weights: C: 60%, U: 25%, R: 10%, E: 4%, L: 1%
+    const rarityRoll = Math.random() * 100;
+    let chosenRarity;
+    if (rarityRoll < 60) chosenRarity = 1;       // Common
+    else if (rarityRoll < 85) chosenRarity = 2;  // Uncommon
+    else if (rarityRoll < 95) chosenRarity = 3;  // Rare
+    else if (rarityRoll < 99) chosenRarity = 4;  // Epic
+    else chosenRarity = 5;                       // Legendary
+
+    let poolByRarity = availableKeys.filter(k => sourcePool[k].rarity === chosenRarity);
+    
+    // Fallback: If no items of that rarity are available, try the next rarity down
+    if (poolByRarity.length === 0) {
+        for (let r = chosenRarity - 1; r >= 1; r--) {
+            poolByRarity = availableKeys.filter(k => sourcePool[k].rarity === r);
+            if (poolByRarity.length > 0) break;
+        }
+    }
+    // Final fallback: just pick from anything available
+    if (poolByRarity.length === 0) {
+        poolByRarity = availableKeys;
+    }
+    if (poolByRarity.length === 0) return null; // Should not happen
+
+    return poolByRarity[Math.floor(Math.random() * poolByRarity.length)];
 }
 
 function buyRoguelikeTool(toolKey) {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     let tool;
     let type;
 
@@ -1670,8 +1837,7 @@ function buyRoguelikeTool(toolKey) {
         type = 'upgrade';
     }
 
-    // --- THIS IS THE CHANGE ---
-    if (!tool || state.currentCrookards < tool.cost) { // Check Crookards, not Chips
+    if (!tool || state.currentCrookards < tool.cost) { 
         addToLog("You can't afford that.", 'text-red-400');
         return;
     }
@@ -1687,7 +1853,7 @@ function buyRoguelikeTool(toolKey) {
     }
 
     // Pay and add tool
-    state.currentCrookards -= tool.cost; // Spend Crookards, not Chips
+    state.currentCrookards -= tool.cost; 
     
     if (type === 'passive') {
         state.passiveModifiers.push(toolKey);
@@ -1695,7 +1861,11 @@ function buyRoguelikeTool(toolKey) {
         state.consumables.push(toolKey);
     } else if (type === 'upgrade') {
         tool.apply(state);
-        // Remove from shop stock so it can't be bought again
+        // --- NEW: Update shopRerollCost immediately if base is changed ---
+        if (toolKey === 'cheaper_reroll') {
+            state.shopRerollCost = state.runUpgrades.baseShopRerollCost;
+        }
+        // --- END NEW ---
     }
 
     // Remove from shop stock
@@ -1704,24 +1874,94 @@ function buyRoguelikeTool(toolKey) {
     renderRoguelikeShop(); // Re-render shop
 }
 
-function roguelikeRerollShop() {
-    const state = roguelikeBlackjackState;
-    const cost = state.runUpgrades.shopRerollCost;
+function sellRoguelikePassiveShop(key) {
+    const state = player.roguelikeBlackjackState;
+    // Can sell anytime in shop
+    if (state.gamePhase !== 'shop') return;
+
+    const mod = BJ_PASSIVE_MODIFIERS[key];
+    if (!mod) {
+        console.error(`Attempted to sell unknown passive: ${key}`);
+        return;
+    }
+
+    const index = state.passiveModifiers.indexOf(key);
+    if (index === -1) {
+        console.error(`Attempted to sell passive not in inventory: ${key}`);
+        return;
+    }
+
+    // Remove the passive
+    state.passiveModifiers.splice(index, 1);
     
-    // --- THIS IS THE CHANGE ---
-    if (state.currentCrookards < cost) { // Check Crookards, not Chips
+    // Grant Crookards (50% of base cost, rounded down)
+    const sellPrice = Math.floor(mod.cost * 0.5);
+    state.currentCrookards += sellPrice;
+    
+    addToLog(`You sold ${mod.name} for ${sellPrice} Crookards.`, 'text-yellow-300');
+    renderRoguelikeShop(); // Refresh the SHOP UI
+}
+
+/**
+ * Sells a Consumable from the player's inventory *from the shop screen*.
+ * @param {number} index - The index of the consumable in the state.consumables array.
+ */
+function sellRoguelikeConsumableShop(index) {
+    const state = player.roguelikeBlackjackState;
+    if (state.gamePhase !== 'shop') return;
+
+    if (index < 0 || index >= state.consumables.length) {
+        console.error(`Attempted to sell invalid consumable index: ${index}`);
+        return;
+    }
+
+    // Remove the consumable by index
+    const key = state.consumables.splice(index, 1)[0]; // This removes and returns the item key
+    const item = BJ_CONSUMABLES[key];
+    
+    if (!item) {
+         console.error(`Sold item key was invalid: ${key}`);
+         return; // Item didn't exist, but it's removed now anyway
+    }
+
+    // Grant Crookards (50% of base cost, rounded down)
+    const sellPrice = Math.floor(item.cost * 0.5);
+    state.currentCrookards += sellPrice;
+
+    addToLog(`You sold ${item.name} for ${sellPrice} Crookards.`, 'text-yellow-300');
+    renderRoguelikeShop(); // Refresh the SHOP UI
+}
+
+function roguelikeRerollShop() {
+    const state = player.roguelikeBlackjackState;
+    const cost = state.shopRerollCost;
+    
+    // --- NEW: Shopaholic check ---
+    if (state.patronSkills.includes('Shopaholic')) {
+        addToLog("Shopaholic! Reroll is free.", "text-yellow-300");
+        state.shopStock = generateRoguelikeShopStock();
+        renderRoguelikeShop();
+        return;
+    }
+    // --- END NEW ---
+
+    if (state.currentCrookards < cost) { 
         addToLog("Not enough Crookards to reroll.", 'text-red-400');
         return;
     }
-    state.currentCrookards -= cost; // Spend Crookards, not Chips
-    // --- END CHANGE ---
+    state.currentCrookards -= cost;
+    
+    // --- NEW: Double the cost for next time ---
+    state.shopRerollCost *= 2;
+    addToLog(`Rerolled shop for ${cost} Crookards. Next reroll costs ${state.shopRerollCost} Crookards.`, "text-yellow-300");
+    // --- END NEW ---
 
     state.shopStock = generateRoguelikeShopStock();
     renderRoguelikeShop();
 }
 
 function startNextHand() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     
     if (state.deck.length < 20) { // Ensure enough cards for initial deal + pool
         state.deck = createDeck();
@@ -1742,10 +1982,12 @@ function startNextHand() {
 
 // --- NEW FUNCTION: Player rerolls the pool ---
 function roguelikePlayerRerollPool() {
-    const state = roguelikeBlackjackState;
-    if (state.gamePhase !== 'player_draft' || state.currentRerollsLeft <= 0) {
+    const state = player.roguelikeBlackjackState;
+    // --- MODIFIED: Added rerollsToHands check ---
+    if (state.gamePhase !== 'player_draft' || state.currentRerollsLeft <= 0 || state.runUpgrades.rerollsToHands) {
         return; // Safety check
     }
+    // --- END MODIFIED ---
 
     state.currentRerollsLeft--; // Consume a reroll
     state.gamePhase = 'dealer_draft'; // It's now the dealer's turn

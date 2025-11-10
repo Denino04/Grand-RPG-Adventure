@@ -378,6 +378,37 @@ class Player extends Entity {
         };
         this.lastCasinoBet = 10; // <-- NEW
         this.lastCasinoAnte = 10; // <-- NEW
+        this.roguelikeBlackjackState = {
+            runActive: false,
+            buyIn: 500,
+            currentAnteIndex: 0,
+            currentVingtUnIndex: 0,
+            currentCrookards: 0,
+            passiveModifiers: [],
+            consumables: [],
+            patronSkills: [],
+            runUpgrades: {
+                passiveSlots: 5,
+                consumableSlots: 2,
+                handSize: 5,
+                shopRerollCost: 1,
+                bonusHandsPerVingtUn: 0,
+                bonusRerollsPerVingtUn: 0,
+                baseMultiplier: 0
+            },
+            currentChips: 0,
+            currentHandsLeft: 0,
+            currentRerollsLeft: 0,
+            vingtUnBustSafety: true,
+            deck: [],
+            playerHand: [],
+            dealerHand: [],
+            sharedPool: [],
+            lastScore: 0,
+            gamePhase: 'buy_in',
+            statusMessage: '',
+            shopStock: [],
+        };
         // --- End Added ---
 
 

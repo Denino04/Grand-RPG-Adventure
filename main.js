@@ -465,6 +465,8 @@ async function renderLoadMenu() {
         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`;
     let hasSaves = false;
 
+    // --- THIS IS THE FIX ---
+    // The onclick handler is modified to manually call handleRouteChange()
     const createSaveHTML = (charData, key, isGuest) => `
         <div class="p-3 bg-slate-800 ${isGuest ? 'border-l-4 border-yellow-400' : ''} rounded-lg flex justify-between items-center">
             <div>
@@ -472,10 +474,11 @@ async function renderLoadMenu() {
                 <p class="text-sm text-gray-400">Level ${charData.level} ${charData.race || ''} ${charData.class || ''}</p>
             </div>
             <div>
-                <button onclick="sessionStorage.setItem('activeSaveKey', '${key}'); window.location.hash = 'game';" class="btn btn-primary text-sm py-1 px-3">Load</button>
+                <button onclick="sessionStorage.setItem('activeSaveKey', '${key}'); window.location.hash = 'game'; handleRouteChange();" class="btn btn-primary text-sm py-1 px-3">Load</button>
                 <button onclick="deleteSave('${key}')" class="btn btn-action text-sm py-1 px-3 ml-2">Delete</button>
             </div>
         </div>`;
+    // --- END FIX ---
 
     // Check Local Storage (Guest Save)
     const localSaveDataString = localStorage.getItem('rpgSaveData_local');
@@ -681,6 +684,43 @@ async function loadGameFromKey(docId, isImport = false) {
             if (player.unlocks.roguelikeCardGame === undefined) player.unlocks.roguelikeCardGame = false; // <-- NEW FLAG MIGRATION
             if (player.lastCasinoBet === undefined) player.lastCasinoBet = 10; // <-- NEW
             if (player.lastCasinoAnte === undefined) player.lastCasinoAnte = 10; // <-- NEW
+
+            // --- NEW: Add roguelike state for old saves ---
+            if (!player.roguelikeBlackjackState) {
+                console.log("Migrating old save: Adding default roguelikeBlackjackState.");
+                player.roguelikeBlackjackState = {
+                    runActive: false,
+                    buyIn: 500,
+                    currentAnteIndex: 0,
+                    currentVingtUnIndex: 0,
+                    currentCrookards: 0,
+                    passiveModifiers: [],
+                    consumables: [],
+                    patronSkills: [],
+                    runUpgrades: {
+                        passiveSlots: 5,
+                        consumableSlots: 2,
+                        handSize: 5,
+                        shopRerollCost: 1,
+                        bonusHandsPerVingtUn: 0,
+                        bonusRerollsPerVingtUn: 0,
+                        baseMultiplier: 0
+                    },
+                    currentChips: 0,
+                    currentHandsLeft: 0,
+                    currentRerollsLeft: 0,
+                    vingtUnBustSafety: true,
+                    deck: [],
+                    playerHand: [],
+                    dealerHand: [],
+                    sharedPool: [],
+                    lastScore: 0,
+                    gamePhase: 'buy_in',
+                    statusMessage: '',
+                    shopStock: [],
+                };
+            }
+            // --- END NEW ---
         }
             // --- END NPC ALLY ---
         // --- End Added ---

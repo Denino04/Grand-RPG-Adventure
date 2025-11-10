@@ -2947,7 +2947,7 @@ function evaluateRoguelikeHand(hand) {
 // --- END NEW HELPER ---
 
 function renderRoguelikeGame() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     
     if (!state.runActive) {
         renderRoguelikeBuyInScreen();
@@ -2968,7 +2968,7 @@ function renderRoguelikeBuyInScreen() {
     applyTheme('void');
     lastViewBeforeInventory = 'casino_hub';
     gameState.currentView = 'roguelike_game';
-    const buyIn = roguelikeBlackjackState.buyIn;
+    const buyIn = player.roguelikeBlackjackState.buyIn;
 
     let html = `
     <div class="w-full text-center">
@@ -2995,7 +2995,7 @@ function renderRoguelikeHandUI() {
     lastViewBeforeInventory = 'casino_hub';
     gameState.currentView = 'roguelike_game';
     
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     const ante = ANTE_STRUCTURE[state.currentAnteIndex];
     const vingtUn = ante.vingtUns[state.currentVingtUnIndex];
 
@@ -3011,12 +3011,77 @@ function renderRoguelikeHandUI() {
     const scoreComponents = getRoguelikeScoreComponents();
     const displayBase = scoreComponents.base;
     const displayMult = scoreComponents.mult;
-
+    
     let patronSkillsHtml = state.patronSkills.map(key => {
         const skill = PATRON_SKILLS[key];
         if (!skill) return `<div class="text-xs p-1 bg-slate-800 rounded">Error: Unknown Skill</div>`;
-        return `<div class="text-xs p-1 bg-slate-800 rounded" onmouseover="showSimpleTooltip('${skill.desc}', event)" onmouseout="hideSimpleTooltip()"><strong>${skill.name}</strong></div>`;
+        
+        // --- THIS IS THE FIX ---
+        const escapedDesc = skill.desc.replace(/'/g, "\\'");
+        // --- END FIX ---
+        
+        return `<div class="text-xs p-1 bg-slate-800 rounded" onmouseover="showSimpleTooltip('${escapedDesc}', event)" onmouseout="hideSimpleTooltip()"><strong>${skill.name}</strong></div>`;
     }).join('') || '<p class="text-xs text-gray-500 text-center">None</p>';
+
+    let passivesHtml = '';
+    if (state.passiveModifiers.length === 0) {
+        passivesHtml = '<p class="text-xs text-gray-500 text-center">None</p>';
+    } else {
+        state.passiveModifiers.forEach(key => {
+            const mod = BJ_PASSIVE_MODIFIERS[key];
+            if (!mod) {
+                passivesHtml += `<div class="text-xs p-1 bg-slate-800 rounded">Error: Unknown Passive</div>`;
+                return;
+            }
+            const sellPrice = Math.floor(mod.cost * 0.5);
+            
+            // --- THIS IS THE FIX ---
+            const escapedDesc = mod.desc.replace(/'/g, "\\'");
+            // --- END FIX ---
+
+            passivesHtml += `
+                <div class="flex items-center justify-between text-xs p-1 bg-slate-800 rounded" onmouseover="showSimpleTooltip('${escapedDesc}', event)" onmouseout="hideSimpleTooltip()">
+                    <span class="font-bold">${mod.name}</span>
+                    <button class="btn btn-action text-xs py-0 px-2" 
+                            onclick="sellRoguelikePassive('${key}')" 
+                            ${state.gamePhase !== 'player_draft' ? 'disabled' : ''}>
+                        Sell (${sellPrice})
+                    </button>
+                </div>`;
+        });
+    }
+
+    let consumablesHtml = '';
+    if (state.consumables.length === 0) {
+        consumablesHtml = '<p class="text-xs text-gray-500 text-center">None</p>';
+    } else {
+        state.consumables.forEach((key, index) => {
+            const item = BJ_CONSUMABLES[key];
+            if (!item) {
+                consumablesHtml += `<button class="btn btn-item text-xs w-full mb-1" disabled>Error</button>`;
+                return;
+            }
+            const sellPrice = Math.floor(item.cost * 0.5);
+            
+            // --- THIS IS THE FIX ---
+            const escapedDesc = item.desc.replace(/'/g, "\\'");
+            // --- END FIX ---
+
+            consumablesHtml += `
+                <div class="flex items-center gap-1 mb-1" onmouseover="showSimpleTooltip('${escapedDesc}', event)" onmouseout="hideSimpleTooltip()">
+                    <button class="btn btn-item text-xs flex-grow" 
+                            onclick="roguelikePlayerDraft(null, '${key}')" 
+                            ${state.gamePhase !== 'player_draft' ? 'disabled' : ''}>
+                        Use: ${item.name}
+                    </button>
+                    <button class="btn btn-action text-xs py-0 px-2 w-16" 
+                            onclick="sellRoguelikeConsumable(${index})" 
+                            ${state.gamePhase !== 'player_draft' ? 'disabled' : ''}>
+                        Sell (${sellPrice})
+                    </button>
+                </div>`;
+        });
+    }
 
     let html = `
     <div class="w-full h-full flex flex-col text-center p-2">
@@ -3035,26 +3100,11 @@ function renderRoguelikeHandUI() {
                 </div>
                 <div class="bg-slate-900/50 p-2 rounded-lg flex-1 flex flex-col overflow-y-auto inventory-scrollbar">
                     <h4 class="font-bold text-yellow-300 text-center mb-2 flex-shrink-0">Passives (${state.passiveModifiers.length}/${state.runUpgrades.passiveSlots})</h4>
-                    <div classs="space-y-1">
-                        ${state.passiveModifiers.map(key => {
-                            const mod = BJ_PASSIVE_MODIFIERS[key];
-                            if (!mod) return `<div class="text-xs p-1 bg-slate-800 rounded">Error: Unknown Passive</div>`;
-                            return `<div class="text-xs p-1 bg-slate-800 rounded" onmouseover="showSimpleTooltip('${mod.desc}', event)" onmouseout="hideSimpleTooltip()"><strong>${mod.name}</strong></div>`;
-                        }).join('') || '<p class="text-xs text-gray-500 text-center">None</p>'}
-                    </div>
+                    <div classs="space-y-1">${passivesHtml}</div>
                 </div>
                 <div class="bg-slate-900/50 p-2 rounded-lg flex-1 flex flex-col overflow-y-auto inventory-scrollbar">
                     <h4 class="font-bold text-yellow-300 text-center mb-2 flex-shrink-0">Consumables (${state.consumables.length}/${state.runUpgrades.consumableSlots})</h4>
-                    <div classs="space-y-1">
-                        ${state.consumables.map(key => {
-                            const item = BJ_CONSUMABLES[key];
-                            if (!item) return `<button class="btn btn-item text-xs w-full mb-1" disabled>Error</button>`;
-                            return `<button class="btn btn-item text-xs w-full mb-1" onmouseover="showSimpleTooltip('${item.desc}', event)" onmouseout="hideSimpleTooltip()"
-                                        onclick="roguelikePlayerDraft(null, '${key}')" ${state.gamePhase !== 'player_draft' ? 'disabled' : ''}>
-                                    ${item.name}
-                                    </button>`;
-                        }).join('') || '<p class="text-xs text-gray-500 text-center">None</p>'}
-                    </div>
+                    <div classs="space-y-1">${consumablesHtml}</div>
                 </div>
             </div>
             
@@ -3063,12 +3113,15 @@ function renderRoguelikeHandUI() {
                     <h3 class="font-bold text-lg text-red-400">Dealer's Hand (<span id="rl-dealer-score">${dealerScoreText}</span>)</h3>
                     <div id="rl-dealer-hand" class="flex justify-center items-center h-16 bg-black/20 rounded-lg p-2 text-3xl gap-2">
                         ${state.dealerHand.map((card, index) => {
-                            const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
+                            const suitColorClass = (card.suit === '♥' || card.suit === '♦' || card.suit === 'JOKER_RED') ? 'text-red-600' : 'text-black';
+                            let cardValue = card.value === 'Joker' ? 'JOK' : card.value;
+                            let cardSuit = (card.suit === 'JOKER_RED' || card.suit === 'JOKER_BLACK') ? '' : card.suit;
+                            
                             if (state.gamePhase !== 'player_draft' && state.gamePhase !== 'dealer_draft') {
-                                return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`;
+                                return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${cardValue}${cardSuit}</div>`;
                             }
                             if (index === 0) {
-                                return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`;
+                                return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${cardValue}${cardSuit}</div>`;
                             } else {
                                 return `<div class="bg-red-800 border-2 border-red-900 text-red-400 p-2 rounded-md shadow-inner w-10 h-16 flex items-center justify-center text-2xl">?</div>`;
                             }
@@ -3080,8 +3133,10 @@ function renderRoguelikeHandUI() {
                     <h3 class="font-bold text-lg text-green-400">Your Hand (<span id="rl-player-score">${calculateHandValue(state.playerHand)}</span>)</h3>
                     <div id="rl-player-hand" class="flex justify-center items-center h-16 bg-black/20 rounded-lg p-2 text-3xl gap-2">
                         ${state.playerHand.map(card => {
-                            const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
-                            return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`;
+                            const suitColorClass = (card.suit === '♥' || card.suit === '♦' || card.suit === 'JOKER_RED') ? 'text-red-600' : 'text-black';
+                            let cardValue = card.value === 'Joker' ? 'JOK' : card.value;
+                            let cardSuit = (card.suit === 'JOKER_RED' || card.suit === 'JOKER_BLACK') ? '' : card.suit;
+                            return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${cardValue}${cardSuit}</div>`;
                         }).join('')}
                     </div>
                 </div>
@@ -3093,7 +3148,7 @@ function renderRoguelikeHandUI() {
                 <div class="grid grid-cols-2 gap-4 max-w-md mx-auto mb-1">
                     <button id="rl-stand-btn" onclick="roguelikePlayerStand()" class="btn btn-primary" ${state.gamePhase !== 'player_draft' ? 'disabled' : ''}>Stand</button>
                     
-                    <button id="rl-reroll-btn" onclick="roguelikePlayerRerollPool()" class="btn btn-action" ${state.gamePhase !== 'player_draft' || state.currentRerollsLeft <= 0 ? 'disabled' : ''}>
+                    <button id="rl-reroll-btn" onclick="roguelikePlayerRerollPool()" class="btn btn-action" ${state.gamePhase !== 'player_draft' || state.currentRerollsLeft <= 0 || state.runUpgrades.rerollsToHands ? 'disabled' : ''}>
                         Reroll (x${state.currentRerollsLeft})
                     </button>
                     
@@ -3106,22 +3161,26 @@ function renderRoguelikeHandUI() {
                     </div>
                 </div>
             </div>
-            
+
             <div class="flex flex-col gap-1 bg-slate-900/50 p-2 rounded-lg overflow-y-auto inventory-scrollbar">
                 <h3 class="font-bold text-lg text-yellow-300 text-center mb-1 flex-shrink-0">Shared Pool</h3>
-                <div id="rl-shared-pool" class="flex flex-col items-center gap-1">
+                <div id="rl-shared-pool" class="flex flex-row flex-wrap justify-center md:flex-col md:flex-nowrap items-center gap-1">
                     ${state.sharedPool.map((card, index) => {
-                        const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
+                        const suitColorClass = (card.suit === '♥' || card.suit === '♦' || card.suit === 'JOKER_RED') ? 'text-red-600' : 'text-black';
                         const maxHandSize = state.runUpgrades.handSize + (state.patronSkills.includes('Jester\'s Gambit') ? 1 : 0);
                         const isDisabled = state.gamePhase !== 'player_draft' || state.playerHand.length >= maxHandSize;
                         const clickAction = isDisabled ? '' : `onclick="roguelikePlayerDraft(${index})"`;
-                        return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md w-24 h-32 text-4xl flex flex-col justify-center items-center ${isDisabled ? 'opacity-50' : 'cursor-pointer hover:border-yellow-300 border-2 border-transparent'}" ${clickAction}>
-                                    <span>${card.value}</span>
-                                    <span>${card.suit}</span>
+                        let cardValue = card.value === 'Joker' ? 'JOK' : card.value;
+                        let cardSuit = (card.suit === 'JOKER_RED' || card.suit === 'JOKER_BLACK') ? '' : card.suit;
+                        
+                        return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md w-12 h-20 text-xl md:w-24 md:h-32 md:text-4xl flex flex-col justify-center items-center flex-shrink-0 ${isDisabled ? 'opacity-50' : 'cursor-pointer hover:border-yellow-300 border-2 border-transparent'}" ${clickAction}>
+                                    <span>${cardValue}</span>
+                                    <span>${cardSuit}</span>
                                 </div>`;
                     }).join('')}
                 </div>
             </div>
+
         </div>
     </div>`;
     
@@ -3134,7 +3193,7 @@ function renderRoguelikeHandUI() {
 }
 
 function renderRoguelikeResultsUI() {
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     // Get current Vingt-un data
     const ante = ANTE_STRUCTURE[state.currentAnteIndex];
     const vingtUn = ante.vingtUns[state.currentVingtUnIndex];
@@ -3227,14 +3286,14 @@ function renderPatronSkillChoice(skillPoolKeys) {
     lastViewBeforeInventory = 'casino_hub';
     gameState.currentView = 'roguelike_game';
     
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     const ante = ANTE_STRUCTURE[state.currentAnteIndex];
 
     let html = `
     <div class="w-full h-full flex flex-col text-center justify-center p-4">
         <h2 class="font-medieval text-3xl mb-2">Patron Defeated!</h2>
         <p class="text-lg text-gray-300 mb-6">You have mastered ${ante.anteName}. The House offers you a boon before you proceed.</p>
-        <p class.text-xl font-bold text-yellow-300 mb-4">Choose Your Patron Skill:</p>
+        <p class="text-xl font-bold text-yellow-300 mb-4">Choose Your Patron Skill:</p>
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
             ${skillPoolKeys.map(key => {
@@ -3244,10 +3303,14 @@ function renderPatronSkillChoice(skillPoolKeys) {
                 // Don't offer a skill the player already has
                 const isOwned = state.patronSkills.includes(key); 
                 
+                // --- FIX: Escape single quotes in description ---
+                const escapedDesc = skill.desc.replace(/'/g, "\\'");
+                // --- END FIX ---
+
                 return `<div class="p-4 bg-slate-800 rounded-lg flex flex-col justify-between text-left shadow-lg ${isOwned ? 'opacity-50' : ''}">
                     <div>
                         <p class="font-bold text-lg text-white">${skill.name}</p>
-                        <p class="text-sm text-gray-300 italic mb-2">${skill.desc}</p>
+                        <p class="text-sm text-gray-300 italic mb-2">${escapedDesc}</p>
                     </div>
                     <button onclick="awardPatronSkill('${key}')" class="btn btn-primary w-full mt-2" ${isOwned ? 'disabled' : ''}>
                         ${isOwned ? 'Already Owned' : 'Select Skill'}
@@ -3255,7 +3318,13 @@ function renderPatronSkillChoice(skillPoolKeys) {
                 </div>`;
             }).join('')}
         </div>
-    </div>`;
+
+        <div class="text-center mt-4">
+            <button onclick="skipPatronSkillChoice()" class="btn btn-action text-sm py-1 px-3">
+                Skip Skill Selection
+            </button>
+        </div>
+        </div>`;
     
     const container = document.createElement('div');
     container.className = 'w-full h-full';
@@ -3264,7 +3333,6 @@ function renderPatronSkillChoice(skillPoolKeys) {
     mainView.classList.remove('items-center', 'p-6');
     mainView.classList.add('p-2');
 }
-
 /**
  * Renders the prompt to cash out or continue after the shop.
  */
@@ -3273,7 +3341,7 @@ function renderCashOutPrompt() {
     lastViewBeforeInventory = 'casino_hub';
     gameState.currentView = 'roguelike_game';
     
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     const currentAnte = ANTE_STRUCTURE[state.currentAnteIndex];
     const nextAnte = ANTE_STRUCTURE[state.currentAnteIndex + 1]; // This is safe because 'winRun' handles the last ante
     
@@ -3285,8 +3353,7 @@ function renderCashOutPrompt() {
         <p class="text-4xl font-bold text-yellow-300 mb-6">${currentAnte.cashOutReward} G</p>
         
         <p class="text-xl text-white mb-2">...or risk it all and continue to the next Ante?</p>
-        <p class="text-2xl font-bold text-red-400 mb-6">${nextAnte.name}</p>
-        
+        <p class="text-2xl font-bold text-red-400 mb-6">${nextAnte.anteName}</p>
         <div class="flex justify-center gap-6 max-w-md mx-auto">
             <button onclick="roguelikeCashOut()" class="btn btn-action text-lg flex-1">
                 Cash Out & End Run
@@ -3310,7 +3377,7 @@ function renderRoguelikeShop() {
     lastViewBeforeInventory = 'casino_hub';
     gameState.currentView = 'roguelike_game';
     
-    const state = roguelikeBlackjackState;
+    const state = player.roguelikeBlackjackState;
     
     // Check if the *next* Vingt-un exists
     const nextVingtUnIndex = state.currentVingtUnIndex; // This was already incremented
@@ -3320,21 +3387,157 @@ function renderRoguelikeShop() {
     let nextUpText = '';
 
     if (nextVingtUn) {
-        // This was after Petit or Grand, so we proceed to the next Vingt-un
-        continueButtonHtml = `
-            <button onclick="startVingtUn()" class="btn btn-primary text-lg">
-                Start Vingt-un: ${nextVingtUn.name}
-            </button>`;
+        // This was after Petit or Grand
+        continueButtonHtml = `<button onclick="startVingtUn()" class="btn btn-primary text-lg">Start Vingt-un: ${nextVingtUn.name}</button>`;
         nextUpText = `Next: ${nextVingtUn.name} (${nextVingtUn.chipsToWin} Chips)`;
     } else {
-        // This was after the Patron (index 2 was completed, index is now 3)
-        // We go to the cash out prompt
-        continueButtonHtml = `
-            <button onclick="renderCashOutPrompt()" class="btn btn-primary text-lg">
-                Finish Ante
-            </button>`;
+        // This was after the Patron
+        continueButtonHtml = `<button onclick="renderCashOutPrompt()" class="btn btn-primary text-lg">Finish Ante</button>`;
         nextUpText = 'Ante Complete!';
     }
+
+    // --- Build Player Inventory Lists ---
+    // (This block is identical to the one you provided, just ensure it's here)
+    // 1. Patron Skills
+    let patronSkillsHtml = state.patronSkills.map(key => {
+        const skill = PATRON_SKILLS[key];
+        if (!skill) return `<div class="text-xs p-1 bg-slate-800 rounded">Error: Unknown Skill</div>`;
+        const escapedDesc = skill.desc.replace(/'/g, "\\'");
+        return `<div class="text-xs p-1 bg-slate-800 rounded" onmouseover="showSimpleTooltip('${escapedDesc}', event)" onmouseout="hideSimpleTooltip()"><strong>${skill.name}</strong></div>`;
+    }).join('') || '<p class="text-xs text-gray-500 text-center">None</p>';
+
+    // 2. Run Upgrades
+    const upgradeDisplayMap = {
+        'passiveSlots': 'Passive Slots',
+        'consumableSlots': 'Consumable Slots',
+        'handSize': 'Hand Size',
+        'shopRerollCost': 'Shop Reroll Cost',
+        'bonusHandsPerVingtUn': 'Bonus Hands/Vingt-un',
+        'bonusRerollsPerVingtUn': 'Bonus Rerolls/Vingt-un',
+        'baseMultiplier': 'Base Multiplier',
+        'rerollsToHands': 'Rerolls to Hands'
+    };
+    let upgradesHtml = '';
+    const upgrades = state.runUpgrades;
+    for (const key in upgrades) {
+        if (key === 'rerollsToHands' && upgrades[key] === true) {
+            upgradesHtml += `<div class="text-xs p-1 bg-slate-800 rounded flex justify-between"><strong>Rerolls to Hands</strong> <span>Active</span></div>`;
+        } else if (key !== 'rerollsToHands' && upgradeDisplayMap[key]) {
+            upgradesHtml += `<div class="text-xs p-1 bg-slate-800 rounded flex justify-between"><strong>${upgradeDisplayMap[key]}</strong> <span>${upgrades[key]}</span></div>`;
+        }
+    }
+    if (upgradesHtml === '') {
+            upgradesHtml = '<p class="text-xs text-gray-500 text-center">None</p>';
+    }
+
+    // 3. Passives (with Sell buttons)
+    let passivesHtml = '';
+    if (state.passiveModifiers.length === 0) {
+        passivesHtml = '<p class="text-xs text-gray-500 text-center">None</p>';
+    } else {
+        state.passiveModifiers.forEach(key => {
+            const mod = BJ_PASSIVE_MODIFIERS[key];
+            if (!mod) {
+                passivesHtml += `<div class="text-xs p-1 bg-slate-800 rounded">Error: Unknown Passive</div>`;
+                return;
+            }
+            const sellPrice = Math.floor(mod.cost * 0.5);
+            const escapedDesc = mod.desc.replace(/'/g, "\\'");
+            passivesHtml += `
+                <div class="flex items-center justify-between text-xs p-1 bg-slate-800 rounded" onmouseover="showSimpleTooltip('${escapedDesc}', event)" onmouseout="hideSimpleTooltip()">
+                    <span class="font-bold">${mod.name}</span>
+                    <button class="btn btn-action text-xs py-0 px-2" 
+                            onclick="sellRoguelikePassiveShop('${key}')">
+                        Sell (${sellPrice})
+                    </button>
+                </div>`;
+        });
+    }
+
+    // 4. Consumables (with Sell buttons)
+    let consumablesHtml = '';
+    if (state.consumables.length === 0) {
+        consumablesHtml = '<p class="text-xs text-gray-500 text-center">None</p>';
+    } else {
+        state.consumables.forEach((key, index) => {
+            const item = BJ_CONSUMABLES[key];
+            if (!item) {
+                consumablesHtml += `<button class="btn btn-item text-xs w-full mb-1" disabled>Error</button>`;
+                return;
+            }
+            const sellPrice = Math.floor(item.cost * 0.5);
+            const escapedDesc = item.desc.replace(/'/g, "\\'");
+            consumablesHtml += `
+                <div class="flex items-center gap-1 mb-1" onmouseover="showSimpleTooltip('${escapedDesc}', event)" onmouseout="hideSimpleTooltip()">
+                    <button class="btn btn-item text-xs flex-grow" disabled title="Consumables can only be used during a hand.">
+                        Use (In-Hand Only)
+                    </button>
+                    <button class="btn btn-action text-xs py-0 px-2 w-16" 
+                            onclick="sellRoguelikeConsumableShop(${index})">
+                        Sell (${sellPrice})
+                    </button>
+                </div>`;
+        });
+    }
+
+    // --- Drawer Content Selection ---
+    let drawerContentHtml = '';
+    switch(roguelikeShopActiveDrawer) {
+        case 'patron': drawerContentHtml = `<div class="space-y-1">${patronSkillsHtml}</div>`; break;
+        case 'upgrades': drawerContentHtml = `<div class="space-y-1">${upgradesHtml}</div>`; break;
+        case 'passives': drawerContentHtml = `<div class="space-y-1">${passivesHtml}</div>`; break;
+        case 'consumables': drawerContentHtml = `<div class="space-y-1">${consumablesHtml}</div>`; break;
+        default: drawerContentHtml = `<div class="space-y-1">${passivesHtml}</div>`;
+    }
+    // --- END: Build Player Inventory Lists ---
+
+
+    // --- NEW: Shop Item Color & Gradient Maps ---
+    const rarityMap = {
+        1: { name: 'Common', color: '#334155', border: 'border-slate-600' },     // to-slate-700
+        2: { name: 'Uncommon', color: '#15803d', border: 'border-green-600' },   // to-green-700
+        3: { name: 'Rare', color: '#1d4ed8', border: 'border-blue-600' },       // to-blue-700
+        4: { name: 'Epic', color: '#7e22ce', border: 'border-purple-600' },     // to-purple-700
+        5: { name: 'Legendary', color: '#b45309', border: 'border-yellow-600' } // to-yellow-700
+    };
+    
+    const typeColorMap = {
+        'passive': '#1e3a8a',    // from-blue-900
+        'consumable': '#581c87', // from-purple-900
+        'upgrade': '#713f12'     // from-yellow-900
+    };
+    // --- END NEW ---
+
+    const shopItems = state.shopStock.map(key => {
+        const tool = BJ_PASSIVE_MODIFIERS[key] || BJ_CONSUMABLES[key] || BJ_RUN_UPGRADES[key];
+        return { key, tool };
+    }).sort((a, b) => (b.tool.rarity || 0) - (a.tool.rarity || 0)); // Sort by rarity descending
+
+    let shopHtml = shopItems.map(({ key, tool }) => {
+        if (!tool) return '';
+        const canAfford = state.currentCrookards >= tool.cost;
+        const rarity = tool.rarity || 1;
+        
+        // --- MODIFIED: Gradient Logic ---
+        const rarityInfo = rarityMap[rarity] || rarityMap[1];
+        const typeColor = typeColorMap[tool.type] || '#334155'; // Fallback to slate
+        const gradientStyle = `background-image: linear-gradient(to right, ${typeColor} 30%, ${rarityInfo.color} 100%);`;
+        // --- END MODIFIED ---
+
+        const escapedDesc = tool.desc.replace(/'/g, "\\'");
+        
+        // --- MODIFIED: Use inline style for gradient, remove bg-color class ---
+        return `<div class="p-3 rounded-lg flex flex-col justify-between text-left shadow-lg border-2 ${rarityInfo.border}" style="${gradientStyle}">
+            <div>
+                <p class="font-bold text-lg text-white">${tool.name}</p>
+                <p class="text-sm text-gray-300 italic mb-2">${escapedDesc}</p>
+            </div>
+            <button onclick="buyRoguelikeTool('${key}')" class="btn btn-primary w-full mt-2" ${!canAfford ? 'disabled' : ''}>
+                Buy (${tool.cost} Crookards)
+            </button>
+        </div>`;
+    }).join('');
+    // --- END MODIFIED ---
 
     let html = `
     <div class="w-full h-full flex flex-col text-center p-4">
@@ -3344,37 +3547,40 @@ function renderRoguelikeShop() {
             <h3 class="font-bold text-lg text-white">${nextUpText}</h3>
         </div>
 
-        <div class="flex-grow grid grid-cols-1 md:grid-cols-4 gap-3 overflow-y-auto inventory-scrollbar p-2 bg-black/20 rounded-lg">
-            ${state.shopStock.map(key => {
-                const tool = BJ_PASSIVE_MODIFIERS[key] || BJ_CONSUMABLES[key] || BJ_RUN_UPGRADES[key];
-                if (!tool) return '';
-                // MODIFIED: Check against Crookards
-                const canAfford = state.currentCrookards >= tool.cost;
-                let typeColor = 'bg-slate-700';
-                if (tool.type === 'passive') typeColor = 'bg-blue-800';
-                if (tool.type ==='consumable') typeColor = 'bg-purple-800';
-                if (tool.type === 'upgrade') typeColor = 'bg-yellow-800';
+        <div class="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden">
+            
+            <div class="flex flex-col gap-1 overflow-hidden">
+                <h3 class="font-bold text-xl text-yellow-300 text-center mb-1 flex-shrink-0">Shop Stock</h3>
+                <div class="flex-grow overflow-y-auto inventory-scrollbar p-2 bg-black/20 rounded-lg space-y-3">
+                    ${shopHtml}
+                </div>
+            </div>
 
-                return `<div class="${typeColor} p-3 rounded-lg flex flex-col justify-between text-left shadow-lg">
-                    <div>
-                        <p class="font-bold text-lg text-white">${tool.name}</p>
-                        <p class="text-sm text-gray-300 italic mb-2">${tool.desc}</p>
-                    </div>
-                    <button onclick="buyRoguelikeTool('${key}')" class="btn btn-primary w-full mt-2" ${!canAfford ? 'disabled' : ''}>
-                        Buy (${tool.cost} Crookards)
-                    </button>
-                </div>`;
-            }).join('')}
+            <div class="flex flex-col gap-1 overflow-hidden">
+                <h3 class="font-bold text-xl text-white text-center mb-1 flex-shrink-0">Your Inventory</h3>
+                
+                <div class="flex-shrink-0 grid grid-cols-4 gap-1 mb-2">
+                    <button onclick="setRoguelikeShopDrawer('patron')" class="btn ${roguelikeShopActiveDrawer === 'patron' ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2">Skills (${state.patronSkills.length})</button>
+                    <button onclick="setRoguelikeShopDrawer('upgrades')" class="btn ${roguelikeShopActiveDrawer === 'upgrades' ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2">Upgrades</button>
+                    <button onclick="setRoguelikeShopDrawer('passives')" class="btn ${roguelikeShopActiveDrawer === 'passives' ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2">Passives (${state.passiveModifiers.length}/${state.runUpgrades.passiveSlots})</button>
+                    <button onclick="setRoguelikeShopDrawer('consumables')" class="btn ${roguelikeShopActiveDrawer === 'consumables' ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2">Items (${state.consumables.length}/${state.runUpgrades.consumableSlots})</button>
+                </div>
+                
+                <div class="flex-grow overflow-y-auto inventory-scrollbar p-2 bg-black/20 rounded-lg">
+                    ${drawerContentHtml}
+                </div>
+                
+            </div>
         </div>
 
         <div class="flex justify-center gap-4 mt-4">
             ${continueButtonHtml}
-            <button onclick="roguelikeRerollShop()" class="btn btn-action" ${state.currentCrookards < state.runUpgrades.shopRerollCost ? 'disabled' : ''}>
-                Reroll (${state.runUpgrades.shopRerollCost} Crookards)
+            <button onclick="roguelikeRerollShop()" class="btn btn-action" ${state.currentCrookards < state.shopRerollCost ? 'disabled' : ''}>
+                Reroll (${state.shopRerollCost} Crookards)
             </button>
         </div>
         <div class="text-center mt-4">
-            <button onclick="roguelikeLoseRun('quit')" class="btn btn-action text-sm py-1 px-3">Quit Run</button>
+            <button onclick="roguelikePauseRun()" class="btn btn-action text-sm py-1 px-3">Quit Run</button>
         </div>
     </div>`;
     
