@@ -2856,9 +2856,9 @@ function renderArcaneCasino() {
             
             <button id="roguelike-game-btn" onclick="renderRoguelikeGame()" 
                     class="btn btn-primary w-full md:w-auto ${!player.unlocks.roguelikeCardGame ? 'hidden' : ''} border-2 border-purple-500 hover:bg-purple-700 hover:border-purple-400 focus:ring-2 focus:ring-purple-300">
-                Play ???
+                Play "Le Tricheur"
             </button>
-        </div>
+            </div>
             <div class="mt-8">
             <button onclick="renderArcaneQuarter()" class="btn btn-action">Back to Arcane Quarter</button>
         </div>
@@ -2972,7 +2972,7 @@ function renderRoguelikeBuyInScreen() {
 
     let html = `
     <div class="w-full text-center">
-        <h2 class="font-medieval text-3xl mb-4 text-center">Arcane 21: The Endless Run</h2>
+        <h2 class="font-medieval text-3xl mb-4 text-center">"Le Tricheur" (The Endless Run)</h2>
         <p class="mb-2 text-gray-300">Welcome to the high-stakes table. A single run consists of 8 stakes of increasing difficulty.</p>
         <p class="mb-6 text-gray-300">Beat all 8 stakes to win a massive prize. Fail to meet any stake, and your run is over.</p>
         <p class="text-2xl font-bold text-yellow-300 mb-6">Buy-in: ${buyIn} G</p>
@@ -3397,12 +3397,11 @@ function renderRoguelikeShop() {
     }
 
     // --- Build Player Inventory Lists ---
-    // (This block is identical to the one you provided, just ensure it's here)
     // 1. Patron Skills
     let patronSkillsHtml = state.patronSkills.map(key => {
         const skill = PATRON_SKILLS[key];
         if (!skill) return `<div class="text-xs p-1 bg-slate-800 rounded">Error: Unknown Skill</div>`;
-        const escapedDesc = skill.desc.replace(/'/g, "\\'");
+        const escapedDesc = (skill.desc + " | " + skill.flavor).replace(/'/g, "\\'"); // Combine desc and flavor for tooltip
         return `<div class="text-xs p-1 bg-slate-800 rounded" onmouseover="showSimpleTooltip('${escapedDesc}', event)" onmouseout="hideSimpleTooltip()"><strong>${skill.name}</strong></div>`;
     }).join('') || '<p class="text-xs text-gray-500 text-center">None</p>';
 
@@ -3421,9 +3420,15 @@ function renderRoguelikeShop() {
     const upgrades = state.runUpgrades;
     for (const key in upgrades) {
         if (key === 'rerollsToHands' && upgrades[key] === true) {
-            upgradesHtml += `<div class="text-xs p-1 bg-slate-800 rounded flex justify-between"><strong>Rerolls to Hands</strong> <span>Active</span></div>`;
+            const upgrade = BJ_RUN_UPGRADES[key];
+            const escapedDesc = (upgrade.desc + " | " + upgrade.flavor).replace(/'/g, "\\'");
+            upgradesHtml += `<div class="text-xs p-1 bg-slate-800 rounded flex justify-between" onmouseover="showSimpleTooltip('${escapedDesc}', event)" onmouseout="hideSimpleTooltip()"><strong>Rerolls to Hands</strong> <span>Active</span></div>`;
         } else if (key !== 'rerollsToHands' && upgradeDisplayMap[key]) {
-            upgradesHtml += `<div class="text-xs p-1 bg-slate-800 rounded flex justify-between"><strong>${upgradeDisplayMap[key]}</strong> <span>${upgrades[key]}</span></div>`;
+            const upgrade = BJ_RUN_UPGRADES[key];
+            if (upgrade) {
+                const escapedDesc = (upgrade.desc + " | " + upgrade.flavor).replace(/'/g, "\\'");
+                upgradesHtml += `<div class="text-xs p-1 bg-slate-800 rounded flex justify-between" onmouseover="showSimpleTooltip('${escapedDesc}', event)" onmouseout="hideSimpleTooltip()"><strong>${upgradeDisplayMap[key]}</strong> <span>${upgrades[key]}</span></div>`;
+            }
         }
     }
     if (upgradesHtml === '') {
@@ -3442,7 +3447,7 @@ function renderRoguelikeShop() {
                 return;
             }
             const sellPrice = Math.floor(mod.cost * 0.5);
-            const escapedDesc = mod.desc.replace(/'/g, "\\'");
+            const escapedDesc = (mod.desc + " | " + mod.flavor).replace(/'/g, "\\'");
             passivesHtml += `
                 <div class="flex items-center justify-between text-xs p-1 bg-slate-800 rounded" onmouseover="showSimpleTooltip('${escapedDesc}', event)" onmouseout="hideSimpleTooltip()">
                     <span class="font-bold">${mod.name}</span>
@@ -3466,11 +3471,11 @@ function renderRoguelikeShop() {
                 return;
             }
             const sellPrice = Math.floor(item.cost * 0.5);
-            const escapedDesc = item.desc.replace(/'/g, "\\'");
+            const escapedDesc = (item.desc + " | " + item.flavor).replace(/'/g, "\\'");
             consumablesHtml += `
                 <div class="flex items-center gap-1 mb-1" onmouseover="showSimpleTooltip('${escapedDesc}', event)" onmouseout="hideSimpleTooltip()">
                     <button class="btn btn-item text-xs flex-grow" disabled title="Consumables can only be used during a hand.">
-                        Use (In-Hand Only)
+                        ${item.name}
                     </button>
                     <button class="btn btn-action text-xs py-0 px-2 w-16" 
                             onclick="sellRoguelikeConsumableShop(${index})">
@@ -3492,7 +3497,7 @@ function renderRoguelikeShop() {
     // --- END: Build Player Inventory Lists ---
 
 
-    // --- NEW: Shop Item Color & Gradient Maps ---
+    // --- Shop Item Color & Gradient Maps ---
     const rarityMap = {
         1: { name: 'Common', color: '#334155', border: 'border-slate-600' },     // to-slate-700
         2: { name: 'Uncommon', color: '#15803d', border: 'border-green-600' },   // to-green-700
@@ -3506,7 +3511,6 @@ function renderRoguelikeShop() {
         'consumable': '#581c87', // from-purple-900
         'upgrade': '#713f12'     // from-yellow-900
     };
-    // --- END NEW ---
 
     const shopItems = state.shopStock.map(key => {
         const tool = BJ_PASSIVE_MODIFIERS[key] || BJ_CONSUMABLES[key] || BJ_RUN_UPGRADES[key];
@@ -3518,26 +3522,27 @@ function renderRoguelikeShop() {
         const canAfford = state.currentCrookards >= tool.cost;
         const rarity = tool.rarity || 1;
         
-        // --- MODIFIED: Gradient Logic ---
         const rarityInfo = rarityMap[rarity] || rarityMap[1];
         const typeColor = typeColorMap[tool.type] || '#334155'; // Fallback to slate
         const gradientStyle = `background-image: linear-gradient(to right, ${typeColor} 30%, ${rarityInfo.color} 100%);`;
-        // --- END MODIFIED ---
 
+        // --- THIS IS THE FIX ---
+        // 1. Escape both flavor and description
         const escapedDesc = tool.desc.replace(/'/g, "\\'");
-        
-        // --- MODIFIED: Use inline style for gradient, remove bg-color class ---
+        const escapedFlavor = tool.flavor ? tool.flavor.replace(/'/g, "\\'") : '...'; // Add flavor
+
+        // 2. Add flavor to card text, and move mechanical desc to tooltip
         return `<div class="p-3 rounded-lg flex flex-col justify-between text-left shadow-lg border-2 ${rarityInfo.border}" style="${gradientStyle}">
-            <div>
+            <div onmouseover="showSimpleTooltip('${escapedDesc}', event)" onmouseout="hideSimpleTooltip()">
                 <p class="font-bold text-lg text-white">${tool.name}</p>
-                <p class="text-sm text-gray-300 italic mb-2">${escapedDesc}</p>
+                <p class="text-sm text-gray-300 italic mb-2">${escapedFlavor}</p>
             </div>
             <button onclick="buyRoguelikeTool('${key}')" class="btn btn-primary w-full mt-2" ${!canAfford ? 'disabled' : ''}>
                 Buy (${tool.cost} Crookards)
             </button>
         </div>`;
+        // --- END FIX ---
     }).join('');
-    // --- END MODIFIED ---
 
     let html = `
     <div class="w-full h-full flex flex-col text-center p-4">

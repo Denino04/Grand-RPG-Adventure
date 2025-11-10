@@ -431,6 +431,7 @@ const BACKGROUNDS = {
     }
 };
 
+
 const WEAPONS = {
     // --- Fists ---
     'fists': { name: 'Fists', class: 'Longsword', damage: [2, 2], price: 0, rarity: 'Broken', description: "Just your bare hands." },
