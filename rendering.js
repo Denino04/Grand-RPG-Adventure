@@ -1542,16 +1542,49 @@ function hireNpc(recruitIndex) {
     player.gold -= cost;
     
     // --- THIS IS THE FIX ---
-    // Create the new ally using all the recruit's data, including background
+    // 1. Create the new ally. This scales their stats to the player's level.
     player.npcAlly = new NpcAlly(
         recruit.name, 
         recruit.classKey, 
         recruit.raceKey, 
         player.level,
-        recruit.backgroundKey,    // <-- ADDED
-        recruit.backgroundName  // <-- ADDED
+        recruit.backgroundKey,
+        recruit.backgroundName
     );
+    
+    // 2. CHECK IF GHOST. If so, overwrite default gear/spells.
+    if (recruit.isGhost) {
+        player.npcAlly.isGhost = true; // <-- ADD THIS LINE
+        addToLog("You can feel the faint presence of another adventurer within this ally...", "text-cyan-300");
+        
+        // Overwrite spells
+        player.npcAlly.spells = recruit.spells || {};
+        
+        // Overwrite consumable items (their "pocket")
+        // We filter for consumables just in case the ghost's "items" snapshot contained junk
+        const consumableTypes = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'enchant', 'experimental'];
+        const ghostConsumables = {};
+        if (recruit.items) {
+            for (const itemKey in recruit.items) {
+                const details = getItemDetails(itemKey);
+                if (details && consumableTypes.includes(details.type)) {
+                    // Limit stack size to the ally's pocket limit (10)
+                    ghostConsumables[itemKey] = Math.min(recruit.items[itemKey], player.npcAlly.inventory.stack);
+                }
+            }
+        }
+        player.npcAlly.inventory.items = ghostConsumables;
+
+        // Equip their gear (silently). This respects the 2-of-3 rule.
+        player.npcAlly.equipItem(recruit.equippedWeaponKey, true);
+        player.npcAlly.equipItem(recruit.equippedCatalystKey, true);
+        player.npcAlly.equipItem(recruit.equippedArmorKey, true);
+        player.npcAlly.equipItem(recruit.equippedShieldKey, true);
+        
+    }
+    // If not a ghost, the constructor has already given them default gear, so we do nothing.
     // --- END FIX ---
+
     player.encountersSinceLastPay = 0; // Reset pay counter
 
     // Remove the recruit from the roster
@@ -1559,13 +1592,11 @@ function hireNpc(recruitIndex) {
 
     const recruitDialogue = player.npcAlly._getDialogue('RECRUIT', player.name);
     addToLog(`You hired ${recruit.name}, the ${capitalize(recruit.raceKey)} ${CLASSES[recruit.classKey].name}, for ${cost} G!<br>"${recruitDialogue}"`, "text-green-400");
-    // --- END DIALOGUE INTEGRATION ---
 
     updateStatsView();
     renderBarracks(); // Re-render to show the manage screen
     saveGame();
-}   
-
+}
 /**
  * Fires the current NPC ally. This is permanent.
  */
@@ -1575,6 +1606,7 @@ function dismissNpc(wasFired = false) {
 
     const allyName = player.npcAlly.name;
     const ally = player.npcAlly; // Get ally object
+    const isGhost = ally.isGhost; // <-- **NEW: Store this before nulling the ally**
     
     // --- DIALOGUE INTEGRATION: Upon Dismissal/Firing ---
     // Pass player.name as the second argument to _getDialogue
@@ -1587,39 +1619,45 @@ function dismissNpc(wasFired = false) {
         // --- END MODIFIED ---
         // No items are returned
     } else {
-        // --- MODIFIED: Added <br> for line break ---
-        addToLog(`You have dismissed ${allyName}. They return their equipment and depart.<br>"${dialogueMessage}"`, 'text-yellow-400');
-        // --- END MODIFIED ---
+        // --- START MODIFICATION ---
+        if (isGhost) {
+            // Ghost dismissal logic (no items returned)
+            addToLog(`You have dismissed the ghost ally, ${allyName}. They fade away, taking their spectral gear with them.<br>"${dialogueMessage}"`, 'text-cyan-400');
         
-        // --- UPDATED: Return ally's equipped items to player inventory ---
-        // --- UPDATED: Return ally's equipped items to player inventory ---
-        const itemsToReturn = [
-            ally.equippedWeapon.name !== 'Fists' ? findKeyByInstance(WEAPONS, ally.equippedWeapon) : null,
-            ally.equippedCatalyst.name !== 'None' ? findKeyByInstance(CATALYSTS, ally.equippedCatalyst) : null,
-            ally.equippedArmor.name !== "Traveler's Garb" ? findKeyByInstance(ARMOR, ally.equippedArmor) : null,
-            ally.equippedShield.name !== 'None' ? findKeyByInstance(SHIELDS, ally.equippedShield) : null
-        ].filter(Boolean); // Filter out nulls (default items)
+        } else {
+            // Normal (non-ghost) ally dismissal logic
+            addToLog(`You have dismissed ${allyName}. They return their equipment and depart.<br>"${dialogueMessage}"`, 'text-yellow-400');
+            
+            // --- UPDATED: Return ally's equipped items to player inventory ---
+            const itemsToReturn = [
+                ally.equippedWeapon.name !== 'Fists' ? findKeyByInstance(WEAPONS, ally.equippedWeapon) : null,
+                ally.equippedCatalyst.name !== 'None' ? findKeyByInstance(CATALYSTS, ally.equippedCatalyst) : null,
+                ally.equippedArmor.name !== "Traveler's Garb" ? findKeyByInstance(ARMOR, ally.equippedArmor) : null,
+                ally.equippedShield.name !== 'None' ? findKeyByInstance(SHIELDS, ally.equippedShield) : null
+            ].filter(Boolean); // Filter out nulls (default items)
 
-        itemsToReturn.forEach(key => {
-            if (key) player.addToInventory(key, 1, true); // Log each returned item
-        });
-        // --- END UPDATE ---
-        
-        // --- NEW: Return all items from their 10-slot pocket ---
-        if (ally.inventory && ally.inventory.items) {
-            let returnedItemCount = 0;
-            for (const itemKey in ally.inventory.items) {
-                const count = ally.inventory.items[itemKey];
-                if (count > 0) {
-                    player.addToInventory(itemKey, count, false); // Add silently
-                    returnedItemCount += count;
+            itemsToReturn.forEach(key => {
+                if (key) player.addToInventory(key, 1, true); // Log each returned item
+            });
+            // --- END UPDATE ---
+            
+            // --- NEW: Return all items from their 10-slot pocket ---
+            if (ally.inventory && ally.inventory.items) {
+                let returnedItemCount = 0;
+                for (const itemKey in ally.inventory.items) {
+                    const count = ally.inventory.items[itemKey];
+                    if (count > 0) {
+                        player.addToInventory(itemKey, count, false); // Add silently
+                        returnedItemCount += count;
+                    }
+                }
+                if (returnedItemCount > 0) {
+                    addToLog(`Their bag contained ${returnedItemCount} items, which have been added to your inventory.`, "text-gray-400");
                 }
             }
-            if (returnedItemCount > 0) {
-                addToLog(`Their bag contained ${returnedItemCount} items, which have been added to your inventory.`, "text-gray-400");
-            }
+            // --- END NEW ---
         }
-        // --- END NEW ---
+        // --- END MODIFICATION ---
     }
     
     player.npcAlly = null;
@@ -1881,35 +1919,42 @@ function renderBarracks() {
         html += `<p class="text-center text-gray-400 mb-6">The Barracks master presents the day's available roster. You may hire one companion at a time. A new roster will be available tomorrow.</p>
                  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 h-80 overflow-y-auto inventory-scrollbar pr-2">`;
         
+        // --- MODIFICATION: REMOVED generateBarracksRoster() call ---
+        // if (player.barracksRoster.length === 0) {
+        //     generateBarracksRoster();
+        // }
+        
+        // --- MODIFICATION: ADDED fallback message ---
         if (player.barracksRoster.length === 0) {
-             // This happens on first load before resting
-             generateBarracksRoster();
-        }
+            html += `<p class="text-center text-gray-500 col-span-full">No new recruits are available. Rest at an Inn or your house to refresh the roster.</p>`;
+        } else {
+        // --- END MODIFICATION ---
 
-        player.barracksRoster.forEach((recruit, index) => {
-            const classData = CLASSES[recruit.classKey];
-            const raceData = RACES[recruit.raceKey];
-            const cost = 100 + (player.level * 25);
-            
-            // --- FIX for undefined raceData ---
-            const raceName = recruit.raceKey ? capitalize(recruit.raceKey) : "Unknown Race"; // The key *is* the name
-            const className = classData ? classData.name : "Unknown Class";
-            // --- END FIX ---
-            
-            html += `<div class="p-4 bg-slate-800 rounded-lg flex flex-col justify-between">
-                        <div>
-                            <h4 class="font-bold text-lg text-yellow-300">${recruit.name}</h4>
-                            <!-- MODIFIED: Added Background -->
-                            <p class="text-sm text-gray-400 mb-1">${raceName} ${className}</p>
-                            <p class="text-xs text-gray-500 italic mb-2">${recruit.backgroundName}</p>
-                            <!-- END MODIFICATION -->
-                            <p class="text-xs text-gray-400 italic">"${classData ? classData.description : 'No description.'}"</p>
-                        </div>
-                        <button onclick="hireNpc(${index})" class="btn btn-primary w-full mt-4" ${player.gold < cost ? 'disabled' : ''}>
-                            Hire (${cost} G)
-                        </button>
-                     </div>`;
-        });
+            player.barracksRoster.forEach((recruit, index) => {
+                const classData = CLASSES[recruit.classKey];
+                const raceData = RACES[recruit.raceKey];
+                const cost = 100 + (player.level * 25);
+                
+                const raceName = recruit.raceKey ? capitalize(recruit.raceKey) : "Unknown Race";
+                const className = classData ? classData.name : "Unknown Class";
+
+                // --- MODIFICATION: Added isGhost visual tag ---
+                const isGhost = recruit.isGhost ? '<span class="text-xs font-bold text-cyan-300"> (Ghost Ally)</span>' : '';
+                // --- END MODIFICATION ---
+                
+                html += `<div class="p-4 bg-slate-800 rounded-lg flex flex-col justify-between">
+                            <div>
+                                <h4 class="font-bold text-lg text-yellow-300">${recruit.name}${isGhost}</h4>
+                                <p class="text-sm text-gray-400 mb-1">${raceName} ${className}</p>
+                                <p class="text-xs text-gray-500 italic mb-2">${recruit.backgroundName}</p>
+                                <p class="text-xs text-gray-400 italic">"${classData ? classData.description : 'No description.'}"</p>
+                            </div>
+                            <button onclick="hireNpc(${index})" class="btn btn-primary w-full mt-4" ${player.gold < cost ? 'disabled' : ''}>
+                                Hire (${cost} G)
+                            </button>
+                         </div>`;
+            });
+        } // <-- ADDED this closing brace for the new 'else' block
         
         html += `</div>`; // Close grid
     }
@@ -2145,22 +2190,40 @@ function generateNpcInventoryAllyEquipment(ally) {
         // --- THIS IS THE FIX ---
         // I am now correctly finding the item key by searching the correct dataObject (e.g., WEAPONS)
         // for the item instance (slot.item).
-        const itemKey = findKeyByInstance(slot.dataObject, slot.item);
+const itemKey = findKeyByInstance(slot.dataObject, slot.item);
         // --- END FIX ---
 
         const isDefault = slot.item.name === slot.default.name;
-        // Pass the *correct* itemKey (e.g., 'battleaxe') instead of 'null'
-        const action = isDefault ? '' : `onclick="moveItemFromNpc('${slot.type}', '${itemKey}')"`;
-        const cursor = isDefault ? 'cursor-default' : 'cursor-pointer';
+        
+        // --- MODIFICATION: Check if ally is a ghost ---
+        const isGhost = ally.isGhost || false;
+        let action = '';
+        let cursor = 'cursor-default';
+        let arrowHtml = '';
+
+        if (!isDefault) {
+            if (isGhost) {
+                // Ghost allies cannot have items taken
+                action = 'onclick="addToLog(\'You cannot take equipment from a Ghost Ally.\', \'text-red-400\')"'; // Give feedback
+                cursor = 'cursor-not-allowed';
+                arrowHtml = '<span class="text-lg font-bold text-gray-600" title="Cannot take items from a Ghost Ally">🔒</span>'; // Locked icon
+            } else {
+                // Normal ally
+                action = `onclick="moveItemFromNpc('${slot.type}', '${itemKey}')"`;
+                cursor = 'cursor-pointer';
+                arrowHtml = '<span class="text-lg font-bold text-red-400">←</span>'; // Take arrow
+            }
+        }
+        // --- END MODIFICATION ---
         
         html += `<div class="p-3 bg-slate-900/50 rounded-lg">
                     <p class="text-xs text-gray-400 uppercase">${capitalize(slot.type)}</p>
                     <div class="flex justify-between items-center mt-1 ${cursor}" 
                          ${action} 
-                         onmouseover="showTooltip('${itemKey}', event)" 
+                         onmouseover="showTooltip('${itemKey}', event)"
                          onmouseout="hideTooltip()">
                         <span class="font-semibold ${isDefault ? 'text-gray-500' : 'text-white'}">${slot.item.name}</span>
-                        ${!isDefault ? '<span class="text-lg font-bold text-red-400">←</span>' : ''}
+                        ${arrowHtml}
                     </div>
                  </div>`;
     });
@@ -2178,6 +2241,8 @@ function generateNpcInventoryAllyPocket(ally) {
     const pocketSize = ally.inventory.size || 10;
     const stackSize = ally.inventory.stack || 10;
     
+    const isGhost = ally.isGhost || false; // <-- ADD THIS LINE
+    
     const itemKeys = Object.keys(pocket);
     let hasItems = false;
     
@@ -2186,11 +2251,28 @@ function generateNpcInventoryAllyPocket(ally) {
         if (count > 0) {
             hasItems = true;
             const details = getItemDetails(key);
-            html += `<div class="flex justify-between items-center p-2 bg-slate-900/50 rounded text-sm" 
+            
+            // --- MODIFICATION: Check if ghost ---
+            let action = '';
+            let arrowHtml = '';
+            let cursor = 'cursor-default';
+            
+            if (isGhost) {
+                action = 'onclick="addToLog(\'You cannot take items from a Ghost Ally.\', \'text-red-400\')"';
+                cursor = 'cursor-not-allowed';
+                arrowHtml = '<span class="text-lg font-bold text-gray-600" title="Cannot take items from a Ghost Ally">🔒</span>'; // Locked icon
+            } else {
+                action = `onclick="moveItemFromNpc('items', '${key}')"`;
+                cursor = 'cursor-pointer';
+                arrowHtml = '<span class="text-lg font-bold text-red-400">←</span>'; // Take arrow
+            }
+            // --- END MODIFICATION ---
+            
+            html += `<div class="flex justify-between items-center p-2 bg-slate-900/50 rounded text-sm ${cursor}" 
                            onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"
-                           onclick="moveItemFromNpc('items', '${key}')">
+                           ${action}
                           <span>${details.name} (x${count})</span>
-                          <span class="text-lg font-bold text-red-400">←</span>
+                          ${arrowHtml}
                       </div>`;
         }
     });

@@ -450,8 +450,51 @@ async function saveGame(manual = false) {
              console.log(`New character saved with ID: ${player.firestoreId}`);
              // The player object in memory now has the ID if it was new
         }
-         console.log("Game Saved to Cloud.");
+        console.log("Game Saved to Cloud.");
         if (manual) addToLog('Game Saved to Cloud!', 'text-green-400 font-bold');
+
+        // --- NEW: Public Ghost Snapshot ---
+        // We also save a public "snapshot" of the character for the Barracks system
+        // Only do this for non-anonymous cloud saves.
+        if (db && userId && !auth.currentUser.isAnonymous && player.firestoreId) { // Added check for player.firestoreId
+            try {
+                // This snapshot contains only the data needed to generate an ally
+                const snapshotData = {
+                    name: saveData.name,
+                    raceKey: saveData.race,
+                    _classKey: saveData._classKey,
+                    backgroundKey: saveData.backgroundKey,
+                    backgroundName: saveData.background,
+                    level: saveData.level,
+                    baseGender: saveData.gender,
+                    lastSaveTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    
+                    // --- ADDED: The owner's User ID ---
+                    userId: userId, 
+                    // --- END ADDED ---
+
+                    equippedWeaponKey: saveData.equippedWeaponKey,
+                    equippedCatalystKey: saveData.equippedCatalystKey,
+                    equippedArmorKey: saveData.equippedArmorKey,
+                    equippedShieldKey: saveData.equippedShieldKey,
+                    spells: saveData.spells,
+                    items: saveData.inventory.items
+                };
+                
+                // --- CHANGED: Use player.firestoreId as the doc ID ---
+                const publicRef = db.collection(`artifacts/${appId}/public/data/characters`).doc(player.firestoreId);
+                // --- END CHANGED ---
+                
+                await publicRef.set(snapshotData, { merge: true });
+                console.log(`Public 'ghost' snapshot saved for ${saveData.name}.`);
+
+            } catch (snapshotError) {
+                console.error("Could not save public character snapshot:", snapshotError);
+                // Don't bother the user with this error, it's non-critical.
+            }
+        }
+        // --- END NEW ---
+
     } catch (error) {
         console.error("Could not save game to Firestore:", error);
         addToLog('Error: Could not save game to cloud.', 'text-red-400');

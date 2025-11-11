@@ -1811,7 +1811,8 @@ class NpcAlly extends Entity {
         this.y = -1;
         this.isFled = false;
         this.isResting = false; // <<< NEWstrengthFlatBonus
-        this.enchantments = {}; // <-- NEW: Store item-type enchantments
+        this.isGhost =false;
+         this.enchantments = {}; // <-- NEW: Store item-type enchantments
         
         // --- Base Stats & Class ---
         this._classKey = classKey; // Store the key, even if it's undefined
@@ -2963,16 +2964,22 @@ class NpcAlly extends Entity {
             } else {
                 // Check if 2-of-3 rule is violated
                 const typeIndex = this.equipmentOrder.indexOf(itemType);
+                const isDefaultItem = (itemType === 'catalyst' && itemKey === 'no_catalyst') ||
+                                  (itemType === 'shield' && itemKey === 'no_shield') ||
+                                  (itemType === 'weapon' && itemKey === 'fists');
                 if (typeIndex > -1) this.equipmentOrder.splice(typeIndex, 1); // Remove old entry if same type
                 
+                if (!isDefaultItem) {
+                // Only non-default items take up an off-hand slot
                 if (this.equipmentOrder.length >= 2) {
                     const typeToUnequip = this.equipmentOrder.shift(); // Get oldest
-                    if (typeToUnequip && typeToUnequip !== itemType) { // Ensure it's not undefined and not the same type
+                    if (typeToUnequip && typeToUnequip !== itemType) {
                         unequippedItemKey = this.unequipItem(typeToUnequip, silent);
                     }
                 }
-                this.equipmentOrder.push(itemType); // Add new type
+                this.equipmentOrder.push(itemType); // Add new *non-default* type
             }
+        }
 
             let isEquippedWeaponTwoHanded = this.equippedWeapon?.class === 'Hand-to-Hand' || this.equippedWeapon?.effect?.dualWield;
             if (isEquippedWeaponTwoHanded && this.equippedWeapon?.class === 'Hand-to-Hand' && this.race === 'Beastkin' && this.level >= 20) isEquippedWeaponTwoHanded = false;
@@ -4386,7 +4393,7 @@ function generateEnemy(biomeKey) {
     return new Enemy(speciesData, rarityData, player.level, elementData);
 }
 
-function generateBarracksRoster() {
+async function generateBarracksRoster() {
     if (!player) return;
 
     // Ensure seed is valid
@@ -4396,36 +4403,26 @@ function generateBarracksRoster() {
     }
     const rng = seededRandom(player.seed); // Use the player's daily seed
     
-    const availableRaces = Object.keys(RACES);
-    const availableClasses = Object.keys(CLASSES);
-    const availableNames = NPC_RANDOM_NAMES; // From game_data.js
-    
     player.barracksRoster = []; // Clear the old roster
     
+    // Get all available names and shuffle them
     const namesMale = NPC_RANDOM_NAMES.Male.map(n => ({ name: n, gender: 'Male' }));
     const namesFemale = NPC_RANDOM_NAMES.Female.map(n => ({ name: n, gender: 'Female' }));
     const namesNeutral = NPC_RANDOM_NAMES.Neutral.map(n => ({ name: n, gender: 'Neutral' }));
-
     const allNames = shuffleArray([...namesMale, ...namesFemale, ...namesNeutral], rng);
 
-    for (let i = 0; i < 5; i++) {
-        if (allNames.length === 0) break; // Stop if no names left
+    // --- 1. Generate 4 Random NPCs ---
+    for (let i = 0; i < 4; i++) {
+        if (allNames.length === 0) break; 
 
-        const recruitData = allNames.pop(); // Get a name and its gender category
-
+        const recruitData = allNames.pop();
         const availableRaces = Object.keys(RACES);
         const availableClasses = Object.keys(CLASSES);
 
         const raceKey = availableRaces[Math.floor(rng() * availableRaces.length)];
         const classKey = availableClasses[Math.floor(rng() * availableClasses.length)];
         
-        // --- NEW: Determine weighted background ---
         const { backgroundKey, backgroundName } = _determineWeightedBackground(raceKey, classKey, rng);
-        // --- END NEW ---
-
-        // We use the recruitData.name, but also need to store the determined dialogue type
-        const dialogueType = _determineDialogueType(recruitData.name);
-
 
         player.barracksRoster.push({
             name: recruitData.name,
@@ -4433,13 +4430,95 @@ function generateBarracksRoster() {
             classKey: classKey,
             backgroundKey: backgroundKey,
             backgroundName: backgroundName,
-            // --- ADDED: Store the determined gender type here ---
-            // This is the BASE category for the name, used for display/recruitment UI clarity.
-            baseGender: recruitData.gender 
+            baseGender: recruitData.gender,
+            isGhost: false // Flag as not a ghost
         });
     }
     
-    console.log("New Barracks roster generated:", player.barracksRoster);
+    // --- 2. Fetch 1 Ghost NPC ---
+    let ghostAdded = false;
+    if (typeof db !== 'undefined' && typeof userId !== 'undefined' && userId && typeof auth !== 'undefined' && auth.currentUser && !auth.currentUser.isAnonymous) {
+        try {
+            // --- REMOVE LEVEL QUERIES ---
+            // const minLvl = Math.max(1, player.level - 5);
+            // const maxLvl = player.level + 10;
+            const publicRef = db.collection(`artifacts/${appId}/public/data/characters`);
+            
+            // --- MODIFIED QUERY: Remove .where() clauses ---
+            const querySnapshot = await publicRef
+                // .where('level', '>=', minLvl) // REMOVED
+                // .where('level', '<=', maxLvl) // REMOVED
+                .limit(20) // Just get a random batch
+                .get();
+
+            if (!querySnapshot.empty) {
+                let potentialGhosts = [];
+                querySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    // --- CHANGED: Check the CHARACTER ID, not the USER ID ---
+                    if (doc.id !== player.firestoreId) { // Don't add your CURRENT character
+                        potentialGhosts.push(data);
+                    }
+                    // --- END CHANGED ---
+                });
+
+                if (potentialGhosts.length > 0) {
+                    const ghostData = potentialGhosts[Math.floor(rng() * potentialGhosts.length)];
+                    
+                    player.barracksRoster.push({
+                        name: ghostData.name,
+                        raceKey: ghostData.raceKey,
+                        classKey: ghostData._classKey,
+                        backgroundKey: ghostData.backgroundKey,
+                        backgroundName: ghostData.backgroundName,
+                        baseGender: ghostData.baseGender,
+                        isGhost: true,
+
+                        // --- ADD THESE NEW LINES ---
+                        // Pass the ghost's loadout into the roster data
+                        equippedWeaponKey: ghostData.equippedWeaponKey,
+                        equippedCatalystKey: ghostData.equippedCatalystKey,
+                        equippedArmorKey: ghostData.equippedArmorKey,
+                        equippedShieldKey: ghostData.equippedShieldKey,
+                        spells: ghostData.spells,
+                        items: ghostData.items
+                        // --- END ADDED LINES ---
+                    });
+                    ghostAdded = true;
+                }
+            }
+        } catch (error) {
+            console.error("Failed to fetch ghost ally:", error);
+            // Fallback will run
+        }
+    }
+
+    // --- 3. Fallback: Add 5th Random NPC ---
+    if (!ghostAdded) {
+        if (allNames.length > 0) {
+            const recruitData = allNames.pop();
+            const availableRaces = Object.keys(RACES);
+            const availableClasses = Object.keys(CLASSES);
+            const raceKey = availableRaces[Math.floor(rng() * availableRaces.length)];
+            const classKey = availableClasses[Math.floor(rng() * availableClasses.length)];
+            const { backgroundKey, backgroundName } = _determineWeightedBackground(raceKey, classKey, rng);
+
+            player.barracksRoster.push({
+                name: recruitData.name,
+                raceKey: raceKey,
+                classKey: classKey,
+                backgroundKey: backgroundKey,
+                backgroundName: backgroundName,
+                baseGender: recruitData.gender,
+                isGhost: false
+            });
+        }
+    }
+
+    // --- 4. Shuffle the final roster ---
+    player.barracksRoster = shuffleArray(player.barracksRoster, rng);
+
+    console.log("New Barracks roster generated (with ghost attempt):", player.barracksRoster);
 }
 
 
@@ -4643,7 +4722,7 @@ function enchantItem(gearType, elementKey) {
 }
     
 
-function restAtInn(cost) {
+async function restAtInn(cost) {
     if(cost > 0 && player.gold < cost) {
         addToLog("You can't afford a room.", "text-red-400");
         return;
@@ -4666,7 +4745,7 @@ function restAtInn(cost) {
         player.questsTakenToday = []; // Reset daily quest limit
         player.seed = Math.floor(Math.random() * 1000000); // Generate new seed for the 'day'
         generateBlackMarketStock(); // Refresh black market stock
-        generateBarracksRoster(); // --- NEW: Refresh Barracks roster ---
+        await generateBarracksRoster(); // --- NEW: Refresh Barracks roster ---
         player.clearFoodBuffs(); // Food buffs wear off after resting
         addToLog(`You wake up feeling refreshed. The quest board and black market have new offerings.`, 'text-green-400 font-bold');
         updateStatsView(); // Update UI after resting
@@ -6070,13 +6149,13 @@ function buildHouse() {
     renderHouse(); // Go directly to the house view
 }
 
-function restAtHouse() {
+async function restAtHouse() {
     player.hp = player.maxHp;
     player.mp = player.maxMp;
      player.questsTakenToday = []; // Reset daily quest limit
      player.seed = Math.floor(Math.random() * 1000000); // Generate new seed for the 'day'
      generateBlackMarketStock(); // Refresh black market stock
-     generateBarracksRoster(); // --- NEW: Refresh Barracks roster ---
+     await generateBarracksRoster(); // --- NEW: Refresh Barracks roster ---
      player.clearFoodBuffs(); // Food buffs wear off after resting
     addToLog("You rest in the comfort of your own bed and feel fully restored. Shops and quests have refreshed.", "text-green-400"); // Updated log
     updateStatsView(); // Update HP/MP display
