@@ -180,6 +180,7 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey, di
         knownCookingRecipes: [],
         knownAlchemyRecipes: [],
         enchantments: {}, // <-- NEW: Initialize enchantments
+        biomeClears: {}, // <--- NEW
         seed: Math.floor(Math.random() * 1000000),
         // --- Initialize Progression Properties ---
         killsSinceLevel4: 0,
@@ -689,6 +690,7 @@ async function loadGameFromKey(docId, isImport = false) {
         if (!player.knownCookingRecipes) player.knownCookingRecipes = [];
         if (!player.knownAlchemyRecipes) player.knownAlchemyRecipes = [];
         if (!player.enchantments) player.enchantments = {}; // <-- NEW: Player enchantment migration
+        if (!player.biomeClears) player.biomeClears = {}; // <--- NEW
         if (!player.seed) player.seed = Math.floor(Math.random() * 1000000);
         if (player.elementalAffinity === undefined) player.elementalAffinity = null; // Add default for old saves
         // --- NPC ALLY: Migration for Player ---

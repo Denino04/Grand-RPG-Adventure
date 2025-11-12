@@ -1375,20 +1375,198 @@ const PALETTES = {
     'noon': { '--bg-main': '#2aa198', '--bg-secondary': '#248d84', '--bg-log': 'rgba(36, 141, 132, 0.6)', '--bg-tooltip': '#248d84', '--border-main': '#47b5ab', '--text-main': '#fdf6e3', '--text-accent': '#facc15', '--btn-primary-bg': '#073642', '--btn-primary-bg-hover': '#586e75', '--btn-primary-border': '#93a1a1', '--btn-primary-border-hover': '#eee8d5', '--btn-primary-text': '#fdf6e3' },
     'sunset': { '--bg-main': '#d35400', '--bg-secondary': '#aa4400', '--bg-log': 'rgba(255, 240, 230, 0.3)', '--bg-tooltip': '#aa4400', '--border-main': '#f39c12', '--text-main': '#fdf6e3', '--text-accent': '#e74c3c', '--btn-primary-bg': '#8e44ad', '--btn-primary-bg-hover': '#9b59b6', '--btn-primary-border': '#6c3483', '--btn-primary-border-hover': '#8e44ad' },
     'midnight': { '--bg-main': '#0c0c1d', '--bg-secondary': '#05050f', '--bg-log': 'rgba(20, 20, 40, 0.5)', '--bg-tooltip': '#05050f', '--border-main': '#2d2d5a', '--text-main': '#bdc3c7', '--text-accent': '#1abc9c', '--btn-primary-bg': '#2d2d5a', '--btn-primary-bg-hover': '#4a4a8c', '--btn-primary-border': '#1c1c3a', '--btn-primary-border-hover': '#2d2d5a' },
-    'casino': { 
+'casino': { 
         '--bg-main': '#4a1d68', // Deep Purple
         '--bg-secondary': '#2b103d',
         '--bg-log': 'rgba(20, 10, 30, 0.5)',
         '--bg-tooltip': '#2b103d',
         '--border-main': '#7a3ea5',
         '--text-main': '#e9d5ff',
-        '--text-accent': '#fcd34d', // Gold
-        '--btn-primary-bg': '#7a3ea5',
-        '--btn-primary-bg-hover': '#9333ea',
-        '--btn-primary-border': '#581c87',
-        '--btn-primary-border-hover': '#6b21a8'
+        '--text-accent': '#fde047', // Brighter Gold
+        /* --- MODIFICATION --- */
+        '--btn-primary-bg': '#dc2626', // Gaudy Red
+        '--btn-primary-bg-hover': '#ef4444',
+        '--btn-primary-border': '#991b1b',
+        '--btn-primary-border-hover': '#b91c1c'
+        /* --- END MODIFICATION --- */
     }
 };
+
+/**
+ * Helper function to aggregate loot from a biome's monsters,
+ * filtered by player's clear count.
+ * @param {string} biomeKey - The key of the biome.
+ * @param {number} clearCount - The number of times the player has cleared this biome.
+ * @returns {object} An object containing arrays for loot rarities.
+ */
+function getLootForBiome(biomeKey, clearCount) {
+    const biome = BIOMES[biomeKey];
+    if (!biome) return {};
+
+    const monsterKeys = Object.keys(biome.monsters);
+    const lootSet = new Set(); // Use a Set to avoid duplicate item names
+
+    monsterKeys.forEach(key => {
+        const monster = MONSTER_SPECIES[key];
+        if (monster && monster.loot_table) {
+            Object.keys(monster.loot_table).forEach(lootKey => {
+                lootSet.add(lootKey);
+            });
+        }
+    });
+
+    const lootLists = {
+        common: [],
+        uncommon: [],
+        rare: [],
+        epic: [],
+        legendary: []
+    };
+
+    lootSet.forEach(itemKey => {
+        const details = getItemDetails(itemKey); // This checks all item types
+        if (details) {
+            const rarity = (details.rarity || 'Common').toLowerCase();
+            if (rarity === 'broken' || rarity === 'junk' || rarity === 'common') {
+                if (clearCount >= 50) lootLists.common.push(details.name);
+            } else if (rarity === 'uncommon') {
+                if (clearCount >= 100) lootLists.uncommon.push(details.name);
+            } else if (rarity === 'rare') {
+                if (clearCount >= 100) lootLists.rare.push(details.name);
+            } else if (rarity === 'epic') {
+                if (clearCount >= 250) lootLists.epic.push(details.name);
+            } else if (rarity === 'legendary') {
+                if (clearCount >= 250) lootLists.legendary.push(details.name);
+            }
+        }
+    });
+
+    // Sort the lists alphabetically
+    for (const key in lootLists) {
+        lootLists[key].sort();
+    }
+    
+    return lootLists;
+}
+
+/**
+ * Shows a detailed tooltip for a Biome.
+ * @param {string} biomeKey The key of the biome to display.
+ * @param {Event} event The mouse event that triggered the tooltip.
+ */
+function showBiomeTooltip(biomeKey, event) {
+    const tooltipElement = $('#tooltip');
+    if (event.type === 'click' && tooltipElement.style.display === 'block' && activeTooltipItem === biomeKey) {
+        hideTooltip();
+        return;
+    }
+
+    const biome = BIOMES[biomeKey];
+    if (!biome) return;
+
+    const clears = player.biomeClears[biomeKey] || 0;
+    let content = `<h4 class="font-bold mb-1" style="color: var(--text-accent);">${biome.name} (Tier ${biome.tier})</h4>`;
+    content += `<p class="text-xs text-gray-400 mb-2"><em>${biome.description}</em></p>`;
+
+    // --- Gate 0: < 10 Clears ---
+    if (clears < 10) {
+        content += `<p class="text-sm">Clears: ${clears} / 10</p>`;
+        content += `<div class="mt-2 pt-2 border-t border-gray-600">
+                        <p class="font-semibold text-sm">Enemy Intel:</p>
+                        <p class="text-sm text-gray-500">????????</p>
+                        <p class="font-semibold text-sm mt-1">Loot Intel:</p>
+                        <p class="text-sm text-gray-500">????????</p>
+                    </div>`;
+    }
+    // --- Gate 1: 10+ Clears (Show Enemies) ---
+    else if (clears < 50) {
+        content += `<p class="text-sm">Clears: ${clears} / 50</p>`;
+        content += `<div class="mt-2 pt-2 border-t border-gray-600">`;
+        content += `<p class="font-semibold text-sm">Known Enemies:</p><div class="flex flex-wrap gap-2 mt-1">`;
+        Object.keys(biome.monsters).forEach(key => {
+            const monster = MONSTER_SPECIES[key];
+            if (monster) {
+                content += `<span class="text-sm text-gray-300 bg-slate-700 px-2 py-0.5 rounded">${monster.emoji} ${monster.name}</span>`;
+            }
+        });
+        content += `</div>`;
+        content += `<p class="font-semibold text-sm mt-2">Loot Intel:</p>
+                    <p class="text-sm text-gray-500">????????</p>
+                    </div>`;
+    }
+    // --- Gate 2: 50+ Clears (Show Common Loot) ---
+    else if (clears < 100) {
+        content += `<p class="text-sm">Clears: ${clears} / 100</p>`;
+        const loot = getLootForBiome(biomeKey, clears);
+        content += `<div class="mt-2 pt-2 border-t border-gray-600">`;
+        content += `<p class="font-semibold text-sm">Known Enemies:</p><div class="flex flex-wrap gap-2 mt-1">`;
+        Object.keys(biome.monsters).forEach(key => {
+            const monster = MONSTER_SPECIES[key];
+            if (monster) {
+                content += `<span class="text-sm text-gray-300 bg-slate-700 px-2 py-0.5 rounded">${monster.emoji} ${monster.name}</span>`;
+            }
+        });
+        content += `</div>`;
+        content += `<p class="font-semibold text-sm mt-2">Common Loot:</p>
+                    <p class="text-xs text-gray-400">${loot.common.length > 0 ? loot.common.join(', ') : 'None'}</p>`;
+        content += `<p class="font-semibold text-sm mt-2">Notable Loot:</p>
+                    <p class="text-sm text-gray-500">????????</p>
+                    </div>`;
+    }
+    // --- Gate 3: 100+ Clears (Show Notable Loot) ---
+    else if (clears < 250) {
+        content += `<p class="text-sm">Clears: ${clears} / 250</p>`;
+        const loot = getLootForBiome(biomeKey, clears);
+        content += `<div class="mt-2 pt-2 border-t border-gray-600">`;
+        content += `<p class="font-semibold text-sm">Known Enemies:</p><div class="flex flex-wrap gap-2 mt-1">`;
+        Object.keys(biome.monsters).forEach(key => {
+            const monster = MONSTER_SPECIES[key];
+            if (monster) {
+                content += `<span class="text-sm text-gray-300 bg-slate-700 px-2 py-0.5 rounded">${monster.emoji} ${monster.name}</span>`;
+            }
+        });
+        content += `</div>`;
+        content += `<p class="font-semibold text-sm mt-2">Common Loot:</p>
+                    <p class="text-xs text-gray-400">${loot.common.length > 0 ? loot.common.join(', ') : 'None'}</p>`;
+        content += `<p class="font-semibold text-sm mt-2">Notable Loot:</p>
+                    <p class="text-xs text-cyan-300">${[...loot.uncommon, ...loot.rare].length > 0 ? [...loot.uncommon, ...loot.rare].join(', ') : 'None'}</p>`;
+        content += `<p class="font-semibold text-sm mt-2">Rare Loot:</p>
+                    <p class="text-sm text-gray-500">????????</p>
+                    </div>`;
+    }
+    // --- Gate 4: 250+ Clears (Show All) ---
+    else {
+        content += `<p class="text-sm text-yellow-300 font-bold">Clears: ${clears} (Mastered)</p>`;
+        const loot = getLootForBiome(biomeKey, clears);
+        content += `<div class="mt-2 pt-2 border-t border-gray-600">`;
+        content += `<p class="font-semibold text-sm">Enemy Spawn Rates:</p><ul class="list-disc list-inside text-sm">`;
+        Object.keys(biome.monsters).forEach(key => {
+            const monster = MONSTER_SPECIES[key];
+            if (monster) {
+                content += `<li>${monster.name} (${biome.monsters[key]}%)</li>`;
+            }
+        });
+        content += `</ul>`;
+        content += `<p class="font-semibold text-sm mt-2">Common Loot:</p>
+                    <p class="text-xs text-gray-400">${loot.common.length > 0 ? loot.common.join(', ') : 'None'}</p>`;
+        content += `<p class="font-semibold text-sm mt-2">Notable Loot:</p>
+                    <p class="text-xs text-cyan-300">${[...loot.uncommon, ...loot.rare].length > 0 ? [...loot.uncommon, ...loot.rare].join(', ') : 'None'}</p>`;
+        content += `<p class="font-semibold text-sm mt-2">Rare Loot:</p>
+                    <p class="text-xs text-purple-400">${[...loot.epic, ...loot.legendary].length > 0 ? [...loot.epic, ...loot.legendary].join(', ') : 'None'}</p>`;
+        content += `</div>`;
+    }
+
+    tooltipElement.innerHTML = content;
+    tooltipElement.style.display = 'block';
+    activeTooltipItem = biomeKey;
+
+    let x = event.clientX + 15;
+    let y = event.clientY + 15;
+    if (x + tooltipElement.offsetWidth > window.innerWidth) x = event.clientX - tooltipElement.offsetWidth - 15;
+    if (y + tooltipElement.offsetHeight > window.innerHeight) y = event.clientY - tooltipElement.offsetHeight - 15;
+    tooltipElement.style.left = `${x}px`;
+    tooltipElement.style.top = `${y}px`;
+}
 
 /**
  * Applies a color theme to the game UI by setting CSS variables.

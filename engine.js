@@ -342,6 +342,7 @@ class Player extends Entity {
         this.backgroundKey = '';
         this.difficulty = 'hardcore';
         this.elementalAffinity = null; // For Elementals
+        this.biomeClears = {}; // <--- NEW
         this.npcAlly = null; // <<< NEW
         this.enchantments = {}; // <-- NEW: Store item-type enchantments
         this.encountersSinceLastPay = 0; // <<< NEW

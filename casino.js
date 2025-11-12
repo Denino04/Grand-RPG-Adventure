@@ -22,6 +22,13 @@ let blackjackState = {
 const SUITS = ['♠', '♥', '♦', '♣'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
+let slotState = {
+    reels: ['❓', '❓', '❓'],
+    bet: 10,
+    gamePhase: 'betting', // 'betting', 'spinning', 'results'
+    statusMessage: 'Place your bet to spin.'
+};
+
 function checkCasinoCode(char) {
     if (player.unlocks.roguelikeCardGame) return; // Already unlocked
 
@@ -592,6 +599,634 @@ function evaluatePokerHand(hand) {
             fourToStraight: fourToStraightDiscard
         }
     };
+}
+
+// =================================================================================
+// --- SLOT MACHINE LOGIC ---
+// =================================================================================
+const SLOT_SYMBOL_HEIGHT = 128; // 8rem at 16px/rem = 128px. This MUST match your .reel-symbol CSS height.
+
+const REELS = [
+    '🍒', '🍒', '🍒', '🍒', '🍒', '🍒', // 6 Cherries
+    '🧈', '🧈', '🧈', '🧈', // 4 BARS
+    '7️⃣', '7️⃣', '7️⃣', // 3 Sevens
+    '💰', '💰', // 2 Moneybags
+    '💎' // 1 Diamond
+];
+
+// Payouts are multipliers of the bet
+const PAYTABLE = {
+    '💎💎💎': 500,
+    '💰💰💰': 100,
+    '7️⃣7️⃣7️⃣': 75,
+    '🧈🧈🧈': 25,
+    '🍒🍒🍒': 10,
+    '🍒🍒_': 5, // Any two cherries
+    '🍒__': 2  // Any one cherry
+};
+
+function startSlots(betAmount) {
+    if (betAmount <= 0) {
+        slotState.statusMessage = "You must bet something!";
+        updateSlotUI();
+        return;
+    }
+    if (player.gold < betAmount) {
+        slotState.statusMessage = "Not enough gold for that bet.";
+        updateSlotUI();
+        return;
+    }
+
+    player.gold -= betAmount;
+    player.lastCasinoBet = betAmount;
+    slotState.bet = betAmount;
+    slotState.gamePhase = 'spinning';
+    slotState.statusMessage = 'Spinning...';
+    
+    updateStatsView(); // Update gold display
+    updateSlotUI(); // This will disable the betting button
+
+    // --- NEW ANIMATION LOGIC ---
+    const strips = [
+        document.getElementById('reel-strip-0'),
+        document.getElementById('reel-strip-1'),
+        document.getElementById('reel-strip-2')
+    ];
+
+    // Add the .spinning class to start the CSS animation
+    strips.forEach(strip => {
+        strip.classList.add('spinning');
+    });
+    // --- END NEW ANIMATION LOGIC ---
+
+
+    // This interval is now just a timer. The animation is handled by CSS.
+    let spinCount = 0;
+    const maxSpins = 15; // This is now just a timer for ~1.5 seconds
+    const spinInterval = setInterval(() => {
+        spinCount++;
+        
+        // --- REMOVED: All visual update logic from the interval ---
+
+        if (spinCount > maxSpins) {
+            clearInterval(spinInterval);
+            // --- MODIFIED: Pass strips to the winner function ---
+            determineSlotWinner(strips);
+        }
+    }, 100);
+}
+
+// This function determines the *final* outcome
+function spinReels() {
+    return [
+        REELS[Math.floor(Math.random() * REELS.length)],
+        REELS[Math.floor(Math.random() * REELS.length)],
+        REELS[Math.floor(Math.random() * REELS.length)]
+    ];
+}
+
+function determineSlotWinner(strips) {
+    const finalReels = spinReels(); // Get the one, true result
+    slotState.reels = finalReels;
+    
+    const [r1, r2, r3] = finalReels;
+    let winnings = 0;
+    let winKey = '';
+
+    // Check from highest to lowest
+    if (r1 === '💎' && r2 === '💎' && r3 === '💎') winKey = '💎💎💎';
+    else if (r1 === '💰' && r2 === '💰' && r3 === '💰') winKey = '💰💰💰';
+    else if (r1 === '7️⃣' && r2 === '7️⃣' && r3 === '7️⃣') winKey = '7️⃣7️⃣7️⃣';
+    else if (r1 === 'BAR' && r2 === 'BAR' && r3 === 'BAR') winKey = 'BARBARBAR';
+    else if (r1 === '🍒' && r2 === '🍒' && r3 === '🍒') winKey = '🍒🍒🍒';
+    else if (r1 === '🍒' && r2 === '🍒') winKey = '🍒🍒_';
+    else if (r1 === '🍒') winKey = '🍒__';
+
+    if (PAYTABLE[winKey]) {
+        winnings = slotState.bet * PAYTABLE[winKey];
+        // DO NOT add to player.gold yet, wait for the reels to stop.
+        slotState.statusMessage = `You won ${winnings} G!`;
+    } else {
+        slotState.statusMessage = `You lost ${slotState.bet} G.`;
+    }
+
+    // --- NEW: Trigger the staggered stop ---
+    // This new helper function will handle the animation and timeouts.
+    stopReel(strips, 0, finalReels, winnings, winKey, slotState.statusMessage);
+}
+
+function stopReel(strips, reelIndex, finalReels, winnings, winKey, statusMessage) {
+    // Base case: All reels have stopped
+    if (reelIndex >= 3) {
+        // Wait for the last reel's animation to finish
+        setTimeout(() => {
+            if (winnings > 0) {
+                player.gold += winnings;
+                addToLog(`You hit ${winKey} and won ${winnings} G!`, 'text-green-400');
+            } else {
+                addToLog(`The reels stop. You lost ${slotState.bet} G.`, 'text-red-400');
+            }
+
+            slotState.gamePhase = 'results';
+            slotState.statusMessage = statusMessage; // Set the final message
+            updateSlotUI();
+            updateStatsView();
+        }, 1500); // Wait for the 1.5s CSS transition to finish
+        return;
+    }
+
+    // Recursive case: Stop the current reel
+    const strip = strips[reelIndex];
+    const finalSymbol = finalReels[reelIndex];
+    
+    let symbolIndex = REELS.indexOf(finalSymbol);
+    if (symbolIndex === -1) symbolIndex = 0; // Fallback
+
+    // Land on the symbol in the *third* repetition
+    const targetIndex = (REELS.length * 2) + symbolIndex;
+    const pixelJitter = Math.floor(Math.random() * 3);
+    const finalY = - (targetIndex * SLOT_SYMBOL_HEIGHT) + pixelJitter;
+
+    // Remove the spinning class and set the final transform
+    strip.classList.remove('spinning');
+    strip.style.transform = `translateY(${finalY}px)`;
+
+    // --- Stagger the next call ---
+    let delay = 500; // Default delay
+    if (reelIndex === 1) { // The last reel
+        delay = 1000; // Tense wait for the 3rd reel
+    }
+
+    setTimeout(() => {
+        stopReel(strips, reelIndex + 1, finalReels, winnings, winKey, statusMessage);
+    }, delay);
+}
+
+// =================================================================================
+// --- BACCARAT LOGIC (STUB) ---
+// =================================================================================
+// =================================================================================
+// --- BACCARAT LOGIC ---
+// =================================================================================
+
+let baccaratState = {
+    deck: [],
+    playerHand: [],
+    bankerHand: [],
+    playerScore: 0,
+    bankerScore: 0,
+    bet: 0,
+    betOn: null, // 'player', 'banker', 'tie'
+    gamePhase: 'betting', // 'betting', 'drawing', 'results'
+    statusMessage: 'Place your bet to begin.'
+};
+
+/**
+ * Calculates the value of a Baccarat hand (0-9).
+ * Face/10s = 0, Ace = 1, 2-9 = face value.
+ * @param {Array} hand - An array of card objects.
+ * @returns {number} The calculated Baccarat value.
+ */
+function calculateBaccaratValue(hand) {
+    let value = 0;
+    for (let card of hand) {
+        if (['J', 'Q', 'K', '10'].includes(card.value)) {
+            value += 0;
+        } else if (card.value === 'A') {
+            value += 1;
+        } else {
+            value += card.weight; // 2-9 are same as weight
+        }
+    }
+    return value % 10; // Baccarat value is the last digit of the sum
+}
+
+/**
+ * Starts a new game of Baccarat.
+ * @param {number} betAmount - The amount of gold to bet.
+ * @param {string} betOn - 'player', 'banker', or 'tie'.
+ */
+async function startBaccarat(betAmount, betOn) {
+    if (betAmount <= 0) {
+        baccaratState.statusMessage = "You must bet something!";
+        updateBaccaratUI();
+        return;
+    }
+    if (player.gold < betAmount) {
+        baccaratState.statusMessage = "Not enough gold for that bet.";
+        updateBaccaratUI();
+        return;
+    }
+
+    player.gold -= betAmount;
+    player.lastCasinoBet = betAmount;
+    baccaratState = {
+        deck: createDeck(),
+        playerHand: [],
+        bankerHand: [],
+        playerScore: 0,
+        bankerScore: 0,
+        bet: betAmount,
+        betOn: betOn,
+        gamePhase: 'drawing',
+        statusMessage: 'Dealing cards...'
+    };
+    shuffleDeck(baccaratState.deck);
+
+    updateBaccaratUI();
+    updateStatsView(); // Update gold display
+
+    // 1. Deal initial hands
+    await new Promise(resolve => setTimeout(resolve, 500));
+    baccaratState.playerHand.push(baccaratState.deck.pop());
+    updateBaccaratUI();
+    await new Promise(resolve => setTimeout(resolve, 500));
+    baccaratState.bankerHand.push(baccaratState.deck.pop());
+    updateBaccaratUI();
+    await new Promise(resolve => setTimeout(resolve, 500));
+    baccaratState.playerHand.push(baccaratState.deck.pop());
+    updateBaccaratUI();
+    await new Promise(resolve => setTimeout(resolve, 500));
+    baccaratState.bankerHand.push(baccaratState.deck.pop());
+    
+    baccaratState.playerScore = calculateBaccaratValue(baccaratState.playerHand);
+    baccaratState.bankerScore = calculateBaccaratValue(baccaratState.bankerHand);
+    baccaratState.statusMessage = `Player has ${baccaratState.playerScore}, Banker has ${baccaratState.bankerScore}.`;
+    updateBaccaratUI();
+
+    // 2. Check for Naturals
+    if (baccaratState.playerScore >= 8 || baccaratState.bankerScore >= 8) {
+        baccaratState.statusMessage = `Natural! ${baccaratState.playerScore >= 8 ? 'Player' : 'Banker'} wins.`;
+        if (baccaratState.playerScore === baccaratState.bankerScore) {
+            baccaratState.statusMessage = "Natural! It's a Tie.";
+        }
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        determineBaccaratWinner();
+        return;
+    }
+
+    // 3. Proceed to drawing logic
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    baccaratDrawingLogic();
+}
+
+/**
+ * Executes the rigid Baccarat drawing rules (Tableau).
+ */
+async function baccaratDrawingLogic() {
+    let playerDrew = false;
+    let playerThirdCard = null;
+
+    // --- Player's Turn ---
+    if (baccaratState.playerScore <= 5) {
+        // Player draws
+        playerDrew = true;
+        playerThirdCard = baccaratState.deck.pop();
+        baccaratState.playerHand.push(playerThirdCard);
+        baccaratState.playerScore = calculateBaccaratValue(baccaratState.playerHand);
+        baccaratState.statusMessage = `Player draws a ${playerThirdCard.value}. Player score: ${baccaratState.playerScore}.`;
+        updateBaccaratUI();
+        await new Promise(resolve => setTimeout(resolve, 1500));
+    } else {
+        // Player stands
+        baccaratState.statusMessage = `Player stands on ${baccaratState.playerScore}.`;
+        updateBaccaratUI();
+        await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+
+    // --- Banker's Turn ---
+    let bankerDraws = false;
+    const bankerScore = baccaratState.bankerScore; // Score from 2 cards
+    const playerThirdCardValue = playerThirdCard ? (playerThirdCard.weight === 11 ? 1 : playerThirdCard.weight) : -1; // 10/J/Q/K = 10, A = 1
+
+    if (!playerDrew) {
+        // --- If Player Stood (has 2 cards) ---
+        // Banker follows the same rule as the player.
+        if (bankerScore <= 5) {
+            bankerDraws = true;
+        }
+    } else {
+        // --- If Player Drew (has 3 cards) ---
+        // Banker follows the Tableau
+        if (bankerScore <= 2) {
+            bankerDraws = true;
+        } else if (bankerScore === 3) {
+            if (playerThirdCardValue !== 8) bankerDraws = true;
+        } else if (bankerScore === 4) {
+            if ([2, 3, 4, 5, 6, 7].includes(playerThirdCardValue)) bankerDraws = true;
+        } else if (bankerScore === 5) {
+            if ([4, 5, 6, 7].includes(playerThirdCardValue)) bankerDraws = true;
+        } else if (bankerScore === 6) {
+            if ([6, 7].includes(playerThirdCardValue)) bankerDraws = true;
+        }
+        // If Banker score is 7, Banker always stands.
+    }
+
+    if (bankerDraws) {
+        const bankerThirdCard = baccaratState.deck.pop();
+        baccaratState.bankerHand.push(bankerThirdCard);
+        baccaratState.bankerScore = calculateBaccaratValue(baccaratState.bankerHand);
+        baccaratState.statusMessage = `Banker draws a ${bankerThirdCard.value}. Banker score: ${baccaratState.bankerScore}.`;
+        updateBaccaratUI();
+        await new Promise(resolve => setTimeout(resolve, 1500));
+    } else {
+        baccaratState.statusMessage = 'Banker stands.';
+        updateBaccaratUI();
+        await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+
+    // --- Go to Results ---
+    determineBaccaratWinner();
+}
+
+/**
+ * Compares final hands and pays out Baccarat bets.
+ */
+function determineBaccaratWinner() {
+    const pScore = baccaratState.playerScore;
+    const bScore = baccaratState.bankerScore;
+    const betOn = baccaratState.betOn;
+    const bet = baccaratState.bet;
+    
+    let winner = null;
+    let winnings = 0;
+
+    if (pScore > bScore) winner = 'player';
+    else if (bScore > pScore) winner = 'banker';
+    else winner = 'tie';
+
+    if (betOn === winner) {
+        if (winner === 'player') {
+            winnings = bet * 2; // 1:1 (bet back + 1x)
+            baccaratState.statusMessage = `Player wins! You win ${winnings} G.`;
+        } else if (winner === 'banker') {
+            winnings = bet + Math.floor(bet * 0.95); // 1:1 minus 5% commission (bet back + 0.95x)
+            baccaratState.statusMessage = `Banker wins! You win ${winnings} G.`;
+        } else { // 'tie'
+            winnings = bet * 9; // 8:1 (bet back + 8x)
+            baccaratState.statusMessage = `Tie! You win ${winnings} G!`;
+        }
+        player.gold += winnings;
+    } else {
+        if (winner === 'tie') {
+            // Bet on Player or Banker and it's a Tie
+            baccaratState.statusMessage = `It's a Tie! Your bet is returned.`;
+            player.gold += bet; // Push
+        } else {
+            // You bet wrong
+            baccaratState.statusMessage = `You bet on ${capitalize(betOn)}, but ${capitalize(winner)} won. You lose ${bet} G.`;
+        }
+    }
+
+    baccaratState.gamePhase = 'results';
+    updateBaccaratUI();
+    updateStatsView();
+}
+
+
+// =================================================================================
+// --- ROULETTE LOGIC ---
+// =================================================================================
+let lastSpinCellId = null;
+// Helper constant for number properties
+const ROULETTE_NUMBERS = {
+    0: { color: 'green', isOdd: null, dozen: null, column: null, range: null },
+    1: { color: 'red', isOdd: true, dozen: 1, column: 1, range: 'low' },
+    2: { color: 'black', isOdd: false, dozen: 1, column: 2, range: 'low' },
+    3: { color: 'red', isOdd: true, dozen: 1, column: 3, range: 'low' },
+    4: { color: 'black', isOdd: false, dozen: 1, column: 1, range: 'low' },
+    5: { color: 'red', isOdd: true, dozen: 1, column: 2, range: 'low' },
+    6: { color: 'black', isOdd: false, dozen: 1, column: 3, range: 'low' },
+    7: { color: 'red', isOdd: true, dozen: 1, column: 1, range: 'low' },
+    8: { color: 'black', isOdd: false, dozen: 1, column: 2, range: 'low' },
+    9: { color: 'red', isOdd: true, dozen: 1, column: 3, range: 'low' },
+    10: { color: 'black', isOdd: false, dozen: 1, column: 1, range: 'low' },
+    11: { color: 'black', isOdd: true, dozen: 1, column: 2, range: 'low' },
+    12: { color: 'red', isOdd: false, dozen: 1, column: 3, range: 'low' },
+    13: { color: 'black', isOdd: true, dozen: 2, column: 1, range: 'low' },
+    14: { color: 'red', isOdd: false, dozen: 2, column: 2, range: 'low' },
+    15: { color: 'black', isOdd: true, dozen: 2, column: 3, range: 'low' },
+    16: { color: 'red', isOdd: false, dozen: 2, column: 1, range: 'low' },
+    17: { color: 'black', isOdd: true, dozen: 2, column: 2, range: 'low' },
+    18: { color: 'red', isOdd: false, dozen: 2, column: 3, range: 'low' },
+    19: { color: 'red', isOdd: true, dozen: 2, column: 1, range: 'high' },
+    20: { color: 'black', isOdd: false, dozen: 2, column: 2, range: 'high' },
+    21: { color: 'red', isOdd: true, dozen: 2, column: 3, range: 'high' },
+    22: { color: 'black', isOdd: false, dozen: 2, column: 1, range: 'high' },
+    23: { color: 'red', isOdd: true, dozen: 2, column: 2, range: 'high' },
+    24: { color: 'black', isOdd: false, dozen: 2, column: 3, range: 'high' },
+    25: { color: 'red', isOdd: true, dozen: 3, column: 1, range: 'high' },
+    26: { color: 'black', isOdd: false, dozen: 3, column: 2, range: 'high' },
+    27: { color: 'red', isOdd: true, dozen: 3, column: 3, range: 'high' },
+    28: { color: 'black', isOdd: false, dozen: 3, column: 1, range: 'high' },
+    29: { color: 'black', isOdd: true, dozen: 3, column: 2, range: 'high' },
+    30: { color: 'red', isOdd: false, dozen: 3, column: 3, range: 'high' },
+    31: { color: 'black', isOdd: true, dozen: 3, column: 1, range: 'high' },
+    32: { color: 'red', isOdd: false, dozen: 3, column: 2, range: 'high' },
+    33: { color: 'black', isOdd: true, dozen: 3, column: 3, range: 'high' },
+    34: { color: 'red', isOdd: false, dozen: 3, column: 1, range: 'high' },
+    35: { color: 'black', isOdd: true, dozen: 3, column: 2, range: 'high' },
+    36: { color: 'red', isOdd: false, dozen: 3, column: 3, range: 'high' },
+};
+
+// Payouts (e.g., 35:1 means you get 35 * bet, + your original bet back)
+const ROULETTE_PAYOUTS = {
+    'straight': 35, // 35:1
+    'col1': 2,      // 2:1
+    'col2': 2,
+    'col3': 2,
+    '1st12': 2,
+    '2nd12': 2,
+    '3rd12': 2,
+    'low': 1,       // 1:1
+    'high': 1,
+    'even': 1,
+    'odd': 1,
+    'red': 1,
+    'black': 1
+};
+
+// Replace the stub
+let rouletteState = {
+    betAmountPerChip: 10,
+    bets: {}, // e.g., {'red': 1, '17': 2} (tracks chip *count*)
+    totalBet: 0,
+    gamePhase: 'betting', // 'betting', 'spinning', 'results'
+    statusMessage: 'Place your bets!',
+    winningNumber: null
+};
+
+function placeRouletteBet(betType) {
+    if (rouletteState.gamePhase !== 'betting') return;
+
+    // Increment chip count for this bet type
+    rouletteState.bets[betType] = (rouletteState.bets[betType] || 0) + 1;
+    
+    // Recalculate total bet
+    recalculateTotalRouletteBet();
+    updateRouletteUI();
+}
+
+function clearRouletteBets() {
+    if (rouletteState.gamePhase !== 'betting') return;
+    rouletteState.bets = {};
+    rouletteState.totalBet = 0;
+    updateRouletteUI();
+}
+
+function recalculateTotalRouletteBet() {
+    let total = 0;
+    for (const betType in rouletteState.bets) {
+        total += rouletteState.bets[betType];
+    }
+    rouletteState.totalBet = total * rouletteState.betAmountPerChip;
+}
+
+async function spinRouletteWheel() {
+    const state = rouletteState;
+    if (state.gamePhase !== 'betting' || state.totalBet === 0) return;
+
+    if (player.gold < state.totalBet) {
+        state.statusMessage = "Not enough gold for this bet.";
+        updateRouletteUI();
+        return;
+    }
+
+    player.gold -= state.totalBet;
+    player.lastCasinoBet = state.betAmountPerChip;
+    state.gamePhase = 'spinning';
+    state.statusMessage = 'No more bets! Spinning...';
+    updateStatsView();
+    updateRouletteUI(); // This disables all betting UI
+
+    // --- NEW SPIN ANIMATION LOGIC ---
+    let spinDuration = 3000; // 3 seconds total
+    let fastSpinInterval = 100; // 10 flashes per second
+    let spinTimer = 0;
+
+    const fastSpin = setInterval(() => {
+        spinTimer += fastSpinInterval;
+        
+        // 1. Clear previous flash
+        if (lastSpinCellId) {
+            const lastCell = document.getElementById(lastSpinCellId);
+            if (lastCell) lastCell.classList.remove('spin-active');
+        }
+
+        // 2. Pick new random number and flash it
+        const randomNum = Math.floor(Math.random() * 37); // 0-36
+        
+        // 3. Flash cell on the table
+        const newCellId = `roulette-cell-${randomNum}`;
+        const newCell = document.getElementById(newCellId);
+        if (newCell) {
+            newCell.classList.add('spin-active');
+            lastSpinCellId = newCellId;
+        }
+
+        // 4. Update central display to follow the spin
+        updateRouletteUI(true, randomNum); // Pass spinning=true and the number
+
+        // 5. Check if spin is over
+        if (spinTimer >= spinDuration) {
+            clearInterval(fastSpin);
+            
+            // 6. Clear the *last* flashed cell
+            if (lastSpinCellId) {
+                const lastCell = document.getElementById(lastSpinCellId);
+                if (lastCell) lastCell.classList.remove('spin-active');
+            }
+
+            // 7. Pick final number and determine winner
+            const winningNumber = Math.floor(Math.random() * 37);
+            state.winningNumber = winningNumber;
+            determineRouletteWinner(winningNumber);
+        }
+    }, fastSpinInterval);
+    // --- END NEW SPIN LOGIC ---
+}
+
+function determineRouletteWinner(number) {
+    const state = rouletteState;
+    const numInfo = ROULETTE_NUMBERS[number];
+    
+    // --- NEW: Highlight Winning Cells ---
+    // 1. Straight up number
+    document.getElementById(`roulette-cell-${number}`)?.classList.add('winner');
+
+    // 2. Outside bets (only if not 0)
+    if (number > 0) {
+        document.getElementById(`roulette-cell-${numInfo.color}`)?.classList.add('winner');
+        document.getElementById(`roulette-cell-${numInfo.isOdd ? 'odd' : 'even'}`)?.classList.add('winner');
+        document.getElementById(`roulette-cell-${numInfo.range}`)?.classList.add('winner'); // 'low' or 'high'
+        
+        // Dozen
+        if (numInfo.dozen === 1) document.getElementById('roulette-cell-1st12')?.classList.add('winner');
+        else if (numInfo.dozen === 2) document.getElementById('roulette-cell-2nd12')?.classList.add('winner');
+        else if (numInfo.dozen === 3) document.getElementById('roulette-cell-3rd12')?.classList.add('winner');
+        
+        // Column
+        document.getElementById(`roulette-cell-col${numInfo.column}`)?.classList.add('winner');
+    }
+    // --- END NEW ---
+    
+    let totalWinnings = 0;
+    let totalBetReturn = 0;
+
+for (const betType in state.bets) {
+        const chipCount = state.bets[betType];
+        if (chipCount === 0) continue;
+        
+        const betAmount = chipCount * state.betAmountPerChip;
+        let isWin = false;
+
+        // Check straight up numbers
+        if (betType.startsWith('straight_')) {
+            const num = parseInt(betType.split('_')[1]);
+            if (num === number) isWin = true;
+        } 
+        // Check outside bets
+        else if (number > 0) { // Outside bets lose on 0
+            switch (betType) {
+                case 'red':   if (numInfo.color === 'red') isWin = true; break;
+                case 'black': if (numInfo.color === 'black') isWin = true; break;
+                case 'even':  if (!numInfo.isOdd) isWin = true; break;
+                case 'odd':   if (numInfo.isOdd) isWin = true; break;
+                case 'low':   if (numInfo.range === 'low') isWin = true; break;
+                case 'high':  if (numInfo.range === 'high') isWin = true; break;
+                case '1st12': if (numInfo.dozen === 1) isWin = true; break;
+                case '2nd12': if (numInfo.dozen === 2) isWin = true; break;
+                case '3rd12': if (numInfo.dozen === 3) isWin = true; break;
+                case 'col1':  if (numInfo.column === 1) isWin = true; break;
+                case 'col2':  if (numInfo.column === 2) isWin = true; break;
+                case 'col3':  if (numInfo.column === 3) isWin = true; break;
+            }
+        }
+
+        if (isWin) {
+            const payoutType = betType.startsWith('straight_') ? 'straight' : betType;
+            const payoutRate = ROULETTE_PAYOUTS[payoutType];
+            const winnings = betAmount * payoutRate;
+            
+            totalWinnings += winnings;
+            totalBetReturn += betAmount; // Add original bet to be returned
+        }
+    }
+
+    const totalReturn = totalWinnings + totalBetReturn;
+    const netGain = totalReturn - state.totalBet;
+
+    if (totalReturn > 0) {
+        player.gold += totalReturn;
+        state.statusMessage = `Winner! Number is ${number}. You win ${netGain} G!`;
+        addToLog(`The Spinner lands on ${number}! You won ${netGain} G.`, 'text-green-400');
+    } else {
+        state.statusMessage = `The Spinner lands on ${number}. You lost ${state.totalBet} G.`;
+    }
+
+    state.gamePhase = 'results';
+    updateRouletteUI();
+    updateStatsView();
 }
 
 // =================================================================================

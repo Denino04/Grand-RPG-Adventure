@@ -910,43 +910,77 @@ function returnFromInventory() {
     inventoryActiveTab = 'consumables'; // Reset to default
 
     switch (lastViewBeforeInventory) {
+        // --- Core ---
         case 'town': renderTownSquare(); break;
-        case 'character_sheet': renderTownSquare(); break; // Go back to town if closed from sheet normally
+        case 'character_sheet': renderTownSquare(); break;
         case 'commercial_district': renderCommercialDistrict(); break;
         case 'arcane_quarter': renderArcaneQuarter(); break;
         case 'residential_district': renderResidentialDistrict(); break;
-        case 'quest_board': renderQuestBoard(); break;
-        case 'inn': renderInn(); break;
-        case 'sage_tower_train': renderSageTowerTrain(); break;
-        case 'sage_tower_menu': renderSageTowerMenu(); break;
-        case 'sage_tower_buy': renderSageTowerBuy(); break;
-        case 'sage_tower_craft': renderSageTowerCraft(); break;
+        case 'wilderness': renderWildernessMenu(); break;
+        case 'settings': renderTownSquare(); break;
+        case 'battle': renderBattleGrid(); break;
+        case 'post_battle': renderPostBattleMenu(); break;
+
+        // --- Shops / Crafting ---
         case 'shop': renderShop('store'); break;
+        case 'black_market': renderShop('black_market'); break;
+        case 'sell': renderSell(); break;
         case 'blacksmith': renderBlacksmithMenu(); break;
         case 'blacksmith_buy': renderBlacksmithBuy(); break;
         case 'blacksmith_craft': renderBlacksmithCraft(); break;
-        case 'black_market': renderShop('black_market'); break;
+        case 'sage_tower_menu': renderSageTowerMenu(); break;
+        case 'sage_tower_train': renderSageTowerTrain(); break;
+        case 'sage_tower_buy': renderSageTowerBuy(); break;
+        case 'sage_tower_craft': renderSageTowerCraft(); break;
+        case 'enchanter': renderArcaneQuarter(); break; 
+        case 'enchanter_menu': renderEnchanterMenu(); break;
+        case 'enchanter_shop': renderEnchanterShop(); break; // MODIFIED
+        case 'enchanter_enchant': renderEnchanterEnchant(); break; // MODIFIED
         case 'witchs_coven': renderWitchsCoven(); break;
-        case 'sell': renderSell(); break;
-        case 'battle': renderBattleGrid(); break; // Shouldn't happen, but fallback
-        case 'post_battle': renderPostBattleMenu(); break;
-        case 'wilderness': renderWildernessMenu(); break;
-        case 'settings': renderTownSquare(); break; // Or return to the view before settings
-         case 'house': renderHouse(); break; // Added house case
-         case 'house_storage': renderHouseStorage(); break;
-         case 'garden': renderGarden(); break;
-         case 'kitchen': renderKitchen(); break;
-         case 'alchemy_lab': renderAlchemyLab(); break;
-         case 'training_grounds': renderTrainingGrounds(); break;
-         case 'library': renderLibrary(); break; // Added library
-         // --- MODIFIED: Adjust Enchanter returns ---
-         case 'enchanter': renderArcaneQuarter(); break; // Should not happen now, but keep fallback
-         case 'enchanter_menu': renderArcaneQuarter(); break; // Back from main enchanter menu
-         case 'enchanter_shop': renderEnchanterMenu(); break; // Back from shop goes to enchanter menu
-         case 'enchanter_enchant': renderEnchanterMenu(); break; // Back from enchant goes to enchanter menu
-         case 'casino_hub': renderArcaneQuarter(); break;
-         case 'blackjack': renderArcaneCasino(); break;
-         case 'poker': renderArcaneCasino(); break; // <-- ADD THIS
+
+        // --- House ---
+        case 'house': renderHouse(); break;
+        case 'house_storage': renderHouseStorage(); break;
+        case 'garden': renderGarden(); break;
+        case 'kitchen': renderKitchen(); break;
+        case 'alchemy_lab': renderAlchemyLab(); break;
+        case 'training_grounds': renderTrainingGrounds(); break;
+        case 'library': renderLibrary(); break; 
+        case 'home_improvements': renderHomeImprovements(); break; // MODIFIED (Added)
+
+        // --- Barracks ---
+        case 'barracks': renderBarracks(); break; // MODIFIED (Added)
+        case 'npc_inventory': renderNpcInventory(); break; // MODIFIED (Added)
+        case 'npc_spell_training': renderNpcSpellTraining(); break; // MODIFIED (Added)
+
+        // --- Questing ---
+        case 'quest_board': renderQuestBoard(); break;
+        case 'inn': renderInn(); break;
+
+        // --- Casino ---
+        case 'casino_hub': renderArcaneCasino(); break; // MODIFIED
+        case 'blackjack': renderBlackjack(); break; // MODIFIED
+        case 'poker': renderPoker(); break; // MODIFIED
+        case 'slots': renderSlots(); break; // MODIFIED (Added)
+        case 'baccarat': renderBaccarat(); break; // MODIFIED (Added)
+        case 'roulette': renderRoulette(); break; // MODIFIED (Added)
+        
+        // --- Roguelike Casino ---
+        case 'roguelike_buy_in': renderRoguelikeBuyInScreen(); break; // MODIFIED (Added)
+        case 'roguelike_hand_ui': renderRoguelikeHandUI(); break; // MODIFIED (Added)
+        case 'roguelike_results_ui': renderRoguelikeResultsUI(); break; // MODIFIED (Added)
+        case 'patron_skill_choice': 
+            // This is tricky, but renderRoguelikeGame() will fail. We need to re-render the skill choice.
+            // This assumes the skill pool is still on the player state (which it should be).
+            if (player.roguelikeBlackjackState && player.roguelikeBlackjackState.lastSkillPool) {
+                renderPatronSkillChoice(player.roguelikeBlackjackState.lastSkillPool);
+            } else {
+                renderArcaneCasino(); // Fallback
+            }
+            break;
+        case 'cash_out_prompt': renderCashOutPrompt(); break; // MODIFIED (Added)
+        case 'roguelike_shop': renderRoguelikeShop(); break; // MODIFIED (Added)
+
         default: renderTownSquare();
     }
 }
@@ -975,7 +1009,9 @@ function renderWildernessMenu() {
         const isUnlocked = player.level >= requiredLevel;
 
         html += `
-            <div class="p-4 bg-slate-800 rounded-lg ${!isUnlocked ? 'opacity-50' : ''}">
+            <div class="p-4 bg-slate-800 rounded-lg ${!isUnlocked ? 'opacity-50' : ''}" 
+                 onmouseover="showBiomeTooltip('${biomeKey}', event)" 
+                 onmouseout="hideTooltip()">
                 <div class="flex justify-between items-center">
                     <div>
                         <h3 class="font-bold text-yellow-300 text-lg">${biome.name}</h3>
@@ -2912,44 +2948,51 @@ function renderArcaneCasino() {
     lastViewBeforeInventory = 'casino_hub';
     gameState.currentView = 'casino_hub';
 
-    // Reset secret code sequence when entering casino
     if (typeof casinoSecretCode !== 'undefined') {
         casinoSecretCode = [];
     }
 
     let html = `
-    <div class="w-full text-center">
+    <div class="w-full max-w-4xl text-center">
         <h2 class="font-medieval text-3xl mb-4 text-center">
             The Crooked C<span data-char="A" class="casino-secret-char cursor-pointer hover:text-yellow-300">a</span>rd
         </h2>
         
-        <p class="text-gray-400 mb-6 max-w-md mx-auto">
+        <p class="text-gray-400 mb-8 max-w-3xl mx-auto">
             "Welcome. Only the truly <span data-char="B" class="casino-secret-char cursor-pointer hover:text-yellow-300">B</span>old win big here.
             This is no p<span data-char="L" class="casino-secret-char cursor-pointer hover:text-yellow-300">l</span><span data-char="A" class="casino-secret-char cursor-pointer hover:text-yellow-300">a</span>ce 
             for the timid. The Pa<span data-char="T" class="casino-secret-char cursor-pointer hover:text-yellow-300">t</span>ron 
             watches all, fav<span data-char="O" class="casino-secret-char cursor-pointer hover:text-yellow-300">o</span>ring those 
             who <span data-char="R" class="casino-secret-char cursor-pointer hover:text-yellow-300">r</span>isk everything."
         </p>
-        <div class="flex flex-col justify-center items-center gap-4">
-            <div class="flex flex-col md:flex-row justify-center items-center gap-4">
-                <button onclick="renderBlackjack()" class="btn btn-primary w-full md:w-auto">Play "Arcane 21"</button>
-                <button onclick="renderPoker()" class="btn btn-primary w-full md:w-auto">Play 5-Card Draw</button>
+        
+        <h3 class="font-medieval text-xl text-yellow-300 mb-3">Main Tables</h3>
+        <div class="grid grid-cols-2 justify-center items-center gap-4 mb-6">
+            <button onclick="renderBlackjack()" class="btn btn-primary">Play "Arcane 21"</button>
+            <button onclick="renderPoker()" class="btn btn-primary">Play "Wizard's Folly"</button>
+            <button onclick="renderBaccarat()" class="btn btn-primary">Play "Banker's Favor"</button>
+            <button onclick="renderRoulette()" class="btn btn-primary">Play "Spinner of Fate"</button>
             </div>
+
+        <h3 class="font-medieval text-xl text-yellow-300 mb-3">Other Games</h3>
+        <div class="flex flex-col justify-center items-center gap-4">
+            <button onclick="renderSlots()" class="btn btn-primary w-full md:w-3/4">Play "Arcane Slots"</button>
             
             <button id="roguelike-game-btn" onclick="renderRoguelikeGame()" 
-                    class="btn btn-primary w-full md:w-auto ${!player.unlocks.roguelikeCardGame ? 'hidden' : ''} border-2 border-purple-500 hover:bg-purple-700 hover:border-purple-400 focus:ring-2 focus:ring-purple-300">
+                    class="btn btn-primary w-full md:w-3/4 ${!player.unlocks.roguelikeCardGame ? 'hidden' : ''} border-2 border-purple-500 hover:bg-purple-700 hover:border-purple-400 focus:ring-2 focus:ring-purple-300">
                 Play "Le Tricheur"
             </button>
-            </div>
-            <div class="mt-8">
+        </div>
+
+        <div class="mt-8">
             <button onclick="renderArcaneQuarter()" class="btn btn-action">Back to Arcane Quarter</button>
         </div>
     </div>`;
+
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
     
-    // This function will now find all 7 new spans
     initCasinoSecret();
 }
 
@@ -3048,7 +3091,7 @@ function renderRoguelikeGame() {
 
 function renderRoguelikeBuyInScreen() {
     applyTheme('void');
-    lastViewBeforeInventory = 'casino_hub';
+    lastViewBeforeInventory = 'roguelike_buy_in';
     gameState.currentView = 'roguelike_game';
     const buyIn = player.roguelikeBlackjackState.buyIn;
 
@@ -3074,7 +3117,7 @@ function renderRoguelikeBuyInScreen() {
 
 function renderRoguelikeHandUI() {
     applyTheme('casino');
-    lastViewBeforeInventory = 'casino_hub';
+    lastViewBeforeInventory = 'roguelike_hand_ui';
     gameState.currentView = 'roguelike_game';
     
     const state = player.roguelikeBlackjackState;
@@ -3276,7 +3319,9 @@ function renderRoguelikeHandUI() {
 
 function renderRoguelikeResultsUI() {
     const state = player.roguelikeBlackjackState;
-    // Get current Vingt-un data
+    applyTheme('casino'); // Added this for theme consistency
+    lastViewBeforeInventory = 'roguelike_results_ui'; // MODIFIED
+    gameState.currentView = 'roguelike_game';
     const ante = ANTE_STRUCTURE[state.currentAnteIndex];
     const vingtUn = ante.vingtUns[state.currentVingtUnIndex];
     const targetChips = vingtUn.chipsToWin;
@@ -3365,7 +3410,7 @@ function renderRoguelikeResultsUI() {
 
 function renderPatronSkillChoice(skillPoolKeys) {
     applyTheme('void');
-    lastViewBeforeInventory = 'casino_hub';
+    lastViewBeforeInventory = 'patron_skill_choice';
     gameState.currentView = 'roguelike_game';
     
     const state = player.roguelikeBlackjackState;
@@ -3420,7 +3465,7 @@ function renderPatronSkillChoice(skillPoolKeys) {
  */
 function renderCashOutPrompt() {
     applyTheme('casino');
-    lastViewBeforeInventory = 'casino_hub';
+    lastViewBeforeInventory = 'cash_out_prompt';
     gameState.currentView = 'roguelike_game';
     
     const state = player.roguelikeBlackjackState;
@@ -3456,7 +3501,7 @@ function renderCashOutPrompt() {
 
 function renderRoguelikeShop() {
     applyTheme('void');
-    lastViewBeforeInventory = 'casino_hub';
+    lastViewBeforeInventory = 'roguelike_shop';
     gameState.currentView = 'roguelike_game';
     
     const state = player.roguelikeBlackjackState;
@@ -3682,7 +3727,7 @@ function renderRoguelikeShop() {
 // --- NEW BLACKJACK UI FUNCTIONS ---
 function renderBlackjack() {
     applyTheme('casino');
-    lastViewBeforeInventory = 'casino_hub'; // Go back to the casino hub
+    lastViewBeforeInventory = 'blackjack'; // Go back to the casino hub
     gameState.currentView = 'blackjack';
 
     // Reset game state when entering the table
@@ -3811,7 +3856,7 @@ function updateBlackjackUI() {
 
 function renderPoker() {
     applyTheme('casino');
-    lastViewBeforeInventory = 'casino_hub'; // Go back to the casino hub
+    lastViewBeforeInventory = 'poker';
     gameState.currentView = 'poker';
 
     // Reset game state when entering the table
@@ -3822,7 +3867,7 @@ function renderPoker() {
 
     let html = `
     <div class="w-full h-full flex flex-col text-center p-4">
-        <h2 class="font-medieval text-3xl mb-2">5-Card Draw Poker</h2>
+        <h2 class="font-medieval text-3xl mb-2">Wizard's Folly</h2>
         
         <!-- Pot Area -->
         <div class="my-2">
@@ -3984,6 +4029,417 @@ function togglePokerDiscard(cardIndex) {
         statusEl.textContent = `Selected ${pokerState.playerDiscards.length} card(s) to discard.`;
     }
 }
+
+function renderSlots() {
+    applyTheme('casino');
+    lastViewBeforeInventory = 'slots';
+    gameState.currentView = 'slots';
+
+    // Reset game state
+    slotState = {
+        reels: ['❓', '❓', '❓'], // Use '❓' as the initial symbol
+        bet: player.lastCasinoBet || 10,
+        gamePhase: 'betting',
+        statusMessage: 'Place your bet to spin.'
+    };
+
+    let html = `
+    <div class="w-full h-full flex flex-col text-center p-4">
+        <h2 class="font-medieval text-3xl mb-2">Arcane Slots</h2>
+        
+        <div class="mb-4">
+            <h3 class="font-bold text-xl text-yellow-300">Jackpot: ${PAYTABLE['💎💎💎']}x Bet</h3>
+            <div id="slot-reels" class="flex justify-center items-center h-32 bg-black/20 rounded-lg p-2 gap-4">
+                <div class="slot-reel-window"><div id="reel-strip-0" class="reel-strip"></div></div>
+                <div class="slot-reel-window"><div id="reel-strip-1" class="reel-strip"></div></div>
+                <div class="slot-reel-window"><div id="reel-strip-2" class="reel-strip"></div></div>
+            </div>
+        </div>
+
+        <div class="my-4">
+            <p id="slot-status" class="text-yellow-300 font-bold h-6">${slotState.statusMessage}</p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4 max-w-md mx-auto">
+            <div id="slot-betting-area" class="col-span-2 grid grid-cols-3 gap-2">
+                <input type="number" id="slot-bet-amount" value="${slotState.bet}" min="1" max="${player.gold}" class="col-span-2 bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                <button id="slot-spin-btn" onclick="startSlots(parseInt(document.getElementById('slot-bet-amount').value))" class="btn btn-primary">Spin</button>
+            </div>
+            
+            <button id="slot-spinning-btn" class="btn btn-primary col-span-2 hidden" disabled>
+                <svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                Spinning...
+            </button>
+        </div>
+
+        <div class="text-center mt-auto pt-4">
+            <button onclick="renderArcaneCasino()" class="btn btn-action">Leave Machine</button>
+        </div>
+    </div>`;
+    const container = document.createElement('div');
+    container.className = 'w-full h-full'; 
+    container.innerHTML = html;
+    render(container);
+    mainView.classList.remove('items-center', 'p-6');
+    mainView.classList.add('p-2');
+    
+    // --- NEW: Populate reels after rendering ---
+    populateSlotReels();
+    updateSlotUI(); // Call once to set initial state
+}
+
+// --- NEW HELPER: Populates the reel strips with symbols ---
+function populateSlotReels() {
+    if (gameState.currentView !== 'slots') return;
+    
+    // This is the full reel strip, repeated 4 times to ensure seamless looping
+    const fullStripSymbols = [...REELS, ...REELS, ...REELS, ...REELS];
+    const stripHtml = fullStripSymbols.map(s => `<div class="reel-symbol">${s}</div>`).join('');
+    
+    for (let i = 0; i < 3; i++) {
+        const strip = document.getElementById(`reel-strip-${i}`);
+        if (strip) {
+            strip.innerHTML = stripHtml;
+            // MODIFICATION: Set initial position to the *second* repetition (16 symbols)
+            // This matches the 'from' state of the CSS animation (-2048px)
+            const startIndex = REELS.length * 1; 
+            strip.style.transition = 'none'; // No animation for initial set
+            strip.style.transform = `translateY(-${startIndex * SLOT_SYMBOL_HEIGHT}px)`;
+        }
+    }
+}
+
+function updateSlotUI(isSpinning = false) { // isSpinning is now just for button state
+    if (gameState.currentView !== 'slots') return;
+
+    const state = slotState;
+    const reelsEl = document.getElementById('slot-reels'); // We only need the container
+    const statusEl = document.getElementById('slot-status');
+    const betArea = document.getElementById('slot-betting-area');
+    const spinBtn = document.getElementById('slot-spin-btn');
+    const spinningBtn = document.getElementById('slot-spinning-btn');
+
+    if (!reelsEl || !statusEl || !betArea || !spinBtn || !spinningBtn) return;
+
+    // --- REMOVED: All reel innerHTML logic ---
+    // The reels are now controlled by CSS transform in determineSlotWinner
+
+    // Update Status
+    statusEl.textContent = state.statusMessage;
+
+    // Update Button States
+    const isBettingPhase = state.gamePhase === 'betting' || state.gamePhase === 'results';
+    betArea.style.display = isBettingPhase ? 'grid' : 'none';
+    spinningBtn.style.display = state.gamePhase === 'spinning' ? 'flex' : 'none';
+    
+    const betInput = document.getElementById('slot-bet-amount');
+    if (betInput) betInput.max = player.gold;
+    
+    if (state.gamePhase === 'results') {
+        spinBtn.textContent = 'Spin Again';
+    } else {
+        spinBtn.textContent = 'Spin';
+    }
+}
+
+// --- NEW BACCARAT RENDERER (STUB) ---
+function renderBaccarat() {
+    applyTheme('casino');
+    lastViewBeforeInventory = 'baccarat';
+    gameState.currentView = 'baccarat';
+    
+    // Reset game state
+    baccaratState = {
+        deck: [], playerHand: [], bankerHand: [], playerScore: 0, bankerScore: 0,
+        bet: 0, betOn: null, gamePhase: 'betting',
+        statusMessage: 'Place your bet to begin.'
+    };
+
+    let html = `
+    <div class="w-full h-full flex flex-col text-center p-4">
+        <h2 class="font-medieval text-3xl mb-2">Baccarat</h2>
+        
+        <div class="my-2">
+            <h3 class="font-bold text-xl text-yellow-300">Payouts: Player (1:1), Banker (0.95:1), Tie (8:1)</h3>
+        </div>
+
+        <div class="mb-4">
+            <h3 class="font-bold text-xl text-red-400">Banker Hand (<span id="baccarat-banker-score">0</span>)</h3>
+            <div id="baccarat-banker-hand" class="flex justify-center items-center h-24 bg-black/20 rounded-lg p-2 text-4xl gap-2">
+                </div>
+        </div>
+
+        <div class="mb-4">
+            <h3 class="font-bold text-xl text-green-400">Player Hand (<span id="baccarat-player-score">0</span>)</h3>
+            <div id="baccarat-player-hand" class="flex justify-center items-center h-24 bg-black/20 rounded-lg p-2 text-4xl gap-2">
+                </div>
+        </div>
+
+        <div class="my-4">
+            <p id="baccarat-status" class="text-yellow-300 font-bold h-6">${baccaratState.statusMessage}</p>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-4 max-w-md mx-auto">
+            <div id="baccarat-betting-area" class="col-span-3 grid grid-cols-3 gap-2">
+                <input type="number" id="baccarat-bet-amount" value="${player.lastCasinoBet || 10}" min="1" max="${player.gold}" class="col-span-3 bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                <button id="baccarat-bet-player" class="btn btn-primary">Bet on Player</button>
+                <button id="baccarat-bet-banker" class="btn btn-primary">Bet on Banker</button>
+                <button id="baccarat-bet-tie" class="btn btn-primary">Bet on Tie</button>
+            </div>
+            
+            <button id="baccarat-play-again-btn" onclick="renderBaccarat()" class="btn btn-primary col-span-3 hidden">Play Again</button>
+        </div>
+
+        <div class="text-center mt-auto pt-4">
+            <button onclick="renderArcaneCasino()" class="btn btn-action">Leave Table</button>
+        </div>
+    </div>`;
+    const container = document.createElement('div');
+    container.className = 'w-full'; // Remove h-full
+    container.innerHTML = html;
+    render(container);
+    
+    // Add event listeners for bet buttons
+    document.getElementById('baccarat-bet-player').onclick = () => startBaccarat(parseInt(document.getElementById('baccarat-bet-amount').value), 'player');
+    document.getElementById('baccarat-bet-banker').onclick = () => startBaccarat(parseInt(document.getElementById('baccarat-bet-amount').value), 'banker');
+    document.getElementById('baccarat-bet-tie').onclick = () => startBaccarat(parseInt(document.getElementById('baccarat-bet-amount').value), 'tie');
+
+    updateBaccaratUI(); // Call once to set initial state
+}
+
+// --- MODIFIED: Replaced stub with full function ---
+function updateBaccaratUI() {
+    if (gameState.currentView !== 'baccarat') return;
+
+    const state = baccaratState;
+    const bankerHandEl = document.getElementById('baccarat-banker-hand');
+    const playerHandEl = document.getElementById('baccarat-player-hand');
+    const bankerScoreEl = document.getElementById('baccarat-banker-score');
+    const playerScoreEl = document.getElementById('baccarat-player-score');
+    const statusEl = document.getElementById('baccarat-status');
+    
+    const betArea = document.getElementById('baccarat-betting-area');
+    const playAgainBtn = document.getElementById('baccarat-play-again-btn');
+
+    if (!bankerHandEl || !playerHandEl || !bankerScoreEl || !playerScoreEl || !statusEl || !betArea || !playAgainBtn) {
+        console.error("Baccarat UI elements are missing!");
+        return;
+    }
+
+    // Render Hands
+    playerHandEl.innerHTML = state.playerHand.map(card => {
+        const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
+        return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`;
+    }).join('');
+    
+    bankerHandEl.innerHTML = state.bankerHand.map(card => {
+        const suitColorClass = (card.suit === '♥' || card.suit === '♦') ? 'text-red-600' : 'text-black';
+        return `<div class="bg-white ${suitColorClass} p-2 rounded-md shadow-md">${card.value}${card.suit}</div>`;
+    }).join('');
+
+    // Render Scores
+    playerScoreEl.textContent = state.playerScore;
+    bankerScoreEl.textContent = state.bankerScore;
+
+    // Update Status
+    statusEl.textContent = state.statusMessage;
+
+    // Update Button States
+    betArea.style.display = (state.gamePhase === 'betting') ? 'grid' : 'none';
+    playAgainBtn.style.display = (state.gamePhase === 'results') ? 'block' : 'none';
+
+    // Update bet input max
+    const betInput = document.getElementById('baccarat-bet-amount');
+    if (betInput) betInput.max = player.gold;
+}
+
+// --- NEW ROULETTE RENDERER (STUB) ---
+function renderRoulette() {
+    applyTheme('casino');
+    lastViewBeforeInventory = 'roulette';
+    gameState.currentView = 'roulette';
+    
+    // Reset game state
+    rouletteState = {
+        betAmountPerChip: player.lastCasinoBet || 10,
+        bets: {},
+        totalBet: 0,
+        gamePhase: 'betting',
+        statusMessage: 'Place your bets!',
+        winningNumber: null
+    };
+
+    let html = `
+    <div class="w-full h-full flex flex-col text-center p-2">
+        <h2 class="font-medieval text-3xl mb-2">Roulette</h2>
+        
+        <div class="flex justify-between items-center mb-2 px-2">
+            <div id="roulette-result-display" class="text-white">--</div>
+            <p id="roulette-status" class="text-yellow-300 font-bold flex-grow text-center text-lg">${rouletteState.statusMessage}</p>
+        </div>
+
+        <div id="roulette-betting-area" class="flex flex-col sm:flex-row justify-center items-center gap-2 mb-2">
+            <label for="roulette-bet-amount" class="font-bold">Bet per Click:</label>
+            <input type="number" id="roulette-bet-amount" value="${rouletteState.betAmountPerChip}" min="1" max="${player.gold}" 
+                   class="w-24 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1 text-lg text-center">
+            <button onclick="clearRouletteBets()" class="btn btn-action text-sm py-1 px-3">Clear Bets</button>
+            <p class="font-bold text-lg">Total Bet: <span id="roulette-total-bet" class="text-yellow-300">0</span> G</p>
+        </div>
+        
+        <div class="roulette-container mx-auto mb-2">
+            ${_buildRouletteTable()}
+        </div>
+
+        <div id="roulette-play-controls" class="flex justify-center gap-4">
+            <button id="roulette-spin-btn" onclick="spinRouletteWheel()" class="btn btn-primary text-lg px-6">Spin</button>
+            <button id="roulette-play-again-btn" onclick="renderRoulette()" class="btn btn-primary text-lg px-6 hidden">Play Again</button>
+        </div>
+        
+        <div class="text-center mt-auto pt-2">
+            <button id="roulette-leave-btn" onclick="renderArcaneCasino()" class="btn btn-action">Leave Table</button>
+        </div>
+    </div>`;
+    const container = document.createElement('div');
+    container.className = 'w-full'; // Remove h-full
+    container.innerHTML = html;
+    render(container);
+    
+    // Update bet amount when input changes
+    document.getElementById('roulette-bet-amount').addEventListener('change', (e) => {
+        let amount = parseInt(e.target.value);
+        if (isNaN(amount) || amount < 1) amount = 1;
+        if (amount > player.gold) amount = player.gold;
+        rouletteState.betAmountPerChip = amount;
+        e.target.value = amount;
+        recalculateTotalRouletteBet();
+        updateRouletteUI();
+    });
+    
+    updateRouletteUI(); // Call once to set initial state
+}
+
+// --- NEW HELPER to build the table ---
+function _buildRouletteTable() {
+    let html = '<div class="roulette-table">';
+    
+    // ... (Row 1, 2, 3 - Numbers 1-36 - are unchanged) ...
+    // 0 Cell
+    html += `<div id="roulette-cell-0" class="roulette-cell green" style="grid-column: 1 / span 1; grid-row: 1 / span 3;" onclick="placeRouletteBet('straight_0')">
+                0<span id="bet-chip-straight_0" class="bet-chip-count"></span>
+             </div>`;
+    // Top row of numbers
+    for (let i = 0; i < 12; i++) {
+        const number = (i * 3) + 3; // 3, 6, 9, ... 36
+        const numInfo = ROULETTE_NUMBERS[number];
+        html += `<div id="roulette-cell-${number}" class="roulette-cell ${numInfo.color}" style="grid-column: ${i + 2} / span 1; grid-row: 1 / span 1;" onclick="placeRouletteBet('straight_${number}')">
+                    ${number}<span id="bet-chip-straight_${number}" class="bet-chip-count"></span>
+                 </div>`;
+    }
+    // ... (Row 2 and 3 number loops) ...
+    for (let i = 0; i < 12; i++) {
+        const number = (i * 3) + 2; // 2, 5, 8, ... 35
+        const numInfo = ROULETTE_NUMBERS[number];
+        html += `<div id="roulette-cell-${number}" class="roulette-cell ${numInfo.color}" style="grid-column: ${i + 2} / span 1; grid-row: 2 / span 1;" onclick="placeRouletteBet('straight_${number}')">
+                    ${number}<span id="bet-chip-straight_${number}" class="bet-chip-count"></span>
+                 </div>`;
+    }
+    for (let i = 0; i < 12; i++) {
+        const number = (i * 3) + 1; // 1, 4, 7, ... 34
+        const numInfo = ROULETTE_NUMBERS[number];
+        html += `<div id="roulette-cell-${number}" class="roulette-cell ${numInfo.color}" style="grid-column: ${i + 2} / span 1; grid-row: 3 / span 1;" onclick="placeRouletteBet('straight_${number}')">
+                    ${number}<span id="bet-chip-straight_${number}" class="bet-chip-count"></span>
+                 </div>`;
+    }
+
+    // --- Row 4: Column & Dozen Bets ---
+    // ... (Column and Dozen bets are unchanged) ...
+    html += `<div id="roulette-cell-col3" class="roulette-cell outside" style="grid-column: 2 / span 4; grid-row: 4 / span 1;" onclick="placeRouletteBet('col3')">Col 3 (2:1)<span id="bet-chip-col3" class="bet-chip-count"></span></div>`;
+    html += `<div id="roulette-cell-col2" class="roulette-cell outside" style="grid-column: 6 / span 4; grid-row: 4 / span 1;" onclick="placeRouletteBet('col2')">Col 2 (2:1)<span id="bet-chip-col2" class="bet-chip-count"></span></div>`;
+    html += `<div id="roulette-cell-col1" class="roulette-cell outside" style="grid-column: 10 / span 4; grid-row: 4 / span 1;" onclick="placeRouletteBet('col1')">Col 1 (2:1)<span id="bet-chip-col1" class="bet-chip-count"></span></div>`;
+    html += `<div id="roulette-cell-1st12" class="roulette-cell outside" style="grid-column: 2 / span 4; grid-row: 5 / span 1;" onclick="placeRouletteBet('1st12')">1st 12<span id="bet-chip-1st12" class="bet-chip-count"></span></div>`;
+    html += `<div id="roulette-cell-2nd12" class="roulette-cell outside" style="grid-column: 6 / span 4; grid-row: 5 / span 1;" onclick="placeRouletteBet('2nd12')">2nd 12<span id="bet-chip-2nd12" class="bet-chip-count"></span></div>`;
+    html += `<div id="roulette-cell-3rd12" class="roulette-cell outside" style="grid-column: 10 / span 4; grid-row: 5 / span 1;" onclick="placeRouletteBet('3rd12')">3rd 12<span id="bet-chip-3rd12" class="bet-chip-count"></span></div>`;
+
+    // --- Row 5: Outside Bets (below 0) ---
+    // MODIFICATION: Changed ID from '1-18' to 'low'
+    html += `<div id="roulette-cell-low" class="roulette-cell outside" style="grid-column: 1 / span 1; grid-row: 4 / span 1;" onclick="placeRouletteBet('low')">1-18<span id="bet-chip-low" class="bet-chip-count"></span></div>`;
+    html += `<div id="roulette-cell-even" class="roulette-cell outside" style="grid-column: 1 / span 1; grid-row: 5 / span 1;" onclick="placeRouletteBet('even')">Even<span id="bet-chip-even" class="bet-chip-count"></span></div>`;
+    
+    // --- Row 5: Outside Bets (below Dozens) ---
+    html += `<div id="roulette-cell-red" class="roulette-cell outside red" style="grid-column: 2 / span 4; grid-row: 6 / span 1;" onclick="placeRouletteBet('red')">Red<span id="bet-chip-red" class="bet-chip-count"></span></div>`;
+    html += `<div id="roulette-cell-black" class="roulette-cell outside black" style="grid-column: 6 / span 4; grid-row: 6 / span 1;" onclick="placeRouletteBet('black')">Black<span id="bet-chip-black" class="bet-chip-count"></span></div>`;
+    html += `<div id="roulette-cell-odd" class="roulette-cell outside" style="grid-column: 10 / span 4; grid-row: 6 / span 1;" onclick="placeRouletteBet('odd')">Odd<span id="bet-chip-odd" class="bet-chip-count"></span></div>`;
+    
+    // MODIFICATION: Changed ID from '19-36' to 'high'
+    html += `<div id="roulette-cell-high" class="roulette-cell outside" style="grid-column: 10 / span 4; grid-row: 7 / span 1;" onclick="placeRouletteBet('high')">19-36<span id="bet-chip-high" class="bet-chip-count"></span></div>`;
+
+    html += '</div>';
+    return html;
+}
+
+// --- MODIFIED: Replaced stub with full function ---
+function updateRouletteUI(isSpinning = false, spinningNumber = null) {
+    if (gameState.currentView !== 'roulette') return;
+
+    const state = rouletteState;
+    const isBetting = state.gamePhase === 'betting';
+    const isResults = state.gamePhase === 'results';
+
+    // Update Status
+    document.getElementById('roulette-status').textContent = state.statusMessage;
+    
+    // Update Result Display
+    const resultEl = document.getElementById('roulette-result-display');
+    if (isSpinning && spinningNumber !== null) {
+        const numInfo = ROULETTE_NUMBERS[spinningNumber];
+        resultEl.textContent = spinningNumber;
+        resultEl.className = `roulette-cell ${numInfo.color}`;
+    } else if (isResults && state.winningNumber !== null) {
+        const numInfo = ROULETTE_NUMBERS[state.winningNumber];
+        resultEl.textContent = state.winningNumber;
+        resultEl.className = `roulette-cell ${numInfo.color}`;
+    } else {
+        resultEl.textContent = '--';
+        resultEl.className = 'roulette-cell';
+    }
+
+    // Update Total Bet
+    document.getElementById('roulette-total-bet').textContent = state.totalBet;
+
+    // Update Bet Input
+    document.getElementById('roulette-bet-amount').disabled = !isBetting;
+    
+    // Update Clear Bet Button
+    document.querySelector('button[onclick="clearRouletteBets()"]').disabled = !isBetting;
+
+    // --- NEW: Clear winning/spin classes on new bet ---
+    if (isBetting) {
+        document.querySelectorAll('.roulette-cell.winner').forEach(c => c.classList.remove('winner'));
+        document.querySelectorAll('.roulette-cell.spin-active').forEach(c => c.classList.remove('spin-active'));
+    }
+    // --- END NEW ---
+
+    // Update Bet Chips on table
+    document.querySelectorAll('.bet-chip-count').forEach(span => {
+        const betType = span.id.replace('bet-chip-', '');
+        const count = state.bets[betType] || 0;
+        span.textContent = count > 0 ? `x${count}` : '';
+    });
+    
+    // Update Table Clickability
+    document.querySelectorAll('.roulette-cell').forEach(cell => {
+        cell.classList.toggle('disabled', !isBetting);
+    });
+
+    // Update Play Buttons
+    document.getElementById('roulette-spin-btn').style.display = (isBetting || isSpinning) ? 'block' : 'none';
+    document.getElementById('roulette-spin-btn').disabled = !isBetting || state.totalBet === 0;
+    document.getElementById('roulette-play-again-btn').style.display = isResults ? 'block' : 'none';
+    
+    // Update Leave Button
+    document.getElementById('roulette-leave-btn').disabled = isSpinning;
+}
+
 function renderWitchsCoven(subView = 'main') {
     applyTheme('necropolis');
     lastViewBeforeInventory = 'witchs_coven';
@@ -4169,6 +4625,28 @@ function renderQuestBoard() {
 
     if (player.activeQuest) {
         const quest = getQuestDetails(player.activeQuest);
+        
+        // --- THIS IS THE FIX ---
+        if (!quest) {
+            // This happens if the player has an active quest in their save
+            // that no longer exists in the game data (e.g., it was deleted).
+            addToLog("Your active quest was invalid or outdated and has been cleared.", "text-yellow-400");
+            player.activeQuest = null;
+            player.questProgress = 0;
+            saveGame(); // Save the cleared quest state
+            
+            // Re-render the quest board now that the quest is cleared
+            // We do this in a setTimeout to avoid a recursive loop in the same stack frame
+            setTimeout(renderQuestBoard, 0); 
+            
+            // Render a temporary "loading" state to avoid errors
+            const container = document.createElement('div');
+            container.innerHTML = html + `<p class="text-center text-gray-400">Refreshing quest board...</p></div>`;
+            render(container);
+            return; // Stop execution
+        }
+        // --- END FIX ---
+
         let progress = player.questProgress;
         let canComplete = progress >= quest.required;
 

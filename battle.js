@@ -2794,6 +2794,14 @@ function checkVictory() {
         gameState.markedTarget = null; // Clear mark on victory
         addToLog(`All enemies defeated!`, 'text-green-400 font-bold');
 
+        // --- NEW: Increment Biome Clears ---
+        if (gameState.currentBiome && preTrainingState === null) {
+            if (!player.biomeClears) player.biomeClears = {}; // Safety check
+            player.biomeClears[gameState.currentBiome] = (player.biomeClears[gameState.currentBiome] || 0) + 1;
+            console.log(`Biome ${gameState.currentBiome} clears: ${player.biomeClears[gameState.currentBiome]}`);
+        }
+        // --- END NEW ---
+
         // Handle tutorial battle end
         const isTutorialBattle = tutorialState.isActive && tutorialState.sequence[tutorialState.currentIndex]?.trigger?.type === 'enemy_death';
         if (isTutorialBattle) {
