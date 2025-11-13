@@ -33,6 +33,17 @@ function getItemDetails(itemKey) {
     if (typeof LURES !== 'undefined' && LURES && LURES[itemKey]) {
         return LURES[itemKey];
     }
+    // --- ADDED NEW CASINO CHECKS ---
+    if (typeof BJ_ARCANA_RITUALS !== 'undefined' && BJ_ARCANA_RITUALS && BJ_ARCANA_RITUALS[itemKey]) {
+        return BJ_ARCANA_RITUALS[itemKey];
+    }
+    if (typeof BJ_CONJURE_PACKS !== 'undefined' && BJ_CONJURE_PACKS && BJ_CONJURE_PACKS[itemKey]) {
+        return BJ_CONJURE_PACKS[itemKey];
+    }
+    if (typeof BJ_ARCANA_PACKS !== 'undefined' && BJ_ARCANA_PACKS && BJ_ARCANA_PACKS[itemKey]) { // <-- THIS BLOCK IS NEW
+        return BJ_ARCANA_PACKS[itemKey];
+    }
+    // --- END NEW CHECKS ---
     if (typeof SPELLS !== 'undefined' && SPELLS && SPELLS[itemKey]) {
         // Spells might need different handling if structure varies,
         // but for tooltip purposes, returning the base object might be okay.

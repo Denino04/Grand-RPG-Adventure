@@ -382,6 +382,7 @@ class Player extends Entity {
         this.roguelikeBlackjackState = {
             runActive: false,
             buyIn: 500,
+            highestAnteCleared: 0, // <-- ADD THIS LINE
             currentAnteIndex: 0,
             currentVingtUnIndex: 0,
             currentCrookards: 0,

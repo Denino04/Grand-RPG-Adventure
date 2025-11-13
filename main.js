@@ -763,10 +763,74 @@ async function loadGameFromKey(docId, isImport = false) {
                     gamePhase: 'buy_in',
                     statusMessage: '',
                     shopStock: [],
-                };
+                    masterDeckList: [],
+                    discardPile: [],
+                    shopLockedSlots: [],
+                    shopLockCost: 2,
+                    deckAbilities: {},      // For deck-wide buffs like Polychrome
+                    cardEnhancements: {}, // Stores ability per unique card ID
+                    cardPairs: [],          // Stores pairs of unique card IDs for Lovers
+                    purchasedArcana: [],    // <-- ADD THIS LINE
+                    conjurePackDisplay: { packKey: null, cards: [], chosenIndices: [] }
+                }
             }
+            if (player.roguelikeBlackjackState.patronSkills === undefined) {
+                console.log("Migrating old roguelike state: Adding missing patronSkills array.");
+                player.roguelikeBlackjackState.patronSkills = [];
+            }
+            // --- NEW MIGRATION FOR DECK UNLOCKS ---
+            if (player.roguelikeBlackjackState.highestAnteCleared === undefined) {
+                // If the value doesn't exist, migrate it.
+                // currentAnteIndex (0-based) is the ante they are *on*.
+                // So, highestAnteCleared (number of cleared antes) should be equal to currentAnteIndex.
+                player.roguelikeBlackjackState.highestAnteCleared = player.roguelikeBlackjackState.currentAnteIndex || 0;
+                console.log(`Migrating old save: Set highestAnteCleared to ${player.roguelikeBlackjackState.highestAnteCleared}`);
+            }
+            // --- END MIGRATION ---
+            if (player.roguelikeBlackjackState.masterDeckList === undefined) {
+                console.log("Migrating old roguelike state: Adding missing masterDeckList array.");
+                player.roguelikeBlackjackState.masterDeckList = [];
+            }
+            if (player.roguelikeBlackjackState.discardPile === undefined) {
+                player.roguelikeBlackjackState.discardPile = [];
+            }
+            // --- ADD THESE LINES ---
+            if (player.roguelikeBlackjackState.deckAbilities === undefined) {
+                player.roguelikeBlackjackState.deckAbilities = {};
+            }
+            if (player.roguelikeBlackjackState.cardEnhancements === undefined) {
+                player.roguelikeBlackjackState.cardEnhancements = {};
+            }
+            if (player.roguelikeBlackjackState.cardPairs === undefined) {
+                player.roguelikeBlackjackState.cardPairs = [];
+            }
+            if (player.roguelikeBlackjackState.purchasedArcana === undefined) {
+                console.log("Migrating old roguelike state: Adding missing purchasedArcana array.");
+                player.roguelikeBlackjackState.purchasedArcana = [];
+            }
+            if (player.roguelikeBlackjackState.shopLockedSlots === undefined) {
+                console.log("Migrating old roguelike state: Adding missing shopLockedSlots array.");
+                player.roguelikeBlackjackState.shopLockedSlots = [];
+            }
+            if (player.roguelikeBlackjackState.shopLockCost === undefined) {
+                console.log("Migrating old roguelike state: Adding default shopLockCost.");
+                player.roguelikeBlackjackState.shopLockCost = 2;
+            }
+            // --- END ADDITION ---
+            if (player.roguelikeBlackjackState.conjurePackDisplay === undefined) {
+                console.log("Migrating old roguelike state: Adding missing conjurePackDisplay object.");
+                player.roguelikeBlackjackState.conjurePackDisplay = { packKey: null, cards: [], chosenIndices: [] };
+            }
+            if (player.roguelikeBlackjackState.arcanaPackDisplay === undefined) { player.roguelikeBlackjackState.arcanaPackDisplay = null; }
+            if (player.roguelikeBlackjackState.arcanaSelection === undefined) { player.roguelikeBlackjackState.arcanaSelection = null; }
+            if (player.roguelikeBlackjackState.arcanaSelection === undefined) { player.roguelikeBlackjackState.arcanaSelection = null; }
+            if (player.roguelikeBlackjackState.playerFinalEval === undefined) { player.roguelikeBlackjackState.playerFinalEval = null; }
+            if (player.roguelikeBlackjackState.dealerFinalEval === undefined) { player.roguelikeBlackjackState.dealerFinalEval = null; }
             // --- END NEW ---
         }
+        // --- ADD THESE LINES for migration ---
+
+            // --- END ADDED LINES ---
             // --- END NPC ALLY ---
         // --- End Added ---
                 // --- NEW: Retroactive Unlock Fix for saves that have 'false' ---

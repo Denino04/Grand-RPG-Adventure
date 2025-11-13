@@ -1,4 +1,66 @@
 // casino_data.js
+const DECK_DEFINITIONS = {
+    'base_deck': {
+        name: "Standard Deck",
+        description: "A standard 52-card deck. Balanced and predictable.",
+        composition: {
+            values: ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'],
+            suits: ['♠', '♥', '♦', '♣']
+        }
+    },
+    'pebble_deck': {
+        name: "Pebble Deck",
+        description: "Contains only low-value cards (A, 2-7). Hard to bust, harder to win.",
+        composition: {
+            values: ['A', '2', '3', '4', '5', '6', '7'],
+            suits: ['♠', '♥', '♦', '♣']
+        }
+    },
+    'unstable_deck': {
+        name: "Unstable Deck (Odd)",
+        description: "Contains only Odd-valued cards (A, 3, 5, 7, 9, Q). No 10-value cards.",
+        composition: {
+            values: ['A', '3', '5', '7', '9', 'Q'],
+            suits: ['♠', '♥', '♦', '♣']
+        }
+    },
+    'stable_deck': {
+        name: "Stable Deck (Even)",
+        description: "Contains only Even-valued cards (2, 4, 6, 8, 10, J, K). No Aces.",
+        composition: {
+            values: ['2', '4', '6', '8', '10', 'J', 'K'],
+            suits: ['♠', '♥', '♦', '♣']
+        }
+    },
+    'greed_deck': {
+        name: "Greed Deck",
+        description: "Contains only high-value cards (A, 7-K). Hitting is a deadly gamble.",
+        composition: {
+            values: ['A', '7', '8', '9', '10', 'J', 'Q', 'K'],
+            suits: ['♠', '♥', '♦', '♣']
+        }
+    },
+    'blighted_deck': {
+        name: "Blighted Deck",
+        description: "A 52-card deck tainted with 4 'Blight' cards. Blight is worth 0, but causes the next card drawn to double its value.",
+        composition: {
+            values: ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'],
+            suits: ['♠', '♥', '♦', '♣'],
+            special_cards: [
+                { id: 'blight', value: 'Blight', suit: 'Special', weight: 0, count: 4 }
+            ]
+        }
+    },
+    'glass_deck': {
+        name: "Glass Deck (All or Nothing)",
+        description: "A 32-card deck containing only 16 Aces and 16 10-value cards. No Jokers.",
+        composition: {
+            values: ['A', '10', 'J', 'Q', 'K'],
+            suits: ['♠', '♥', '♦', '♣'],
+            card_multipliers: { 'A': 4 } // 4x Aces, 1x 10-cards = 16 of each
+        }
+    }
+};
 
 const ANTE_STRUCTURE = [
     // --- Ante 1 (Intro) - UNTOUCHED ---
@@ -18,7 +80,7 @@ const ANTE_STRUCTURE = [
         vingtUns: [
             { name: 'Petit', chipsToWin: 200, hands: 5, rerolls: 3 },
             { name: 'Grand', chipsToWin: 400, hands: 5, rerolls: 3 },
-            { name: 'Patron', chipsToWin: 800, hands: 5, rerolls: 3, patronSkillPool: ['High Roller\'s Intuition', 'Perfect Start', 'Golden Hand'] }
+            { name: 'Patron', chipsToWin: 800, hands: 5, rerolls: 3, patronSkillPool: ['High Roller Intuition', 'Perfect Start', 'Golden Hand'] }
         ]
     },
     // --- Ante 3 (Scaled) ---
@@ -48,7 +110,7 @@ const ANTE_STRUCTURE = [
         vingtUns: [
             { name: 'Petit', chipsToWin: 2000, hands: 4, rerolls: 2 },
             { name: 'Grand', chipsToWin: 4000, hands: 4, rerolls: 2 },
-            { name: 'Patron', chipsToWin: 8000, hands: 4, rerolls: 2, patronSkillPool: ['High Roller\'s Intuition', 'Jester\'s Gambit', 'Golden Hand'] }
+            { name: 'Patron', chipsToWin: 8000, hands: 4, rerolls: 2, patronSkillPool: ['High Roller Intuition', 'Jester Gambit', 'Golden Hand'] }
         ]
     },
     // --- Ante 6 (Scaled) ---
@@ -78,10 +140,238 @@ const ANTE_STRUCTURE = [
         vingtUns: [
             { name: 'Petit', chipsToWin: 15000, hands: 3, rerolls: 1 },
             { name: 'Grand', chipsToWin: 30000, hands: 3, rerolls: 1 },
-            { name: 'Patron', chipsToWin: 60000, hands: 3, rerolls: 1, patronSkillPool: ['Escalating Stakes', 'Jester\'s Gambit', 'Joker\'s Wild'] }
+            { name: 'Patron', chipsToWin: 60000, hands: 3, rerolls: 1, patronSkillPool: ['Escalating Stakes', 'Jester Gambit', 'Joker Wild'] }
         ]
     }
 ];
+
+const BJ_CONJURE_PACKS = {
+    'pack_small': {
+        name: "Glimpse Fate",
+        desc: "The shaman conjures 3 random cards from the ether. You may choose 1 to add to your deck.",
+        cost: 5,
+        conjure: 3,
+        choose: 1,
+        type: 'conjure', // <-- ADD THIS
+        rarity: 1,       // <-- ADD THIS (Common)
+        flavor: "The shaman parts the veil for but a moment..." // <-- ADDED FLAVOR
+    },
+    'pack_medium': {
+        name: "Read the Tapestry",
+        desc: "The shaman reveals 5 strands of fate. You may choose 2 to weave into your deck.",
+        cost: 8,
+        conjure: 5,
+        choose: 2,
+        type: 'conjure', // <-- ADD THIS
+        rarity: 2,       // <-- ADD THIS (Uncommon)
+        flavor: "The threads of destiny are laid bare for you to see." // <-- ADDED FLAVOR
+    },
+    'pack_large': {
+        name: "Seize Destiny",
+        desc: "The shaman parts the veil, revealing 8 potential paths. You may seize 3 to bind to your deck.",
+        cost: 12,
+        conjure: 8,
+        choose: 3,
+        type: 'conjure', // <-- ADD THIS
+        rarity: 3,       // <-- ADD THIS (Rare)
+        flavor: "Fate is not a river, but a sea. Choose your current." // <-- ADDED FLAVOR
+    }
+};
+
+const BJ_ARCANA_PACKS = {
+    'pack_arcana_small': {
+        name: "Minor Arcana",
+        desc: "The shaman reveals 2 Arcana. You may choose 1 to bind to your fate.",
+        cost: 10,
+        conjure: 2,
+        choose: 1,
+        type: 'arcana_pack',
+        rarity: 2, // Uncommon
+        flavor: "A small glimpse into the patterns of power."
+    },
+    'pack_arcana_medium': {
+        name: "Major Arcana",
+        desc: "The shaman reveals 3 Arcana. You may choose 1 to bind to your fate.",
+        cost: 15,
+        conjure: 3,
+        choose: 1,
+        type: 'arcana_pack',
+        rarity: 3, // Rare
+        flavor: "The threads of destiny are clearer now."
+    },
+    'pack_arcana_large': {
+        name: "True Arcana",
+        desc: "The shaman reveals 5 Arcana. You may choose 1 to bind to your fate.",
+        cost: 20,
+        conjure: 5,
+        choose: 1,
+        type: 'arcana_pack',
+        rarity: 4, // Epic
+        flavor: "The full, unbridled truth of the cards is laid bare."
+    }
+};
+
+const BJ_ARCANA_RITUALS = {
+    // --- Enhancements (Pick one card) ---
+    'arcana_strength': {
+        name: 'Arcana VIII: Strength',
+        desc: '(Enhancement) Choose one card in your deck. It permanently grants +50 Base Chips when played.',
+        cost: 7, type: 'arcana', rarity: 2, subType: 'enhancement',
+        apply: (card) => { card.ability = 'strength'; card.abilityName = 'Enhanced'; },
+        flavor: '"Inner Power."'
+    },
+    'arcana_emperor': {
+        name: 'Arcana IV: The Emperor',
+        desc: '(Enhancement) Enhance 1 Face Card (J,Q,K). It permanently grants double its Base Chip value (+10 Chips) when scored.',
+        cost: 8, type: 'arcana', rarity: 3, subType: 'enhancement',
+        apply: (card) => { card.ability = 'emperor'; card.abilityName = 'Imperial'; },
+        flavor: '"Authority."'
+    },
+    'arcana_star': {
+        name: 'Arcana XVII: The Star',
+        desc: '(Enhancement) Choose one card in your deck. It permanently grants +4 Multiplier when played.',
+        cost: 7, type: 'arcana', rarity: 2, subType: 'enhancement',
+        apply: (card) => { card.ability = 'star'; card.abilityName = 'Illuminated'; },
+        flavor: '"Guiding Light."'
+    },
+    'arcana_justice': {
+        name: 'Arcana XI: Justice',
+        desc: '(Ritual) Choose 2 cards. They are now considered both a Face Card (Royal) and a Non-Face Card (Peasant) for all passive checks.',
+        cost: 8, type: 'arcana', rarity: 2, subType: 'ritual_pick_2_enhance',
+        apply: (card) => { card.ability = 'justice'; card.abilityName = 'Balanced'; },
+        flavor: '"Balance."'
+    },
+    'arcana_chariot': {
+        name: 'Arcana VII: The Chariot',
+        desc: '(Enhancement) Choose one card. When played, it grants +5 Base Chips for every Hand remaining in this Vingt-un.',
+        cost: 7, type: 'arcana', rarity: 2, subType: 'enhancement',
+        apply: (card) => { card.ability = 'chariot'; card.abilityName = 'Driven'; },
+        flavor: '"Momentum."'
+    },
+    'arcana_sun': {
+        name: 'Arcana XIX: The Sun',
+        desc: '(Enhancement) Choose one card. It permanently applies a x2 Multiplier when played.',
+        cost: 10, type: 'arcana', rarity: 3, subType: 'enhancement',
+        apply: (card) => { card.ability = 'sun'; card.abilityName = 'Solar'; },
+        flavor: '"Radiance."'
+    },
+    'arcana_devil': {
+        name: 'Arcana XV: The Devil',
+        desc: '(Enhancement) Choose one card. It is now considered a Joker for all passive checks, but retains its original value.',
+        cost: 10, type: 'arcana', rarity: 3, subType: 'enhancement',
+        apply: (card) => { card.ability = 'devil'; card.abilityName = 'Masked'; },
+        flavor: '"The Mask."'
+    },
+    'arcana_wheel': {
+        name: 'Arcana X: Wheel of Fortune',
+        desc: '(Enhancement) Choose one card. It grants +10 Multiplier, but has a 10% chance to be destroyed after being played in a winning hand.',
+        cost: 9, type: 'arcana', rarity: 3, subType: 'enhancement',
+        apply: (card) => { card.ability = 'wheel'; card.abilityName = 'Gambled'; },
+        flavor: '"A Great Gamble."'
+    },
+    'arcana_hermit': {
+        name: 'Arcana IX: The Hermit',
+        desc: '(Enhancement) Choose one card. It grants +15 Multiplier, but only if it is the only card of its suit in your hand when scored.',
+        cost: 9, type: 'arcana', rarity: 3, subType: 'enhancement',
+        apply: (card) => { card.ability = 'hermit'; card.abilityName = 'Solitary'; },
+        flavor: '"Isolation."'
+    },
+    'arcana_judgement': {
+        name: 'Arcana XX: Judgement',
+        desc: '(Enhancement) Choose one card. It grants +8 Multiplier, but only if your hand contains a Poker Hand (Pair, Straight, etc.).',
+        cost: 10, type: 'arcana', rarity: 3, subType: 'enhancement',
+        apply: (card) => { card.ability = 'judgement'; card.abilityName = 'Judged'; },
+        flavor: '"The Final Call."'
+    },
+    'arcana_tower': {
+        name: 'Arcana XVI: The Tower',
+        desc: '(Enhancement) Enhance 1 card. It transforms into a "Rock Card". Rocks are not part of any suit, have a value of 10, and grant +20 Base Chips.',
+        cost: 8, type: 'arcana', rarity: 3, subType: 'enhancement',
+        apply: (card) => { card.ability = 'tower_rock'; card.abilityName = 'Rock'; },
+        flavor: '"Upheaval."'
+    },
+    'arcana_hanged_man': {
+        name: 'Arcana XII: The Hanged Man',
+        desc: '(Enhancement) Choose one card. When in your hand, it grants +1 Multiplier for every card left in the Shared Pool when you Stand.',
+        cost: 9, type: 'arcana', rarity: 3, subType: 'enhancement',
+        apply: (card) => { card.ability = 'hanged_man'; card.abilityName = 'Bound'; },
+        flavor: '"Perspective."'
+    },
+    'arcana_moon': {
+        name: 'Arcana XVIII: The Moon',
+        desc: '(Enhancement) Choose one card. If this card remains in the Shared Pool at the end of a hand, it re-triggers the "on-play" abilities of all Enhanced cards in your scored hand.',
+        cost: 14, type: 'arcana', rarity: 4, subType: 'enhancement',
+        apply: (card) => { card.ability = 'moon'; card.abilityName = 'Spectral'; },
+        flavor: '"Illusion."'
+    },
+    'arcana_world': {
+        name: 'Arcana XXI: The World',
+        desc: '(Enhancement) Choose one card. It is now Polychrome, considered to be all four suits (♠, ♥, ♦, ♣) simultaneously.',
+        cost: 12, type: 'arcana', rarity: 4, subType: 'enhancement',
+        apply: (card) => { card.ability = 'world'; card.abilityName = 'Polychrome'; },
+        flavor: '"Completion."'
+    },
+
+    // --- Rituals (Deck-wide / Pick multiple) ---
+    'arcana_fool': {
+        name: 'Arcana 0: The Fool',
+        desc: '(Ritual) Choose one card in your deck to permanently erase from your run. Gain 10 Crookards and +1 Reroll for this Vingt-un.',
+        cost: 3, type: 'arcana', rarity: 1, subType: 'ritual_pick_1_erase',
+        flavor: '"A New Beginning."'
+    },
+    'arcana_magician_up': {
+        name: 'Arcana I: The Magician (Ascendant)',
+        desc: '(Ritual) Choose 2 Number cards (2-10). They transform into random Face cards (J, Q, K) of the same suit.',
+        cost: 6, type: 'arcana', rarity: 2, subType: 'ritual_pick_2_transform_up',
+        flavor: '"Transformation."'
+    },
+    'arcana_magician_down': {
+        name: 'Arcana I: The Magician (Descendant)',
+        desc: '(Ritual) Choose 2 Face cards (J, Q, K). They transform into random Number cards (2-10) of the same suit.',
+        cost: 6, type: 'arcana', rarity: 2, subType: 'ritual_pick_2_transform_down',
+        flavor: '"Reversion."'
+    },
+    'arcana_lovers': {
+        name: 'Arcana VI: The Lovers',
+        desc: '(Ritual) Choose two cards in your deck. They become Lovers. If both are in your hand when you score, gain +100 Chips and +10 Mult.',
+        cost: 10, type: 'arcana', rarity: 3, subType: 'ritual_pick_2_pair',
+        flavor: '"A Fated Pair."'
+    },
+    'arcana_empress': {
+        name: 'Arcana III: The Empress',
+        desc: '(Ritual) Choose one card in your deck. Add two copies of that card to your deck.',
+        cost: 10, type: 'arcana', rarity: 3, subType: 'ritual_pick_1_copy_2',
+        flavor: '"Abundance."'
+    },
+    'arcana_death': {
+        name: 'Arcana XIII: Death',
+        desc: '(Ritual) Choose up to 4 cards in your deck to permanently erase from your run.',
+        cost: 8, type: 'arcana', rarity: 3, subType: 'ritual_pick_4_erase',
+        flavor: '"Culling."'
+    },
+    'arcana_hierophant': {
+        name: 'Arcana V: The Hierophant',
+        desc: '(Ritual) Choose 3 Number cards (A, 2-10). They permanently grant double their Base Chip value when scored.',
+        cost: 12, type: 'arcana', rarity: 4, subType: 'ritual_pick_3_double_chips',
+        flavor: '"Tradition."'
+    },
+    'arcana_temperance': {
+        name: 'Arcana XIV: Temperance',
+        desc: '(Ritual) Choose two cards in your deck. They are destroyed and fused into a new "Chimeric" card with their combined Base Chip values.',
+        cost: 12, type: 'arcana', rarity: 4, subType: 'ritual_pick_2_fuse',
+        flavor: '"Fusion."'
+    },
+    
+    // --- Rituals (Immediate Effect, No Choice) ---
+    'arcana_high_priestess': {
+        name: 'Arcana II: The High Priestess',
+        desc: '(Enhancement) Choose one card. While this "Blessed" card is in your hand (or the Dealer\'s hand), that hand cannot Bust. Scoring 21+ will instead immediately force a Stand.',
+        cost: 15, type: 'arcana', rarity: 4, subType: 'enhancement',
+        apply: (card) => { card.ability = 'priestess'; card.abilityName = 'Blessed'; },
+        flavor: '"Hidden Knowledge."'
+    }
+};
+
 
 const PATRON_SKILLS = {
     // --- Rare (Rarity 3) ---
@@ -91,8 +381,8 @@ const PATRON_SKILLS = {
         flavor: "The Patron is impressed. 'Your continued success is... amusing. I shall raise the stakes, making your victories all the more potent.'",
         rarity: 3
     },
-    'High Roller\'s Intuition': {
-        name: 'High Roller\'s Intuition',
+    'High Roller Intuition': {
+        name: 'High Roller Intuition',
         desc: 'Doubles the chip bonus from all Poker Hands (Pair, Two Pair, 3-of-a-Kind, etc.).',
         flavor: "'You no longer see just cards; you see the patterns of fate. The connections between pairs and triplets now grant you double their usual power.'",
         rarity: 3
@@ -135,8 +425,8 @@ const PATRON_SKILLS = {
         flavor: "'The void offers more choices, but also more confusion. An extra card is now dealt to the shared pool, complicating your (and the dealer's) decisions.'",
         rarity: 4
     },
-    'Jester\'s Gambit': {
-        name: 'Jester\'s Gambit',
+    'Jester Gambit': {
+        name: 'Jester Gambit',
         desc: 'Your maximum hand size is increased to 6. A "6-Card Charlie" (6 cards, 21 or less) counts as an automatic win and applies the 5-card bonus.',
         flavor: "'You adopt the fool\'s strategy, allowing you to hold a sixth card. If you manage to hold 6 cards without busting, the Patron laughs and grants you an automatic win.'",
         rarity: 4
@@ -161,7 +451,7 @@ const PATRON_SKILLS = {
     },
 
     // --- Legendary (Rarity 5) ---
-    'Joker\'s Wild': {
+    'Jokers Wild': {
         name: 'Joker\'s Wild',
         desc: 'Adds 2 Jokers (1 Red, 1 Black) to the deck for the rest of the run. Jokers are worth +12 Chips and count as an automatic win if not Bust.',
         flavor: "'You invite true chaos to the table. Two Jokers, one red and one black, are shuffled into the deck. They are wild, powerful, and guarantee a win... if you don\'t bust first.'",
@@ -616,16 +906,27 @@ const BJ_PASSIVE_MODIFIERS = {
     },
     'one_suit_mult': {
         name: 'Monochrome',
-        desc: '+10 Multiplier if your hand consists of only one suit (e.g., all Hearts). Jokers do not count.',
-        flavor: 'A hand of perfect uniformity—all one suit. This rare sight grants a +10 Multiplier.',
+        desc: 'If your hand contains only one suit (no Jokers), gain a Multiplier bonus based on hand size: 2 cards (+1 Mult), 3 cards (+3 Mult), 4 cards (+5 Mult), 5+ cards (+10 Mult).',
+        flavor: 'A hand of perfect uniformity. The Patron rewards this display of order with a scaling bonus.',
         type: 'passive',
         cost: 9,
         rarity: 3,
         check: (hand) => {
-            if (hand.length === 0) return false;
+            if (hand.length < 2) return false; // Bonus only starts at 2 cards
             return hand.every(c => c.suit === hand[0].suit && !c.suit.startsWith('JOKER'));
         },
-        logic: (mult) => mult + 10
+        logic: (mult, base, hand) => {
+            let bonus = 0;
+            switch (hand.length) {
+                case 2: bonus = 1; break;
+                case 3: bonus = 3; break;
+                case 4: bonus = 5; break;
+                case 5: bonus = 10; break;
+                case 6: bonus = 10; break; // Also apply to 6-card hands (Jester's Gambit)
+                default: bonus = (hand.length > 6) ? 10 : 0; // Future-proofing
+            }
+            return mult + bonus;
+        }
     },
     'base_mult_plus': {
         name: 'Solid Foundation',
@@ -765,8 +1066,12 @@ const BJ_CONSUMABLES = {
         cost: 2,
         rarity: 1,
         use: (state) => {
-            state.deck = createDeck();
+            // --- MODIFICATION ---
+            state.deck = createDeck(state.deckKey); // Use the run's deckKey
             shuffleDeck(state.deck);
+            state.masterDeckList = [...state.deck]; // <-- ADD THIS
+            state.discardPile = []; // <-- ADD THIS
+            // --- END MODIFICATION ---
             return { success: true, message: 'Deck has been reshuffled.' };
         }
     },
@@ -871,14 +1176,26 @@ const BJ_CONSUMABLES = {
         cost: 4,
         rarity: 2,
         use: (state) => {
+            // --- THIS IS THE FIX ---
+            const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+            // --- END FIX ---
+            
             const randValue = VALUES[Math.floor(Math.random() * VALUES.length)];
             let weight = parseInt(randValue);
             if (['J', 'Q', 'K'].includes(randValue)) weight = 10;
             if (randValue === 'A') weight = 11;
             
-            state.deck.unshift({ value: randValue, suit: '♦', weight: weight });
-            state.deck.unshift({ value: randValue, suit: '♥', weight: weight });
+            const card1 = { value: randValue, suit: '♦', weight: weight };
+            const card2 = { value: randValue, suit: '♥', weight: weight };
             
+            state.deck.unshift(card1);
+            state.deck.unshift(card2);
+            
+            // Also add to master list
+            state.masterDeckList.push(card1); // <-- ADD THIS
+            state.masterDeckList.push(card2); // <-- ADD THIS
+            // --- END MODIFICATION ---
+
             state.sharedPool = [];
             dealRoguelikePool();
             return { success: true, message: 'The pool now contains a pair...' };
@@ -1037,5 +1354,14 @@ const BJ_RUN_UPGRADES = {
         cost: 10,
         rarity: 3, // Rare
         apply: (state) => { state.runUpgrades.rerollsToHands = true; }
+    },
+    'cheaper_locks': {
+        name: 'Iron Clad Contract',
+        desc: 'Reduces the cost to lock items in the shop to 1 Crookard.',
+        flavor: 'You found a loophole in your contract with the shopkeeper. Locking items is now dirt cheap.',
+        type: 'upgrade',
+        cost: 7,
+        rarity: 2, // Uncommon
+        apply: (state) => { state.runUpgrades.cheaperLocks = true; }
     }
 };

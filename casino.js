@@ -1,5 +1,21 @@
 // This file contains the game logic for the Arcane Casino.
-
+const MASTER_CARD_LIST = [];
+(function buildMasterCardList() {
+    const allValues = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    const allSuits = ['♠', '♥', '♦', '♣'];
+    
+    for (const suit of allSuits) {
+        for (const value of allValues) {
+            let weight = parseInt(value);
+            if (value === 'J' || value === 'Q' || value === 'K') weight = 10;
+            if (value === 'A') weight = 11;
+            MASTER_CARD_LIST.push({ value, suit, weight });
+        }
+    }
+    // You can add Jokers or other special cards here if you want them to be conjurable
+    // MASTER_CARD_LIST.push({ value: 'Joker', suit: 'JOKER_RED', weight: 12, id: 'joker_red' });
+    // MASTER_CARD_LIST.push({ value: 'Joker', suit: 'JOKER_BLACK', weight: 12, id: 'joker_black' });
+})();
 // --- BLACKJACK ("Arcane 21") ---
 let casinoSecretCode = []; // <-- NEW: Track secret code
 let roguelikeShopActiveDrawer = 'passives'; // Default to 'Passives' as it's most common
@@ -18,9 +34,6 @@ let blackjackState = {
     gamePhase: 'betting', // 'betting', 'playerTurn', 'dealerTurn', 'results'
     statusMessage: 'Place your bet to begin.'
 };
-
-const SUITS = ['♠', '♥', '♦', '♣'];
-const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
 let slotState = {
     reels: ['❓', '❓', '❓'],
@@ -74,26 +87,55 @@ function checkCasinoCode(char) {
 /**
  * Creates a standard 52-card deck.
  */
-function createDeck() {
+function createDeck(deckKey = 'base_deck') {
     let deck = [];
-    for (let suit of SUITS) {
-        for (let value of VALUES) {
+    
+    // Default to base_deck if key is invalid
+    const definition = DECK_DEFINITIONS[deckKey] || DECK_DEFINITIONS['base_deck'];
+    const comp = definition.composition;
+
+    const values = comp.values;
+    const suits = comp.suits;
+    const multipliers = comp.card_multipliers || {}; // Default to empty object
+
+    for (let suit of suits) {
+        for (let value of values) {
             let weight = parseInt(value);
             if (value === 'J' || value === 'Q' || value === 'K') weight = 10;
             if (value === 'A') weight = 11; // Handle as 11 initially
-            deck.push({ value, suit, weight });
+
+            // Check for card multipliers (for Glass Deck)
+            let count = multipliers[value] || 1; // Default to 1 if not specified
+            
+            for (let i = 0; i < count; i++) {
+                deck.push({ value, suit, weight });
+            }
+        }
+    }
+
+    // Add special cards (for Blighted Deck)
+    if (comp.special_cards) {
+        for (const card of comp.special_cards) {
+            for (let i = 0; i < card.count; i++) {
+                // Add all properties from the definition
+                deck.push({ 
+                    value: card.value, 
+                    suit: card.suit, 
+                    weight: card.weight, 
+                    id: card.id 
+                });
+            }
         }
     }
     
-    // --- NEW: Add Jokers if player has the Patron Skill ---
+    // Add Jokers if player has the Patron Skill (this logic is unchanged from your file)
     if (player && player.roguelikeBlackjackState.patronSkills.includes('Joker\'s Wild')) {
-        deck.push({ value: 'Joker', suit: '🎭', weight: 12 });
-        deck.push({ value: 'Joker', suit: '🎭', weight: 12 });
+        deck.push({ value: 'Joker', suit: 'JOKER_RED', weight: 12, id: 'joker_red' });
+        deck.push({ value: 'Joker', suit: 'JOKER_BLACK', weight: 12, id: 'joker_black' });
     }
-    // --- END NEW ---
     
     return deck;
-}   
+}
 
 /**
  * Shuffles a deck using Fisher-Yates.
@@ -1234,11 +1276,14 @@ for (const betType in state.bets) {
 // =================================================================================
 
 
-function startRoguelikeRun() {
+function startRoguelikeRun(deckKey = 'base_deck') { // <-- MODIFICATION: Add deckKey parameter
     
     // Check if this is a resume or a new run
-    const isResuming = player.roguelikeBlackjackState.runActive === false && (player.roguelikeBlackjackState.currentAnteIndex > 0 || player.roguelikeBlackjackState.currentVingtUnIndex > 0);
+    const state = player.roguelikeBlackjackState; // <-- NEW: Define state earlier
+    const isResuming = state.runActive === false && (state.currentAnteIndex > 0 || state.currentVingtUnIndex > 0);
 
+    // --- NEW: Store the selected deck key ---
+    state.deckKey = deckKey;
     if (isResuming) {
         player.roguelikeBlackjackState.runActive = true;
         player.roguelikeBlackjackState.gamePhase = 'shop'; 
@@ -1262,6 +1307,14 @@ function startRoguelikeRun() {
         }
         player.gold -= player.roguelikeBlackjackState.buyIn;
         
+        // --- NEW: Create masterDeckList ONCE here ---
+        const newDeck = createDeck(deckKey); // Create the base deck
+        shuffleDeck(newDeck);
+        // Assign unique IDs to every card for tracking enhancements
+        newDeck.forEach((card, index) => card.uniqueId = `card_${index}`);
+        player.roguelikeBlackjackState.masterDeckList = newDeck;
+        // --- END NEW ---
+
         // Reset all progress for the new run
         player.roguelikeBlackjackState.runActive = true;
         player.roguelikeBlackjackState.currentAnteIndex = 0;
@@ -1270,6 +1323,13 @@ function startRoguelikeRun() {
         player.roguelikeBlackjackState.passiveModifiers = [];
         player.roguelikeBlackjackState.consumables = [];
         player.roguelikeBlackjackState.patronSkills = [];
+        
+        // --- NEW: Initialize deck modification properties ---
+        player.roguelikeBlackjackState.deckAbilities = {};
+        player.roguelikeBlackjackState.cardEnhancements = {};
+        player.roguelikeBlackjackState.cardPairs = [];
+        // --- END NEW ---
+
         player.roguelikeBlackjackState.runUpgrades = {
             passiveSlots: 5,
             consumableSlots: 2,
@@ -1408,6 +1468,7 @@ function roguelikePlayerDraft(poolCardIndex, consumableKey = null) {
     }
 
     const playerValue = calculateHandValue(state.playerHand);
+    const hasPriestess = state.playerHand.some(c => c.ability === 'priestess');
     
     // --- NEW: Handle Spectral Hand ---
     const maxHandSize = state.runUpgrades.handSize + (state.patronSkills.includes('Jester\'s Gambit') ? 1 : 0);
@@ -1420,6 +1481,16 @@ function roguelikePlayerDraft(poolCardIndex, consumableKey = null) {
     } 
     // --- END NEW ---
     else if (playerValue > 21) {
+        // --- NEW: High Priestess Bust Prevention ---
+        if (hasPriestess) {
+            state.statusMessage = "The High Priestess intercedes! You automatically Stand.";
+            addToLog(state.statusMessage, 'text-yellow-300');
+            renderRoguelikeGame();
+            setTimeout(() => roguelikePlayerStand(), 1000);
+            return; // Stop processing, hand goes to Stand
+        }
+        // --- END NEW ---
+
         // --- Check for 'Minor Miscalculation' Patron Skill ---
         if (state.vingtUnBustSafety) { // Check if safety net is active
             state.vingtUnBustSafety = false; // Consume the safety net
@@ -1627,12 +1698,26 @@ function roguelikeDetermineWinner(result) {
     let win = false;
     let push = false;
 
+    // --- NEW: Store evals in state ---
+    state.playerFinalEval = evaluateRoguelikeHand(state.playerHand);
+    state.dealerFinalEval = evaluateRoguelikeHand(state.dealerHand);
+    // --- END NEW ---
+
     if (result === 'win') { // Player wins (e.g., dealer bust)
         win = true;
+        // --- NEW: Store raw score for display ---
+        state.playerFinalEval.rawValue = calculateHandValue(state.playerHand);
+        state.dealerFinalEval.rawValue = calculateHandValue(state.dealerHand);
+        // --- END NEW ---
     
     } else if (result === 'showdown') { 
-        const playerScore = calculateFinalShowdownScore(state.playerHand);
-        const dealerScore = calculateFinalShowdownScore(state.dealerHand);
+        const playerScore = calculateFinalShowdownScore(state.playerHand, state.playerFinalEval); // Pass eval
+        const dealerScore = calculateFinalShowdownScore(state.dealerHand, state.dealerFinalEval); // Pass eval
+        
+        // --- NEW: Store raw score for display ---
+        state.playerFinalEval.rawValue = calculateHandValue(state.playerHand);
+        state.dealerFinalEval.rawValue = calculateHandValue(state.dealerHand);
+        // --- END NEW ---
 
         // --- Joker Win Condition ---
         const playerHasJoker = state.playerHand.some(c => c.value === 'Joker');
@@ -1665,6 +1750,10 @@ function roguelikeDetermineWinner(result) {
     } else { // 'lose' (Player bust)
         win = false;
         state.statusMessage = `You lost the hand. (Bust)`; 
+        // --- NEW: Store raw score for display ---
+        state.playerFinalEval.rawValue = calculateHandValue(state.playerHand); // Store bust value
+        state.dealerFinalEval.rawValue = calculateHandValue(state.dealerHand);
+        // --- END NEW ---
     }
     
     // --- NEW: Score Calculation & Finalization ---
@@ -1714,6 +1803,21 @@ function roguelikeDetermineWinner(result) {
         }
     }
     
+    if (win) {
+        const gambledCards = state.playerHand.filter(c => c.ability === 'wheel');
+        gambledCards.forEach(card => {
+            if (Math.random() < 0.10) { // 10% chance
+                addToLog(`The Wheel turns... your ${card.abilityName} ${card.value}${card.suit} has been destroyed!`, 'text-red-500');
+                // Remove from masterDeckList
+                const masterIndex = state.masterDeckList.findIndex(c => c.uniqueId === card.uniqueId);
+                if (masterIndex > -1) {
+                    state.masterDeckList.splice(masterIndex, 1);
+                }
+                // Remove from enhancements
+                delete state.cardEnhancements[card.uniqueId];
+            }
+        });
+    }
     // Clear one-time flags
     state.liquidLuckActive = false;
     state.spectralHandActive = false;
@@ -1727,13 +1831,36 @@ function roguelikeDetermineWinner(result) {
 }
 
 function evaluateRoguelikeHand(hand) {
+    // --- THIS IS THE FIX ---
+    const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+    // --- END FIX ---
+    
+    // --- NEW: Get run state ---
+    const state = player.roguelikeBlackjackState;
+    // --- END NEW ---
+    const isMonochrome = hand.length >= 2 && hand.every(c => c.suit === hand[0].suit && !c.suit.startsWith('JOKER'));
     // --- Get Ranks (Values) and sort them by their actual poker order ---
     const ranks = hand.map(c => VALUES.indexOf(c.value)).sort((a, b) => a - b);
     const weights = hand.map(c => c.weight).sort((a, b) => a - b);
-    const suits = hand.map(c => c.suit);
+    
+    // --- MODIFICATION: Check for Polychrome ---
+    let suits = hand.map(c => c.suit);
+    if (state.deckAbilities.polychrome) {
+        // If Polychrome is active, pretend all cards are Hearts
+        suits = hand.map(c => '♥');
+    } else {
+        // Check for individual Polychrome (World) cards
+        suits = hand.map((card, i) => {
+            if (card.ability === 'world') return '♥'; // Use ♥ as the "stand-in" suit
+            return suits[i];
+        });
+    }
+    // --- END MODIFICATION ---
     
     let isStraight = false;
-    let isFlush = false;
+    // --- MODIFICATION: Check for Polychrome ---
+    let isFlush = hand.length > 0 && suits.every(s => s === suits[0]);
+    // --- END MODIFICATION ---
     let isStraightFlush = false;
     let isRoyalFlush = false; // <-- NEW
 
@@ -1766,14 +1893,42 @@ function evaluateRoguelikeHand(hand) {
     }
 
     // --- Original logic for pairs, kinds, and Ace teams (works on any hand size) ---
-    const counts = {};
+   const counts = {};
     let aceCount = 0;
     let initialValue = 0;
+    
+    // --- NEW: Hierophant & Justice/Devil check ---
+    let faceCardCount = 0;
+    let nonFaceCardCount = 0;
+    let jokerCount = 0;
+    // --- END NEW ---
 
     hand.forEach(card => {
         counts[card.value] = (counts[card.value] || 0) + 1; // Use card.value
         initialValue += card.weight;
         if (card.value === 'A') aceCount++;
+        
+        // --- NEW: Check card properties ---
+        let isFace = ['J', 'Q', 'K'].includes(card.value);
+        let isNonFace = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A'].includes(card.value);
+        
+        // Check Hierophant
+        if (state.deckAbilities.suitRoyals && card.suit === state.deckAbilities.suitRoyals) {
+            isFace = true;
+        }
+        // Check Justice (Balanced)
+        if (card.ability === 'justice') {
+            isFace = true;
+            isNonFace = true;
+        }
+        // Check Devil (Masked)
+        if (card.ability === 'devil') {
+            jokerCount++;
+        }
+
+        if (isFace) faceCardCount++;
+        if (isNonFace) nonFaceCardCount++;
+        // --- END NEW ---
     });
 
     let pairs = 0;
@@ -1819,36 +1974,51 @@ function evaluateRoguelikeHand(hand) {
         isThreeOfAKind: isThreeOfAKind,
         isFourOfAKind: isFourOfAKind,
         isTeamOfAce: isTeamOfAce,
-        isStraight: isStraight,
-        isFlush: isFlush,
-        isFullHouse: isFullHouse,
         isStraightFlush: isStraightFlush,
-        isRoyalFlush: isRoyalFlush, // <-- NEW
-        handName: handName // <-- NEW
+        isRoyalFlush: isRoyalFlush,
+        handName: handName,
+        faceCardCount: faceCardCount,
+        nonFaceCardCount: nonFaceCardCount,
+        jokerCount: jokerCount,
+        isMonochrome: isMonochrome // <-- ADD THIS
     };
 }
 
-function getPokerHandBonus(hand) {
-    const pokerRank = evaluateRoguelikeHand(hand);
+function getPokerHandBonus(hand, pokerRank = null) {
+    if (!pokerRank) {
+        pokerRank = evaluateRoguelikeHand(hand); // Calculate if not provided
+    }
     let bonus = 0;
     
     // Assign bonus points based on the rank
     if (pokerRank.isStraightFlush) bonus = 30;
     else if (pokerRank.isFourOfAKind) bonus = 20;
     else if (pokerRank.isFullHouse) bonus = 12;
-    else if (pokerRank.isFlush) bonus = 10;
     else if (pokerRank.isStraight) bonus = 8;
     else if (pokerRank.isThreeOfAKind) bonus = 6;
     else if (pokerRank.isTwoPair) bonus = 4;
     else if (pokerRank.pairs === 1) bonus = 2;
-    
+    // --- MODIFICATION: Flush Bonus now uses Monochrome scaling ---
+    else if (pokerRank.isMonochrome) { // Checks if all cards are the same suit
+        // Apply scaling bonus based on hand size
+        switch (hand.length) {
+            case 2: bonus = 1; break; // 2 cards = +1
+            case 3: bonus = 3; break; // 3 cards = +3
+            case 4: bonus = 5; break; // 4 cards = +5
+            case 5: bonus = 10; break; // 5 cards = +10
+            case 6: bonus = 10; break; // 6 cards = +10
+            default: bonus = 0;
+        }
+    }
+    // --- END MODIFICATION ---
+
     // NEW: Apply 'High Roller's Intuition'
     if (bonus > 0 && player.roguelikeBlackjackState.patronSkills.includes('High Roller\'s Intuition')) {
         bonus *= 2;
     }
     
     return bonus;
-}   
+}
 
 function calculateFinalShowdownScore(hand) {
     // 1. Get the raw Blackjack score
@@ -1891,8 +2061,12 @@ function getRoguelikeScoreComponents() {
     }
 
     const pokerRank = evaluateRoguelikeHand(hand);
-    const pokerBonus = getPokerHandBonus(hand);
+    let pokerBonus = getPokerHandBonus(hand, pokerRank); // Pass the hand AND the pre-calculated rank
+    if (state.deckAbilities.doublePoker) {
+        pokerBonus *= 2;
+    }
     baseChips += pokerBonus;
+    // --- END MODIFICATION ---
 
     // 2. Calculate Multiplier
     let totalMultiplier = 1 + (state.runUpgrades.baseMultiplier || 0);
@@ -1909,6 +2083,99 @@ function getRoguelikeScoreComponents() {
     if (state.patronSkills.includes('Perfect Start')) initialHands++;
     if (state.currentHandsLeft === initialHands && state.patronSkills.includes('Golden Hand')) {
         baseChips += 100;
+    }
+
+    hand.forEach(card => {
+        if (card.ability) {
+            switch (card.ability) {
+                case 'strength':
+                    baseChips += 50;
+                    break;
+                case 'emperor': // <-- NEW
+                    baseChips += 10; // Doubles 10-value, so +10
+                    break;
+                case 'tower_rock': // <-- NEW
+                    baseChips += 20;
+                    break;
+                case 'star':
+                    totalMultiplier += 4;
+                    break;
+                case 'sun':
+                    totalMultiplier *= 2;
+                    break;
+                case 'wheel':
+                    totalMultiplier += 10;
+                    // (Burn logic will be in roguelikeDetermineWinner)
+                    break;
+                case 'chariot':
+                    baseChips += (state.currentHandsLeft * 3);
+                    break;
+                case 'hermit':
+                    const suitCount = hand.filter(c => c.suit === card.suit).length;
+                    if (suitCount === 1) {
+                        totalMultiplier += 15;
+                    }
+                    break;
+                case 'judgement':
+                    if (pokerBonus > 0) { // Check if we *have* a poker hand
+                        totalMultiplier += 8;
+                    }
+                    break;
+                case 'hanged_man':
+                    totalMultiplier += state.sharedPool.length;
+                    break;
+                // 'moon' (Spectral) re-triggers others, handled below
+                // 'devil' (Masked) is handled by evaluateRoguelikeHand
+                // 'justice' (Balanced) is handled by evaluateRoguelikeHand
+                // 'world' (Polychrome) is handled by evaluateRoguelikeHand
+                // 'tower' (Shattered) logic is in buyRoguelikeTool
+            }
+        }
+    });
+    if (state.cardPairs.length > 0) {
+        const handIds = new Set(hand.map(c => c.uniqueId));
+        state.cardPairs.forEach(pair => {
+            if (handIds.has(pair[0]) && handIds.has(pair[1])) {
+                baseChips += 100;
+                totalMultiplier += 10;
+                addToLog("The Lovers are united! +100 Chips, +10 Mult!", "text-purple-300");
+            }
+        });
+    }
+
+    // --- NEW: Apply Hierophant (Double Chips) ---
+    hand.forEach(card => {
+        if (card.ability === 'hierophant') {
+            baseChips += card.weight; // Add the card's value again
+        }
+    });
+    // --- NEW: Handle Spectral (Moon) Re-trigger ---
+    const spectralCard = hand.find(c => c.ability === 'moon');
+    if (spectralCard) {
+        hand.forEach(card => {
+            if (card.uniqueId === spectralCard.uniqueId) return; // Don't re-trigger self
+
+            if (card.ability) {
+                // Re-apply all 'on-play' abilities
+                switch (card.ability) {
+                    case 'strength': baseChips += 50; break;
+                    case 'star': totalMultiplier += 4; break;
+                    case 'sun': totalMultiplier *= 2; break;
+                    case 'wheel': totalMultiplier += 10; break;
+                    case 'chariot': baseChips += (state.currentHandsLeft * 3); break;
+                    case 'hermit':
+                        const suitCount = hand.filter(c => c.suit === card.suit).length;
+                        if (suitCount === 1) totalMultiplier += 15;
+                        break;
+                    case 'judgement':
+                        if (pokerBonus > 0) totalMultiplier += 8;
+                        break;
+                    case 'hanged_man':
+                        totalMultiplier += state.sharedPool.length;
+                        break;
+                }
+            }
+        });
     }
 
     // Apply standard passives
@@ -1984,8 +2251,12 @@ function roguelikeLoseRun(reason = 'out of hands') {
 
 function startVingtUn() {
     const state = player.roguelikeBlackjackState;
-    
-    // Check for win condition
+
+    // --- ADD THIS BLOCK AT THE TOP ---
+    state.shopStock = []; // Clear the shop stock
+    state.shopLockedSlots = []; // Clear all locks
+    // --- END ADDITION ---
+
     if (state.currentAnteIndex >= ANTE_STRUCTURE.length) {
         roguelikeWinRun();
         return;
@@ -2001,15 +2272,22 @@ function startVingtUn() {
     }
 
     // Create a new deck for this Vingt-un
-    state.deck = createDeck();
+    state.deck = createDeck(state.deckKey);
     shuffleDeck(state.deck);
+
+    // --- NEW: Create master list and empty discard pile ---
+    state.deck = [...state.masterDeckList]; // Copy all cards
+    shuffleDeck(state.deck);
+
+    // Clear the discard pile for this Vingt-un
+    state.discardPile = []; 
+    // --- END MODIFICATION ---
+
     addToLog("A fresh deck is shuffled for this Vingt-un.", "text-gray-400");
     
     // --- NEW: Reset shop reroll cost for the new Ante ---
     // This happens when Vingt-un 0 starts
-    if (state.currentVingtUnIndex === 0) {
-        state.shopRerollCost = state.runUpgrades.baseShopRerollCost || 2;
-    }
+    state.shopRerollCost = state.runUpgrades.baseShopRerollCost || 2;
     // --- END NEW ---
 
     // --- MODIFIED: Handle all hand/reroll modifiers ---
@@ -2213,9 +2491,17 @@ function skipPatronSkillChoice() {
  */
 function roguelikeCashOut() {
     const state = player.roguelikeBlackjackState;
-    const ante = ANTE_STRUCTURE[state.currentAnteIndex]; // Get the Ante they just *completed*
-    const goldReward = ante.cashOutReward;
+    const anteClearedIndex = state.currentAnteIndex; // This is 0 for Ante 1, 1 for Ante 2, etc.
 
+    // --- THIS IS THE FIX: Update highest clear ---
+    // We add 1 because anteClearedIndex is 0-based
+    if (anteClearedIndex + 1 > state.highestAnteCleared) {
+        state.highestAnteCleared = anteClearedIndex + 1;
+    }
+    // --- END FIX ---
+
+    const goldReward = ANTE_STRUCTURE[anteClearedIndex].cashOutReward;
+    
     player.gold += goldReward;
     
     addToLog(`*** Run Complete! ***`, 'text-yellow-200 font-bold text-lg');
@@ -2250,6 +2536,11 @@ function roguelikeCashOut() {
  */
 function roguelikeWinRun() {
     const state = player.roguelikeBlackjackState;
+
+    // --- THIS IS THE FIX: Update highest clear ---
+    state.highestAnteCleared = ANTE_STRUCTURE.length; // They cleared all 8
+    // --- END FIX ---
+
     const finalAnte = ANTE_STRUCTURE[ANTE_STRUCTURE.length - 1]; // Get the last Ante
     const goldReward = finalAnte.cashOutReward;
     
@@ -2289,7 +2580,16 @@ function roguelikeWinRun() {
  */
 function startNextAnte() {
     const state = player.roguelikeBlackjackState;
-    state.currentAnteIndex++;
+
+    // --- THIS IS THE FIX: Update highest clear ---
+    // state.currentAnteIndex is the one we *just* beat (e.g., 0)
+    // We add 1 because it's 0-based
+    if (state.currentAnteIndex + 1 > state.highestAnteCleared) {
+        state.highestAnteCleared = state.currentAnteIndex + 1;
+    }
+    // --- END FIX ---
+
+    state.currentAnteIndex++; // Now we increment to 1 (to start Ante 2)
     state.currentVingtUnIndex = 0;
     
     // Apply 'Escalating Stakes' Patron Skill (for the *new* Ante)
@@ -2302,11 +2602,450 @@ function startNextAnte() {
     startVingtUn(); // Start the 'Petit' of the new Ante
 }
 
+function buyConjurePack(packKey) {
+    const state = player.roguelikeBlackjackState;
+    if (state.gamePhase !== 'shop') return;
+
+    const pack = BJ_CONJURE_PACKS[packKey];
+    if (!pack) {
+        console.error(`Invalid pack key: ${packKey}`);
+        return;
+    }
+
+    if (state.currentCrookards < pack.cost) {
+        addToLog("You cannot afford that ritual.", 'text-red-400');
+        return;
+    }
+
+    state.currentCrookards -= pack.cost;
+    addToLog(`You pay ${pack.cost} Crookards. The shaman begins the ritual...`, 'text-yellow-300');
+
+    // Generate random cards
+    const conjuredCards = [];
+    for (let i = 0; i < pack.conjure; i++) {
+        const randomCard = MASTER_CARD_LIST[Math.floor(Math.random() * MASTER_CARD_LIST.length)];
+        conjuredCards.push({ ...randomCard }); // Push a copy
+    }
+
+    // Set the state and render the conjure screen
+    state.gamePhase = 'conjuring'; // New game phase
+    state.conjurePackDisplay = {
+        packKey: packKey,
+        cards: conjuredCards,
+        chosenIndices: []
+    };
+    
+    renderRoguelikeConjure();
+}
+
+/**
+ * Toggles a card for selection in the conjure UI.
+ * @param {number} cardIndex - The index of the card in the state.conjurePackDisplay.cards array.
+ */
+function selectConjuredCard(cardIndex) {
+    const state = player.roguelikeBlackjackState;
+    if (state.gamePhase !== 'conjuring') return;
+
+    const pack = BJ_CONJURE_PACKS[state.conjurePackDisplay.packKey];
+    if (!pack) return;
+
+    const { chosenIndices } = state.conjurePackDisplay;
+    const indexInSelection = chosenIndices.indexOf(cardIndex);
+
+    if (indexInSelection > -1) {
+        // Card is already selected, de-select it
+        chosenIndices.splice(indexInSelection, 1);
+    } else {
+        // Card is not selected, add it
+        chosenIndices.push(cardIndex);
+        // If we've exceeded the choose limit, remove the *oldest* selection
+        if (chosenIndices.length > pack.choose) {
+            chosenIndices.shift(); // Remove the first item in the array
+        }
+    }
+    
+    // Re-render to show the new selection state
+    renderRoguelikeConjure();
+}
+
+/**
+ * Confirms the card selection and adds them to the player's deck.
+ */
+function confirmConjuredCards() {
+    const state = player.roguelikeBlackjackState;
+    if (state.gamePhase !== 'conjuring') return;
+
+    const { packKey, cards, chosenIndices } = state.conjurePackDisplay;
+    const pack = BJ_CONJURE_PACKS[packKey];
+
+    if (chosenIndices.length !== pack.choose) {
+        addToLog("You have not chosen the correct number of cards.", 'text-red-400');
+        return;
+    }
+
+    const cardsAdded = [];
+    chosenIndices.forEach(index => {
+        const card = cards[index];
+        if (card) {
+            // Add to both the master deck (for the run) and the current draw pile
+            state.masterDeckList.push(card);
+            state.deck.push(card);
+            cardsAdded.push(`${card.value}${card.suit}`);
+        }
+    });
+
+    // Reshuffle the draw pile with the new cards
+    shuffleDeck(state.deck);
+
+    addToLog(`You have bound the following cards to your fate: ${cardsAdded.join(', ')}.`, 'text-green-300');
+
+    // Reset state and return to shop
+    state.gamePhase = 'shop';
+    state.conjurePackDisplay = { packKey: null, cards: [], chosenIndices: [] };
+    renderRoguelikeShop();
+}
+
+/**
+ * Cancels the card selection and returns to the shop.
+ */
+function cancelConjure() {
+    const state = player.roguelikeBlackjackState;
+    if (state.gamePhase !== 'conjuring') return;
+
+    addToLog("You step away from the ritual.", 'text-gray-400');
+    
+    // Reset state and return to shop
+    state.gamePhase = 'shop';
+    state.conjurePackDisplay = { packKey: null, cards: [], chosenIndices: [] };
+    renderRoguelikeShop();
+}
+
+function selectArcanaChoice(arcanaKey) {
+    const state = player.roguelikeBlackjackState;
+    if (state.gamePhase !== 'arcana_choice') return;
+    state.arcanaPackDisplay.chosenKey = arcanaKey;
+    renderRoguelikeArcanaChoice(); // Re-render to show selection
+}
+
+function confirmArcanaChoice() {
+    const state = player.roguelikeBlackjackState;
+    if (state.gamePhase !== 'arcana_choice') return;
+    
+    const chosenKey = state.arcanaPackDisplay.chosenKey;
+    if (!chosenKey) {
+        addToLog("You must choose an Arcana.", 'text-red-400');
+        return;
+    }
+    
+    const arcana = BJ_ARCANA_RITUALS[chosenKey];
+    addToLog(`You have chosen the ${arcana.name} ritual.`, 'text-purple-300');
+
+    // Reset pack display
+    state.arcanaPackDisplay = null;
+    
+    // --- This part is now the same as the OLD 'arcana' purchase logic ---
+    if (arcana.subType === 'ritual_immediate') {
+        // Apply effect instantly, return to shop
+        arcana.apply(state); // e.g., state.deckAbilities.revealDealer = true;
+        addToLog(`The ritual is complete. You feel your fate shift!`, 'text-purple-400');
+        state.gamePhase = 'shop'; // Back to shop
+        renderRoguelikeShop();
+    } else {
+        // This Arcana requires card selection.
+        state.gamePhase = 'arcana_selection';
+        state.activeArcanaKey = chosenKey;
+        state.arcanaSelection = {
+            cardIds: [],
+            arcanaKey: chosenKey
+        };
+        renderRoguelikeArcanaSelection(); // Go to the card selection screen
+    }
+}
+
+function cancelArcanaChoice() {
+    const state = player.roguelikeBlackjackState;
+    if (state.gamePhase !== 'arcana_choice') return;
+    
+    const packKey = state.arcanaPackDisplay.packKey;
+    const tool = BJ_ARCANA_PACKS[packKey];
+    
+    // Refund cost and put pack back in shop
+    if (tool) {
+        state.currentCrookards += tool.cost;
+        state.shopStock.push(packKey);
+    }
+    
+    addToLog("You step away from the Arcana ritual, your Crookards returned.", "text-gray-400");
+    
+    state.gamePhase = 'shop';
+    state.arcanaPackDisplay = null;
+    renderRoguelikeShop();
+}   
+
+/**
+ * Main logic handler for when a player clicks a card during Arcana selection.
+ * @param {string} arcanaKey - The key of the ritual being performed.
+ * @param {string} cardUniqueId - The uniqueId of the card that was clicked.
+ */
+function applyArcanaToCard(arcanaKey, cardUniqueId) {
+    const state = player.roguelikeBlackjackState;
+    const arcana = BJ_ARCANA_RITUALS[arcanaKey];
+    const card = state.masterDeckList.find(c => c.uniqueId === cardUniqueId);
+    
+    if (!arcana || !card) {
+        console.error("Arcana or Card not found.");
+        cancelArcanaSelection(); // Failsafe
+        return;
+    }
+    
+    const selection = state.arcanaSelection;
+
+    // 1. Handle Enhancements (Single-click)
+    if (arcana.subType === 'enhancement') {
+        if (state.cardEnhancements[card.uniqueId]) {
+            const oldEnhancementName = state.cardEnhancements[card.uniqueId].name || 'a previous enhancement';
+            addToLog(`The new ritual for ${arcana.name} overrides the old ${oldEnhancementName}!`, 'text-purple-400 font-bold');
+            // No return, just log and proceed
+        }
+        arcana.apply(card); // e.g., card.ability = 'strength'
+        state.cardEnhancements[card.uniqueId] = { name: card.abilityName, ability: card.ability };
+        
+        addToLog(`The ${arcana.name} ritual is complete. Your ${card.value}${card.suit} is now ${card.abilityName}!`, 'text-purple-300');
+        finishArcanaSelection();
+        return;
+    }
+    
+    // 2. Handle Multi-Step Rituals
+    switch (arcana.subType) {
+        case 'ritual_pick_1_erase':
+        case 'ritual_pick_1_copy_2':
+            // These rituals only need one card
+            executeArcanaRitual(arcanaKey, [cardUniqueId]);
+            break;
+            
+        case 'ritual_pick_3_double_chips': // <-- NEW (Hierophant)
+            // This ritual needs multiple clicks
+            
+            // Check card validity
+            if (card.value === 'J' || card.value === 'Q' || card.value === 'K') {
+                renderRoguelikeArcanaSelection(null, "Hierophant only affects Number cards (A, 2-10).");
+                return;
+            }
+
+            // Check if card is already selected, and remove it
+            const indexInSelection_H = selection.cardIds.indexOf(cardUniqueId);
+            if (indexInSelection_H > -1) {
+                selection.cardIds.splice(indexInSelection_H, 1);
+            } else {
+                selection.cardIds.push(cardUniqueId);
+            }
+
+            const requiredClicks_H = 3;
+            
+            if (selection.cardIds.length >= requiredClicks_H) {
+                executeArcanaRitual(arcanaKey, selection.cardIds);
+            } else {
+                const remaining = requiredClicks_H - selection.cardIds.length;
+                renderRoguelikeArcanaSelection(null, `Select ${remaining} more Number card(s).`);
+            }
+            break;
+
+        case 'ritual_pick_4_erase':
+        case 'ritual_pick_2_pair':
+        case 'ritual_pick_2_fuse':
+            // These rituals need multiple clicks
+            
+            // Check if card is already selected, and remove it
+            const indexInSelection = selection.cardIds.indexOf(cardUniqueId);
+            if (indexInSelection > -1) {
+                selection.cardIds.splice(indexInSelection, 1);
+            } else {
+                selection.cardIds.push(cardUniqueId);
+            }
+
+            const requiredClicks = (arcanaKey === 'arcana_death') ? 4 : 2;
+            
+            if (selection.cardIds.length >= requiredClicks) {
+                // We have enough cards, execute the ritual
+                executeArcanaRitual(arcanaKey, selection.cardIds);
+            } else {
+                // Need more cards, just refresh the UI
+                const remaining = requiredClicks - selection.cardIds.length;
+                renderRoguelikeArcanaSelection(null, `Select ${remaining} more card(s).`);
+            }
+            break;
+
+        case 'ritual_pick_suit':
+            // This is a special case that needs a different UI
+            renderArcanaSuitPicker(arcanaKey);
+            break;
+    }
+}
+
+/**
+ * Executes the final logic for multi-step or single-step rituals.
+ * @param {string} arcanaKey - The key of the ritual.
+ * @param {Array<string>} cardIds - An array of one or more unique card IDs.
+ */
+function executeArcanaRitual(arcanaKey, cardIds) {
+    const state = player.roguelikeBlackjackState;
+    const arcana = BJ_ARCANA_RITUALS[arcanaKey];
+    if (!arcana || !cardIds || cardIds.length === 0) return;
+
+    // Get card objects from IDs
+    const cards = cardIds.map(id => state.masterDeckList.find(c => c.uniqueId === id)).filter(Boolean);
+    
+    switch (arcana.subType) {
+        case 'ritual_pick_1_erase':
+            state.masterDeckList = state.masterDeckList.filter(c => c.uniqueId !== cardIds[0]);
+            state.currentCrookards += 10;
+            state.currentRerollsLeft += 1;
+            addToLog(`Your ${cards[0].value}${cards[0].suit} has been erased. You gain 10 Crookards and 1 Reroll.`, 'text-purple-300');
+            break;
+            
+        case 'ritual_pick_2_transform_up': // <-- NEW CASE
+            cards.forEach(card => {
+                const newFace = ['J', 'Q', 'K'][Math.floor(Math.random() * 3)];
+                card.value = newFace;
+                card.weight = 10;
+            });
+            addToLog(`Your ${cards.map(c => c.uniqueId).join(', ')} transform into Face Cards!`, 'text-purple-300');
+            break;
+            
+        case 'ritual_pick_2_transform_down': // <-- NEW CASE
+            cards.forEach(card => {
+                const newNum = ['2', '3', '4', '5', '6', '7', '8', '9', '10'][Math.floor(Math.random() * 9)];
+                card.value = newNum;
+                card.weight = parseInt(newNum);
+            });
+            addToLog(`Your ${cards.map(c => c.uniqueId).join(', ')} transform into Number Cards!`, 'text-purple-300');
+            break;
+            
+        case 'ritual_pick_1_copy_2':
+            const cardToCopy = cards[0];
+            const copy1 = { ...cardToCopy, uniqueId: `card_${Math.random().toString(36).substring(2, 9)}` };
+            const copy2 = { ...cardToCopy, uniqueId: `card_${Math.random().toString(36).substring(2, 9)}` };
+            state.masterDeckList.push(copy1, copy2);
+            addToLog(`Two copies of ${cardToCopy.value}${cardToCopy.suit} have been added to your deck!`, 'text-purple-300');
+            break;
+            
+        case 'ritual_pick_4_erase':
+            state.masterDeckList = state.masterDeckList.filter(c => !cardIds.includes(c.uniqueId));
+            const cardNames = cards.map(c => `${c.value}${c.suit}`).join(', ');
+            addToLog(`The following cards have been purged from your deck: ${cardNames}.`, 'text-purple-300');
+            break;
+
+        case 'ritual_pick_2_pair':
+            state.cardPairs.push([cardIds[0], cardIds[1]]);
+            cards[0].ability = 'lover'; cards[0].abilityName = 'Lover';
+            cards[1].ability = 'lover'; cards[1].abilityName = 'Lover';
+            addToLog(`Your ${cards[0].value}${cards[0].suit} and ${cards[1].value}${cards[1].suit} are now Fated Lovers!`, 'text-purple-300');
+            break;
+            
+        case 'ritual_pick_2_fuse':
+            const cardA = cards[0];
+            const cardB = cards[1];
+
+            const isAceA = cardA.value === 'A';
+            const isAceB = cardB.value === 'A';
+            const hasAce = isAceA || isAceB;
+
+            let newValue, newWeight;
+
+            if (hasAce) {
+                // If an Ace is involved, the new card acts like an Ace
+                newValue = 'A'; // This will make calculateHandValue() treat it as flexible
+
+                // Set the 'weight' to be the high value (Ace = 11)
+                if (isAceA && isAceB) {
+                    // Fusing two Aces. (A=11) + (A=1) = 12.
+                    newWeight = 11 + 1; // The flexible values will be 12 or 2
+                } else if (isAceA) {
+                    // Fusing Ace + Number. (A=11) + (CardB's value)
+                    newWeight = 11 + cardB.weight;
+                } else { // isAceB
+                    // Fusing Number + Ace. (CardA's value) + (A=11)
+                    newWeight = cardA.weight + 11;
+                }
+            } else {
+                // Original logic: No Aces involved
+                newValue = `${cardA.value}+${cardB.value}`;
+                newWeight = cardA.weight + cardB.weight;
+            }
+
+            // Create a new card
+            const newCard = {
+                value: newValue, // Set to 'A' if an Ace was involved, or "7+3" otherwise
+                suit: cardA.suit, // Keep suit of the first card
+                weight: newWeight, // Set to the high value (if Ace) or sum (if not)
+                uniqueId: `card_${Math.random().toString(36).substring(2, 9)}`,
+                ability: 'fused',
+                abilityName: 'Chimeric'
+            };
+            finishArcanaSelection();
+            break; // <-- FIX 1: This was a '}' on line 3510
+    } // <-- This '}' is on line 3511 and closes the 'switch'
+} // <-- FIX 2: Add this '}' on a new line (3512) to close 'executeArcanaRitual'
+
+/**
+ * Handles the logic for The Hierophant (picking a suit).
+ * @param {string} arcanaKey - The key ('arcana_hierophant').
+ * @param {string} suit - The suit chosen ('♠', '♥', '♦', '♣').
+ */
+function applyArcanaRitual_Suit(arcanaKey, suit) {
+    const state = player.roguelikeBlackjackState;
+    state.deckAbilities.suitRoyals = suit;
+    
+    addToLog(`All ${suit} cards in your deck will now be considered Face Cards!`, 'text-purple-300');
+    
+    // Close the suit picker modal
+    closeArcanaSuitPicker();
+    // Finish the selection process
+    finishArcanaSelection();
+}
+
+/**
+ * Cleans up the state after an Arcana ritual is finished and returns to the shop.
+ */
+function finishArcanaSelection() {
+    const state = player.roguelikeBlackjackState;
+    // Reset state
+    state.gamePhase = 'shop';
+    state.activeArcanaKey = null;
+    state.arcanaSelection = null;
+    
+    // Close the UI
+    closeArcanaSelection(); // This function is in rendering.js
+    renderRoguelikeShop();
+}
+
+/**
+ * Cancels the Arcana selection and returns to the shop.
+ */
+function cancelArcanaSelection() {
+    const state = player.roguelikeBlackjackState;
+
+    // --- NO REFUND ---
+    // The pack was already 'opened'. Cancelling now just forfeits the ritual.
+
+    addToLog("You step away from the ritual, forfeiting the Arcana.", "text-gray-400"); // <-- New log
+
+    // Clear state
+    state.activeArcanaKey = null;
+    state.arcanaSelection = null;
+    state.gamePhase = 'shop';
+
+    closeArcanaSelection(); // This function is in rendering.js
+    renderRoguelikeShop();
+}
+
 // NEW function to be added to casino.js
 /**
  * Sells a Passive Modifier from the player's inventory.
  * @param {string} key - The key of the passive (e.g., 'diamonds_chips').
  */
+
+
 function sellRoguelikePassive(key) {
     const state = player.roguelikeBlackjackState;
     if (state.gamePhase !== 'player_draft') return; // Can only sell on your turn
@@ -2367,22 +3106,28 @@ function sellRoguelikeConsumable(index) {
 
 function generateRoguelikeShopStock() {
     const state = player.roguelikeBlackjackState;
-    const stock = [];
-    
-    // --- NEW: Shopaholic logic ---
-    const itemsToStock = 3 + (state.patronSkills.includes('Shopaholic') ? 1 : 0);
-    // --- END NEW ---
 
-    // Stock 3 (or 4) items
-    for (let i = 0; i < itemsToStock; i++) {
-        // 50% passive, 30% consumable, 20% upgrade
+    // 1. Get locked items and determine target size
+    const stock = [...state.shopLockedSlots];
+    const targetStockSize = (4 + (state.patronSkills.includes('Shopaholic') ? 1 : 0)) + 2; // 4 random + 2 guaranteed = 6 total (or 7)
+    
+    // 2. Generate the 4 (or 5) random items
+    const randomItemsToStock = (4 + (state.patronSkills.includes('Shopaholic') ? 1 : 0)) - stock.length; // Only add randoms if not locked
+    for (let i = 0; i < randomItemsToStock; i++) {
         const roll = Math.random();
         let itemKey;
-        if (roll < 0.5) {
+        if (roll < 0.30) { // 30%
             itemKey = generateWeightedShopItem('passive');
-        } else if (roll < 0.8) {
+        } else if (roll < 0.50) { // 20%
             itemKey = generateWeightedShopItem('consumable');
-        } else {
+        } else if (roll < 0.85) { // 35%
+            const shamanRoll = Math.random();
+            if (shamanRoll < 0.5) { // 30% of this 35% = 10.5%
+                itemKey = generateWeightedShopItem('conjure');
+            } else { // 70% of this 35% = 24.5%
+                itemKey = generateWeightedShopItem('arcana_pack');
+            }
+        } else { // 15%
             itemKey = generateWeightedShopItem('upgrade');
         }
         
@@ -2391,15 +3136,35 @@ function generateRoguelikeShopStock() {
         }
     }
     
-    // Add 1 guaranteed Common Passive
-    const commonPassive = generateWeightedShopItem('passive', 1); // Force rarity 1
-    if (commonPassive) stock.push(commonPassive);
+    // 3. Add 2 guaranteed items (if slots not locked)
+    if (randomItemsToStock > 0) { // Only add guaranteed if we're not fully locked
+        const commonPassive = generateWeightedShopItem('passive', 1);
+        if (commonPassive) stock.push(commonPassive);
 
-    // Add 1 guaranteed Common Consumable
-    const commonConsumable = generateWeightedShopItem('consumable', 1); // Force rarity 1
-    if (commonConsumable) stock.push(commonConsumable);
-    
-    return [...new Set(stock)]; // Remove duplicates
+        const commonConsumable = generateWeightedShopItem('consumable', 1);
+        if (commonConsumable) stock.push(commonConsumable);
+    }
+
+    // 4. De-duplicate the list
+    let uniqueStock = [...new Set(stock)];
+
+    // 5. (THE FIX) Backfill the shop if duplicates were removed or guaranteed items failed
+    let attempt = 0; // Failsafe to prevent infinite loops
+    while (uniqueStock.length < targetStockSize && attempt < 10) {
+        // Add a random item (any type) to fill the gap
+        const randomType = ['passive', 'consumable', 'arcana_pack', 'upgrade', 'conjure'][Math.floor(Math.random() * 5)];
+        const fillItem = generateWeightedShopItem(randomType); // Generate a random item
+        
+        if (fillItem) {
+            uniqueStock.push(fillItem); // Add it to the stock
+            uniqueStock = [...new Set(uniqueStock)]; // Re-run set to ensure *this* wasn't a duplicate
+        }
+        attempt++;
+    }
+
+    // 6. Save the final stock
+    state.shopStock = uniqueStock; 
+    return state.shopStock;
 }
 
 function generateWeightedShopItem(type) {
@@ -2422,8 +3187,15 @@ function generateWeightedShopItem(type) {
             // Add more checks for future non-stackable upgrades
             return true;
         };
+    } else if (type === 'conjure') {
+        sourcePool = BJ_CONJURE_PACKS;
+        filterPool = k => true; // Conjure packs can be bought multiple times
+    // --- ADD THIS ELSE IF ---
+    } else if (type === 'arcana_pack') {
+        sourcePool = BJ_ARCANA_PACKS;
+        filterPool = k => true; // Packs can always be bought
     } else {
-        return null;
+        return null;    
     }
 
     const availableKeys = Object.keys(sourcePool).filter(filterPool);
@@ -2462,32 +3234,24 @@ function buyRoguelikeTool(toolKey) {
     let type;
 
     if (BJ_PASSIVE_MODIFIERS[toolKey]) {
-        tool = BJ_PASSIVE_MODIFIERS[toolKey];
-        type = 'passive';
+        tool = BJ_PASSIVE_MODIFIERS[toolKey]; type = 'passive';
     } else if (BJ_CONSUMABLES[toolKey]) {
-        tool = BJ_CONSUMABLES[toolKey];
-        type = 'consumable';
+        tool = BJ_CONSUMABLES[toolKey]; type = 'consumable';
     } else if (BJ_RUN_UPGRADES[toolKey]) {
-        tool = BJ_RUN_UPGRADES[toolKey];
-        type = 'upgrade';
+        tool = BJ_RUN_UPGRADES[toolKey]; type = 'upgrade';
+    } else if (BJ_CONJURE_PACKS[toolKey]) {
+        tool = BJ_CONJURE_PACKS[toolKey]; type = 'conjure';
+    } else if (BJ_ARCANA_PACKS[toolKey]) { // <-- THIS LINE IS NEW
+        tool = BJ_ARCANA_PACKS[toolKey]; type = 'arcana_pack';
     }
+    // --- END ADDITION ---
 
-    if (!tool || state.currentCrookards < tool.cost) { 
+    if (!tool || state.currentCrookards < tool.cost) {
         addToLog("You can't afford that.", 'text-red-400');
         return;
     }
 
     // Check slots
-    if (type === 'passive' && state.passiveModifiers.length >= state.runUpgrades.passiveSlots) {
-        addToLog("Your passive slots are full.", 'text-red-400');
-        return;
-    }
-    if (type === 'consumable' && state.consumables.length >= state.runUpgrades.consumableSlots) {
-        addToLog("Your consumable slots are full.", 'text-red-400');
-        return;
-    }
-
-    // Pay and add tool
     state.currentCrookards -= tool.cost; 
     
     if (type === 'passive') {
@@ -2496,17 +3260,92 @@ function buyRoguelikeTool(toolKey) {
         state.consumables.push(toolKey);
     } else if (type === 'upgrade') {
         tool.apply(state);
-        // --- NEW: Update shopRerollCost immediately if base is changed ---
         if (toolKey === 'cheaper_reroll') {
             state.shopRerollCost = state.runUpgrades.baseShopRerollCost;
         }
+    } else if (type === 'conjure') {
+        addToLog(`You pay ${tool.cost} Crookards. The shaman begins the ritual...`, 'text-yellow-300');
+        const conjuredCards = [];
+        
+        // --- NEW: 10% Enhancement Chance ---
+        const enhancements = Object.keys(BJ_ARCANA_RITUALS).filter(k => BJ_ARCANA_RITUALS[k].subType === 'enhancement');
         // --- END NEW ---
-    }
 
-    // Remove from shop stock
+        for (let i = 0; i < tool.conjure; i++) {
+            const randomCard = { ...MASTER_CARD_LIST[Math.floor(Math.random() * MASTER_CARD_LIST.length)] }; // Push a copy
+            
+            // --- NEW: 10% Chance Logic ---
+            if (enhancements.length > 0 && Math.random() < 0.10) { // 10% chance
+                const randomArcanaKey = enhancements[Math.floor(Math.random() * enhancements.length)];
+                const randomArcana = BJ_ARCANA_RITUALS[randomArcanaKey];
+                randomArcana.apply(randomCard); // Apply enhancement (e.g., card.ability = 'strength')
+                addToLog(`The conjured ${randomCard.value}${randomCard.suit} feels... different. It is now ${randomCard.abilityName}!`, 'text-purple-300');
+            }
+            // --- END NEW ---
+            conjuredCards.push(randomCard);
+        }
+        state.gamePhase = 'conjuring';
+        state.conjurePackDisplay = {
+            packKey: toolKey,
+            cards: conjuredCards,
+            chosenIndices: []
+        };
+        
+        state.shopStock = state.shopStock.filter(key => key !== toolKey);
+        
+        renderRoguelikeConjure(); // Render the new screen
+        return; 
+    }
+    // --- ADD THIS ENTIRE BLOCK ---
+    else if (type === 'arcana_pack') {
+        addToLog(`You pay ${tool.cost} Crookards for the ${tool.name} ritual...`, 'text-yellow-300');
+
+        // Generate random Arcana choices
+        const arcanaChoices = [];
+        const availableArcana = Object.keys(BJ_ARCANA_RITUALS); // All arcana are available
+
+        for (let i = 0; i < tool.conjure; i++) {
+            if (availableArcana.length === 0) break; // Should not happen
+            const randIndex = Math.floor(Math.random() * availableArcana.length);
+            // --- THIS IS THE FIX: Splice returns an array, so take the first element ---
+            const chosenArcanaKey = availableArcana.splice(randIndex, 1)[0]; // Pull from list to avoid duplicates *in this one pack*
+            arcanaChoices.push(chosenArcanaKey);
+        }
+
+        state.gamePhase = 'arcana_choice'; // New game phase
+        state.arcanaPackDisplay = {
+            packKey: toolKey,
+            arcana: arcanaChoices,
+            chosenKey: null // Single select
+        };
+
+        state.shopStock = state.shopStock.filter(key => key !== toolKey);
+
+        renderRoguelikeArcanaChoice(); // Render the new screen
+        return; 
+    }
+// Remove from shop stock (for non-conjure/arcana items)
+    // --- END NEW ---
+
+    // Remove from shop stock (for non-conjure/arcana items)
     state.shopStock = state.shopStock.filter(key => key !== toolKey);
     addToLog(`Purchased: ${tool.name}!`, 'text-green-300');
     renderRoguelikeShop(); // Re-render shop
+}
+
+function getRandomCardEnhancement() {
+    const state = player.roguelikeBlackjackState;
+    // Get all Arcana that are 'enhancement' type
+    const enhancements = Object.keys(BJ_ARCANA_RITUALS).filter(k => BJ_ARCANA_RITUALS[k].subType === 'enhancement');
+    
+    if (enhancements.length === 0) {
+        return null; // No enhancements defined
+    }
+    
+    const randomArcanaKey = enhancements[Math.floor(Math.random() * enhancements.length)];
+    const randomArcana = BJ_ARCANA_RITUALS[randomArcanaKey];
+    
+    return randomArcana;
 }
 
 function sellRoguelikePassiveShop(key) {
@@ -2585,27 +3424,66 @@ function roguelikeRerollShop() {
         return;
     }
     state.currentCrookards -= cost;
-    
-    // --- NEW: Double the cost for next time ---
     state.shopRerollCost *= 2;
     addToLog(`Rerolled shop for ${cost} Crookards. Next reroll costs ${state.shopRerollCost} Crookards.`, "text-yellow-300");
-    // --- END NEW ---
 
-    state.shopStock = generateRoguelikeShopStock();
+    // --- MODIFICATION ---
+    // Clear the shop stock. generateRoguelikeShopStock will see it's empty
+    // and rebuild it, automatically preserving the shopLockedSlots.
+    state.shopStock = [];
+    // --- END MODIFICATION ---
+
     renderRoguelikeShop();
+}
+
+function toggleShopLock(itemKey) {
+    const state = player.roguelikeBlackjackState;
+    if (state.gamePhase !== 'shop') return;
+
+    // Get the correct lock cost from run upgrades
+    const lockCost = state.runUpgrades.cheaperLocks ? 1 : (state.shopLockCost || 2);
+    const index = state.shopLockedSlots.indexOf(itemKey);
+
+    if (index > -1) {
+        // Item is locked, UNLOCK it
+        state.shopLockedSlots.splice(index, 1);
+        // Do NOT refund cost.
+        addToLog(`You unlocked ${getItemDetails(itemKey).name}. It will be removed on the next reroll.`, 'text-gray-400');
+    } else {
+        // Item is unlocked, LOCK it
+        if (state.currentCrookards < lockCost) {
+            addToLog(`You need ${lockCost} Crookards to lock that item.`, 'text-red-400');
+            return;
+        }
+        state.currentCrookards -= lockCost;
+        state.shopLockedSlots.push(itemKey);
+        addToLog(`You paid ${lockCost} Crookards to lock ${getItemDetails(itemKey).name}. It is safe from rerolls.`, 'text-yellow-300');
+    }
+    renderRoguelikeShop(); // Refresh UI to show new lock state
 }
 
 function startNextHand() {
     const state = player.roguelikeBlackjackState;
     
-    if (state.deck.length < 20) { // Ensure enough cards for initial deal + pool
-        state.deck = createDeck();
-        shuffleDeck(state.deck);
+    // --- NEW: Move used cards to discard pile ---
+    state.discardPile.push(...state.playerHand);
+    state.discardPile.push(...state.dealerHand);
+    state.discardPile.push(...state.sharedPool);
+    // --- END NEW ---
+
+    if (state.deck.length < 20) { // Ensure enough cards for next hand + pool
+        addToLog("Shuffling the discard pile back into the deck.", "text-gray-400");
+        state.deck.push(...state.discardPile); // Add discards back
+        state.discardPile = []; // Empty discard
+        shuffleDeck(state.deck); // Shuffle the full deck
     }
 
+    // --- MODIFIED: Clear hands/pool *after* discarding ---
     state.playerHand = [state.deck.pop(), state.deck.pop()];
-    state.dealerHand = [state.deck.pop(), state.deck.pop()]; // Dealer gets 2 cards (1 hidden)
-    state.sharedPool = []; // Clear old pool
+    state.dealerHand = [state.deck.pop(), state.deck.pop()]; 
+    state.sharedPool = []; 
+    // --- END MODIFIED ---
+
     dealRoguelikePool(); // Deal 6 cards to the pool
 
     state.gamePhase = 'player_draft'; // Start with player's turn to draft
