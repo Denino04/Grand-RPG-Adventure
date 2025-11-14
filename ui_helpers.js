@@ -3,6 +3,35 @@
 // theme management, and other interface-related logic.
 
 // =================================================================================
+// SECTION 0: AUDIO ENGINE
+// =================================================================================
+
+const SOUNDS = {
+    // IMPORTANT: Replace these paths with your own audio files
+    'hover': new Audio('path/to/your/hover.mp3'),
+    'click': new Audio('path/to/your/click.mp3')
+};
+
+// Set volumes (optional, 0.5 = 50% volume)
+SOUNDS.hover.volume = 0.3;
+SOUNDS.click.volume = 0.5;
+
+/**
+ * Plays a pre-loaded sound effect.
+ * @param {string} soundName - The key of the sound to play (e.g., 'hover', 'click').
+ */
+function playSound(soundName) {
+    const sound = SOUNDS[soundName];
+    if (sound) {
+        sound.currentTime = 0;
+        sound.play().catch(error => {
+            // This catch prevents console errors if the user clicks too fast
+            console.warn(`Audio play failed for [${soundName}]:`, error.message);
+        });
+    }
+}
+
+// =================================================================================
 // SECTION 1: CORE UTILITIES & DOM HELPERS
 // =================================================================================
 
@@ -1371,7 +1400,7 @@ function debugUpdateVariables() {
 // =================================================================================
 // SECTION 8: THEMING & PALETTES
 // =================================================================================
-const PALETTES = {
+/*const PALETTES = {
     'default': { '--bg-main': '#1f2937', '--bg-secondary': '#111827', '--bg-log': 'rgba(0,0,0,0.3)', '--bg-tooltip': '#111827', '--border-main': '#374151', '--text-main': '#d1d5db', '--text-accent': '#fcd34d', '--btn-primary-bg': '#475569', '--btn-primary-bg-hover': '#64748b', '--btn-primary-border': '#1e293b', '--btn-primary-border-hover': '#334155' },
     'town': { '--bg-main': '#44403c', '--bg-secondary': '#292524', '--bg-log': 'rgba(20,10,0,0.3)', '--bg-tooltip': '#292524', '--border-main': '#57534e', '--text-main': '#e7e5e4', '--text-accent': '#f59e0b', '--btn-primary-bg': '#a16207', '--btn-primary-bg-hover': '#b45309', '--btn-primary-border': '#713f12', '--btn-primary-border-hover': '#854d0e' },
     'forest': { '--bg-main': '#14532d', '--bg-secondary': '#064e3b', '--bg-log': 'rgba(0,10,5,0.3)', '--bg-tooltip': '#064e3b', '--border-main': '#065f46', '--text-main': '#d1fae5', '--text-accent': '#a3e635', '--btn-primary-bg': '#059669', '--btn-primary-bg-hover': '#047857', '--btn-primary-border': '#065f46', '--btn-primary-border-hover': '#064e3b' },
@@ -1393,14 +1422,149 @@ const PALETTES = {
         '--bg-tooltip': '#2b103d',
         '--border-main': '#7a3ea5',
         '--text-main': '#e9d5ff',
-        '--text-accent': '#fde047', // Brighter Gold
-        /* --- MODIFICATION --- */
         '--btn-primary-bg': '#dc2626', // Gaudy Red
         '--btn-primary-bg-hover': '#ef4444',
         '--btn-primary-border': '#991b1b',
         '--btn-primary-border-hover': '#b91c1c'
-        /* --- END MODIFICATION --- */
     }
+};*/
+// Define the one, true wintry palette
+// This is our "Wintry" color. It's the 'cold air' that will be in every theme.
+const WINTRY_BASE_COLOR = '#0f172a'; // slate-900
+
+// This is the default Wintry theme for the town square, menus, etc.
+const WINTRY_PALETTE = {
+    '--bg-main': `linear-gradient(to bottom right, ${WINTRY_BASE_COLOR}, #020617)`, // Wintry Slate -> Wintry Dark
+    '--bg-secondary': '#020617', // slate-950
+    '--bg-log': 'rgba(2, 6, 23, 0.5)',
+    '--bg-tooltip': '#020617',
+    '--border-main': '#334155', // slate-700
+    '--text-main': '#dbeafe', // light blue
+    '--text-accent': '#60a5fa', // bright blue
+    '--btn-primary-bg': '#1e3a8a',
+    '--btn-primary-bg-hover': '#1e40af',
+    '--btn-primary-border': '#1e40af',
+    '--btn-primary-border-hover': '#1d4ed8'
+};
+
+// These are the HYBRID palettes
+const PALETTES = {
+    // DEFAULT (Wintry)
+    'default': WINTRY_PALETTE,
+    
+    // TOWN (Homely & Wintry)
+    'town': {
+        '--bg-main': `linear-gradient(to bottom right, ${WINTRY_BASE_COLOR} 30%, #44403c 100%)`, // Wintry Slate -> Homely Stone Grey
+        '--bg-secondary': '#292524', // Original "stone" secondary
+        '--bg-log': 'rgba(20,10,0,0.3)',
+        '--bg-tooltip': '#292524',
+        '--border-main': '#57534e',
+        '--text-main': '#e7e5e4',
+        '--text-accent': '#f59e0b', // Homely amber text
+        '--btn-primary-bg': '#a16207', // Homely brown/gold buttons
+        '--btn-primary-bg-hover': '#b45309',
+        '--btn-primary-border': '#713f12',
+        '--btn-primary-border-hover': '#854d0e'
+    },
+    
+    // FOREST (Lush & Wintry)
+    'forest': {
+        '--bg-main': `linear-gradient(to bottom right, ${WINTRY_BASE_COLOR} 30%, #14532d 100%)`, // Wintry Slate -> Deep Forest Green
+        '--bg-secondary': '#064e3b', // Original dark green secondary
+        '--bg-log': 'rgba(0,10,5,0.3)',
+        '--bg-tooltip': '#064e3b',
+        '--border-main': '#065f46',
+        '--text-main': '#d1fae5',
+        '--text-accent': '#a3e635', // Vibrant green text
+        '--btn-primary-bg': '#059669', // Deep green buttons
+        '--btn-primary-bg-hover': '#047857',
+        '--btn-primary-border': '#065f46',
+        '--btn-primary-border-hover': '#064e3b'
+    },
+    
+    // CAVE (Dank & Wintry)
+    'cave': {
+        '--bg-main': `linear-gradient(to bottom right, ${WINTRY_BASE_COLOR} 30%, #262626 100%)`, // Wintry Slate -> Dank Grey
+        '--bg-secondary': '#171717',
+        '--bg-log': 'rgba(0,0,0,0.5)',
+        '--bg-tooltip': '#171717',
+        '--border-main': '#404040',
+        '--text-main': '#a3a3a3',
+        '--text-accent': '#eab308', // Gold/torchlight text
+        '--btn-primary-bg': '#525252', // Stone grey buttons
+        '--btn-primary-bg-hover': '#737373',
+        '--btn-primary-border': '#262626',
+        '--btn-primary-border-hover': '#404040'
+    },
+    
+    // MOUNTAIN (Pure Icy)
+    'mountain': {
+        '--bg-main': `linear-gradient(to bottom right, ${WINTRY_BASE_COLOR} 30%, #075985 100%)`, // Wintry Slate -> Sky Blue
+        '--bg-secondary': '#0c4a6e',
+        '--bg-log': 'rgba(0,5,20,0.3)',
+        '--bg-tooltip': '#0c4a6e',
+        '--border-main': '#0369a1',
+        '--text-main': '#e0f2fe',
+        '--text-accent': '#f0f9ff', // Pure white text
+        '--btn-primary-bg': '#0ea5e9', // Sky blue buttons
+        '--btn-primary-bg-hover': '#38bdf8',
+        '--btn-primary-border': '#0369a1',
+        '--btn-primary-border-hover': '#075985'
+    },
+
+    // VOLCANO (Soot & Hot & Wintry) - This is your Blacksmith theme
+    'volcano': {
+        '--bg-main': `linear-gradient(to bottom right, ${WINTRY_BASE_COLOR} 30%, #2d3748 100%)`, // Wintry Slate -> Soot Grey
+        '--bg-secondary': '#1a202c', // Sooty secondary
+        '--bg-log': 'rgba(0,0,0,0.5)',
+        '--bg-tooltip': '#1a202c',
+        '--border-main': '#4a5568',
+        '--text-main': '#e2e8f0',
+        '--text-accent': '#f56565', // Fiery red text
+        '--btn-primary-bg': '#c53030', // Hot red buttons
+        '--btn-primary-bg-hover': '#e53e3e',
+        '--btn-primary-border': '#9b2c2c',
+        '--btn-primary-border-hover': '#c53030'
+    },
+    
+    // MAGIC (Arcane & Wintry)
+    'magic': {
+        '--bg-main': `linear-gradient(to bottom right, ${WINTRY_BASE_COLOR} 30%, #2c1b47 100%)`, // Wintry Slate -> Arcane Purple
+        '--bg-secondary': '#1a102d',
+        '--bg-log': 'rgba(10, 5, 20, 0.5)',
+        '--bg-tooltip': '#1a102d',
+        '--border-main': '#4a3a6b',
+        '--text-main': '#e6defe',
+        '--text-accent': '#f0abfc', // Bright magenta text
+        '--btn-primary-bg': '#4a3a6b', // Arcane purple buttons
+        '--btn-primary-bg-hover': '#6a5a8b',
+        '--btn-primary-border': '#2c215d',
+        '--btn-primary-border-hover': '#4a3a6b'
+    },
+
+    // CASINO (Gaudy & Wintry)
+    'casino': {
+        '--bg-main': `linear-gradient(to bottom right, ${WINTRY_BASE_COLOR} 30%, #4a1d68 100%)`, // Wintry Slate -> Gaudy Purple
+        '--bg-secondary': '#2b103d',
+        '--bg-log': 'rgba(20, 10, 30, 0.5)',
+        '--bg-tooltip': '#2b103d',
+        '--border-main': '#7a3ea5',
+        '--text-main': '#e9d5ff',
+        '--text-accent': '#fde047', // Gold text
+        '--btn-primary-bg': '#dc2626', // Gaudy red buttons
+        '--btn-primary-bg-hover': '#ef4444',
+        '--btn-primary-border': '#991b1b',
+        '--btn-primary-border-hover': '#b91c1c'
+    },
+
+    // All other themes will use the Wintry Base Palette
+    'swamp': WINTRY_PALETTE,
+    'tundra': WINTRY_PALETTE,
+    'void': WINTRY_PALETTE,
+    'necropolis': WINTRY_PALETTE,
+    'noon': WINTRY_PALETTE,
+    'sunset': WINTRY_PALETTE,
+    'midnight': WINTRY_PALETTE
 };
 
 /**

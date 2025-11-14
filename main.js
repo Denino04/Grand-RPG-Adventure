@@ -1138,6 +1138,22 @@ function handleStartScreenClicks(event) {
 
 
 function setupEventListeners() {
+    // --- NEW: Global Button Sound Listeners ---
+    document.body.addEventListener('mousedown', (event) => {
+        // 'mousedown' feels more responsive for a "pressed" sound
+        if (event.target.closest('.btn')) {
+            playSound('click');
+        }
+    });
+    
+    document.body.addEventListener('mouseenter', (event) => {
+        // 'mouseenter' fires only once when entering, unlike 'mouseover'
+        if (event.target.closest('.btn')) {
+            playSound('hover');
+        }
+    }, true); // Use capture phase to catch the event early
+    // --- END: Global Button Sound Listeners ---
+
     $('#start-screen').addEventListener('click', handleStartScreenClicks);
 
     const tutorialToggle = $('#tutorial-toggle');

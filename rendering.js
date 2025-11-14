@@ -362,7 +362,7 @@ function renderCharacterSheet(isLevelUp = false) {
     // This is now much cleaner and just assembles the parts.
     let html = `
     <div class="w-full text-left">
-        <h2 class="font-medieval text-2xl mb-2 text-center">Character Sheet</h2>
+        <h2 class="font-medieval text-2xl mb-2 text-center title-glow">Character Sheet</h2>
 
         <!-- Allocation Controls -->
         <div class="flex justify-between items-center mb-2 p-1 bg-slate-900/50 rounded-lg text-sm">
@@ -1000,7 +1000,7 @@ function renderWildernessMenu() {
     lastViewBeforeInventory = 'wilderness';
     gameState.currentView = 'wilderness';
     let html = `<div class="w-full">
-        <h2 class="font-medieval text-3xl mb-4 text-center">Choose a Biome to Explore</h2>
+        <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Choose a Biome to Explore</h2>
         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`;
 
     player.biomeOrder.forEach(biomeKey => {
@@ -1110,7 +1110,7 @@ function renderTownSquare() {
 
 
     let html = `
-        <h2 class="font-medieval text-3xl mb-8 text-center">Town Square</h2>
+        <h2 class="font-medieval text-3xl mb-8 text-center title-glow">Town Square</h2>
         <div class="grid grid-cols-2 gap-4 w-full max-w-md">`;
 
     // Render only unlocked buttons (except house placeholder)
@@ -1159,7 +1159,7 @@ function renderHouse() {
 
     let html = `
         <div class="w-full text-center">
-            <h2 class="font-medieval text-3xl mb-4 text-center">Your House</h2>
+            <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Your House</h2>
             <p class="mb-6 text-gray-400">A cozy, personal space to rest and prepare for your adventures.</p>
             <div class="grid grid-cols-2 gap-4 w-full max-w-md mx-auto">
                 ${buttonsHtml}
@@ -1364,7 +1364,7 @@ function renderHouseStorage() {
 
     let html = `
         <div class="w-full max-w-5xl mx-auto flex flex-col h-full">
-            <h2 class="font-medieval text-3xl mb-2 text-center">Storage Chest</h2>
+            <h2 class="font-medieval text-3xl mb-2 text-center title-glow">Storage Chest</h2>
             <p class="text-center text-sm text-gray-400 mb-4">Capacity: ${uniqueItemCount} / ${limits.unique} Unique Items | Max Stack: ${limits.stack}</p>
 
             <div class="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden">
@@ -1460,7 +1460,7 @@ function renderSettingsMenu(originView = 'town') {
     };
 
     let html = `<div class="w-full max-w-2xl text-center">
-        <h2 class="font-medieval text-3xl mb-4">Settings</h2>
+        <h2 class="font-medieval text-3xl mb-4 title-glow">Settings</h2>
 
         <div class="mb-6 space-y-2">
             <button onclick="saveGame(true)" class="btn btn-primary">Save Game</button>
@@ -1533,7 +1533,7 @@ function renderResidentialDistrict() {
     }
     // --- END NPC ALLY ---
 
-    let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Residential District</h2>
+    let html = `<h2 class="font-medieval text-3xl mb-8 text-center title-glow">Residential District</h2>
                 <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
 
     // --- Level 1 Gating Logic ---
@@ -1723,7 +1723,7 @@ function renderNpcSpellTraining() {
     const elementOrder = ['none', 'fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'void', 'healing'];
 
     let html = `<div class="w-full max-w-4xl mx-auto">
-        <h2 class="font-medieval text-3xl mb-2 text-center">Spell Training for ${ally.name}</h2>
+        <h2 class="font-medieval text-3xl mb-2 text-center title-glow">Spell Training for ${ally.name}</h2>
         <p class="text-center text-gray-400 mb-6">Purchase spell training for your ally. Essences are not required, but you must pay the gold cost for each tier.</p>
         
         <div class="h-96 overflow-y-auto inventory-scrollbar pr-2 space-y-4">`;
@@ -1867,7 +1867,7 @@ function renderBarracks() {
     gameState.currentView = 'barracks';
 
     let html = `<div class="w-full max-w-3xl mx-auto text-left">
-        <h2 class="font-medieval text-3xl mb-4 text-center">Barracks</h2>`;
+        <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Barracks</h2>`;
 
     if (player.npcAlly) {
         // --- NPC ALLY: MANAGE ALLY & SALARY UI ---
@@ -2077,7 +2077,7 @@ function renderNpcInventory() {
     const playerItems = player.inventory;
     
     let html = `<div class="w-full max-w-5xl mx-auto flex flex-col h-full">
-        <h2 class="font-medieval text-3xl mb-2 text-center">Manage ${ally.name}'s Inventory</h2>
+        <h2 class="font-medieval text-3xl mb-2 text-center title-glow">Manage ${ally.name}'s Inventory</h2>
         <p class="text-center text-sm text-gray-400 mb-4">Left-click an item in your inventory to give it to your ally. Left-click an item in their inventory to take it back.</p>
         
         <div class="flex-grow grid grid-cols-2 gap-4 overflow-hidden">
@@ -2441,7 +2441,7 @@ function renderLibrary() {
     gameState.currentView = 'library';
 
     let html = `<div class="w-full h-full flex flex-col text-left">
-        <h2 class="font-medieval text-3xl mb-4 text-center">The Library</h2>
+        <h2 class="font-medieval text-3xl mb-4 text-center ">The Library</h2>
         <div class="flex-grow flex gap-6 overflow-hidden">
             <div class="w-1/3 flex flex-col gap-2">
                 <h3 class="font-bold text-lg text-yellow-300">Available Tomes</h3>
@@ -2621,7 +2621,7 @@ function renderCommercialDistrict() {
         locations.push({ name: "Foundation & Fortune", action: "renderHomeImprovements()", unlocked: true });
     }
 
-    let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Commercial District</h2>
+    let html = `<h2 class="font-medieval text-3xl mb-8 text-center title-glow">Commercial District</h2>
                 <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
 
     // --- Modified Button Rendering ---
@@ -2655,7 +2655,7 @@ function renderHomeImprovements(activeCategoryKey = 'storage') {
     gameState.currentView = 'home_improvements';
 
     let html = `<div class="w-full h-full flex flex-col text-left">
-        <h2 class="font-medieval text-3xl mb-1 text-center">Foundation & Fortune</h2>
+        <h2 class="font-medieval text-3xl mb-1 text-center title-glow ">Foundation & Fortune</h2>
         <p class="text-sm text-gray-400 text-center mb-4">"Gizmo at your service! More space? Bigger booms? Pointy-er practice dummies? You want it, I got it... for a price!"</p>
 
         <div class="flex-grow flex flex-col md:flex-row gap-6 overflow-hidden">
@@ -2769,7 +2769,7 @@ function renderArcaneQuarter() {
         { name: 'The Crooked Card', action: "renderArcaneCasino()", unlocked: player.unlocks.arcaneCasino }
     ];
 
-    let html = `<h2 class="font-medieval text-3xl mb-8 text-center">Arcane Quarter</h2>
+    let html = `<h2 class="font-medieval text-3xl mb-8 text-center title-glow">Arcane Quarter</h2>
                 <div class="grid grid-cols-1 gap-4 w-full max-w-xs">`;
 
     // --- Modified Button Rendering ---
@@ -2828,7 +2828,7 @@ function renderEnchanterShop() {
     }
 
     let html = `<div class="w-full">
-                    <h2 class="font-medieval text-3xl mb-4 text-center">Enchanter's Wares</h2>
+                    <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Enchanter's Wares</h2>
                     <p class="text-center text-gray-400 mb-4">"Looking for reagents? Essences? Things to make your pointy bits... pointier?"</p>
                     <div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div>
                     <div class="flex justify-center gap-4 mt-4">
@@ -2853,7 +2853,7 @@ function renderEnchanterEnchant(selectedElement = null) {
     const container = document.createElement('div');
     container.className = 'w-full';
 
-    let html = `<h2 class="font-medieval text-3xl mb-2 text-center">The Enchanter's Table</h2>
+    let html = `<h2 class="font-medieval text-3xl mb-2 text-center title-glow">The Enchanter's Table</h2>
                 <p class="text-center text-gray-400 mb-6">"Bring your gear, bring the essence... let's make some magic happen."</p>`;
 
     html += `<div class="mb-6 p-4 bg-slate-900/50 rounded-lg">
@@ -2928,7 +2928,7 @@ function renderEnchanterMenu() {
 
     let html = `
         <div class="w-full text-center">
-            <h2 class="font-medieval text-3xl mb-4 text-center">The Enchanter</h2>
+            <h2 class="font-medieval text-3xl mb-4 text-center title-glow">The Enchanter</h2>
             <p class="mb-6 text-gray-400">"Welcome, welcome! Need some... esoteric supplies? Or perhaps looking to imbue your gear with elemental power?"</p>
             <div class="flex flex-col md:flex-row justify-center items-center gap-4">
                 <button onclick="renderEnchanterShop()" class="btn btn-primary w-full md:w-auto">Buy Wares</button>
@@ -2954,7 +2954,7 @@ function renderArcaneCasino() {
 
     let html = `
     <div class="w-full max-w-4xl text-center">
-        <h2 class="font-medieval text-3xl mb-4 text-center">
+        <h2 class="font-medieval text-3xl mb-4 text-center title-glow">
             The Crooked C<span data-char="A" class="casino-secret-char cursor-pointer hover:text-yellow-300">a</span>rd
         </h2>
         
@@ -3138,7 +3138,7 @@ function renderRoguelikeBuyInScreen() {
 
     let html = `
     <div class="w-full text-center">
-        <h2 class="font-medieval text-3xl mb-4 text-center">"Le Tricheur" (The Endless Run)</h2>
+        <h2 class="font-medieval text-3xl mb-4 text-center title-glow">"Le Tricheur" (The Endless Run)</h2>
         <p class="mb-2 text-gray-300">Welcome to the high-stakes table. A single run consists of 8 stakes of increasing difficulty.</p>
         <p class="mb-6 text-gray-300">Beat all 8 stakes to win a massive prize. Fail to meet any stake, and your run is over.</p>
         
@@ -3274,7 +3274,7 @@ function renderRoguelikeHandUI() {
     let html = `
     <div class="w-full h-full flex flex-col text-center p-2">
     <div class="flex-shrink-0 flex justify-between items-center mb-2 px-2">
-        <h2 class="font-medieval text-xl">Ante ${state.currentAnteIndex + 1}: ${vingtUn.name} | <span class="text-yellow-300">Crookards: ${state.currentCrookards}</span></h2>
+        <h2 class="font-medieval text-xl title-glow">Ante ${state.currentAnteIndex + 1}: ${vingtUn.name} | <span class="text-yellow-300">Crookards: ${state.currentCrookards}</span></h2>
         <h3 class="font-bold text-lg text-yellow-300">Target: <span class="text-2xl">${state.currentChips} / ${vingtUn.chipsToWin}</span></h3>
         <h3 class="font-bold text-lg text-white">Hands Left: <span class="text-2xl">${state.currentHandsLeft}</span></h3>
     </div>
@@ -3430,7 +3430,7 @@ function renderRoguelikeResultsUI() {
 
     let html = `
     <div class="w-full h-full flex flex-col text-center justify-center p-4">
-        <h2 class="font-medieval text-3xl mb-4">Hand Complete</h2>
+        <h2 class="font-medieval text-3xl mb-4 title-glow">Hand Complete</h2>
         
         <div class="grid grid-cols-2 gap-4 mb-4">
             <div class="text-left">
@@ -3513,7 +3513,7 @@ function renderPatronSkillChoice(skillPoolKeys) {
 
     let html = `
     <div class="w-full h-full flex flex-col text-center justify-center p-4">
-        <h2 class="font-medieval text-3xl mb-2">Patron Defeated!</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">Patron Defeated!</h2>
         <p class="text-lg text-gray-300 mb-6">You have mastered ${ante.anteName}. The House offers you a boon before you proceed.</p>
         <p class="text-xl font-bold text-yellow-300 mb-4">Choose Your Patron Skill:</p>
         
@@ -3569,7 +3569,7 @@ function renderCashOutPrompt() {
     
     let html = `
     <div class="w-full h-full flex flex-col text-center justify-center p-4">
-        <h2 class="font-medieval text-3xl mb-2">Ante Complete!</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">Ante Complete!</h2>
         <p class="text-lg text-gray-300 mb-6">You defeated the Patron of ${currentAnte.anteName}.</p>
         <p class="text-xl text-white mb-2">You can cash out now and take your winnings:</p>
         <p class="text-4xl font-bold text-yellow-300 mb-6">${currentAnte.cashOutReward} G</p>
@@ -3823,7 +3823,7 @@ function renderRoguelikeShop() {
 
     let html = `
     <div class="w-full h-full flex flex-col text-center p-4">
-        <h2 class="font-medieval text-3xl mb-2">The Void Market</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">The Void Market</h2>
         <div class="flex justify-between items-center mb-4 px-2">
             <h3 class="font-bold text-lg text-yellow-300">Crookards: <span class="text-2xl">${state.currentCrookards}</span></h3>
             <h3 class="font-bold text-lg text-white">${nextUpText}</h3>
@@ -3908,7 +3908,7 @@ function renderRoguelikeConjure() {
 
     let html = `
     <div class="w-full h-full flex flex-col text-center justify-center p-4">
-        <h2 class="font-medieval text-3xl mb-2">${pack.name}</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">${pack.name}</h2>
         <p class="text-lg text-gray-300 mb-6">${pack.desc}</p>
         
         <p id="conjure-status" class="text-xl font-bold text-yellow-300 mb-4 h-6">${statusMessage}</p>
@@ -3968,7 +3968,7 @@ function renderRoguelikeArcanaChoice() {
 
     let html = `
     <div class="w-full h-full flex flex-col text-center justify-center p-4">
-        <h2 class="font-medieval text-3xl mb-2">${pack.name}</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">${pack.name}</h2>
         <p class="text-lg text-gray-300 mb-6">${pack.desc}</p>
         <p id="arcana-choice-status" class="text-xl font-bold text-yellow-300 mb-4 h-6">${statusMessage}</p>
         <div class="flex-grow bg-slate-900/50 rounded-lg p-4 overflow-y-auto inventory-scrollbar">
@@ -4053,7 +4053,7 @@ function renderRoguelikeArcanaSelection(filterFn = null, customStatus = null) {
     let html = `
     <div class="w-full h-full flex flex-col p-4">
         <div class="flex-shrink-0 text-center">
-            <h2 class="font-medieval text-3xl text-yellow-300">${arcana.name}</h2>
+            <h2 class="font-medieval text-3xl text-yellow-300 title-glow">${arcana.name}</h2>
             <p class="text-lg text-gray-300 mb-4">${arcana.desc}</p>
             <p id="arcana-status" class="text-xl font-bold text-yellow-300 h-6">${statusMessage}</p>
         </div>
@@ -4232,7 +4232,7 @@ function renderDeckViewer() {
     let html = `
     <div class="w-full h-full flex flex-col p-4">
         <div class="flex justify-between items-center mb-2 flex-shrink-0">
-            <h2 class="font-medieval text-3xl text-center text-yellow-300">Deck Viewer</h2>
+            <h2 class="font-medieval text-3xl text-center text-yellow-300 title-glow">Deck Viewer</h2>
             <button onclick="closeDeckViewer()" class="btn btn-action text-lg py-1 px-3">&times;</button>
         </div>
         <p class="text-center text-gray-400 mb-4 flex-shrink-0">Cards in Draw Pile: ${state.deck.length} / ${state.masterDeckList.length}</p>
@@ -4296,7 +4296,7 @@ function renderArcanaSuitPicker(arcanaKey) {
     let html = `
     <div class="w-full h-full flex flex-col p-4 justify-center items-center">
         <div class="flex-shrink-0 text-center bg-slate-800 p-6 rounded-lg shadow-xl border border-slate-600">
-            <h2 class="font-medieval text-3xl text-yellow-300">${arcana.name}</h2>
+            <h2 class="font-medieval text-3xl text-yellow-300 title-glow">${arcana.name}</h2>
             <p class="text-lg text-gray-300 my-4">${arcana.desc}</p>
             <p class="text-xl font-bold text-yellow-300 h-6 mb-4">Choose a suit to empower:</p>
             <div class="flex justify-center gap-4">
@@ -4343,7 +4343,7 @@ function renderBlackjack() {
 
     let html = `
     <div class="w-full h-full flex flex-col text-center p-4">
-        <h2 class="font-medieval text-3xl mb-2">Arcane 21</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">Arcane 21</h2>
         
         <!-- Dealer Area -->
         <div class="mb-4">
@@ -4475,7 +4475,7 @@ function renderPoker() {
 
     let html = `
     <div class="w-full h-full flex flex-col text-center p-4">
-        <h2 class="font-medieval text-3xl mb-2">Wizard's Folly</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow ">Wizard's Folly</h2>
         
         <!-- Pot Area -->
         <div class="my-2">
@@ -4653,7 +4653,7 @@ function renderSlots() {
 
     let html = `
     <div class="w-full h-full flex flex-col text-center p-4">
-        <h2 class="font-medieval text-3xl mb-2">Arcane Slots</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">Arcane Slots</h2>
         
         <div class="mb-4">
             <h3 class="font-bold text-xl text-yellow-300">Jackpot: ${PAYTABLE['💎💎💎']}x Bet</h3>
@@ -4765,7 +4765,7 @@ function renderBaccarat() {
 
     let html = `
     <div class="w-full h-full flex flex-col text-center p-4">
-        <h2 class="font-medieval text-3xl mb-2">Baccarat</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">Baccarat</h2>
         
         <div class="my-2">
             <h3 class="font-bold text-xl text-yellow-300">Payouts: Player (1:1), Banker (0.95:1), Tie (8:1)</h3>
@@ -4879,7 +4879,7 @@ function renderRoulette() {
 
     let html = `
     <div class="w-full h-full flex flex-col text-center p-2">
-        <h2 class="font-medieval text-3xl mb-2">Roulette</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">Roulette</h2>
         
         <div class="flex justify-between items-center mb-2 px-2">
             <div id="roulette-result-display" class="text-white">--</div>
@@ -5055,7 +5055,7 @@ function renderWitchsCoven(subView = 'main') {
 
     const hearts = player.inventory.items['undying_heart'] || 0;
     let html = `<div class="w-full text-center">
-        <h2 class="font-medieval text-3xl mb-2">Witch's Coven</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">Witch's Coven</h2>
         <p class="text-purple-300 mb-6">You have <span class="font-bold">${hearts}</span> Undying Hearts.</p>`;
 
     if (subView === 'main') {
@@ -5206,7 +5206,7 @@ function renderSageTowerMenu() {
 
     let html = `
         <div class="w-full text-center">
-            <h2 class="font-medieval text-3xl mb-4 text-center">Sage's Tower</h2>
+            <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Sage's Tower</h2>
             <p class="mb-6">The ancient sage offers knowledge of spells and arcane catalysts.</p>
             <div class="flex flex-col md:flex-row justify-center items-center gap-4">
                 <button onclick="renderSageTowerTrain()" class="btn btn-magic w-full md:w-auto">Train Spells</button>
@@ -5229,7 +5229,7 @@ function renderQuestBoard() {
 
     lastViewBeforeInventory = 'quest_board';
     gameState.currentView = 'quest_board';
-    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">Quest Board</h2>`;
+    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center title-glow">Quest Board</h2>`;
 
     if (player.activeQuest) {
         const quest = getQuestDetails(player.activeQuest);
@@ -5337,7 +5337,7 @@ function renderInn() {
     lastViewBeforeInventory = 'inn';
     gameState.currentView = 'inn';
     const cost = 10 + 5 * player.level;
-    let html = `<h2 class="font-medieval text-3xl mb-4 text-center">The Weary Traveler Inn</h2><p class="mb-4 text-center">A night's rest costs ${cost} G. You will be fully restored.</p><div class="flex justify-center gap-4"><button onclick="restAtInn(${cost})" class="btn btn-primary" ${player.gold < cost ? 'disabled' : ''}>Rest for the night</button><button onclick="renderResidentialDistrict()" class="btn btn-primary">Back</button></div>${player.gold < cost ? '<p class="text-red-400 mt-2 text-center">You cannot afford a room.</p>' : ''}`;
+    let html = `<h2 class="font-medieval text-3xl mb-4 text-center title-glow">The Weary Traveler Inn</h2><p class="mb-4 text-center">A night's rest costs ${cost} G. You will be fully restored.</p><div class="flex justify-center gap-4"><button onclick="restAtInn(${cost})" class="btn btn-primary" ${player.gold < cost ? 'disabled' : ''}>Rest for the night</button><button onclick="renderResidentialDistrict()" class="btn btn-primary">Back</button></div>${player.gold < cost ? '<p class="text-red-400 mt-2 text-center">You cannot afford a room.</p>' : ''}`;
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -5417,7 +5417,7 @@ function renderShop(type) {
 
         itemsHtml += '</div>';
     }
-    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderCommercialDistrict()" class="btn btn-primary">Back</button></div></div>`;
+    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center title-glow">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderCommercialDistrict()" class="btn btn-primary">Back</button></div></div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -5434,7 +5434,7 @@ function renderBlacksmithMenu() {
 
     let html = `
         <div class="w-full text-center">
-            <h2 class="font-medieval text-3xl mb-4 text-center">Clanging Hammer Blacksmith</h2>
+            <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Clanging Hammer Blacksmith</h2>
             <p class="mb-6">The heat of the forge is immense. What do you need?</p>
             <div class="flex justify-center gap-4">
                 <button onclick="renderBlacksmithBuy()" class="btn btn-primary">Buy Equipment</button>
@@ -5474,7 +5474,7 @@ function renderBlacksmithBuy() {
 
         itemsHtml += '</div>';
     }
-    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center">Buy Equipment</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4"><button onclick="renderBlacksmithMenu()" class="btn btn-primary">Back</button></div></div>`;
+    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center title-glow">Buy Equipment</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4"><button onclick="renderBlacksmithMenu()" class="btn btn-primary">Back</button></div></div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -5543,7 +5543,7 @@ function renderBlacksmithCraft() {
 
     let html = `
         <div class="w-full">
-            <h2 class="font-medieval text-3xl mb-4 text-center">Craft Equipment</h2>
+            <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Craft Equipment</h2>
             <p class="text-center text-gray-400 mb-4">Combine materials to forge powerful gear.</p>
             <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">${recipesHtml}</div>
             <div class="text-center mt-4">
@@ -5602,7 +5602,7 @@ function renderSell() {
 
     let html = `
         <div class="w-full text-left h-full flex flex-col">
-            <h2 class="font-medieval text-3xl mb-2 text-center">Sell Items</h2>
+            <h2 class="font-medieval text-3xl mb-2 text-center title-glow">Sell Items</h2>
             ${tabHtml}
             <div class="flex-grow overflow-hidden h-72">
                 ${rightPaneContent}
@@ -5849,7 +5849,7 @@ function renderSageTowerTrain() {
     const elementOrder = ['none', 'fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'void', 'healing'];
 
     let html = `<div class="w-full">
-        <h2 class="font-medieval text-3xl mb-4 text-center">Train Spells</h2>
+        <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Train Spells</h2>
         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-4">`;
 
     elementOrder.forEach(element => {
@@ -5942,7 +5942,7 @@ function renderSageTowerBuy() {
     }
 
     let html = `<div class="w-full">
-                    <h2 class="font-medieval text-3xl mb-4 text-center">Purchase Catalysts</h2>
+                    <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Purchase Catalysts</h2>
                     <div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div>
                     <div class="text-center mt-4">
                         <button onclick="renderSageTowerMenu()" class="btn btn-primary">Back</button>
@@ -6003,7 +6003,7 @@ function renderSageTowerCraft() {
 
     let html = `
         <div class="w-full">
-            <h2 class="font-medieval text-3xl mb-4 text-center">Synthesize Catalysts</h2>
+            <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Synthesize Catalysts</h2>
             <p class="text-center text-gray-400 mb-4">Combine materials to create powerful arcane catalysts.</p>
             <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">${recipesHtml}</div>
             <div class="text-center mt-4">
@@ -6366,7 +6366,7 @@ function renderInventory() {
 
     let html = `
         <div class="w-full text-left h-full flex flex-col">
-            <h2 class="font-medieval text-3xl mb-2 text-center">Inventory</h2>
+            <h2 class="font-medieval text-3xl mb-2 text-center title-glow">Inventory</h2>
             ${battleWarning}
             ${tabHtml}
             <div class="flex-grow overflow-hidden h-72">
@@ -6404,7 +6404,7 @@ function renderBattle(subView = 'main', actionData = null) {
         // This block remains unchanged as it's only for the old attack/magic button lists,
         // which might still be used if we revert or for a different UI later.
         // However, the item targeting logic that *was* here is now gone.
-        let html = `<h2 class="font-medieval text-3xl mb-4 text-center">Choose a Target</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
+        let html = `<h2 class="font-medieval text-3xl mb-4 text-center title-glow">Choose a Target</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
         let buttonAction, buttonClass, titleText, backFunction;
 
         if (subView === 'attack') {
@@ -6419,7 +6419,7 @@ function renderBattle(subView = 'main', actionData = null) {
              backFunction = `renderBattle('magic')`; // Back to magic selection
         }
 
-        html = `<h2 class="font-medieval text-3xl mb-4 text-center">${titleText}</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
+        html = `<h2 class="font-medieval text-3xl mb-4 text-center title-glow">${titleText}</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
 
         currentEnemies.forEach((enemy, index) => {
             if (enemy.isAlive()) {
@@ -6463,7 +6463,7 @@ function renderBattle(subView = 'main', actionData = null) {
         }).join('');
 
         let html = `<div class="w-full text-center">
-                        <h2 class="font-medieval text-3xl mb-4">Cast a Spell</h2>
+                        <h2 class="font-medieval text-3xl mb-4 title-glow">Cast a Spell</h2>
                         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 mb-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-2">${spellsHtml}</div>
                         </div>
@@ -6616,7 +6616,7 @@ function renderPostBattleMenu() {
     }
     const biome = BIOMES[biomeKey];
     let html = `<div class="text-center">
-        <h2 class="font-medieval text-3xl mb-4 text-yellow-200">Victory!</h2>
+        <h2 class="font-medieval text-3xl mb-4 text-yellow-200 title-glow">Victory!</h2>
         <p class="mb-6">You have cleared the area. What will you do next?</p>
         <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
             <button onclick="startBattle('${biomeKey}')" class="btn btn-primary w-full sm:w-auto">Continue Exploring</button>
@@ -6631,7 +6631,7 @@ function renderPostBattleMenu() {
 function renderGraveyard() {
     const graveyard = JSON.parse(localStorage.getItem('rpgGraveyard') || '[]');
     let html = `<div class="w-full text-center">
-        <h2 class="font-medieval text-3xl mb-4 text-center">Graveyard</h2>
+        <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Graveyard</h2>
         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3 text-left">`;
 
     if (graveyard.length === 0) {
@@ -6664,7 +6664,7 @@ function renderChangelog() {
     const changelogScreen = $('#changelog-screen');
     changelogScreen.classList.remove('hidden');
 
-    let html = `<h2 class="font-medieval text-4xl mb-4 text-center text-yellow-400">Changelog</h2>
+    let html = `<h2 class="font-medieval text-4xl mb-4 text-center text-yellow-400 title-glow">Changelog</h2>
                 <div class="bg-slate-800 rounded-lg p-6 h-96 overflow-y-auto inventory-scrollbar space-y-6">`;
 
     CHANGELOG_DATA.forEach(version => {
@@ -6774,7 +6774,7 @@ function renderBestiaryMenu(origin = 'inventory') {
     }
 
     let html = `<div class="w-full text-center">
-        <h2 class="font-medieval text-3xl mb-4">Bestiary</h2>
+        <h2 class="font-medieval text-3xl mb-4 title-glow">Bestiary</h2>
         <p class="text-gray-400 mb-6">(Work in Progress)</p>
         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">
             <p class="text-gray-500">You haven't discovered any creatures yet.</p>
@@ -6805,7 +6805,7 @@ function startBettyDialogue() {
         const randomIdle = BETTY_DIALOGUE.betty_idle[Math.floor(Math.random() * BETTY_DIALOGUE.betty_idle.length)];
         let html = `<div class="w-full h-full flex flex-col items-center justify-center p-4">
             <div class="w-full max-w-lg text-center">
-                <h2 class="font-medieval text-2xl mb-4">Betty's Corner</h2>
+                <h2 class="font-medieval text-2xl mb-4 title-glow">Betty's Corner</h2>
                 <p class="text-gray-400 mb-6 italic">"${randomIdle}"</p>
                 <div class="flex justify-center gap-4">
                     <button onclick="renderBestiaryMenu('betty')" class="btn btn-primary">View Bestiary</button>
@@ -6978,7 +6978,7 @@ function renderGarden() {
     }
 
     let html = `<div class="w-full text-center">
-        <h2 class="font-medieval text-3xl mb-2">Your Garden</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">Your Garden</h2>
         <p class="text-gray-400 mb-4">Click an empty plot to plant a seed, or a grown plant to harvest.</p>
 
         <div class="flex flex-col md:flex-row justify-center items-center md:items-start gap-4 w-full">
@@ -7185,7 +7185,7 @@ function renderKitchen() {
     applyTheme('town');
 
     let html = `<div class="w-full text-center">
-        <h2 class="font-medieval text-3xl mb-2">Kitchen</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">Kitchen</h2>
         <p class="text-gray-400 mb-6">Combine ingredients to cook hearty meals. Note: Food buffs do not stack.</p>
         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3 max-w-lg mx-auto text-left">`;
 
@@ -7316,7 +7316,7 @@ function renderAlchemyLab() {
 
     let html = `
         <div class="w-full text-left">
-            <h2 class="font-medieval text-3xl mb-2 text-center">Home Alchemy Lab</h2>
+            <h2 class="font-medieval text-3xl mb-2 text-center title-glow">Home Alchemy Lab</h2>
             <p class="text-center text-gray-400 mb-6">Tier ${alchemyTier} Station. Left-click a slot to add ingredients. Right-click to remove.</p>
 
             <div class="alchemy-station">
@@ -7448,7 +7448,7 @@ function renderTrainingGrounds() {
     const trainingTier = player.house.trainingTier || 0;
     const defeatedEnemies = Object.keys(player.legacyQuestProgress || {});
     let html = `<div class="w-full text-center">
-        <h2 class="font-medieval text-3xl mb-2">Training Grounds</h2>`;
+        <h2 class="font-medieval text-3xl mb-2 title-glow">Training Grounds</h2>`;
 
     // --- Tier 2: Arena of Champions (Replaces Tier 1) ---
     if (trainingTier >= 2) {
@@ -7593,7 +7593,7 @@ window.startTrainingBattle = function(tier) {
 // Function to render Cook's On-Field Cooking UI
 function renderOnFieldCookingUI() {
     let html = `<div class="w-full text-center">
-        <h2 class="font-medieval text-3xl mb-2">On-Field Cooking</h2>
+        <h2 class="font-medieval text-3xl mb-2 title-glow">On-Field Cooking</h2>
         <p class="text-gray-400 mb-4">Select a recipe to prepare. Missing ingredients will cost MP.</p>
         <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3 max-w-lg mx-auto text-left">`;
 
