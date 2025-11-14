@@ -67,6 +67,7 @@ const ANTE_STRUCTURE = [
     { 
         anteName: "The Entryway",
         cashOutReward: 1000,
+        payoutRatio: 2, // <-- ADDED
         vingtUns: [
             { name: 'Petit', chipsToWin: 50, hands: 5, rerolls: 3 },
             { name: 'Grand', chipsToWin: 100, hands: 5, rerolls: 3 },
@@ -77,6 +78,7 @@ const ANTE_STRUCTURE = [
     { 
         anteName: "The Double Down",
         cashOutReward: 3000,
+        payoutRatio: 6, // <-- ADDED
         vingtUns: [
             { name: 'Petit', chipsToWin: 200, hands: 5, rerolls: 3 },
             { name: 'Grand', chipsToWin: 400, hands: 5, rerolls: 3 },
@@ -87,6 +89,7 @@ const ANTE_STRUCTURE = [
     { 
         anteName: "The High Table",
         cashOutReward: 6000,
+        payoutRatio: 12, // <-- ADDED
         vingtUns: [
             { name: 'Petit', chipsToWin: 500, hands: 4, rerolls: 3 },
             { name: 'Grand', chipsToWin: 1000, hands: 4, rerolls: 3 },
@@ -97,6 +100,7 @@ const ANTE_STRUCTURE = [
     { 
         anteName: "The Turn",
         cashOutReward: 10000,
+        payoutRatio: 20, // <-- ADDED
         vingtUns: [
             { name: 'Petit', chipsToWin: 1000, hands: 4, rerolls: 3 },
             { name: 'Grand', chipsToWin: 2000, hands: 4, rerolls: 3 },
@@ -107,6 +111,7 @@ const ANTE_STRUCTURE = [
     { 
         anteName: "The River",
         cashOutReward: 15000,
+        payoutRatio: 30, // <-- ADDED
         vingtUns: [
             { name: 'Petit', chipsToWin: 2000, hands: 4, rerolls: 2 },
             { name: 'Grand', chipsToWin: 4000, hands: 4, rerolls: 2 },
@@ -117,6 +122,7 @@ const ANTE_STRUCTURE = [
     { 
         anteName: "The All-In",
         cashOutReward: 22000,
+        payoutRatio: 44, // <-- ADDED
         vingtUns: [
             { name: 'Petit', chipsToWin: 4000, hands: 4, rerolls: 2 },
             { name: 'Grand', chipsToWin: 8000, hands: 4, rerolls: 2 },
@@ -127,6 +133,7 @@ const ANTE_STRUCTURE = [
     { 
         anteName: "The Shark Tank",
         cashOutReward: 30000,
+        payoutRatio: 60, // <-- ADDED
         vingtUns: [
             { name: 'Petit', chipsToWin: 8000, hands: 3, rerolls: 2 },
             { name: 'Grand', chipsToWin: 16000, hands: 3, rerolls: 2 },
@@ -137,6 +144,7 @@ const ANTE_STRUCTURE = [
     { 
         anteName: "The House Always Wins",
         cashOutReward: 50000,
+        payoutRatio: 100, // <-- ADDED
         vingtUns: [
             { name: 'Petit', chipsToWin: 15000, hands: 3, rerolls: 1 },
             { name: 'Grand', chipsToWin: 30000, hands: 3, rerolls: 1 },

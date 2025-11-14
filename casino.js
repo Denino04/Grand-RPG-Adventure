@@ -16,10 +16,8 @@ const MASTER_CARD_LIST = [];
     // MASTER_CARD_LIST.push({ value: 'Joker', suit: 'JOKER_RED', weight: 12, id: 'joker_red' });
     // MASTER_CARD_LIST.push({ value: 'Joker', suit: 'JOKER_BLACK', weight: 12, id: 'joker_black' });
 })();
-// --- BLACKJACK ("Arcane 21") ---
-let casinoSecretCode = []; // <-- NEW: Track secret code
+// --- BLACKJACK ("Arcane 21") ---  
 let roguelikeShopActiveDrawer = 'passives'; // Default to 'Passives' as it's most common
-const CASINO_SECRET = ['B', 'A', 'L', 'A', 'T', 'R', 'O']; // <-- NEW: The code itself
 
 window.setRoguelikeShopDrawer = function(drawerName) {
     roguelikeShopActiveDrawer = drawerName;
@@ -42,7 +40,7 @@ let slotState = {
     statusMessage: 'Place your bet to spin.'
 };
 
-function checkCasinoCode(char) {
+/*function checkCasinoCode(char) {
     if (player.unlocks.roguelikeCardGame) return; // Already unlocked
 
     casinoSecretCode.push(char);
@@ -83,7 +81,7 @@ function checkCasinoCode(char) {
         // Re-render the casino to show the new button
         renderArcaneCasino();
     }
-}
+}*/
 /**
  * Creates a standard 52-card deck.
  */
@@ -1276,7 +1274,7 @@ for (const betType in state.bets) {
 // =================================================================================
 
 
-function startRoguelikeRun(deckKey = 'base_deck') { // <-- MODIFICATION: Add deckKey parameter
+function startRoguelikeRun(buyInAmount, deckKey = 'base_deck') { // <-- MODIFICATION: Add buyInAmount parameter
     
     // Check if this is a resume or a new run
     const state = player.roguelikeBlackjackState; // <-- NEW: Define state earlier
@@ -1301,11 +1299,19 @@ function startRoguelikeRun(deckKey = 'base_deck') { // <-- MODIFICATION: Add dec
         
     } else {
         // This is a NEW run
-        if (player.gold < player.roguelikeBlackjackState.buyIn) {
-            addToLog(`You need ${player.roguelikeBlackjackState.buyIn}G to start a new run.`, 'text-red-400');
+        
+        // --- MODIFICATION START: Use buyInAmount ---
+        if (buyInAmount < 100) {
+            addToLog("Buy-in must be at least 100G.", "text-red-400");
             return;
         }
-        player.gold -= player.roguelikeBlackjackState.buyIn;
+        if (player.gold < buyInAmount) {
+            addToLog(`You need ${buyInAmount}G to start a new run.`, 'text-red-400');
+            return;
+        }
+        player.gold -= buyInAmount;
+        player.roguelikeBlackjackState.buyIn = buyInAmount; // Store the run's buy-in
+        // --- MODIFICATION END ---
         
         // --- NEW: Create masterDeckList ONCE here ---
         const newDeck = createDeck(deckKey); // Create the base deck
@@ -1347,7 +1353,7 @@ function startRoguelikeRun(deckKey = 'base_deck') { // <-- MODIFICATION: Add dec
         player.roguelikeBlackjackState.gamePhase = 'starting_run';
         player.roguelikeBlackjackState.statusMessage = 'The run begins. Prepare for the first Vingt-un.';
         
-        addToLog(`You pay the ${player.roguelikeBlackjackState.buyIn}G buy-in. A new run begins.`, 'text-yellow-300');
+        addToLog(`You pay the ${buyInAmount}G buy-in. A new run begins.`, 'text-yellow-300'); // MODIFIED
     }
     
     updateStatsView();
@@ -2500,7 +2506,10 @@ function roguelikeCashOut() {
     }
     // --- END FIX ---
 
-    const goldReward = ANTE_STRUCTURE[anteClearedIndex].cashOutReward;
+    // --- MODIFICATION START: Calculate reward ---
+    const anteData = ANTE_STRUCTURE[anteClearedIndex];
+    const goldReward = state.buyIn * anteData.payoutRatio;
+    // --- MODIFICATION END ---
     
     player.gold += goldReward;
     
@@ -2542,7 +2551,10 @@ function roguelikeWinRun() {
     // --- END FIX ---
 
     const finalAnte = ANTE_STRUCTURE[ANTE_STRUCTURE.length - 1]; // Get the last Ante
-    const goldReward = finalAnte.cashOutReward;
+    
+    // --- MODIFICATION START: Calculate reward ---
+    const goldReward = state.buyIn * finalAnte.payoutRatio;
+    // --- MODIFICATION END ---
     
     player.gold += goldReward;
     

@@ -726,7 +726,6 @@ async function loadGameFromKey(docId, isImport = false) {
             if (player.unlocks.hasTowerKey === undefined) player.unlocks.hasTowerKey = !!player.inventory?.items?.['tower_key'];
             // --- NPC ALLY: Barracks migration ---
             if (player.unlocks.barracks === undefined) player.unlocks.barracks = (player.level >= 8);
-            if (player.unlocks.roguelikeCardGame === undefined) player.unlocks.roguelikeCardGame = false; // <-- NEW FLAG MIGRATION
             if (player.lastCasinoBet === undefined) player.lastCasinoBet = 10; // <-- NEW
             if (player.lastCasinoAnte === undefined) player.lastCasinoAnte = 10; // <-- NEW
 

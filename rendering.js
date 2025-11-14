@@ -2948,24 +2948,20 @@ function renderArcaneCasino() {
     lastViewBeforeInventory = 'casino_hub';
     gameState.currentView = 'casino_hub';
 
-    if (typeof casinoSecretCode !== 'undefined') {
-        casinoSecretCode = [];
-    }
+    // --- REMOVED 'casinoSecretCode' variable ---
 
     let html = `
     <div class="w-full max-w-4xl text-center">
         <h2 class="font-medieval text-3xl mb-4 text-center title-glow">
-            The Crooked C<span data-char="A" class="casino-secret-char cursor-pointer hover:text-yellow-300">a</span>rd
+            The Crooked Card
         </h2>
         
         <p class="text-gray-400 mb-8 max-w-3xl mx-auto">
-            "Welcome. Only the truly <span data-char="B" class="casino-secret-char cursor-pointer hover:text-yellow-300">B</span>old win big here.
-            This is no p<span data-char="L" class="casino-secret-char cursor-pointer hover:text-yellow-300">l</span><span data-char="A" class="casino-secret-char cursor-pointer hover:text-yellow-300">a</span>ce 
-            for the timid. The Pa<span data-char="T" class="casino-secret-char cursor-pointer hover:text-yellow-300">t</span>ron 
-            watches all, fav<span data-char="O" class="casino-secret-char cursor-pointer hover:text-yellow-300">o</span>ring those 
-            who <span data-char="R" class="casino-secret-char cursor-pointer hover:text-yellow-300">r</span>isk everything."
+            "Welcome. Only the truly Bold win big here.
+            This is no place for the timid. The Patron 
+            watches all, favoring those 
+            who risk everything."
         </p>
-        
         <h3 class="font-medieval text-xl text-yellow-300 mb-3">Main Tables</h3>
         <div class="grid grid-cols-2 justify-center items-center gap-4 mb-6">
             <button onclick="renderBlackjack()" class="btn btn-primary">Play "Arcane 21"</button>
@@ -2979,10 +2975,10 @@ function renderArcaneCasino() {
             <button onclick="renderSlots()" class="btn btn-primary w-full md:w-3/4">Play "Arcane Slots"</button>
             
             <button id="roguelike-game-btn" onclick="renderRoguelikeGame()" 
-                    class="btn btn-primary w-full md:w-3/4 ${!player.unlocks.roguelikeCardGame ? 'hidden' : ''} border-2 border-purple-500 hover:bg-purple-700 hover:border-purple-400 focus:ring-2 focus:ring-purple-300">
+                    class="btn btn-primary w-full md:w-3/4 border-2 border-purple-500 hover:bg-purple-700 hover:border-purple-400 focus:ring-2 focus:ring-purple-300">
                 Play "Le Tricheur"
             </button>
-        </div>
+            </div>
 
         <div class="mt-8">
             <button onclick="renderArcaneQuarter()" class="btn btn-action">Back to Arcane Quarter</button>
@@ -3105,9 +3101,8 @@ function renderRoguelikeBuyInScreen() {
     gameState.currentView = 'roguelike_game'; // <-- MODIFIED: Your file had 'roguelike_buy_in'
     
     const state = player.roguelikeBlackjackState;
-    const buyIn = state.buyIn;
-    // 0 = none cleared, 1 = Ante 1 cleared, etc.
-    const highestAnteCleared = state.highestAnteCleared || 0; // <-- [ADD THIS LINE]
+    const initialBuyIn = 500; // <-- CHANGED
+    const highestAnteCleared = state.highestAnteCleared || 0;
 
     // --- NEW: Deck Unlock Logic ---
     // Decks are unlocked *after* clearing the specified Ante index
@@ -3151,12 +3146,21 @@ function renderRoguelikeBuyInScreen() {
                 ${DECK_DEFINITIONS['base_deck'].description}
             </p>
         </div>
-        <p class="text-2xl font-bold text-yellow-300 mb-6">Buy-in: ${buyIn} G</p>
-        <div class="flex flex-col md:flex-row justify-center items-center gap-4">
-            <button onclick="startRoguelikeRun(document.getElementById('deck-select').value)" class="btn btn-primary w-full md:w-auto" ${player.gold < buyIn ? 'disabled' : ''}>
-                Start Run (${buyIn} G)
-            </button>
+        
+        <div class="max-w-md mx-auto mb-4">
+            <label for="roguelike-buy-in-amount" class="block text-lg font-bold mb-2 text-yellow-300">Set Buy-in (Min: 100)</label>
+            <input type="number" id="roguelike-buy-in-amount" value="${initialBuyIn}" min="100" 
+                   oninput="const btn = document.getElementById('start-roguelike-run-btn'); const val = parseInt(this.value); if(btn) btn.disabled = player.gold < val || val < 100;"
+                   class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400">
         </div>
+        <div class="flex flex-col md:flex-row justify-center items-center gap-4">
+            <button id="start-roguelike-run-btn" 
+                    onclick="startRoguelikeRun(parseInt(document.getElementById('roguelike-buy-in-amount').value), document.getElementById('deck-select').value)" 
+                    class="btn btn-primary w-full md:w-auto" 
+                    ${player.gold < initialBuyIn ? 'disabled' : ''}>
+                Start Run
+            </button>
+            </div>
             <div class="mt-8">
             <button onclick="renderArcaneCasino()" class="btn btn-action">Back to Casino</button>
         </div>
@@ -3567,14 +3571,16 @@ function renderCashOutPrompt() {
     const currentAnte = ANTE_STRUCTURE[state.currentAnteIndex];
     const nextAnte = ANTE_STRUCTURE[state.currentAnteIndex + 1]; // This is safe because 'winRun' handles the last ante
     
+    // --- MODIFICATION START: Calculate reward based on buy-in ---
+    const goldReward = state.buyIn * currentAnte.payoutRatio;
+    // --- MODIFICATION END ---
+
     let html = `
     <div class="w-full h-full flex flex-col text-center justify-center p-4">
         <h2 class="font-medieval text-3xl mb-2 title-glow">Ante Complete!</h2>
         <p class="text-lg text-gray-300 mb-6">You defeated the Patron of ${currentAnte.anteName}.</p>
         <p class="text-xl text-white mb-2">You can cash out now and take your winnings:</p>
-        <p class="text-4xl font-bold text-yellow-300 mb-6">${currentAnte.cashOutReward} G</p>
-        
-        <p class="text-xl text-white mb-2">...or risk it all and continue to the next Ante?</p>
+        <p class="text-4xl font-bold text-yellow-300 mb-6">${goldReward} G</p> <p class="text-xl text-white mb-2">...or risk it all and continue to the next Ante?</p>
         <p class="text-2xl font-bold text-red-400 mb-6">${nextAnte.anteName}</p>
         <div class="flex justify-center gap-6 max-w-md mx-auto">
             <button onclick="roguelikeCashOut()" class="btn btn-action text-lg flex-1">
