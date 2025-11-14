@@ -22,36 +22,49 @@
     </script>
     <script src="/_vercel/insights/script.js"></script>
 
-    <style>
+<style>
         /* --- Root Variables & Themes --- */
         :root {
-            --bg-main: #1f2937;
-            --bg-secondary: #111827;
-            --bg-log: rgba(0, 0, 0, 0.3);
-            --bg-tooltip: #111827;
-            --border-main: #374151;
-            --text-main: #d1d5db;
-            --text-accent: #fcd34d;
-            --btn-primary-bg: #475569;
-            --btn-primary-bg-hover: #64748b;
-            --btn-primary-border: #1e293b;
-            --btn-primary-border-hover: #334155;
+            /* Wintry Backgrounds (from start-screen) */
+            --bg-main: linear-gradient(to bottom right, #0f172a, #020617); /* Default Wintry Gradient */
+            --bg-secondary: #020617; /* slate-950 */
+            --bg-log: rgba(2, 6, 23, 0.5); /* transparent slate-950 */
+            --bg-tooltip: #020617;
+            --border-main: #334155; /* slate-700 */
+            
+            /* Wintry Text */
+            --text-main: #dbeafe; /* light blue */
+            --text-accent: #60a5fa; /* bright blue */
+
+            /* Wintry Primary Button (from .btn-wintry) */
+            --btn-primary-bg: #1e3a8a;
+            --btn-primary-bg-hover: #1e40af;
+            --btn-primary-border: #1e40af;
+            --btn-primary-border-hover: #1d4ed8;
+
+            /* Action Buttons (Keep Red for UI clarity) */
             --btn-action-bg: #dc2626;
             --btn-action-bg-hover: #ef4444;
             --btn-action-border: #991b1b;
             --btn-action-border-hover: #b91c1c;
-            --btn-magic-bg: #9333ea;
-            --btn-magic-bg-hover: #a855f7;
-            --btn-magic-border: #6b21a8;
-            --btn-magic-border-hover: #7e22ce;
+            
+            /* Magic Button (Use Wintry Blue) */
+            --btn-magic-bg: #1e3a8a;
+            --btn-magic-bg-hover: #1e40af;
+            --btn-magic-border: #1e40af;
+            --btn-magic-border-hover: #1d4ed8;
+
+            /* Item Button (Keep Green for UI clarity) */
             --btn-item-bg: #16a34a;
             --btn-item-bg-hover: #22c55e;
             --btn-item-border: #15803d;
             --btn-item-border-hover: #16a34a;
-            --btn-flee-bg: #6b7280;
+
+            /* Flee/Secondary Button (from .btn-wintry-secondary) */
+            --btn-flee-bg: #374151;
             --btn-flee-bg-hover: #4b5563;
-            --btn-flee-border: '#374151';
-            --btn-flee-border-hover: '#1f2937';
+            --btn-flee-border: #4b5563;
+            --btn-flee-border-hover: #525f76;
         }
 
         html {
@@ -78,8 +91,6 @@
         }
 
         /* --- Show ONLY when in-game AND NOT in a forbidden view --- */
-        /* This rule says: If the body has 'in-game' BUT NOT 'view-battle', NOR 'view-inventory',
-           NOR 'view-character_sheet', NOR 'view-character_sheet_levelup', THEN display the buttons */
         body.in-game:not(.view-battle):not(.view-inventory):not(.view-character_sheet):not(.view-character_sheet_levelup) #persistent-buttons {
             display: flex;
         }
@@ -104,31 +115,55 @@
 
         /* --- Component Styling --- */
         .font-medieval { font-family: 'MedievalSharp', cursive; }
-        #game-container { background-color: var(--bg-main); border-color: var(--border-main); }
-        #stats-view, .bg-slate-800 { background-color: var(--bg-secondary); }
-        #main-view { background-color: color-mix(in srgb, var(--bg-secondary) 50%, transparent); }
-        #game-log-container { background-color: var(--bg-log); /* Moved bg color here */ }
+        
+        /* THIS IS THE GRADIENT FIX */
+        #game-container { 
+            background-image: var(--bg-main); /* FIX: Use background-image for gradients */
+            border-color: #38bdf8; /* Wintry blue border from start-screen */
+            box-shadow: 0 0 30px rgba(147, 197, 253, 0.2), inset 0 0 15px rgba(147, 197, 253, 0.1); /* Wintry frost shadow from start-screen */
+            border-width: 2px; /* Match start-screen border */
+        }
+        #stats-view, .bg-slate-800 { 
+            background-color: var(--bg-secondary); 
+        }
+        #stats-view {
+            border-right: 2px solid var(--border-main); /* Add a divider */
+        }
+        #main-view { 
+            background-color: color-mix(in srgb, var(--bg-secondary) 50%, transparent); 
+            border: 1px solid var(--border-main); /* Add a subtle border */
+        }
+        #game-log-container { 
+            background-color: var(--bg-log); 
+            border: 1px solid var(--border-main); /* Add a subtle border */
+        }
         #game-log { /* Removed background-color here */ color: var(--text-main); display: flex; flex-direction: column; }
         #tooltip { background-color: var(--bg-tooltip); border-color: var(--border-main); }
         #player-name, .text-yellow-300 { color: var(--text-accent); }
         .text-gray-200 { color: var(--text-main); }
 
         /* --- Scrollbar Styling --- */
-        .inventory-scrollbar::-webkit-scrollbar { width: 8px; /* Slightly thinner */ }
-        .inventory-scrollbar::-webkit-scrollbar-track { background: var(--bg-secondary); /* Match secondary background */ border-radius: 4px; }
-        /* *** SCROLLBAR COLOR FIX: Changed thumb color *** */
-        .inventory-scrollbar::-webkit-scrollbar-thumb { background-color: #4a5568; /* Darker gray */ border-radius: 4px; border: 1px solid var(--bg-secondary); }
-        .inventory-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #6b7280; /* Slightly lighter on hover */ }
+        .inventory-scrollbar::-webkit-scrollbar { width: 8px; }
+        .inventory-scrollbar::-webkit-scrollbar-track { background: var(--bg-secondary); border-radius: 4px; }
+        .inventory-scrollbar::-webkit-scrollbar-thumb { background-color: #4a5568; border-radius: 4px; border: 1px solid var(--bg-secondary); }
+        .inventory-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #6b7280; }
 
-        /* --- Button Styling --- */
+        /* --- Button Styling (MERGED .btn-wintry) --- */
         .btn {
             padding: 0.5rem 1rem;
             border-radius: 0.5rem;
             font-weight: 600;
-            color: white;
-            transition: all 0.2s;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            color: #dbeafe; /* Light blue text from .btn-wintry */
+            font-family: 'MedievalSharp', cursive; /* Wintry font */
+            transition: all 0.3s ease; /* Wintry transition */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2), inset 0 -2px 0 0 rgba(0,0,0,0.2); /* Wintry shadow */
             border-bottom-width: 4px;
+        }
+        .btn:hover:not(:disabled) {
+            color: #ffffff; /* White text from .btn-wintry:hover */
+            transform: translateY(-2px); /* Wintry lift effect */
+            /* Wintry glow effect */
+            box-shadow: 0 0 15px rgba(147, 197, 253, 0.3), 0 6px 10px -1px rgba(0, 0, 0, 0.3), inset 0 -1px 0 0 rgba(0,0,0,0.1);
         }
         .btn:disabled {
             background-color: #6b7280;
@@ -138,9 +173,17 @@
         }
         .btn-primary { background-color: var(--btn-primary-bg); border-color: var(--btn-primary-border); }
         .btn-primary:hover:not(:disabled) { background-color: var(--btn-primary-bg-hover); border-color: var(--btn-primary-border-hover); }
-        #start-screen .btn-primary { background-color: transparent; border-color: transparent; box-shadow: none; }
-        #start-screen .btn-primary:hover:not(:disabled) { background-color: var(--bg-secondary); border-color: transparent; }
-        #start-screen .btn-primary:disabled { background-color: transparent; border-color: transparent; opacity: 0.5; }
+        
+        /* Start screen buttons use the primary color */
+        #start-screen .btn-primary {
+            background-color: var(--btn-primary-bg);
+            border-color: var(--btn-primary-border);
+        }
+        #start-screen .btn-primary:hover:not(:disabled) {
+            background-color: var(--btn-primary-bg-hover);
+            border-color: var(--btn-primary-border-hover);
+        }
+        
         .btn-action { background-color: var(--btn-action-bg); border-color: var(--btn-action-border); }
         .btn-action:hover:not(:disabled) { background-color: var(--btn-action-bg-hover); border-color: var(--btn-action-border-hover); }
         .btn-magic { background-color: var(--btn-magic-bg); border-color: var(--btn-magic-border); }
@@ -178,16 +221,15 @@
         .grid-cell.magic-attackable { background-color: #a855f7; opacity: 0.7; }
         .grid-cell.splash-targetable { background-color: #f87171; opacity: 0.6; }
         .grid-cell.terrain { background-color: #4a5568; opacity: 0.8; cursor: not-allowed; border: 1px solid #2d3748; }
-        .grid-cell.item-attackable { background-color: #16a34a; opacity: 0.7; } /* Item highlight */
+        .grid-cell.item-attackable { background-color: #16a34a; opacity: 0.7; }
 
         /* --- NPC Ally Styles --- */
-        /* --- NPC Ally Styles --- */
-        .grid-cell.ally { background-color: #0e7490; /* A distinct teal/cyan */ border-color: #155e75; }
+        .grid-cell.ally { background-color: #0e7490; border-color: #155e75; }
         .ally-emoji { font-size: 1.5rem; line-height: 1; }
         .ally-hp-bar-bg { position: absolute; bottom: 4px; left: 10%; width: 80%; height: 5px; background-color: rgba(0,0,0,0.7); border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.2); }
-        .ally-hp-bar { height: 100%; background-color: #22c55e; /* Green HP bar for ally */ border-radius: 2px; transition: width 0.3s ease-out; }
-        .grid-cell.magic-targetable-ally { background-color: #059669; opacity: 0.8; } /* Green for healing magic */
-        .grid-cell.item-targetable-ally { background-color: #059669; opacity: 0.8; } /* Green for healing items */
+        .ally-hp-bar { height: 100%; background-color: #22c55e; border-radius: 2px; transition: width 0.3s ease-out; }
+        .grid-cell.magic-targetable-ally { background-color: #059669; opacity: 0.8; }
+        .grid-cell.item-targetable-ally { background-color: #059669; opacity: 0.8; }
 
         /* --- Garden Styles --- */
         .garden-plot { aspect-ratio: 1 / 1; width: auto; height: auto; min-width: 40px; min-height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 0.5rem; border: 2px solid; cursor: pointer; font-size: 2rem; transition: all 0.2s; position: relative; }
@@ -201,7 +243,7 @@
         /* --- Alchemy Lab Styles --- */
         .alchemy-station { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: auto auto auto; gap: 1rem; align-items: center; justify-content: center; width: 100%; max-width: 600px; margin: 0 auto; position: relative; }
         .alchemy-slot { border: 2px dashed #4a5568; border-radius: 0.5rem; height: 80px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0.5rem; font-size: 0.8rem; color: #9ca3af; cursor: pointer; transition: all 0.2s; background-color: #1f2937; position: relative; }
-        .alchemy-slot:hover { border-color: #fcd34d; color: #fcd34d; }
+        .alchemy-slot:hover { border-color: var(--text-accent); color: var(--text-accent); }
         .alchemy-slot.filled { border-style: solid; border-color: #3b82f6; background-color: #2d3748; color: white; font-weight: bold; cursor: default; }
         .slot-tier-1:nth-child(1) { grid-column: 1 / 2; grid-row: 1 / 2; }
         .slot-tier-1:nth-child(2) { grid-column: 3 / 4; grid-row: 1 / 2; }
@@ -238,12 +280,10 @@
         .reel-strip {
             display: flex;
             flex-direction: column;
-            /* This default transition is for the 'stopping' motion */
             transition: transform 1.5s cubic-bezier(0.25, 1, 0.5, 1);
         }
         .reel-strip.spinning {
             transition: none;
-            /* MODIFICATION: Adjusted speed for a better blur */
             animation: reelSpin 0.15s linear infinite;
         }
         .reel-symbol {
@@ -257,13 +297,9 @@
             color: white;
             text-shadow: 0 0 5px rgba(0,0,0,0.7);
         }
-        /* This animation scrolls through the entire reel strip (16 symbols * 8rem height)
-          We set it to -2048px (16 * 128px) to make it loop perfectly.
-        */
         @keyframes reelSpin {
-            /* MODIFICATION: Animate from the 2nd repetition to the 3rd repetition */
-            from { transform: translateY(-2048px); } /* 16 symbols * 128px */
-            to { transform: translateY(-4096px); } /* 32 symbols * 128px */
+            from { transform: translateY(-2048px); }
+            to { transform: translateY(-4096px); }
         }
 
         .roulette-container {
@@ -272,11 +308,11 @@
         }
         .roulette-table {
             display: grid;
-            /* MODIFICATION: Switched to a wide 13-col, 5-row layout */
             grid-template-columns: repeat(13, 1fr);
             grid-template-rows: repeat(5, auto);
             gap: 2px;
             background-color: #064e3b; /* Dark green */
+        }
         .roulette-cell {
             display: flex;
             flex-direction: column;
@@ -329,23 +365,53 @@
             border: 4px solid #a16207;
             background-color: #111827;
         }
-        .roulette-cell.spin-active {
-            /* A temporary, bright flash */
-            background-color: #fde047 !important;
-            color: #111827 !important;
-            transform: scale(1.1);
-            box-shadow: 0 0 15px #fde047;
+        
+        /* --- Wintry Theme Additions --- */
+        @keyframes slow-glow {
+          0%, 100% { text-shadow: 0 0 15px rgba(224, 242, 254, 0.5), 0 0 5px rgba(147, 197, 253, 0.3); }
+          50% { text-shadow: 0 0 25px rgba(147, 197, 253, 0.8), 0 0 10px rgba(147, 197, 253, 0.5); }
         }
-        .roulette-cell.winner {
-            /* A persistent, strong glow */
-            background-color: #f59e0b !important; /* Gold */
-            color: #111827 !important;
-            border-color: #fde047 !important;
-            animation: pulse-winner 1s infinite;
+        
+        /* NEW: Apply glow to all headers */
+        h1, h2, h3, .title-glow {
+          animation: slow-glow 4s ease-in-out infinite;
         }
-        @keyframes pulse-winner {
-          0%, 100% { box-shadow: 0 0 10px 0px #f59e0b; }
-          50% { box-shadow: 0 0 20px 8px #f59e0b; }
+        
+        /* NEW: Decorative Divider */
+        .decorative-divider {
+            height: 2px;
+            background: linear-gradient(to right, transparent, rgba(147, 197, 253, 0.6), transparent);
+            position: relative;
+            margin: 2rem 0;
+        }
+        .decorative-divider::before {
+            content: '❄';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-main); /* Use main bg to "cut out" the line */
+            color: #93c5fd; /* Light blue */
+            padding: 0 0.75rem;
+            font-size: 1.5rem;
+            line-height: 1;
+        }
+        /* Match start screen's gradient and add frost shadow */
+        #start-screen {
+            box-shadow: 0 0 30px rgba(147, 197, 253, 0.2), inset 0 0 15px rgba(147, 197, 253, 0.1);
+            border-color: #38bdf8; /* Brighter ice-blue border */
+        }
+        
+        /* Wintry Secondary Button (re-using old .btn-wintry-secondary) */
+        .btn-secondary {
+          background-color: #374151; /* Slate Gray */
+          border-color: #4b5563;
+          color: #9ca3af; /* Muted text */
+        }
+        .btn-secondary:hover:not(:disabled) {
+          background-color: #4b5563;
+          border-color: #525f76;
+          color: #d1d5db;
         }
     </style>
 
@@ -355,49 +421,55 @@
     <!-- Menu Wrapper (Handles Start, Creation, Load, etc.) -->
     <div id="menu-wrapper">
         <!-- Start Screen -->
-        <div id="start-screen" class="text-center p-4">
-            <h1 class="font-medieval text-6xl text-yellow-300 mb-8">Chronicles of Cocytus</h1>
-            <div class="space-y-4">
+<div id="start-screen" class="w-full max-w-3xl p-8 bg-gradient-to-br from-slate-900 via-gray-900 to-blue-950 rounded-lg shadow-2xl border-2 text-center">
+            
+            <h1 class="font-medieval text-6xl text-white mb-2 title-glow">Chronicles of Cocytus</h1>
+            <p class="font-medieval text-xl text-blue-200 mb-8 italic">"The Frigid Land Awaits"</p>
+            
+            <div class="decorative-divider"></div>
 
-                <!-- Pre-Authentication Buttons -->
-                <div id="auth-buttons">
-                    <button id="google-signin-btn" class="btn btn-primary text-2xl px-8 py-4">
+            <div class="space-y-6">
+                
+                <div id="auth-buttons" class="space-y-4">
+                    <button id="google-signin-btn" class="btn btn-primary text-2xl px-8 py-4 w-full md:w-auto">
                         <div class="flex items-center justify-center">
                             <svg class="w-6 h-6 mr-3" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"></path><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"></path><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.222 0-9.618-3.499-11.181-8.234l-6.573 4.817C9.042 39.52 15.935 44 24 44z"></path><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C44.272 36.845 48 30.825 48 24c0-1.341-.138-2.65-.389-3.917z"></path></svg>
                             Sign in with Google
                         </div>
                     </button>
-                     <button id="anonymous-signin-btn" class="btn btn-primary text-xl px-8 py-3 mt-2">Play as Guest</button>
+                    <button id="anonymous-signin-btn" class="btn btn-primary text-xl px-8 py-3 w-full md:w-auto">Play as Guest</button>
                 </div>
 
-                <!-- Post-Authentication Section -->
-                <div id="post-auth-section">
+                <div id="post-auth-section" class="space-y-6">
                     <div class="space-y-4">
-                         <button id="start-game-btn" class="btn btn-primary text-2xl px-8 py-4">New Game</button>
-                         <button id="load-game-btn" class="btn btn-primary text-2xl px-8 py-4">Load Game</button>
+                         <button id="start-game-btn" class="btn btn-primary text-2xl px-8 py-4 w-full md:w-auto">⚔️ New Game ⚔️</button>
+                         <button id="load-game-btn" class="btn btn-primary text-2xl px-8 py-4 w-full md:w-auto">📜 Load Game 📜</button>
                     </div>
+                    
                     <div class="text-center pt-4">
                         <p id="user-display" class="text-gray-300 mb-2"></p>
                         <button id="sign-out-btn" class="btn btn-action text-lg px-6 py-2">Sign Out</button>
                     </div>
                 </div>
 
-                <!-- Import / Other Buttons -->
-                <div class="flex items-center justify-center space-x-2 pt-4">
-                    <input type="text" id="import-save-input" placeholder="Paste Save Key..." class="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 w-64">
-                    <button id="import-save-btn" class="btn btn-primary text-lg">Import</button>
+                <div class="flex justify-center items-center flex-wrap gap-4 pt-6 border-t-2 border-slate-700/50">
+                    <button id="changelog-btn" class="btn btn-secondary">Changelog</button>
+                    <button id="graveyard-btn" class="btn btn-secondary">Graveyard</button>
                 </div>
-                 <div class="flex justify-center space-x-4 pt-4">
-                    <button id="changelog-btn" class="btn btn-primary">Changelog</button>
-                    <button id="graveyard-btn" class="btn btn-primary">Graveyard</button>
-                </div>
-                <div class="flex justify-center items-center space-x-2 mt-4 text-gray-400">
-                    <input type="checkbox" id="tutorial-toggle" class="form-checkbox h-5 w-5 rounded bg-gray-700 border-gray-600 text-yellow-400 focus:ring-yellow-500" checked>
-                    <label for="tutorial-toggle">Enable Tutorial</label>
+
+                <div class="space-y-4 pt-6 border-t-2 border-slate-700/50">
+                    <div class="flex items-center justify-center space-x-2">
+                        <input type="text" id="import-save-input" placeholder="Paste Save Key..." class="font-sans bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 w-64">
+                        <button id="import-save-btn" class="btn btn-secondary text-lg">Import</button>
+                    </div>
+                    <div class="flex justify-center items-center space-x-2 text-gray-400">
+                        <input type="checkbox" id="tutorial-toggle" class="form-checkbox h-5 w-5 rounded bg-gray-700 border-gray-600 text-yellow-400 focus:ring-yellow-500" checked>
+                        <label for="tutorial-toggle" class="font-sans">Enable Tutorial</label>
+                    </div>
                 </div>
             </div>
         </div>
-
+        
         <!-- Changelog/Load/Graveyard Screen Container -->
         <div id="changelog-screen" class="w-full max-w-2xl p-6 bg-slate-900 rounded-lg shadow-lg hidden">
             <!-- Content will be injected here -->
