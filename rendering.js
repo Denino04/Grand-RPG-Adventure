@@ -2988,12 +2988,10 @@ function renderArcaneCasino() {
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
-    
-    initCasinoSecret();
 }
 
 // --- END NEW FUNCTION ---
-function initCasinoSecret() {
+/*function initCasinoSecret() {
     console.log("[CASINO DEBUG] initCasinoSecret() called.");
     // --- FIX: Corrected unlock key name ---
     if (player.unlocks.roguelikeCardGame) {
@@ -3024,7 +3022,7 @@ function initCasinoSecret() {
             }
         });
     });
-}
+}*/
 
 function evaluateRoguelikeHand(hand) {
     const counts = {};

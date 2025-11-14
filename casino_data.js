@@ -157,7 +157,7 @@ const BJ_CONJURE_PACKS = {
     'pack_small': {
         name: "Glimpse Fate",
         desc: "The shaman conjures 3 random cards from the ether. You may choose 1 to add to your deck.",
-        cost: 5,
+        cost: 3,
         conjure: 3,
         choose: 1,
         type: 'conjure', // <-- ADD THIS
@@ -167,7 +167,7 @@ const BJ_CONJURE_PACKS = {
     'pack_medium': {
         name: "Read the Tapestry",
         desc: "The shaman reveals 5 strands of fate. You may choose 2 to weave into your deck.",
-        cost: 8,
+        cost: 5,
         conjure: 5,
         choose: 2,
         type: 'conjure', // <-- ADD THIS
@@ -177,7 +177,7 @@ const BJ_CONJURE_PACKS = {
     'pack_large': {
         name: "Seize Destiny",
         desc: "The shaman parts the veil, revealing 8 potential paths. You may seize 3 to bind to your deck.",
-        cost: 12,
+        cost: 10,
         conjure: 8,
         choose: 3,
         type: 'conjure', // <-- ADD THIS
@@ -190,7 +190,7 @@ const BJ_ARCANA_PACKS = {
     'pack_arcana_small': {
         name: "Minor Arcana",
         desc: "The shaman reveals 2 Arcana. You may choose 1 to bind to your fate.",
-        cost: 10,
+        cost: 5,
         conjure: 2,
         choose: 1,
         type: 'arcana_pack',
@@ -200,7 +200,7 @@ const BJ_ARCANA_PACKS = {
     'pack_arcana_medium': {
         name: "Major Arcana",
         desc: "The shaman reveals 3 Arcana. You may choose 1 to bind to your fate.",
-        cost: 15,
+        cost: 10,
         conjure: 3,
         choose: 1,
         type: 'arcana_pack',
@@ -210,7 +210,7 @@ const BJ_ARCANA_PACKS = {
     'pack_arcana_large': {
         name: "True Arcana",
         desc: "The shaman reveals 5 Arcana. You may choose 1 to bind to your fate.",
-        cost: 20,
+        cost: 15,
         conjure: 5,
         choose: 1,
         type: 'arcana_pack',
