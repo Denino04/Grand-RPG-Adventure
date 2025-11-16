@@ -203,10 +203,11 @@
 
         /* --- Tutorial Arrows --- */
         #tutorial-box::after { content: ''; position: absolute; width: 0; height: 0; border-style: solid; }
-        #tutorial-box.arrow-left::after { top: 50%; right: 100%; margin-top: -10px; border-width: 10px; border-color: transparent #fcd34d transparent transparent; }
-        #tutorial-box.arrow-right::after { top: 50%; left: 100%; margin-top: -10px; border-width: 10px; border-color: transparent transparent transparent #fcd34d; }
-        #tutorial-box.arrow-top::after { bottom: 100%; left: 50%; margin-left: -10px; border-width: 10px; border-color: transparent transparent #fcd34d transparent; }
-        #tutorial-box.arrow-bottom::after { top: 100%; left: 50%; margin-left: -10px; border-width: 10px; border-color: #fcd34d transparent transparent transparent; }
+        /* MODIFIED: Changed arrow color from #fcd34d (yellow) to the new dark background color */
+        #tutorial-box.arrow-left::after { top: 50%; right: 100%; margin-top: -10px; border-width: 10px; border-color: transparent rgba(30, 41, 59, 0.95) transparent transparent; }
+        #tutorial-box.arrow-right::after { top: 50%; left: 100%; margin-top: -10px; border-width: 10px; border-color: transparent transparent transparent rgba(30, 41, 59, 0.95); }
+        #tutorial-box.arrow-top::after { bottom: 100%; left: 50%; margin-left: -10px; border-width: 10px; border-color: transparent transparent rgba(30, 41, 59, 0.95) transparent; }
+        #tutorial-box.arrow-bottom::after { top: 100%; left: 50%; margin-left: -10px; border-width: 10px; border-color: rgba(30, 41, 59, 0.95) transparent transparent transparent; }
 
         /* --- Battle Grid --- */
         .grid-cell { border: 1px solid #4a5568; background-color: #2d3748; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; color: white; cursor: pointer; transition: background-color 0.2s; position: relative; font-size: 1.5rem; line-height: 1; }
@@ -766,11 +767,15 @@
     <div id="betty-encounter-popup" class="hidden fixed bottom-5 right-5 bg-slate-800 border-2 border-purple-400 p-4 rounded-lg shadow-2xl max-w-sm cursor-pointer z-20">
         <!-- Betty popup content -->
     </div>
-    <div id="tutorial-box" class="hidden fixed bg-yellow-400 text-slate-900 p-4 rounded-lg shadow-2xl max-w-xs z-50 transition-all duration-300 border-4 border-yellow-600"> <!-- Changed background/text/border -->
-        <p id="tutorial-text" class="font-semibold"></p> <!-- Added font-semibold -->
-        <button id="tutorial-next-btn" class="btn btn-primary mt-4 w-full bg-slate-700 hover:bg-slate-600 border-slate-900">Next</button> <!-- Adjusted button style -->
+    <div id="tutorial-box" class="hidden fixed bg-slate-800/95 backdrop-blur-sm text-blue-100 p-4 rounded-lg shadow-2xl max-w-xs z-50 transition-all duration-300 border-2 border-blue-400">
+        <button id="tutorial-hide-btn" onclick="document.getElementById('tutorial-box').classList.add('hidden')" class="absolute top-1 right-1 btn btn-action !p-0 !w-5 !h-5 !rounded-full !text-sm !leading-none flex items-center justify-center !border-b-2" title="Hide this tip" aria-label="Hide this tip">
+            &times;
+        </button>
+        <p id="tutorial-text" class="font-semibold"></p>
+        <button id="tutorial-next-btn" class="btn btn-primary mt-4 w-full">Next</button>
         <div id="tutorial-choice-buttons" class="mt-4 flex gap-2"></div>
     </div>
+</div>
     <div id="debug-panel" class="hidden fixed bottom-4 right-4 bg-gray-900 border border-gray-700 p-4 rounded-lg shadow-lg w-96 h-1/2 flex flex-col z-[150]"> <!-- Increased z-index -->
         <h3 class="text-lg font-bold mb-2 text-center">Debug Panel</h3>
         <div class="flex-grow overflow-y-auto text-xs pr-2 inventory-scrollbar">

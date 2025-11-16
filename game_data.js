@@ -469,14 +469,18 @@ const SHOP_INVENTORY = {
         'recipe_brew_zapsipper', 'recipe_brew_vinekill', 'recipe_brew_lightcloser', 'recipe_brew_lampside'
     ],
     'Weapons': ['rusty_sword', 'wooden_stick', 'soldiers_spear', 'farmers_glaive', 'parrying_dagger', 'light_scythe', 'flowing_blade'],
-    'Gear': ['travelers_garb', 'leather_armor', 'padded_leather', 'wooden_shield']
+    
+    // --- MODIFICATION: Split "Gear" into "Armor" and "Shields" ---
+    'Armor': ['travelers_garb', 'leather_armor', 'padded_leather'],
+    'Shields': ['wooden_shield']
+    // --- END MODIFICATION ---
 };
 
 
 const MAGIC_SHOP_INVENTORY = {
     'Catalysts': ['wooden_wand', 'cracked_orb', 'hardwood_staff', 'magical_orb', 'arcane_focus', 'cypresswood_staff'],
     'Weapons': [],
-    'Consumables': ['magic_rock_dust'] // Added Magic Rock Dust here
+    'Consumables': ['magic_rock_dust'] // This category is fine
 };
 
 const ENCHANTER_INVENTORY = {
@@ -488,7 +492,7 @@ const ENCHANTER_INVENTORY = {
         'lightning_rod',
         'fertilized_seed'
     ],
-    'Essences': [ // Also makes sense for the Enchanter to sell essences
+    'Essences': [ 
         'fire_essence',
         'water_essence',
         'earth_essence',
@@ -502,7 +506,7 @@ const ENCHANTER_INVENTORY = {
 
 const BLACKSMITH_INVENTORY = {
     'Weapons': ['steel_longsword', 'rapier', 'longbow', 'heavy_greatsword', 'masterwork_spear', 'dual_longswords', 'elven_saber', 'dwarven_warhammer', 'caestus', 'shamshir', 'steel_mace', 'iron_ball', 'great_epee', 'sharpshots_beloved'],
-    'Tools': ['whetstone'],// Added Whetstone to a new 'Tools' category
+    'Tools': ['whetstone'],
     'Armor': ['chainmail_armor', 'half_plate_armor', 'steel_plate_armor'],
     'Shields': ['iron_kite_shield', 'iron_buckler', 'brass_shield', 'trollblood_shield', 'titanium_parrying_shield', 'maxwellian_dueling_shield', 'tower_greatshield'],
 };
@@ -510,9 +514,7 @@ const BLACKSMITH_INVENTORY = {
 const BLACK_MARKET_INVENTORY = {
     'Weapons': ['assassins_claw', 'psychic_blade', 'bloody_butchering_knife', 'battlestaff'],
     'Armor': ['silenced_leather_armor', 'assassin_cloak_armor'],
-    // --- NEW CATEGORY FOR GREASES ---
     'Enhancements': ['poisonous_grease', 'paralysis_grease'],
-    // --- END NEW CATEGORY ---
     'Lures': ['goblin_scent_gland', 'sweet_grass_scent', 'rotten_cheese', 'chemical_lure', 'bandit_coin', 'wolf_musk', 'war_horn_fragment', 'silken_cocoon', 'petrified_field_mouse', 'grave_dust']
 };
 

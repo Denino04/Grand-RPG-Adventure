@@ -298,12 +298,22 @@ async function initGame(playerName, gender, raceKey, classKey, backgroundKey, di
     await saveGame(); // Save initial state
     console.log("Initial save complete.");
 
-
     const saveKey = player.firestoreId || 'local';
     sessionStorage.setItem('activeSaveKey', saveKey);
     console.log(`Setting hash to #game, activeSaveKey: ${saveKey}`);
-    window.location.hash = 'game'; // This should trigger handleRouteChange
-     console.log("initGame finished.");
+    
+    // --- MODIFICATION START ---
+    // Set the hash, but don't rely on the event.
+    window.location.hash = 'game'; 
+    
+    // Directly call loadGameFromKey to ensure the flow continues
+    // without relying on the hashchange event firing.
+    console.log("initGame finished. Directly calling loadGameFromKey...");
+    await loadGameFromKey(saveKey); 
+    // --- MODIFICATION END ---
+    
+    // The old line "window.location.hash = 'game';" was here and has been replaced.
+    console.log("initGame fully finished after loadGameFromKey.");
 }
     
 

@@ -926,9 +926,10 @@ function showTutorialStep(step, content) {
     const text = $('#tutorial-text');
     const nextBtn = $('#tutorial-next-btn');
     const choiceContainer = $('#tutorial-choice-buttons');
+    const hideBtn = $('#tutorial-hide-btn'); // <-- ADDED
 
     // Ensure elements exist
-    if (!box || !text || !nextBtn || !choiceContainer) {
+    if (!box || !text || !nextBtn || !choiceContainer || !hideBtn) { // <-- ADDED hideBtn
         console.error("Tutorial UI elements not found. Cannot display step.");
         endTutorial(); // End tutorial if UI is broken
         return;

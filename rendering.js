@@ -5,6 +5,11 @@ let inventoryActiveTab = 'consumables'; // Default tab
 let sellActiveTab = 'consumables'; // NEW: State for sell tab
 let storagePlayerInvTab = 'consumables';
 let storageChestTab = 'consumables';
+let shopActiveTab = 'all'; 
+let blacksmithActiveTab = 'all'; 
+let blackMarketActiveTab = 'all'; 
+let sageTowerActiveTab = 'all'; 
+let enchanterActiveTab = 'all';
 
 function setStorageSortOrder(order) {
     storageSortOrder = order;
@@ -18,6 +23,117 @@ window.setStoragePlayerInvTab = function(tabName) {
 window.setStorageChestTab = function(tabName) {
     storageChestTab = tabName;
     renderHouseStorage(); // Re-render the storage UI
+}
+
+window.setShopTab = function(tabName) {
+    shopActiveTab = tabName;
+    renderShop('store');
+}
+window.setBlacksmithTab = function(tabName) {
+    blacksmithActiveTab = tabName;
+    renderBlacksmithBuy();
+}
+window.setBlackMarketTab = function(tabName) {
+    blackMarketActiveTab = tabName;
+    renderShop('black_market');
+}
+window.setSageTowerTab = function(tabName) {
+    sageTowerActiveTab = tabName;
+    renderSageTowerBuy();
+}
+window.setEnchanterTab = function(tabName) {
+    enchanterActiveTab = tabName;
+    renderEnchanterShop();
+}
+
+/**
+ * [REWRITTEN HELPER] Renders a standardized, tabbed shop interface.
+ * This function now dynamically builds tabs based on the keys in the inventory object.
+ * @param {object} config - Configuration for the shop.
+ */
+function _renderTabbedShopUI(config) {
+    const { 
+        title, 
+        baseInventory, 
+        activeTabState, 
+        setTabFunction, 
+        backAction, 
+        shopType, 
+        priceMultiplier = 1.0, 
+        theme = 'default' 
+    } = config;
+
+    applyTheme(theme);
+    const scrollable = mainView.querySelector('#shop-item-list');
+    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+
+    // 1. Generate tabs based on the *keys* of the inventory object
+    const allTabs = [{ key: 'all', title: 'All' }];
+    Object.keys(baseInventory).forEach(categoryName => {
+        // Don't make a tab for an empty category
+        if (baseInventory[categoryName] && baseInventory[categoryName].length > 0) {
+            allTabs.push({ key: categoryName, title: categoryName });
+        }
+    });
+
+    // 2. Filter items based on the active tab
+    let filteredItems = [];
+    if (activeTabState === 'all') {
+        filteredItems = [].concat(...Object.values(baseInventory));
+    } else {
+        // The activeTabState is now the *key* of the inventory (e.g., "Potions & Items")
+        filteredItems = baseInventory[activeTabState] || [];
+    }
+
+    // 3. Build the tab HTML
+    let tabGridCols = Math.max(4, allTabs.length);
+    let tabHtml = `<div class="grid grid-cols-${tabGridCols} gap-1 mb-2">`;
+    allTabs.forEach(tab => {
+        const isActive = activeTabState === tab.key;
+        const bgColor = isActive ? 'bg-yellow-600 border-yellow-800' : 'bg-slate-700 hover:bg-slate-600 border-slate-900';
+        tabHtml += `<button onclick="${setTabFunction}('${tab.key}')" class="btn ${bgColor} text-sm py-1 px-3">${tab.title}</button>`;
+    });
+    tabHtml += '</div>';
+
+    // 4. Build the item list HTML
+    let itemsHtml = createItemList({
+        items: filteredItems,
+        detailsFn: getItemDetails,
+        actionsHtmlFn: (key, details) => {
+            const price = Math.floor(details.price * priceMultiplier);
+            return `
+                <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
+                <button onclick="buyItem('${key}', '${shopType}', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
+            `;
+        }
+    });
+    
+    if (filteredItems.length === 0) {
+        itemsHtml = `<p class="text-gray-400 text-center mt-4">No items in this category.</p>`;
+    }
+
+    // 5. Assemble the final view
+    let html = `<div class="w-full h-full flex flex-col">
+                    <h2 class="font-medieval text-3xl mb-4 text-center title-glow">${title}</h2>
+                    ${tabHtml}
+                    <div id="shop-item-list" class="h-80 overflow-y-auto inventory-scrollbar pr-2 flex-grow">${itemsHtml}</div>
+                    <div class="flex justify-center gap-4 mt-4 flex-shrink-0">`;
+    
+    if (shopType === 'store') {
+        html += `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>`;
+    }
+
+    html += `       <button onclick="${backAction}" class="btn btn-primary">Back</button>
+                    </div>
+                </div>`;
+    
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    container.className = 'w-full h-full flex flex-col';
+    render(container);
+
+    const newScrollable = mainView.querySelector('#shop-item-list');
+    if (newScrollable) newScrollable.scrollTop = scrollPos;
 }
 
 function getWeaponStatsString(weapon) {
@@ -2472,8 +2588,14 @@ function renderLibrary() {
     </div>`;
 
     const container = document.createElement('div');
+    // --- ADDED: Ensure container fills the view ---
+    container.className = 'w-full h-full';
     container.innerHTML = html;
     render(container);
+
+    // --- ADDED: Remove centering and padding from mainView ---
+    mainView.classList.remove('items-center', 'p-6');
+    mainView.classList.add('p-2');
 }
 
 function renderBook(bookKey, chapterIndex = 0) {
@@ -2799,50 +2921,20 @@ function renderArcaneQuarter() {
 
 // --- NEW FUNCTION: Renders the MAIN Enchanter menu ---
 function renderEnchanterShop() {
-    applyTheme('void'); // Use the Enchanter's theme
-    const scrollable = mainView.querySelector('.inventory-scrollbar');
-    const scrollPos = scrollable ? scrollable.scrollTop : 0;
-
-    lastViewBeforeInventory = 'enchanter_shop'; // Use a specific view name
+    lastViewBeforeInventory = 'enchanter_shop'; 
     gameState.currentView = 'enchanter_shop';
 
-    let itemsHtml = '';
-    for (const category in ENCHANTER_INVENTORY) {
-        if (ENCHANTER_INVENTORY[category].length === 0) continue;
-        itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
-        itemsHtml += '<div class="space-y-2">';
-
-        itemsHtml += createItemList({
-            items: ENCHANTER_INVENTORY[category],
-            detailsFn: getItemDetails,
-            actionsHtmlFn: (key, details) => {
-                const price = details.price; // Enchanter prices are standard
-                return `
-                    <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
-                    <button onclick="buyItem('${key}', 'enchanter', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
-                `;
-            }
-        });
-
-        itemsHtml += '</div>';
-    }
-
-    let html = `<div class="w-full">
-                    <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Enchanter's Wares</h2>
-                    <p class="text-center text-gray-400 mb-4">"Looking for reagents? Essences? Things to make your pointy bits... pointier?"</p>
-                    <div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div>
-                    <div class="flex justify-center gap-4 mt-4">
-                        <button onclick="renderEnchanterMenu()" class="btn btn-primary">Back</button>
-                    </div>
-                </div>`;
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    render(container);
-
-    const newScrollable = mainView.querySelector('.inventory-scrollbar');
-    if (newScrollable) newScrollable.scrollTop = scrollPos;
+    _renderTabbedShopUI({
+        title: 'Enchanter\'s Wares',
+        baseInventory: ENCHANTER_INVENTORY, //
+        activeTabState: enchanterActiveTab,
+        setTabFunction: 'setEnchanterTab',
+        backAction: 'renderEnchanterMenu()',
+        shopType: 'enchanter',
+        priceMultiplier: 1.0,
+        theme: 'void'
+    });
 }
-
 
 // --- Renders the ENCHANTING view ---
 function renderEnchanterEnchant(selectedElement = null) {
@@ -5349,85 +5441,58 @@ function renderInn() {
 
 function renderShop(type) {
     if (type === 'store') {
-        updateRealTimePalette();
-    } else if (type === 'black_market') {
-        applyTheme('void');
-    }
-    const scrollable = mainView.querySelector('.inventory-scrollbar');
-    const scrollPos = scrollable ? scrollable.scrollTop : 0;
+        // --- GENERAL STORE LOGIC ---
+        lastViewBeforeInventory = 'shop';
+        gameState.currentView = 'shop';
+        
+        // Create a modifiable copy of the base inventory
+        let shopInventory = JSON.parse(JSON.stringify(SHOP_INVENTORY));
 
-    let inventory, title;
-
-    // Create a mutable copy of the base inventory
-    let shopInventory = JSON.parse(JSON.stringify(SHOP_INVENTORY));
-
-    switch (type) {
-        case 'store':
-            // --- DYNAMIC RECIPE LOGIC FOR GENERAL STORE ---
-            const rng = seededRandom(player.seed);
-            let availableRecipes = [];
-
-            // Determine which recipes to potentially show based on house upgrades
-            if (player.house.kitchenTier > 0) {
-                 const cookingRecipes = shopInventory['Recipes'].filter(key => ITEMS[key] && ITEMS[key].recipeType === 'cooking');
-                 const shuffled = shuffleArray([...cookingRecipes], rng);
-                 availableRecipes.push(...shuffled.slice(0, 2));
-            }
-            if (player.house.alchemyTier > 0) {
-                 const alchemyRecipes = shopInventory['Recipes'].filter(key => ITEMS[key] && ITEMS[key].recipeType === 'alchemy');
-                 const shuffled = shuffleArray([...alchemyRecipes], rng);
-                 availableRecipes.push(...shuffled.slice(0, 3));
-            }
-
-            // Assign the dynamically selected recipes to the shop's inventory for this render
-            shopInventory['Recipes'] = availableRecipes;
-
-            inventory = shopInventory;
-            title = 'General Store';
-            lastViewBeforeInventory = 'shop';
-            gameState.currentView = 'shop';
-            break;
-        case 'black_market':
-            inventory = { ...BLACK_MARKET_INVENTORY, 'Seasonal Wares': player.blackMarketStock.seasonal };
-            title = 'Black Market';
-            lastViewBeforeInventory = 'black_market';
-            gameState.currentView = 'black_market';
-            break;
-        default: return;
-    }
-
-    let itemsHtml = '';
-    for (const category in inventory) {
-        // Hide Recipes category if there are none to show
-        if (category === 'Recipes' && (!inventory[category] || inventory[category].length === 0)) {
-            continue;
+        // Dynamically filter recipes
+        const rng = seededRandom(player.seed);
+        let availableRecipes = [];
+        if (player.house.kitchenTier > 0) {
+             const cookingRecipes = (shopInventory['Recipes'] || []).filter(key => ITEMS[key] && ITEMS[key].recipeType === 'cooking');
+             const shuffled = shuffleArray([...cookingRecipes], rng);
+             availableRecipes.push(...shuffled.slice(0, 2));
         }
+        if (player.house.alchemyTier > 0) {
+             const alchemyRecipes = (shopInventory['Recipes'] || []).filter(key => ITEMS[key] && ITEMS[key].recipeType === 'alchemy');
+             const shuffled = shuffleArray([...alchemyRecipes], rng);
+             availableRecipes.push(...shuffled.slice(0, 3));
+        }
+        shopInventory['Recipes'] = availableRecipes; // Overwrite with the filtered list
 
-        if (inventory[category].length === 0) continue;
-        itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
-        itemsHtml += '<div class="space-y-2">';
-
-        itemsHtml += createItemList({
-            items: inventory[category],
-            detailsFn: getItemDetails,
-            actionsHtmlFn: (key, details) => {
-                const price = Math.floor(details.price * (type === 'black_market' ? 1.5 : 1));
-                return `
-                    <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
-                    <button onclick="buyItem('${key}', '${type}', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
-                `;
-            }
+        _renderTabbedShopUI({
+            title: 'General Store',
+            baseInventory: shopInventory, // Pass the modified inventory
+            activeTabState: shopActiveTab,
+            setTabFunction: 'setShopTab',
+            backAction: 'renderCommercialDistrict()',
+            shopType: 'store',
+            priceMultiplier: 1.0,
+            theme: 'default'
         });
 
-        itemsHtml += '</div>';
-    }
-    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center title-glow">${title}</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4">${type === 'store' ? `<button onclick="renderSell()" class="btn btn-primary">Sell Items</button>` : ''}<button onclick="renderCommercialDistrict()" class="btn btn-primary">Back</button></div></div>`;
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    render(container);
+    } else if (type === 'black_market') {
+        // --- BLACK MARKET LOGIC ---
+        lastViewBeforeInventory = 'black_market';
+        gameState.currentView = 'black_market';
+        
+        // Create the inventory object, merging seasonal stock
+        const inventory = { ...BLACK_MARKET_INVENTORY, 'Seasonal Wares': player.blackMarketStock.seasonal };
 
-    const newScrollable = mainView.querySelector('.inventory-scrollbar');
-    if (newScrollable) newScrollable.scrollTop = scrollPos;
+        _renderTabbedShopUI({
+            title: 'Black Market',
+            baseInventory: inventory, // Pass the merged inventory
+            activeTabState: blackMarketActiveTab,
+            setTabFunction: 'setBlackMarketTab',
+            backAction: 'renderCommercialDistrict()',
+            shopType: 'black_market',
+            priceMultiplier: 1.5,
+            theme: 'void'
+        });
+    }
 }
 
 
@@ -5452,39 +5517,19 @@ function renderBlacksmithMenu() {
 }
 
 function renderBlacksmithBuy() {
-    const scrollable = mainView.querySelector('.inventory-scrollbar');
-    const scrollPos = scrollable ? scrollable.scrollTop : 0;
-
     lastViewBeforeInventory = 'blacksmith_buy';
     gameState.currentView = 'blacksmith_buy';
 
-    let itemsHtml = '';
-    for (const category in BLACKSMITH_INVENTORY) {
-        if (BLACKSMITH_INVENTORY[category].length === 0) continue;
-        itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
-        itemsHtml += '<div class="space-y-2">';
-
-        itemsHtml += createItemList({
-            items: BLACKSMITH_INVENTORY[category],
-            detailsFn: getItemDetails,
-            actionsHtmlFn: (key, details) => {
-                const price = details.price;
-                return `
-                    <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
-                    <button onclick="buyItem('${key}', 'blacksmith', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
-                `;
-            }
-        });
-
-        itemsHtml += '</div>';
-    }
-    let html = `<div class="w-full"><h2 class="font-medieval text-3xl mb-4 text-center title-glow">Buy Equipment</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div><div class="flex justify-center gap-4 mt-4"><button onclick="renderBlacksmithMenu()" class="btn btn-primary">Back</button></div></div>`;
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    render(container);
-
-    const newScrollable = mainView.querySelector('.inventory-scrollbar');
-    if (newScrollable) newScrollable.scrollTop = scrollPos;
+    _renderTabbedShopUI({
+        title: 'Buy Equipment',
+        baseInventory: BLACKSMITH_INVENTORY, //
+        activeTabState: blacksmithActiveTab,
+        setTabFunction: 'setBlacksmithTab',
+        backAction: 'renderBlacksmithMenu()',
+        shopType: 'blacksmith',
+        priceMultiplier: 1.0,
+        theme: 'volcano'
+    });
 }
 
 function renderBlacksmithCraft() {
@@ -5917,47 +5962,19 @@ function renderSageTowerTrain() {
 }
 
 function renderSageTowerBuy() {
-    applyTheme('magic');
-    const scrollable = mainView.querySelector('.inventory-scrollbar');
-    const scrollPos = scrollable ? scrollable.scrollTop : 0;
-
     lastViewBeforeInventory = 'sage_tower_buy';
     gameState.currentView = 'sage_tower_buy';
 
-    let itemsHtml = '';
-    for (const category in MAGIC_SHOP_INVENTORY) {
-        if (MAGIC_SHOP_INVENTORY[category].length === 0) continue;
-        itemsHtml += `<h3 class="font-medieval text-xl mt-4 mb-2 text-yellow-300">${category}</h3>`;
-        itemsHtml += '<div class="space-y-2">';
-
-        itemsHtml += createItemList({
-            items: MAGIC_SHOP_INVENTORY[category],
-            detailsFn: getItemDetails,
-            actionsHtmlFn: (key, details) => {
-                const price = details.price;
-                return `
-                    <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
-                    <button onclick="buyItem('${key}', 'magic', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
-                `;
-            }
-        });
-
-        itemsHtml += '</div>';
-    }
-
-    let html = `<div class="w-full">
-                    <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Purchase Catalysts</h2>
-                    <div class="h-80 overflow-y-auto inventory-scrollbar pr-2">${itemsHtml}</div>
-                    <div class="text-center mt-4">
-                        <button onclick="renderSageTowerMenu()" class="btn btn-primary">Back</button>
-                    </div>
-                </div>`;
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    render(container);
-
-    const newScrollable = mainView.querySelector('.inventory-scrollbar');
-    if (newScrollable) newScrollable.scrollTop = scrollPos;
+    _renderTabbedShopUI({
+        title: 'Purchase Catalysts',
+        baseInventory: MAGIC_SHOP_INVENTORY, //
+        activeTabState: sageTowerActiveTab,
+        setTabFunction: 'setSageTowerTab',
+        backAction: 'renderSageTowerMenu()',
+        shopType: 'magic',
+        priceMultiplier: 1.0,
+        theme: 'magic'
+    });
 }
 
 function renderSageTowerCraft() {

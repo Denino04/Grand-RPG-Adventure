@@ -3287,7 +3287,7 @@ function buyRoguelikeTool(toolKey) {
             const randomCard = { ...MASTER_CARD_LIST[Math.floor(Math.random() * MASTER_CARD_LIST.length)] }; // Push a copy
             
             // --- NEW: 10% Chance Logic ---
-            if (enhancements.length > 0 && Math.random() < 0.10) { // 10% chance
+            if (enhancements.length > 0 && Math.random() < 0.20) { // 10% chance
                 const randomArcanaKey = enhancements[Math.floor(Math.random() * enhancements.length)];
                 const randomArcana = BJ_ARCANA_RITUALS[randomArcanaKey];
                 randomArcana.apply(randomCard); // Apply enhancement (e.g., card.ability = 'strength')
