@@ -515,12 +515,33 @@ function showTooltip(itemKey, event) {
     tooltipElement.style.display = 'block';
     activeTooltipItem = itemKey;
 
-    let x = event.clientX + 15;
-    let y = event.clientY + 15;
-    if (x + tooltipElement.offsetWidth > window.innerWidth) x = event.clientX - tooltipElement.offsetWidth - 15;
-    if (y + tooltipElement.offsetHeight > window.innerHeight) y = event.clientY - tooltipElement.offsetHeight - 15;
-    tooltipElement.style.left = `${x}px`;
-    tooltipElement.style.top = `${y}px`;
+    // --- MODIFICATION START: Centering for Mobile ---
+    const isMobile = window.innerWidth <= 768; // 768px as mobile breakpoint
+
+    if (isMobile) {
+        // On mobile, force center the tooltip
+        tooltipElement.style.position = 'fixed'; // Use fixed to center on viewport
+        tooltipElement.style.left = '50%';
+        tooltipElement.style.top = '50%';
+        tooltipElement.style.transform = 'translate(-50%, -50%)';
+        // Make sure it's not wider than the screen
+        tooltipElement.style.width = '90%'; 
+        tooltipElement.style.maxWidth = '400px'; // Set a max width
+    } else {
+        // On desktop, use the original mouse-following logic
+        tooltipElement.style.position = 'fixed'; // Keep fixed positioning
+        tooltipElement.style.width = '256px'; // Reset to default width (w-64)
+        tooltipElement.style.maxWidth = '256px';
+        tooltipElement.style.transform = ''; // Clear transform
+
+        let x = event.clientX + 15;
+        let y = event.clientY + 15;
+        if (x + tooltipElement.offsetWidth > window.innerWidth) x = event.clientX - tooltipElement.offsetWidth - 15;
+        if (y + tooltipElement.offsetHeight > window.innerHeight) y = event.clientY - tooltipElement.offsetHeight - 15;
+        tooltipElement.style.left = `${x}px`;
+        tooltipElement.style.top = `${y}px`;
+    }
+    // --- MODIFICATION END ---
 }
 
 
