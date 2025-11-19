@@ -13,17 +13,23 @@ let gameState = {
     isPlayerTurn: true,
     currentBiome: null,
     playerIsDying: false,
-    action: null, // Track current player action (move, attack, etc.)
-    spellToCast: null, // Track spell selected for casting
-    comboTarget: null, // Track target for combo weapons
-    comboCount: 0, // Track combo hits
-    lastSpellElement: 'none', // Track last spell element used
-    gridWidth: 0, // Battle grid dimensions
+    action: null, 
+    spellToCast: null, 
+    comboTarget: null, 
+    comboCount: 0, 
+    lastSpellElement: 'none', 
+    gridWidth: 0, 
     gridHeight: 0,
-    gridLayout: [], // Battle grid layout (0 = inactive, 1 = active)
-    gridObjects: [], // Obstacles, terrain on the grid
-    battleEnded: false, // Flag for battle end state
-    activeDrone: null // Reference to the Artificer's drone if active
+    gridLayout: [], 
+    gridObjects: [], 
+    battleEnded: false, 
+    activeDrone: null, 
+    // --- NEW PROPERTIES ---
+    currentMap: null,       
+    currentNodeId: null,    
+    currentEncounterType: null,
+    initialRunGold: 0 // <-- ADD THIS: Tracks gold at start of run
+    // --- END NEW ---
 };
 let isDebugVisible = false;
 let realTimeInterval = null;
@@ -401,17 +407,20 @@ function setDifficulty(newDifficulty) {
 }
 
 async function saveGame(manual = false) {
-    if (!player) {
-         console.log("Save cancelled: Player object is null.");
-         return;
-    }
+    if (!player) { /* ... log ... */ return; }
+    
     // Deep copy player data for saving
     const saveData = JSON.parse(JSON.stringify(player));
 
-    // Clean up potentially non-serializable data before saving
-    delete saveData.racialPassive; // Remove function reference
-    delete saveData.signatureAbilityData; // Remove object reference (will be re-linked on load)
-    // Ensure _classKey IS SAVED (already handled by stringify)
+    // Clean up non-serializable data before saving (unchanged)
+    delete saveData.racialPassive;
+    delete saveData.signatureAbilityData;
+    
+    // --- NEW: Save necessary global state variables ---
+    saveData.lastView = gameState.currentView;
+    saveData.currentMap = gameState.currentMap;
+    saveData.currentNodeId = gameState.currentNodeId;
+    saveData.currentBiome = gameState.currentBiome;
 
     // --- NEW: Add keys for equipped items for robust loading ---
     saveData.equippedWeaponKey = findKeyByInstance(WEAPONS, player.equippedWeapon);
@@ -598,8 +607,9 @@ async function deleteSave(docId) {
 
 
 async function loadGameFromKey(docId, isImport = false) {
-     console.log(`loadGameFromKey called with docId: ${docId}, isImport: ${isImport}`);
+    console.log(`loadGameFromKey called with docId: ${docId}, isImport: ${isImport}`);
     let parsedData;
+
     try {
         if (docId === 'local') {
             console.log("Loading from local storage...");
@@ -676,6 +686,14 @@ async function loadGameFromKey(docId, isImport = false) {
         // --- END NPC ALLY ---
         
         Object.assign(player, parsedData); // Load all saved data
+
+        // --- NEW: Restore essential global state from loaded data ---
+        gameState.currentMap = parsedData.currentMap || null;
+        gameState.currentNodeId = parsedData.currentNodeId || null;
+        gameState.currentBiome = parsedData.currentBiome || null;
+        
+        // --- NEW: Capture the last view key ---
+        const lastView = parsedData.lastView || 'town';
 
         // Set firestoreId if loaded from cloud
         if(docId !== 'local') player.firestoreId = docId;
@@ -987,21 +1005,19 @@ async function loadGameFromKey(docId, isImport = false) {
 
         // Delay rendering slightly to ensure DOM is ready
         requestAnimationFrame(() => {
-             console.log("Requesting animation frame for final rendering...");
+            console.log("Requesting animation frame for final rendering...");
             updateRealTimePalette();
             updateStatsView();
 
             if (isNewGame && isTutorialEnabled) {
-                 console.log("Starting tutorial...");
                 setTimeout(() => startTutorialSequence('main_game_screen'), 500);
             } else if (player.statPoints > 0) {
-                 console.log("Player has stat points, rendering level up sheet...");
                 setTimeout(() => renderCharacterSheet(true), 1500);
             } else {
-                 console.log("Rendering Town Square...");
-                renderTownSquare();
+                // Route to the specific saved view
+                routeToSavedView(lastView); // <-- Use the new router
             }
-             console.log("loadGameFromKey finished execution.");
+            console.log("loadGameFromKey finished execution.");
         });
 
     } else {

@@ -270,6 +270,353 @@ function findPath(start, end, isFlying = false) {
     return null; // No path found
 }
 
+function generateNewBiomeMap(biomeKey) {
+    const biome = BIOMES[biomeKey];
+    if (!biome) return null;
+
+    const rules = biome.map_generation;
+    const rng = Math.random;
+    
+    let nodes = [];
+    let nodesByFloor = [];
+    
+    // Constants
+    const bossNodeId = 'node-boss';
+    const preBossRestId = 'node-pre-boss-rest';
+    const halfwayRestId = 'node-halfway-rest'; // New constant
+
+    // --- NEW: Set initial gold for the run ---
+    gameState.initialRunGold = player.gold; 
+    // --- END NEW ---
+    
+    // --- BOSS SELECTION ---
+    const bossKey = rules.bosses[Math.floor(Math.random() * rules.bosses.length)]; // <- This sets the key.     
+    
+    // Calculate halfway point (e.g., floor 4 of 8)
+    const halfwayFloor = Math.floor(rules.depth / 2);
+
+    for (let f = 0; f < rules.depth; f++) {
+        nodesByFloor[f] = [];
+        let nodesInThisFloor = 0;
+
+        if (f === 0) {
+            // Floor 0: Start (2-3 nodes)
+            nodesInThisFloor = Math.floor(rng() * 2) + 2;
+            const segmentSize = rules.width / nodesInThisFloor;
+            
+            for (let i = 0; i < nodesInThisFloor; i++) {
+                const col = Math.floor((i * segmentSize) + (segmentSize / 2)); 
+                const node = { id: `node-${f}-${col}`, floor: f, col: col, type: 'monster', state: 'next_available', connections: [] };
+                nodesByFloor[f].push(node); nodes.push(node);
+            }
+        } 
+        // --- NEW: Guaranteed Halfway Rest Site ---
+        else if (f === halfwayFloor) {
+            // Always center
+            const node = { id: halfwayRestId, floor: f, col: Math.floor(rules.width / 2), type: 'rest', state: 'hidden', connections: [] };
+            nodesByFloor[f].push(node); nodes.push(node);
+            
+            // Connect ALL nodes from the previous floor to this single rest site
+            // This creates a "choke point" on the map
+            if (nodesByFloor[f - 1]) {
+                nodesByFloor[f - 1].forEach(prev => prev.connections.push(node.id));
+            }
+        }
+        // --- END NEW ---
+        else if (f === rules.depth - 2) {
+            // Pre-Boss: Rest Site (Always center)
+            const node = { id: preBossRestId, floor: f, col: Math.floor(rules.width / 2), type: 'rest', state: 'hidden', connections: [bossNodeId] };
+            nodesByFloor[f].push(node); nodes.push(node);
+            if (nodesByFloor[f - 1]) nodesByFloor[f - 1].forEach(prev => prev.connections.push(node.id));
+        } else if (f === rules.depth - 1) {
+            // Final Floor: Boss (Always center)
+            // Ensure you are using the bossKey variable here for the icon fix to work
+            const node = { id: bossNodeId, floor: f, col: Math.floor(rules.width / 2), type: 'boss', bossId: bossKey, state: 'hidden', connections: [] }; 
+            nodesByFloor[f].push(node); nodes.push(node);
+        } else {
+                // Intermediate Floors
+            const prevFloorNodes = nodesByFloor[f - 1];
+            if (!prevFloorNodes || prevFloorNodes.length === 0) continue;
+
+            nodesInThisFloor = Math.floor(rng() * 3) + 2; // 2-4 nodes
+            const segmentSize = rules.width / nodesInThisFloor;
+
+            for (let i = 0; i < nodesInThisFloor; i++) {
+                let col = Math.floor((i * segmentSize) + (segmentSize / 2));
+                if (i > 0 && col <= nodesByFloor[f][i-1].col) {
+                    col = nodesByFloor[f][i-1].col + 1;
+                }
+                if (col >= rules.width) col = rules.width - 1;
+
+                // Determine Type
+                let nodeType = 'monster';
+                const typeRoll = rng();
+                let cumulativeChance = 0;
+                for (const type in rules.node_pool) {
+                    cumulativeChance += rules.node_pool[type];
+                    if (typeRoll < cumulativeChance) { nodeType = type; break; }
+                }
+                // Safety Rules
+                if (f < 4 && (nodeType === 'elite' || nodeType === 'rest')) nodeType = 'monster';
+
+                const node = { id: `node-${f}-${col}`, floor: f, col: col, type: nodeType, state: 'hidden', connections: [] };
+                nodesByFloor[f].push(node); nodes.push(node);
+            }
+
+            // Connect Previous Floor to This Floor
+            prevFloorNodes.forEach(prevNode => {
+                const createdNodes = nodesByFloor[f];
+                let validTargets = createdNodes.filter(n => !(['elite', 'rest', 'shop'].includes(n.type) && n.type === prevNode.type));
+                if (validTargets.length === 0) validTargets = createdNodes;
+                
+                validTargets.sort((a, b) => Math.abs(a.col - prevNode.col) - Math.abs(b.col - prevNode.col));
+
+                prevNode.connections.push(validTargets[0].id);
+
+                if (rng() < 0.3 && validTargets.length > 1) {
+                    prevNode.connections.push(validTargets[1].id);
+                }
+            });
+        }
+    }
+
+    // 2. PRUNING (Remove unreachable nodes)
+    let accessibleIds = new Set(nodesByFloor[0].map(n => n.id));
+    let queue = [...nodesByFloor[0]];
+    while(queue.length > 0) {
+        const curr = queue.shift();
+        curr.connections.forEach(childId => {
+            if(!accessibleIds.has(childId)) {
+                accessibleIds.add(childId);
+                const childNode = nodes.find(n => n.id === childId);
+                if(childNode) queue.push(childNode);
+            }
+        });
+    }
+
+    let reachesBossIds = new Set([bossNodeId]);
+    for(let f = rules.depth - 2; f >= 0; f--) {
+        nodesByFloor[f].forEach(node => {
+            const connectsToValid = node.connections.some(connId => reachesBossIds.has(connId));
+            if (connectsToValid) reachesBossIds.add(node.id);
+        });
+    }
+
+    const finalNodes = nodes.filter(n => accessibleIds.has(n.id) && reachesBossIds.has(n.id));
+    
+    finalNodes.forEach(node => {
+        node.connections = node.connections.filter(connId => accessibleIds.has(connId) && reachesBossIds.has(connId));
+    });
+
+    const map = { biomeKey: biomeKey, nodes: finalNodes };
+    gameState.currentMap = map;
+    return map;
+}
+
+function triggerNodeEvent(node) {
+    if (!node) return;
+    gameState.currentEncounterType = node.type;
+
+    switch(node.type) {
+        case 'monster_lured':
+            // Pass the lure target specifically
+            const lureDetails = LURES[player.equippedLure];
+            startBattle(gameState.currentMap.biomeKey, { 
+                nodeType: 'monster_lured', 
+                speciesKey: lureDetails.lureTarget 
+            });
+            break;
+            
+        case 'monster':
+            startBattle(gameState.currentMap.biomeKey, { nodeType: 'monster' });
+            break;
+            
+        case 'elite':
+            startBattle(gameState.currentMap.biomeKey, { nodeType: 'elite' });
+            break;
+            
+        case 'boss':
+            // Pass the specific boss ID stored on the node
+            startBattle(gameState.currentMap.biomeKey, { 
+                nodeType: 'boss', 
+                bossKey: node.bossId 
+            });
+            break;
+            
+        case 'event': handleRandomEvent(node); break; // <-- MODIFIED
+        case 'rest': renderRestNode(); break;
+        case 'shop': renderMerchantNode(); break;
+        default: renderBiomeMap(gameState.currentMap.biomeKey);
+    }
+}
+
+function handleRandomEvent(node) {
+    // 1. Define events and weights (Weights can depend on player level/luck)
+    const eventTypes = [
+        'Treasure', // Current basic event (safe, instant reward)
+        'LockedChest', // Puzzle/Skill Check
+        'SphinxRiddle', // Quiz/Knowledge Check
+        'PoisonedStream' // Resource/Risk Check
+    ];
+    const weights = [
+        40, // Base Treasure (safe)
+        25, // Locked Chest
+        20, // Sphinx Riddle
+        15  // Poisoned Stream
+    ];
+    
+    const chosenEvent = choices(eventTypes, weights, Math.random); // Use Math.random for world events
+
+    // 2. Store event on node (to prevent re-roll on accidental refresh/re-render)
+    if (!node.eventData) {
+        node.eventData = { type: chosenEvent, state: 'active' };
+    }
+    
+    // 3. Route to the appropriate renderer
+    switch (node.eventData.type) {
+        case 'LockedChest': renderLockedChestPuzzle(node); break;
+        case 'SphinxRiddle': renderSphinxRiddleQuiz(node); break;
+        case 'PoisonedStream': renderPoisonedStreamRisk(node); break;
+        case 'Treasure': renderTreasureNode(); break; // Existing logic
+        default: renderTreasureNode();
+    }
+}
+/**
+ * Executes the event for a given map node.
+ * This is the bridge between the map and the game's encounter logic.
+ * @param {object} node - The node object from the gameState.currentMap.nodes array.
+ */
+function triggerNodeEvent(node) {
+    if (!node) return;
+    gameState.currentEncounterType = node.type;
+
+    switch(node.type) {
+        case 'monster_lured':
+        case 'monster':
+            let enemy;
+            if (node.type === 'monster_lured') {
+                const lureDetails = LURES[player.equippedLure];
+                const speciesData = MONSTER_SPECIES[lureDetails.lureTarget];
+                enemy = new Enemy(speciesData, MONSTER_RARITY['common'], player.level);
+            } else {
+                enemy = generateEnemy(gameState.currentMap.biomeKey);
+                while (enemy.rarityData.key === 'legendary') enemy = generateEnemy(gameState.currentMap.biomeKey);
+            }
+            // Manually push enemy and start battle to bypass standard generation
+            currentEnemies = [enemy];
+            // We use a customized startBattle flow or just inject it
+            // Actually, standard startBattle generates enemies if list is empty. 
+            // We need to tweak startBattle OR just use the array we just made.
+            // Let's rely on the rendering.js/battle.js tweaks to handle pre-existing enemies.
+            // *Self-correction*: Simplest way is to set currentEnemies and call a modified startBattle, 
+            // OR just let startBattle generate it if we didn't pass one. 
+            // Let's stick to the standard flow for now to avoid breaking things:
+            // If type is monster_lured, we need to force it. 
+            // See `battle.js` modification below for how we handle this cleanly.
+            startBattle(gameState.currentMap.biomeKey, { nodeType: node.type }); 
+            break;
+            
+        case 'elite':
+            startBattle(gameState.currentMap.biomeKey, { nodeType: 'elite' });
+            break;
+            
+        case 'boss':
+            startBattle(gameState.currentMap.biomeKey, { nodeType: 'boss' });
+            break;
+            
+        case 'event': renderTreasureNode(); break;
+        case 'rest': renderRestNode(); break;
+        case 'shop': renderMerchantNode(); break;
+        default: renderBiomeMap(gameState.currentMap.biomeKey);
+    }
+}
+
+/**
+ * Ends the biome run, handles penalties/rewards, and returns to town.
+ * @param {string} reason - 'victory' (beat boss), 'death' (player died), 'flee' (player fled map).
+ */
+function endBiomeRun(reason) {
+    const map = gameState.currentMap;
+    if (!map) return;
+
+    // 1. Calculate Proportional Gold Loss (if fleeing)
+    let goldMessage = "";
+    if (reason === 'flee') {
+        
+        // --- NEW: Check if fleeing from a Rest Site ---
+        const currentNode = map.nodes.find(n => n.id === gameState.currentNodeId);
+        const isSafeZone = currentNode && currentNode.type === 'rest';
+        
+        if (isSafeZone) {
+            goldMessage = `You chose to leave safely from a Rest Site. You keep all your winnings!`;
+        } 
+        // --- END NEW ---
+        
+        else {
+            // Standard penalty logic
+            const currentGold = player.gold;
+            const earnedGold = Math.max(0, currentGold - gameState.initialRunGold);
+            
+            if (earnedGold > 0) {
+                let currentFloor = 0;
+                if (gameState.currentNodeId) {
+                    const node = map.nodes.find(n => n.id === gameState.currentNodeId);
+                    if (node) currentFloor = node.floor;
+                }
+                
+                const penaltyPct = Math.min(1.0, currentFloor * 0.1); // 10% per floor
+                const penalty = Math.floor(earnedGold * penaltyPct);
+                
+                if (penalty > 0) {
+                    player.gold -= penalty;
+                    goldMessage = `You dropped <span class="font-bold text-red-400">${penalty} G</span> of your winnings while fleeing in panic.`;
+                } else {
+                    goldMessage = `You managed to flee with all your winnings!`;
+                }
+            } else {
+                goldMessage = `You made no profit, so you lost nothing.`;
+            }
+        }
+    }
+
+    // 2. Clear map state
+    gameState.currentMap = null;
+    gameState.currentNodeId = null;
+    gameState.currentEncounterType = null;
+    gameState.initialRunGold = 0; // Reset
+    
+    // 3. Handle outcome
+    if (reason === 'victory') {
+        addToLog(`You have conquered the ${BIOMES[map.biomeKey].name}!`, "text-green-400 font-bold");
+        
+        // --- NEW: Advance service counter once per expedition ---
+        if (player.npcAlly && !player.npcAlly.isResting) {
+            player.encountersSinceLastPay++;
+            addToLog(`Your ally's service counter advanced. (${5 - player.encountersSinceLastPay} expeditions left until pay.)`, "text-gray-400");
+        }
+        // --------------------------------------------------------
+
+        setTimeout(renderTownSquare, 1500);
+
+    } else if (reason === 'flee') {
+        addToLog(`You fled the expedition! ${goldMessage}`, "text-yellow-400");
+        if (player.npcAlly && !player.npcAlly.isResting) {
+            player.encountersSinceLastPay++;
+            addToLog(`Your ally's service counter advanced. (${5 - player.encountersSinceLastPay} expeditions left until pay.)`, "text-gray-400");
+        }
+        // --------------------------------------------------------
+        
+        setTimeout(renderTownSquare, 1500);
+
+    } else if (reason === 'death') {
+        setTimeout(renderTownSquare, 3000); 
+    }
+    
+    player.clearBattleBuffs();
+    if (player.npcAlly) player.npcAlly.clearBattleBuffs();
+    updateStatsView();
+}
+
 function findReachableCells(start, maxDistance) {
     const reachable = [];
     const visited = new Set();
@@ -877,7 +1224,8 @@ class Player extends Entity {
              'magic_dampen', 'elemental_vuln', 'slowed', 'inaccurate',
              'monster_lure', 'clumsy', 'fumble',
              'buff_whetstone', // Added whetstone buff
-             'buff_magic_dust' // Added magic rock dust buff
+             'buff_magic_dust',  // Added magic rock dust buff
+             'buff_elemental_grease' // <-- ADD THIS LINE
         ];
 
         let cleared = false;
@@ -1215,6 +1563,16 @@ class Player extends Entity {
             baseWeaponDamage += elementalBonusDamage;
             messageLog.push(`+${elementalBonusDamage} ${this.weaponElement} damage!`);
             calcLog.steps.push({ description: `Enchantment Bonus (1d8)`, value: `+${elementalBonusDamage}`, result: baseWeaponDamage });
+        }
+        // --- NEW: Elemental Grease Buff ---
+        else if (this.statusEffects.buff_elemental_grease) {
+            const grease = this.statusEffects.buff_elemental_grease;
+            const elementalBonusRoll = rollDice(grease.damage[0], grease.damage[1], `Grease Bonus (${grease.element})`);
+            const elementalBonusDamage = elementalBonusRoll.total;
+            baseWeaponDamage += elementalBonusDamage;
+            attackEffects.element = grease.element; // Apply the element to the attack
+            messageLog.push(`+${elementalBonusDamage} ${grease.element} damage!`);
+            calcLog.steps.push({ description: `Grease Bonus (${grease.damage[0]}d${grease.damage[1]})`, value: `+${elementalBonusDamage}`, result: baseWeaponDamage });
         }
 
             let statBonus = this.physicalDamageBonus;
@@ -5792,12 +6150,27 @@ function changeCharacterAspect(aspectType, newKey) {
 
 function determineBrewingOutcome(ingredients) {
     const alchemyTier = player.house.alchemyTier || 1;
-    const ingredientCounts = {};
+    
+    // 1. Convert provided ingredients into counts and categorize them
+    const providedSpecificCounts = {};
+    const providedGenericInputs = { // Keep track of which specific items are fulfilling generic roles
+        meat: [],
+        veggie: [],
+        seasoning: []
+    };
+    
     ingredients.forEach(key => {
-        ingredientCounts[key] = (ingredientCounts[key] || 0) + 1;
+        providedSpecificCounts[key] = (providedSpecificCounts[key] || 0) + 1;
+        const details = getItemDetails(key);
+        if (details && details.cookingType && providedGenericInputs.hasOwnProperty(details.cookingType)) {
+            // Add the key once for each item provided
+            for (let i = 0; i < (providedSpecificCounts[key] || 0); i++) {
+                providedGenericInputs[details.cookingType].push(key);
+            }
+        }
     });
 
-    // Check for exact recipe match first
+    // 2. Loop all recipes to find a match
     for (const recipeKey in ALCHEMY_RECIPES) {
         const recipe = ALCHEMY_RECIPES[recipeKey];
         // Ensure recipe matches the current lab tier
@@ -5805,21 +6178,51 @@ function determineBrewingOutcome(ingredients) {
 
         const recipeIngredients = recipe.ingredients;
         let isMatch = true;
-        // Check if number of ingredient types match
-        if (Object.keys(recipeIngredients).length !== Object.keys(ingredientCounts).length) {
-            isMatch = false;
-        } else {
-             // Check if counts for each ingredient type match
-            for (const itemKey in recipeIngredients) {
-                if (ingredientCounts[itemKey] !== recipeIngredients[itemKey]) {
+        let totalRecipeItems = 0;
+        const ingredientsToConsume = {}; // What we will actually remove from inventory
+        const tempGenericInputs = JSON.parse(JSON.stringify(providedGenericInputs)); // Make a copy to check against
+
+        // 3. Check if player's items satisfy the recipe
+        for (const reqKey in recipeIngredients) {
+            const requiredAmount = recipeIngredients[reqKey];
+            totalRecipeItems += requiredAmount;
+            const isGeneric = ['meat', 'veggie', 'seasoning'].includes(reqKey);
+
+            if (isGeneric) {
+                // Check if we have enough generic items of this type
+                if (tempGenericInputs[reqKey].length < requiredAmount) {
                     isMatch = false;
                     break;
                 }
+                // Consume the required amount of generic items
+                for (let i = 0; i < requiredAmount; i++) {
+                    const itemToUse = tempGenericInputs[reqKey].shift(); // Get the first available generic item
+                    ingredientsToConsume[itemToUse] = (ingredientsToConsume[itemToUse] || 0) + 1;
+                }
+            } else {
+                // Check if we have enough specific items
+                if ((providedSpecificCounts[reqKey] || 0) < requiredAmount) {
+                    isMatch = false;
+                    break;
+                }
+                // Consume the specific item
+                ingredientsToConsume[reqKey] = (ingredientsToConsume[reqKey] || 0) + requiredAmount;
             }
         }
-        // If it's an exact match, return success
+
+        // 4. Check for total item count match (e.g., 3 ingredients in slots must match 3 ingredients in recipe)
+        if (ingredients.length !== totalRecipeItems) {
+            isMatch = false;
+        }
+
         if (isMatch) {
-            return { success: true, potion: recipe.output, message: `You successfully brewed a ${getItemDetails(recipe.output).name}!` };
+            // We found an exact match (including generics)!
+            return { 
+                success: true, 
+                potion: recipe.output, 
+                message: `You successfully brewed a ${getItemDetails(recipe.output).name}!`,
+                ingredientsToConsume: ingredientsToConsume // e.g., { fire_essence: 1, slime_glob: 1, sunshine_flower: 1 }
+            };
         }
     }
 
@@ -5866,14 +6269,17 @@ function determineBrewingOutcome(ingredients) {
         outcome = { success: true, potion: randomPotion, message: "A happy accident! You've created a useful potion." };
     }
 
+    // Pass the original ingredients to be consumed for failure/random success
+    outcome.ingredientsToConsume = ingredients.reduce((acc, key) => {
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+    }, {});
+
     return outcome;
 }
 
-function brewHomePotion(ingredients, outcome) {
-    const ingredientCounts = {};
-    ingredients.forEach(key => {
-        ingredientCounts[key] = (ingredientCounts[key] || 0) + 1;
-    });
+function brewHomePotion(outcome) {
+    const ingredientCounts = outcome.ingredientsToConsume;
 
     // Consume ingredients from player inventory
     for(const key in ingredientCounts) {

@@ -41,6 +41,15 @@ const WITCH_COVEN_RECIPES = {
     'transmute_light_essence': { output: 'light_essence', ingredients: { 'slime_glob': 5, 'goblin_ear': 3 }, cost: 100 },
     'transmute_void_essence': { output: 'void_essence', ingredients: { 'slime_glob': 5, 'spider_venom': 2 }, cost: 100 },
 
+    'craft_fire_grease': { output: 'fire_grease', ingredients: { 'slime_glob': 1, 'fire_essence': 1 }, cost: 50 },
+    'craft_water_grease': { output: 'water_grease', ingredients: { 'slime_glob': 1, 'water_essence': 1 }, cost: 50 },
+    'craft_earth_grease': { output: 'earth_grease', ingredients: { 'slime_glob': 1, 'earth_essence': 1 }, cost: 50 },
+    'craft_wind_grease': { output: 'wind_grease', ingredients: { 'slime_glob': 1, 'wind_essence': 1 }, cost: 50 },
+    'craft_lightning_grease': { output: 'lightning_grease', ingredients: { 'slime_glob': 1, 'lightning_essence': 1 }, cost: 50 },
+    'craft_nature_grease': { output: 'nature_grease', ingredients: { 'slime_glob': 1, 'nature_essence': 1 }, cost: 50 },
+    'craft_light_grease': { output: 'light_grease', ingredients: { 'slime_glob': 1, 'light_essence': 1 }, cost: 50 },
+    'craft_void_grease': { output: 'void_grease', ingredients: { 'slime_glob': 1, 'void_essence': 1 }, cost: 50 },
+
     // Basic Potion Brewing (Added hearts: 0 - will show under Brew)
     'brew_health': { output: 'health_potion', ingredients: { 'slime_glob': 2 }, cost: 10, hearts: 0 }, // Added hearts: 0
     'brew_mana': { output: 'mana_potion', ingredients: { 'slime_glob': 2 }, cost: 15, hearts: 0 }, // Added hearts: 0
@@ -735,7 +744,97 @@ const ALCHEMY_RECIPES = {
             <h4 class='font-bold text-lg text-yellow-300 mb-2'>Addendum</h4>
             <p class='italic text-gray-400'>A far more elegant solution. The ordered matrix of the Crystalline Apple provides a perfect structural framework against entropic decay. It seems Nathalie's penchant for making tarts with these apples has inspired a breakthrough in metaphysical defense. Remarkable.</p>
         `
-    }
+    },
+    // --- NEW GREASE RECIPES WITH NATHALIE'S DESCRIPTIONS ---
+    'brew_fire_grease_home': {
+        tier: 1,
+        output: 'fire_grease',
+        ingredients: { 'fire_essence': 1, 'slime_glob': 1, 'veggie': 1 },
+        cost: 0,
+        author: 'Nathalie',
+        library_description: `
+            <h4 class='font-bold text-lg text-yellow-300 mb-2'>Nathalie's Notes</h4>
+            <p class='italic text-gray-400'>Kiky goes on about 'thermal insulation' and 'pyric catalysts.' Dreadfully complicated! I just find that mixing this lovely warm essence with a bit of slime and a simple herb makes a paste that's like a tiny, cozy campfire for your sword. It smells wonderful, and it makes things burn!</p>
+        `
+    },
+    'brew_water_grease_home': {
+        tier: 1,
+        output: 'water_grease',
+        ingredients: { 'water_essence': 1, 'slime_glob': 1, 'veggie': 1 },
+        cost: 0,
+        author: 'Nathalie',
+        library_description: `
+            <h4 class='font-bold text-lg text-yellow-300 mb-2'>Nathalie's Notes</h4>
+            <p class='italic text-gray-400'>Kiky's water potions are always so complex, for 'hydrophobic properties.' I just think this essence has a lovely, calming flow. It makes your weapon glide like a fish, and it's perfect for dousing those fiery tempers you run into!</p>
+        `
+    },
+    'brew_earth_grease_home': {
+        tier: 1,
+        output: 'earth_grease',
+        ingredients: { 'earth_essence': 1, 'slime_glob': 1, 'veggie': 1 },
+        cost: 0,
+        author: 'Nathalie',
+        library_description: `
+            <h4 class='font-bold text-lg text-yellow-300 mb-2'>Nathalie's Notes</h4>
+            <p class='italic text-gray-400'>Kiky has all these theories about 'molecular densification.' I just know that mashing in a bit of root vegetable or tater starch makes the essence stick, and it gives your weapon the satisfying *thud* of a heavy stone. Sturdy and reliable, just like a good stew.</p>
+        `
+    },
+    'brew_wind_grease_home': {
+        tier: 1,
+        output: 'wind_grease',
+        ingredients: { 'wind_essence': 1, 'slime_glob': 1, 'veggie': 1 },
+        cost: 0,
+        author: 'Nathalie',
+        library_description: `
+            <h4 class='font-bold text-lg text-yellow-300 mb-2'>Nathalie's Notes</h4>
+            <p class='italic text-gray-400'>Kiky is always trying to 'stabilize the anti-kinetic field' of these. Honestly! I just think a bit of fluffy dandelion or sweet grass helps the wind essence create a sharp little blade of air around your weapon. It feels light as a feather and cuts wonderfully!</p>
+        `
+    },
+    'brew_lightning_grease_home': {
+        tier: 1,
+        output: 'lightning_grease',
+        ingredients: { 'lightning_essence': 1, 'slime_glob': 1, 'veggie': 1 },
+        cost: 0,
+        author: 'Nathalie',
+        library_description: `
+            <h4 class='font-bold text-lg text-yellow-300 mb-2'>Nathalie's Notes</h4>
+            <p class='italic text-gray-400'>Kiky is so worried about 'grounding' these essences. I say, let them be wild! This grease crackles and pops right on the blade, and it gives your enemies a lovely, surprising *zap*. It always makes my hair stand on end a bit!</p>
+        `
+    },
+    'brew_nature_grease_home': {
+        tier: 1,
+        output: 'nature_grease',
+        ingredients: { 'nature_essence': 1, 'slime_glob': 1, 'veggie': 1 },
+        cost: 0,
+        author: 'Nathalie',
+        library_description: `
+            <h4 class='font-bold text-lg text-yellow-300 mb-2'>Nathalie's Notes</h4>
+            <p class='italic text-gray-400'>Kiky uses this essence and all sorts of fruits to make antitoxins. I find it's just as easy to go the other way! This paste is like coating your blade in a thousand tiny, angry thorns. Very 'back to nature'!</p>
+        `
+    },
+    'brew_light_grease_home': {
+        tier: 1,
+        output: 'light_grease',
+        ingredients: { 'light_essence': 1, 'slime_glob': 1, 'veggie': 1 },
+        cost: 0,
+        author: 'Nathalie',
+        library_description: `
+            <h4 class='font-bold text-lg text-yellow-300 mb-2'>Nathalie's Notes</h4>
+            <p class='italic text-gray-400'>Kiky's potions refract the light, which is clever, but I think that's a waste of its beauty. This simple grease makes your weapon *shine*! It's lovely, and it seems to make the darkness recoil. Sometimes a little light is all you need.</p>
+        `
+    },
+    'brew_void_grease_home': {
+        tier: 1,
+        output: 'void_grease',
+        ingredients: { 'void_essence': 1, 'slime_glob': 1, 'veggie': 1 },
+        cost: 0,
+        author: 'Nathalie',
+        library_description: `
+            <h4 class='font-bold text-lg text-yellow-300 mb-2'>Nathalie's Notes</h4>
+            <p class='italic text-gray-400'>Kiky's notes on this one are just a bunch of complicated diagrams about 'anti-entropic fields.' It's a bit gloomy for my taste, but grinding it into this paste makes your weapon feel... hungry. It’s very strange, but Kiky assures me it's 'metaphysically sound.' I'll take their word for it!</p>
+        `
+    },
+    // --- END OF NEW GREASE RECIPES ---
 };
 
 const WITCH_COVEN_SERVICES = {

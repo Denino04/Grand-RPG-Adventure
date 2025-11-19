@@ -1785,3 +1785,91 @@ function applyTheme(themeName = 'default') {
         document.documentElement.style.setProperty(key, finalPalette[key]);
     }
 }
+
+function injectMapStyles() {
+    const styleId = 'roguelike-map-styles';
+    if (document.getElementById(styleId)) return;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+        .map-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            background: linear-gradient(to top, var(--map-bg-start), var(--map-bg-end));
+            border-radius: 0.5rem;
+            box-shadow: inset 0 0 20px #000;
+            scrollbar-width: thin;
+            scrollbar-color: var(--map-scroll-thumb) var(--map-scroll-track);
+        }
+        .map-container::-webkit-scrollbar { width: 8px; }
+        .map-container::-webkit-scrollbar-track { background: var(--map-scroll-track); border-radius: 4px; }
+        .map-container::-webkit-scrollbar-thumb { background-color: var(--map-scroll-thumb); border-radius: 4px; border: 1px solid var(--map-scroll-track); }
+
+        .map-svg-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 0;
+        }
+        /* Explicitly disable pointer events on lines just in case */
+        .map-svg-layer line { pointer-events: none; }
+
+        .map-node {
+            position: absolute;
+            width: 48px; height: 48px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem;
+            background-color: #1e293b;
+            border: 2px solid #475569;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            z-index: 1;
+            transition: all 0.3s ease;
+            color: #94a3b8;
+            user-select: none;
+            /* Fix for mobile tap highlight */
+            -webkit-tap-highlight-color: transparent;
+            cursor: default; /* Default cursor for non-clickable nodes */
+        }
+        
+        /* --- HITBOX EXPANSION --- */
+        /* Increases clickable area without changing visual size */
+        .map-node.next_available::after {
+            content: '';
+            position: absolute;
+            top: -20px; left: -20px; right: -20px; bottom: -20px; /* Even larger hit area */
+            border-radius: 50%;
+            z-index: 1; /* Ensure it captures clicks */
+            /* background-color: rgba(255, 0, 0, 0.2); /* Uncomment to debug hit area */ */
+        }
+
+        .map-node.visited { filter: grayscale(100%); opacity: 0.5; border-color: #334155; }
+        .map-node.next_available {
+            cursor: pointer; border-color: #fbbf24; color: #fff; background-color: #334155;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.4);
+            animation: pulse-node 2s infinite;
+        }
+        .map-node.next_available:hover { transform: translate(-50%, -50%) scale(1.15); background-color: #475569; }
+        .map-node.hidden { opacity: 0.6; }
+        
+        .map-node.type-monster { border-color: #94a3b8; }
+        .map-node.type-elite { border-color: #ef4444; color: #fca5a5; }
+        .map-node.type-boss { 
+            border-color: #dc2626; background-color: #450a0a; 
+            width: 80px; height: 80px; font-size: 3rem; z-index: 2; 
+        }
+        .map-node.type-rest { border-color: #f97316; color: #fdba74; }
+        .map-node.type-shop { border-color: #eab308; color: #fde047; }
+        .map-node.type-event { border-color: #8b5cf6; color: #d8b4fe; }
+        .map-node.type-monster_lured { border-color: #22c55e; color: #86efac; box-shadow: 0 0 10px #22c55e; }
+
+        @keyframes pulse-node {
+            0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+        }
+    `;
+    document.head.appendChild(style);
+}

@@ -115,6 +115,118 @@ const ITEMS = {
     'poisonous_grease': { name: 'Poisonous Grease', type: 'buff', price: 200, rarity: 'Uncommon', description: 'Smear this foul-smelling gunk on your weapon. For 3 turns, your attacks have a chance to inflict a nasty poison that deals ¼ of your weapon’s average damage for 3 more turns. The gift that keeps on giving... sepsis. (Chance: 20%+Luck%/2)', effect: { type: 'buff_poison_grease', duration: 4, poisonChance: 0.20 } },
     'paralysis_grease': { name: 'Paralysis Grease', type: 'buff', price: 250, rarity: 'Uncommon', description: 'A sticky paste that makes your weapon shockingly effective. For 3 turns, your attacks have a chance to inflict paralysis for 1 turn, causing enemies to suddenly stop and stare blankly into the middle distance. (Chance: 20%+Luck%/2. Stacks with Earth Element effects for extra stillness.)', effect: { type: 'buff_paralysis_grease', duration: 4, paralyzeChance: 0.20 } },
 
+    'fire_grease': { 
+        name: 'Fire Grease', 
+        type: 'buff', 
+        price: 150, 
+        rarity: 'Common', 
+        description: "Coats your weapon in searing flames, adding 1d8 Fire damage to your attacks for one encounter. Does not stack with permanent enchantments.", 
+        effect: { 
+            type: 'buff_elemental_grease', 
+            duration: Infinity, // Lasts for the encounter, cleared by clearBattleBuffs
+            element: 'fire', 
+            damage: [1, 8] 
+        },
+        alchemyType: 'base_potion' // So it can be crafted at home
+    },
+    'water_grease': { 
+        name: 'Water Grease', 
+        type: 'buff', 
+        price: 150, 
+        rarity: 'Common', 
+        description: "Coats your weapon in surging water, adding 1d8 Water damage to your attacks for one encounter. Does not stack with permanent enchantments.", 
+        effect: { 
+            type: 'buff_elemental_grease', 
+            duration: Infinity,
+            element: 'water', 
+            damage: [1, 8] 
+        },
+        alchemyType: 'base_potion'
+    },
+    'earth_grease': { 
+        name: 'Earth Grease', 
+        type: 'buff', 
+        price: 150, 
+        rarity: 'Common', 
+        description: "Coats your weapon in grinding stones, adding 1d8 Earth damage to your attacks for one encounter. Does not stack with permanent enchantments.", 
+        effect: { 
+            type: 'buff_elemental_grease', 
+            duration: Infinity,
+            element: 'earth', 
+            damage: [1, 8] 
+        },
+        alchemyType: 'base_potion'
+    },
+    'wind_grease': { 
+        name: 'Wind Grease', 
+        type: 'buff', 
+        price: 150, 
+        rarity: 'Common', 
+        description: "Coats your weapon in cutting gales, adding 1d8 Wind damage to your attacks for one encounter. Does not stack with permanent enchantments.", 
+        effect: { 
+            type: 'buff_elemental_grease', 
+            duration: Infinity,
+            element: 'wind', 
+            damage: [1, 8] 
+        },
+        alchemyType: 'base_potion'
+    },
+    'lightning_grease': { 
+        name: 'Lightning Grease', 
+        type: 'buff', 
+        price: 150, 
+        rarity: 'Common', 
+        description: "Coats your weapon in crackling lightning, adding 1d8 Lightning damage to your attacks for one encounter. Does not stack with permanent enchantments.", 
+        effect: { 
+            type: 'buff_elemental_grease', 
+            duration: Infinity,
+            element: 'lightning', 
+            damage: [1, 8] 
+        },
+        alchemyType: 'base_potion'
+    },
+    'nature_grease': { 
+        name: 'Nature Grease', 
+        type: 'buff', 
+        price: 150, 
+        rarity: 'Common', 
+        description: "Coats your weapon in living thorns, adding 1d8 Nature damage to your attacks for one encounter. Does not stack with permanent enchantments.", 
+        effect: { 
+            type: 'buff_elemental_grease', 
+            duration: Infinity,
+            element: 'nature', 
+            damage: [1, 8] 
+        },
+        alchemyType: 'base_potion'
+    },
+    'light_grease': { 
+        name: 'Light Grease', 
+        type: 'buff', 
+        price: 150, 
+        rarity: 'Common', 
+        description: "Coats your weapon in holy light, adding 1d8 Light damage to your attacks for one encounter. Does not stack with permanent enchantments.", 
+        effect: { 
+            type: 'buff_elemental_grease', 
+            duration: Infinity,
+            element: 'light', 
+            damage: [1, 8] 
+        },
+        alchemyType: 'base_potion'
+    },
+    'void_grease': { 
+        name: 'Void Grease', 
+        type: 'buff', 
+        price: 150, 
+        rarity: 'Common', 
+        description: "Coats your weapon in hungry shadows, adding 1d8 Void damage to your attacks for one encounter. Does not stack with permanent enchantments.", 
+        effect: { 
+            type: 'buff_elemental_grease', 
+            duration: Infinity,
+            element: 'void', 
+            damage: [1, 8] 
+        },
+        alchemyType: 'base_potion'
+    },
     // --- 3. Ingredients & Materials ---
     // Junk (for selling)
     'goblin_ear': {name: 'Goblin Ear', type: 'junk', price: 5, description: "A grotesque trophy."},
@@ -244,3 +356,4 @@ const SEEDS = {
     'blood_peach_sapling': { growsInto: 'blood_peach', growthTime: 3 * 60 * 60 * 1000, harvestEmoji: '🍑' },
     'ice_cherry_sapling': { growsInto: 'ice_cherry', growthTime: 3 * 60 * 60 * 1000, harvestEmoji: '🍒' }
 };
+

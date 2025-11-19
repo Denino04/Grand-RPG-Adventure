@@ -109,372 +109,234 @@ async function applyKnockback(target, source, distance) {
     }
 }
 // --- BATTLE FUNCTIONS ---
-function startBattle(biomeKey, trainingConfig = null) {
-    if (trainingConfig) {
+function startBattle(biomeKey, options = null) {
+    // 1. Reset State
+    if (options && options.trainingConfig) {
         preTrainingState = { hp: player.hp, mp: player.mp };
     } else {
         preTrainingState = null;
     }
 
-    isProcessingAction = false; // Reset action lock at the start of every battle
+    // --- FIX: Reset ALL special weapon state flags for a new encounter ---
+    player.specialWeaponStates = {}; 
+    // -------------------------------------------------------------------
+    
+    isProcessingAction = false; 
     gameState.isPlayerTurn = true;
     gameState.battleEnded = false;
     gameState.currentBiome = biomeKey;
-    // --- Disable buttons on battle start ---
+    
     $('#inventory-btn').disabled = false;
     $('#character-sheet-btn').disabled = false;
-    // --- END MODIFICATION ---
-    currentEnemies = [];
-    player.clearBattleBuffs(); // Clear buffs from previous battle
+
+    // Reset Battle State
     gameState.action = null;
     gameState.comboTarget = null;
     gameState.comboCount = 0;
     gameState.lastSpellElement = 'none';
-    gameState.gridObjects = []; // Obstacles and terrain
-
-    // Reset drone state at start of battle
+    gameState.gridObjects = []; 
     gameState.activeDrone = null;
-    gameState.npcActiveDrone = null; // <-- NEW: Add NPC drone state
-    // Reset mark state at start of battle
+    gameState.npcActiveDrone = null;
     gameState.markedTarget = null;
-    // --- NPC ALLY: Clear Fled Status ---
+
+    // Clear Player Buffs
+    player.clearBattleBuffs();
+    player.signatureAbilityUsed = false;
+    player.signatureAbilityToggleActive = false; 
+
+    // Reset Ally State
     if (player.npcAlly) {
         player.npcAlly.isFled = false;
-        player.npcAlly.clearBattleBuffs(); // Also clear their buffs
-        // Ensure HP/MP are clamped (they don't auto-heal)
+        player.npcAlly.clearBattleBuffs();
         player.npcAlly.hp = Math.min(player.npcAlly.maxHp, player.npcAlly.hp);
         player.npcAlly.mp = Math.min(player.npcAlly.maxMp, player.npcAlly.mp);
-        // Reset position, will be set during spawn
-        player.npcAlly.x = -1;
+        player.npcAlly.x = -1; 
         player.npcAlly.y = -1;
-        // --- NEW: Reset ability flags ---
         player.npcAlly.signatureAbilityUsed = false;
         player.npcAlly.signatureAbilityToggleActive = false;
         player.npcAlly.activeModeIndex = -1;
         player.npcAlly.npcAllyMarkedTarget = null;
-    }
-    // --- END NPC ALLY ---
-
-    if (player.npcAlly && player.npcAlly.x !== -1) {
-        player.npcAlly._50PercentLogged = false; // Reset threshold trackers
-        player.npcAlly._10PercentLogged = false;
-        const dialogueType = trainingConfig ? 'START_TRAIN' : 'START_BATTLE';
-        const dialogue = player.npcAlly._getDialogue(dialogueType, player.name);
-        addToLog(`(${player.npcAlly.name})<br>"${dialogue}"`, 'text-gray-400');
-    }
-
-    // Reset signature ability states for the new battle
-    player.signatureAbilityUsed = false;
-    player.signatureAbilityToggleActive = false; // Reset toggle state at start of battle
-
-
-    const isTutorialBattle = tutorialState.isActive && tutorialState.sequence[tutorialState.currentIndex]?.id === 'wilderness_select';
-
-    if (isTutorialBattle) {
-        // --- TUTORIAL BATTLE SETUP ---
-        // ... (rest of tutorial setup remains the same) ...
-        const gridData = BATTLE_GRIDS['square_5x5'];
-        gameState.gridWidth = gridData.width;
-        gameState.gridHeight = gridData.height;
-        gameState.gridLayout = gridData.layout;
-
-        const enemy = new Enemy(MONSTER_SPECIES['goblin'], MONSTER_RARITY['common'], player.level);
-        enemy.isMarked = false; // Ensure mark flag is initialized
-        enemy.hasDealtDamageThisEncounter = false; // Reset damage dealt flag
-
-        // Place player and enemy at random valid spots
-        const occupiedCells = new Set();
-        const validCells = [];
-        for (let y = 0; y < gameState.gridHeight; y++) {
-            for (let x = 0; x < gameState.gridWidth; x++) {
-                if (gameState.gridLayout[y * gameState.gridWidth + x] === 1) {
-                    validCells.push({x, y});
-                }
-            }
-        }
-
-        let playerCellIndex = Math.floor(Math.random() * validCells.length);
-        let playerCell = validCells.splice(playerCellIndex, 1)[0];
-        player.x = playerCell.x;
-        player.y = playerCell.y;
-        occupiedCells.add(`${player.x},${player.y}`); // Add player pos to occupied
-
-        // --- NPC ALLY: Spawn Ally in Tutorial ---
-        if (player.npcAlly && player.npcAlly.hp > 0) {
-            let allyCell = validCells.find(c => c.x === player.x + 1 && c.y === player.y) || validCells.find(c => c.x === player.x - 1 && c.y === player.y) || validCells.find(c => c.x === player.x && c.y === player.y + 1);
-            if (allyCell && validCells.includes(allyCell)) {
-                player.npcAlly.x = allyCell.x;
-                player.npcAlly.y = allyCell.y;
-                occupiedCells.add(`${allyCell.x},${allyCell.y}`);
-                validCells.splice(validCells.indexOf(allyCell), 1); // Remove from valid
-                _activateNpcStartOfBattleAbilities(player.npcAlly);
-            }
-            // If no adjacent cell, ally won't spawn in tutorial
-        } else if (player.npcAlly && player.npcAlly.hp > 0) {
-            // <<< NEW: Log why ally didn't spawn in tutorial
-            if (player.encountersSinceLastPay >= 5) addToLog(`${player.npcAlly.name} refuses to join the tutorial fight until paid!`, 'text-yellow-400');
-            else if (player.npcAlly.isResting) addToLog(`${player.npcAlly.name} is resting and skips the tutorial fight.`, 'text-gray-400');
-        }
-        // --- END NPC ALLY ---
-
-        let enemyCellIndex = Math.floor(Math.random() * validCells.length);
-        let enemyCell = validCells.splice(enemyCellIndex, 1)[0];
-        enemy.x = enemyCell.x;
-        enemy.y = enemyCell.y;
-        occupiedCells.add(`${enemy.x},${enemy.y}`); // Add enemy pos
-
-        currentEnemies.push(enemy);
-
-    } else if (trainingConfig) {
-        // --- TRAINING BATTLE SETUP ---
-        // ... (rest of training setup remains the same) ...
-        const gridSize = trainingConfig.gridSize;
-        const gridData = BATTLE_GRIDS[`square_${gridSize}x${gridSize}`] || BATTLE_GRIDS['square_5x5'];
-        gameState.gridWidth = gridData.width;
-        gameState.gridHeight = gridData.height;
-        gameState.gridLayout = gridData.layout;
-
-        player.x = Math.floor(gridSize / 2);
-        player.y = gridSize - 1;
-
-        const occupiedCells = new Set([`${player.x},${player.y}`]);
         
-        // --- NPC ALLY: Spawn Ally in Training ---
-        if (player.npcAlly && player.npcAlly.hp > 0 && player.encountersSinceLastPay < 5 && !player.npcAlly.isResting) { // <<< MODIFIED
+        if (!player.npcAlly.isResting && player.encountersSinceLastPay < 5) {
+            player.npcAlly._50PercentLogged = false; 
+            player.npcAlly._10PercentLogged = false;
+            const dialogueType = options?.trainingConfig ? 'START_TRAIN' : 'START_BATTLE';
+            const dialogue = player.npcAlly._getDialogue(dialogueType, player.name);
+            addToLog(`(${player.npcAlly.name})<br>"${dialogue}"`, 'text-gray-400');
+        }
+    }
 
-            // Try to spawn to the right, fallback to left
-            let allyX = player.x + 1;
-            let allyY = player.y;
-            if (allyX >= gridSize || isCellBlocked(allyX, allyY, false, false)) { // Check if blocked or OOB
-                allyX = player.x - 1;
-            }
-            if (allyX >= 0 && !isCellBlocked(allyX, allyY, false, false)) { // Check left side
-                player.npcAlly.x = allyX;
-                player.npcAlly.y = allyY;
-                occupiedCells.add(`${allyX},${allyY}`);
-                _activateNpcStartOfBattleAbilities(player.npcAlly);
-            } // If both blocked, ally doesn't spawn
-        } else if (player.npcAlly && player.npcAlly.hp > 0) {
-            // <<< NEW: Log why ally didn't spawn in training
-            if (player.encountersSinceLastPay >= 5) addToLog(`${player.npcAlly.name} refuses to train until paid!`, 'text-yellow-400');
-            else if (player.npcAlly.isResting) addToLog(`${player.npcAlly.name} is resting and skips the training session.`, 'text-gray-400');
-        }        // --- END NPC ALLY ---
+    // 2. Determine Context & Grid
+    const isTutorial = tutorialState.isActive && tutorialState.sequence[tutorialState.currentIndex]?.id === 'wilderness_select';
+    const isTraining = options && options.trainingConfig;
+    const isMapNode = options && options.nodeType;
 
-        trainingConfig.enemies.forEach((enemyConfig, index) => {
-            const species = MONSTER_SPECIES[enemyConfig.key];
-            const rarity = MONSTER_RARITY[enemyConfig.rarity];
-            if (species && rarity) {
-                const enemy = new Enemy(species, rarity, player.level);
-                enemy.isMarked = false; // Ensure mark flag is initialized
-                enemy.hasDealtDamageThisEncounter = false; // Reset damage dealt flag
-                // Simple placement logic for training
-                enemy.x = Math.floor(gridSize / 2) + index - Math.floor(trainingConfig.enemies.length / 2);
-                enemy.y = 0;
-                if (!occupiedCells.has(`${enemy.x},${enemy.y}`)) {
-                    currentEnemies.push(enemy);
-                    occupiedCells.add(`${enemy.x},${enemy.y}`);
-                }
-            }
-        });
-
+    let gridData;
+    if (isTutorial) {
+        gridData = BATTLE_GRIDS['square_5x5'];
+    } else if (isTraining) {
+        const size = options.trainingConfig.gridSize;
+        gridData = BATTLE_GRIDS[`square_${size}x${size}`] || BATTLE_GRIDS['square_5x5'];
     } else {
-        // --- STANDARD BATTLE SETUP ---
-        // ... (rest of standard setup remains the same) ...
         const gridKeys = Object.keys(BATTLE_GRIDS);
-        const randomGridKey = gridKeys[Math.floor(Math.random() * gridKeys.length)];
-        const gridData = BATTLE_GRIDS[randomGridKey];
-        gameState.gridWidth = gridData.width;
-        gameState.gridHeight = gridData.height;
-        gameState.gridLayout = gridData.layout;
-
-        const occupiedCells = new Set();
-        const validCells = [];
-        for (let y = 0; y < gameState.gridHeight; y++) {
-            for (let x = 0; x < gameState.gridWidth; x++) {
-                if (gameState.gridLayout[y * gameState.gridWidth + x] === 1) {
-                    validCells.push({x, y});
-                }
-            }
-        }
-
-        const getUnoccupiedCell = (cellList) => {
-            let availableCells = cellList.filter(c => !occupiedCells.has(`${c.x},${c.y}`));
-            if (availableCells.length === 0) return null;
-            return availableCells[Math.floor(Math.random() * availableCells.length)];
-        };
-
-        const playerSpawnArea = validCells.filter(c => c.y >= Math.floor(gameState.gridHeight / 2));
-        const playerCell = getUnoccupiedCell(playerSpawnArea);
-        if (playerCell) {
-            player.x = playerCell.x;
-            player.y = playerCell.y;
-            occupiedCells.add(`${player.x},${player.y}`);
-        } else {
-            const fallbackCell = getUnoccupiedCell(validCells);
-            if(fallbackCell) {
-                player.x = fallbackCell.x;
-                player.y = fallbackCell.y;
-                occupiedCells.add(`${player.x},${player.y}`);
-            } else {
-                console.error("No valid cell to spawn player!");
-                addToLog("Error: Could not find a valid spot to start the battle. Returning to menu.", "text-red-500");
-                setTimeout(showStartScreen, 2000);
-                return;
-            }
-        }
-
-        // --- NPC ALLY: Spawn Ally in Standard Battle ---
-        if (player.npcAlly && player.npcAlly.hp > 0 && player.encountersSinceLastPay < 5 && !player.npcAlly.isResting) { // <<< MODIFIED
-            // Find adjacent, valid, unoccupied cell
-            const potentialSpawns = [
-                {x: player.x + 1, y: player.y}, {x: player.x - 1, y: player.y},
-                {x: player.x, y: player.y + 1}, {x: player.x, y: player.y - 1}
-            ].filter(c => 
-                c.x >= 0 && c.x < gameState.gridWidth &&
-                c.y >= 0 && c.y < gameState.gridHeight &&
-                gameState.gridLayout[c.y * gameState.gridWidth + c.x] === 1 &&
-                !occupiedCells.has(`${c.x},${c.y}`)
-            );
-
-            if (potentialSpawns.length > 0) {
-                const allyCell = potentialSpawns[Math.floor(Math.random() * potentialSpawns.length)]; // Pick a random adjacent spot
-                player.npcAlly.x = allyCell.x;
-                player.npcAlly.y = allyCell.y;
-                occupiedCells.add(`${allyCell.x},${allyCell.y}`);
-                _activateNpcStartOfBattleAbilities(player.npcAlly);
-            } else {
-                addToLog("There was no room for your ally to join the fight!", "text-yellow-400");
-                // Ally just doesn't spawn this fight
-            }
-        } else if (player.npcAlly && player.npcAlly.hp > 0) {
-             // <<< NEW: Log why ally didn't spawn
-            if (player.encountersSinceLastPay >= 5) addToLog(`${player.npcAlly.name} refuses to join the fight until paid!`, 'text-yellow-400');
-            else if (player.npcAlly.isResting) addToLog(`${player.npcAlly.name} is resting and sits this one out.`, 'text-gray-400');
-        }
-        // --- END NPC ALLY ---
-
-        const enemySpawnArea = validCells.filter(c => c.y < Math.floor(gameState.gridHeight / 2));
-        let numEnemies = 1;
-        if (player.level >= 50) {
-            const rand = Math.random();
-            if (rand > 0.9) numEnemies = 5;
-            else if (rand > 0.7) numEnemies = 4;
-            else if (rand > 0.4) numEnemies = 3;
-            else if (rand > 0.1) numEnemies = 2;
-        } else if (player.level >= 6) {
-            const rand = Math.random();
-            if (rand > 0.8) { numEnemies = 3; }
-            else if (rand > 0.5) { numEnemies = 2; }
-        }
-
-        if (player.statusEffects.monster_lure) numEnemies = Math.min(5, numEnemies + 2); // Add more monsters if lured
-
-        for (let i = 0; i < numEnemies; i++) {
-            const enemy = generateEnemy(biomeKey);
-            enemy.isMarked = false; // Ensure mark flag is initialized
-            enemy.hasDealtDamageThisEncounter = false; // Reset damage dealt flag
-            const enemyCell = getUnoccupiedCell(enemySpawnArea);
-            if (enemyCell) {
-                enemy.x = enemyCell.x;
-                enemy.y = enemyCell.y;
-                occupiedCells.add(`${enemy.x},${enemy.y}`);
-                currentEnemies.push(enemy);
-            }
-        }
-
-        let criticalPath = [];
-        if (currentEnemies.length > 0) {
-            // Pathfind with Pinionfolk flight if applicable
-            criticalPath = findPath({ x: player.x, y: player.y }, { x: currentEnemies[0].x, y: currentEnemies[0].y }, player.race === 'Pinionfolk') || [];
-        }
-        const criticalPathCells = new Set(criticalPath.map(cell => `${cell.x},${cell.y}`));
-        const obstacleSafeCells = validCells.filter(cell => !criticalPathCells.has(`${cell.x},${cell.y}`));
-
-        const numObstacles = 1 + Math.floor(Math.random() * 3);
-        for (let i = 0; i < numObstacles; i++) {
-            const obstacleCell = getUnoccupiedCell(obstacleSafeCells);
-            if (obstacleCell) {
-                const obstacleType = BIOMES[biomeKey].obstacle || { char: '🪨', name: 'Rock' };
-                gameState.gridObjects.push({
-                    x: obstacleCell.x,
-                    y: obstacleCell.y,
-                    type: 'obstacle',
-                    hp: 1,
-                    emoji: obstacleType.char,
-                    name: obstacleType.name
-                });
-                occupiedCells.add(`${obstacleCell.x},${obstacleCell.y}`);
-            }
-        }
-
-        const numTerrain = 1 + Math.floor(Math.random() * 3);
-        if (numTerrain > 0) {
-            const startCell = getUnoccupiedCell(obstacleSafeCells);
-            if (startCell) {
-                const terrainGroup = [startCell];
-                occupiedCells.add(`${startCell.x},${startCell.y}`);
-
-                for (let i = 1; i < numTerrain; i++) {
-                    const frontier = [];
-                    for (const tile of terrainGroup) {
-                        const neighbors = [
-                            {x: tile.x + 1, y: tile.y}, {x: tile.x - 1, y: tile.y},
-                            {x: tile.x, y: tile.y + 1}, {x: tile.x, y: tile.y - 1}
-                        ];
-                        for (const neighbor of neighbors) {
-                            const isOccupied = occupiedCells.has(`${neighbor.x},${neighbor.y}`);
-                            const isValid = validCells.some(c => c.x === neighbor.x && c.y === neighbor.y);
-                            if(isValid && !isOccupied && !terrainGroup.some(t => t.x === neighbor.x && t.y === neighbor.y)) {
-                                frontier.push(neighbor);
-                            }
-                        }
-                    }
-
-                    if (frontier.length > 0) {
-                        const nextCell = frontier[Math.floor(Math.random() * frontier.length)];
-                        terrainGroup.push(nextCell);
-                        occupiedCells.add(`${nextCell.x},${nextCell.y}`);
-                    } else {
-                        break;
-                    }
-                }
-                 terrainGroup.forEach(cell => {
-                    gameState.gridObjects.push({ x: cell.x, y: cell.y, type: 'terrain' });
-                });
-            }
-        }
+        gridData = BATTLE_GRIDS[gridKeys[Math.floor(Math.random() * gridKeys.length)]];
     }
-
-    if (!trainingConfig) {
-        const biome = BIOMES[biomeKey];
-        if (biome && biome.theme) {
-            applyTheme(biome.theme);
-        }
-    } else {
-        applyTheme('town'); // Use a neutral theme for training
-    }
-
-    lastViewBeforeInventory = 'battle'; // Set return view from inventory opened in battle
-    gameState.currentView = 'battle';
-    const enemyNames = currentEnemies.map(e => `<span class="font-bold text-red-400">${e.name}</span>`).join(', ');
     
-    // --- NPC ALLY: Add ally to encounter log ---
-    let allyMessage = "";
-    if (player.npcAlly && player.npcAlly.hp > 0 && player.npcAlly.x !== -1) { // Check they spawned
-        allyMessage = ` with your ally, <span class="font-bold text-blue-400">${player.npcAlly.name}</span>,`;
-    }
-    // --- END NPC ALLY ---
+    gameState.gridWidth = gridData.width;
+    gameState.gridHeight = gridData.height;
+    gameState.gridLayout = gridData.layout;
 
-    if (trainingConfig) {
-        addToLog(`You begin a training session against: ${enemyNames}!`, 'text-yellow-300');
+    // 3. Enemy Generation
+    // Explicitly clear enemies if this is a fresh start call (Map Node or Training/Tutorial)
+    // engine.js pre-fills for 'monster_lured' and 'boss' sometimes, but let's standardize here.
+    if (isMapNode || isTraining || isTutorial) {
+        currentEnemies = [];
+    }
+    // Initialize if undefined (legacy safety)
+    if (!currentEnemies || !Array.isArray(currentEnemies)) currentEnemies = [];
+
+    if (currentEnemies.length === 0) {
+        if (isTutorial) {
+            currentEnemies.push(new Enemy(MONSTER_SPECIES['goblin'], MONSTER_RARITY['common'], player.level));
+        } else if (isTraining) {
+            options.trainingConfig.enemies.forEach(cfg => {
+                 const species = MONSTER_SPECIES[cfg.key];
+                 const rarity = MONSTER_RARITY[cfg.rarity];
+                 if (species && rarity) currentEnemies.push(new Enemy(species, rarity, player.level));
+            });
+        } else if (isMapNode) {
+            // --- MAP NODE LOGIC ---
+            if (options.nodeType === 'elite') {
+                 // Spawns exactly 1 Rare or Epic enemy
+                 let tempEnemy = generateEnemy(biomeKey);
+                 const rarityKey = Math.random() < 0.7 ? 'rare' : 'epic';
+                 currentEnemies.push(new Enemy(tempEnemy.speciesData, MONSTER_RARITY[rarityKey], player.level));
+            } else if (options.nodeType === 'boss') {
+                 // Spawns exactly 1 heavily modified boss enemy
+                 const bossKey = options.bossKey; 
+                 const species = MONSTER_SPECIES[bossKey] || generateEnemy(biomeKey).speciesData;
+                 const rarityData = MONSTER_RARITY['legendary']; 
+                 const boss = new Enemy(species, rarityData, player.level);
+                 boss.hp = Math.floor(boss.maxHp * 10);
+                 boss.maxHp = boss.hp;
+                 boss.strength = Math.floor(boss.strength * 3);
+                 boss.isBoss = true;
+                 currentEnemies.push(boss);
+            } else if (options.nodeType === 'monster_lured') {
+                 // Spawns exactly 1 lured enemy
+                 const species = MONSTER_SPECIES[options.speciesKey];
+                 currentEnemies.push(new Enemy(species, MONSTER_RARITY['common'], player.level));
+            } else {
+                 // --- NEW LOGIC: Use Ambush Scaling for standard 'monster' nodes ---
+                 let numEnemies = 1;
+                 if (player.level >= 20) numEnemies = 4; // 20+ = 4 enemies
+                 else if (player.level >= 6) numEnemies = 3; // 6+ = 3 enemies
+                 else if (player.level >= 4) numEnemies = 2; // 4-5 = 2 enemies
+                 // Player level 1-3 defaults to 1 enemy.
+
+                 // Scale further based on player level for 4 and 5 enemies (as requested)
+                 if (player.level >= 30) numEnemies = 5; // 30+ = 5 enemies
+
+                 if (player.statusEffects.monster_lure) numEnemies = Math.min(5, numEnemies + 2);
+
+                 for (let i = 0; i < numEnemies; i++) {
+                     let enemy = generateEnemy(biomeKey);
+                     let safety = 0;
+                     while(enemy.rarityData.key === 'legendary' && safety < 10) {
+                         enemy = generateEnemy(biomeKey);
+                         safety++;
+                     }
+                     currentEnemies.push(enemy);
+                 }
+                 // --- END NEW LOGIC ---
+            }
+        } else {
+            // --- STANDARD AMBUSH (Fallback if not a map node) ---
+            // Revert back to the old, simple scaling for non-map encounters
+            let numEnemies = 1;
+            if (player.level >= 6 && Math.random() > 0.8) numEnemies = 2;
+            if (player.statusEffects.monster_lure) numEnemies = Math.min(4, numEnemies + 2);
+            
+            for (let i = 0; i < numEnemies; i++) currentEnemies.push(generateEnemy(biomeKey));
+        }
+    }
+
+    // 4. Placement
+    const validCells = [];
+    for (let y = 0; y < gameState.gridHeight; y++) {
+        for (let x = 0; x < gameState.gridWidth; x++) {
+            if (gameState.gridLayout[y * gameState.gridWidth + x] === 1) validCells.push({x, y});
+        }
+    }
+    const occupiedCells = new Set();
+    const getUnoccupied = (list) => {
+        const available = list.filter(c => !occupiedCells.has(`${c.x},${c.y}`));
+        return available.length > 0 ? available[Math.floor(Math.random() * available.length)] : null;
+    };
+    
+    // Place Player
+    const playerSpawnArea = validCells.filter(c => c.y >= Math.floor(gameState.gridHeight / 2));
+    let pCell = getUnoccupied(playerSpawnArea) || getUnoccupied(validCells);
+    player.x = pCell.x; player.y = pCell.y;
+    occupiedCells.add(`${player.x},${player.y}`);
+    
+    // Place Enemies
+    const enemySpawnArea = validCells.filter(c => c.y < Math.floor(gameState.gridHeight / 2));
+    currentEnemies.forEach(enemy => {
+        enemy.isMarked = false; enemy.hasDealtDamageThisEncounter = false;
+        let cell = getUnoccupied(enemySpawnArea) || getUnoccupied(validCells);
+        if (cell) {
+            enemy.x = cell.x; enemy.y = cell.y;
+            occupiedCells.add(`${cell.x},${cell.y}`);
+        } else {
+            enemy.x = -1; enemy.y = -1; 
+        }
+    });
+
+    // Place Ally
+    if (player.npcAlly && player.npcAlly.hp > 0 && !player.npcAlly.isResting && player.encountersSinceLastPay < 5) {
+         const adj = [{x:player.x+1, y:player.y}, {x:player.x-1, y:player.y}, {x:player.x, y:player.y+1}, {x:player.x, y:player.y-1}];
+         const validAdj = adj.filter(c => c.x >= 0 && c.x < gameState.gridWidth && c.y >= 0 && c.y < gameState.gridHeight && gameState.gridLayout[c.y*gameState.gridWidth+c.x] === 1 && !occupiedCells.has(`${c.x},${c.y}`));
+         if (validAdj.length > 0) {
+             const spot = validAdj[Math.floor(Math.random() * validAdj.length)];
+             player.npcAlly.x = spot.x; player.npcAlly.y = spot.y;
+             occupiedCells.add(`${spot.x},${spot.y}`);
+             _activateNpcStartOfBattleAbilities(player.npcAlly);
+         } else {
+             addToLog("No room for ally!", "text-yellow-400");
+         }
+    }
+
+    // Place Obstacles
+    const numObstacles = 1 + Math.floor(Math.random() * 3);
+    for(let i=0; i<numObstacles; i++) {
+        const cell = getUnoccupied(validCells);
+        if (cell) {
+            const obsType = (biomeKey && BIOMES[biomeKey]) ? (BIOMES[biomeKey].obstacle || { char: '🪨', name: 'Rock' }) : { char: '🪨', name: 'Rock' };
+            gameState.gridObjects.push({ x: cell.x, y: cell.y, type: 'obstacle', hp: 1, emoji: obsType.char, name: obsType.name });
+            occupiedCells.add(`${cell.x},${cell.y}`);
+        }
+    }
+
+    // 5. Finalize
+    if (!isTraining) {
+        const biome = BIOMES[biomeKey];
+        if (biome && biome.theme) applyTheme(biome.theme);
     } else {
-        addToLog(`You encounter: ${enemyNames}${allyMessage} in the ${BIOMES[biomeKey].name}!`);
+        applyTheme('town');
     }
-    renderBattleGrid();
 
-    if (isTutorialBattle) {
-        advanceTutorial();
-    }
+    lastViewBeforeInventory = 'battle';
+    gameState.currentView = 'battle';
+    
+    const enemyNames = currentEnemies.map(e => `<span class="font-bold text-red-400">${e.name}</span>`).join(', ');
+    let allyLog = (player.npcAlly && player.npcAlly.x !== -1) ? ` with your ally, <span class="font-bold text-blue-400">${player.npcAlly.name}</span>,` : "";
+
+    if (isTraining) addToLog(`Training against: ${enemyNames}!`, 'text-yellow-300');
+    else addToLog(`You encounter: ${enemyNames}${allyLog}!`);
+
+    renderBattleGrid();
+    if (isTutorial) advanceTutorial();
 }
 
 function spawnNpcDrone(ally) {
@@ -1285,6 +1147,7 @@ function performAttack(targetIndex) {
         };
         let messageLog = []; // Log messages specific to this attack instance
         let forceCritMultiplier = null; // Used by Rogue's Assassinate
+        let attackEffects = { element: player.weaponElement }; // <-- MOVED THIS LINE UP
 
         // --- Rogue: Assassinate Check ---
         // Check HP, MP, AND if the target hasn't dealt damage yet
@@ -1350,6 +1213,17 @@ function performAttack(targetIndex) {
             baseWeaponDamage += elementalBonusDamage;
             messageLog.push(`+${elementalBonusDamage} ${player.weaponElement} damage!`);
             calcLog.steps.push({ description: `Enchantment Bonus (1d8)`, value: `+${elementalBonusDamage}`, result: baseWeaponDamage });
+        }
+
+        // --- NEW: Elemental Grease Buff ---
+        else if (player.statusEffects.buff_elemental_grease && !isSecondStrike) {
+            const grease = player.statusEffects.buff_elemental_grease;
+            const elementalBonusRoll = rollDice(grease.damage[0], grease.damage[1], `Grease Bonus (${grease.element})`);
+            const elementalBonusDamage = elementalBonusRoll.total;
+            baseWeaponDamage += elementalBonusDamage;
+            attackEffects.element = grease.element; // Apply the element to the attack
+            messageLog.push(`+${elementalBonusDamage} ${grease.element} damage!`);
+            calcLog.steps.push({ description: `Grease Bonus (${grease.damage[0]}d${grease.damage[1]})`, value: `+${elementalBonusDamage}`, result: baseWeaponDamage });
         }
         // --- END MODIFICATION --- 
 
@@ -1436,11 +1310,6 @@ function performAttack(targetIndex) {
              calcLog.steps.push({ description: "Hunter's Mark", value: "+1d8", result: damage });
              allowCrit = true; // Marked targets can be crit
         }
-
-
-        let attackEffects = { element: player.weaponElement };
-
-
         // --- SPECIAL WEAPON LOGIC ---
         // Elemental Sword
         if (weapon.name === 'Elemental Sword') {
@@ -2551,24 +2420,30 @@ function battleAction(type, actionData = null) {
 
         // --- END NEW CASE ---
         case 'flee':
-            // ... existing flee code ...
-            // This block remains unchanged.
             gameState.isPlayerTurn = false;
-            // Use new rollForEffect function, applying bonuses/penalties
-            if (player.statusEffects.buff_voidwalker || player.rollForEffect(0.8, 'Flee')) { // Base 80% flee chance
+            
+            // 1. Check for success (80% base chance)
+            if (player.statusEffects.buff_voidwalker || player.rollForEffect(0.8, 'Flee')) {
                 addToLog(`You successfully escaped!`, 'text-green-400');
+                
+                // 2. Handle Training vs. Real Encounter
                 if (preTrainingState !== null) {
+                    // Training: Restore resources and return to Training Grounds (No penalty/cleanup needed)
                     player.hp = preTrainingState.hp;
                     player.mp = preTrainingState.mp;
                     preTrainingState = null;
                     updateStatsView();
                     setTimeout(renderTrainingGrounds, 1000);
                 } else {
-                    setTimeout(renderTownSquare, 1000);
+                    // Real Encounter (Map-based or Ambush): Use endBiomeRun to handle penalties/cleanup
+                    // This function in engine.js handles the tiered penalty and the safe 'rest' node exit.
+                    setTimeout(() => endBiomeRun('flee'), 500);
                 }
+                
             } else {
+                // Failure: Proceed to enemy turn
                 addToLog(`You failed to escape!`, 'text-red-400');
-                finalizePlayerAction(); // Go to next phase
+                finalizePlayerAction(); 
             }
             break;
         case 'signature_ability':
@@ -2790,8 +2665,8 @@ function checkVictory() {
     if (gameState.battleEnded) return;
     if (currentEnemies.every(e => !e.isAlive())) {
         gameState.battleEnded = true;
-        gameState.activeDrone = null; // Clear drone on victory
-        gameState.markedTarget = null; // Clear mark on victory
+        gameState.activeDrone = null;
+        gameState.markedTarget = null;
         addToLog(`All enemies defeated!`, 'text-green-400 font-bold');
 
         // --- NEW: Increment Biome Clears ---
@@ -2805,19 +2680,22 @@ function checkVictory() {
         // Handle tutorial battle end
         const isTutorialBattle = tutorialState.isActive && tutorialState.sequence[tutorialState.currentIndex]?.trigger?.type === 'enemy_death';
         if (isTutorialBattle) {
-            // *** REVERTED CHANGE: Let the tutorial sequence handle the next step via advanceTutorial ***
-            // The 'wait_for_goblin_death' trigger is met, so advance the tutorial sequence.
-            // This will show the 'outro' modal defined in dialogue.js.
-            // The modal's button will now call completeBattleTutorial().
-            advanceTutorial(); // Let the tutorial system show the final modal
-            return true; // Indicate victory occurred, tutorial handles next step
+            advanceTutorial();
+            return true;
         }
+        
+        // --- MODIFICATION: Check if this was a boss fight ---
+        if (gameState.currentMap && gameState.currentEncounterType === 'boss') {
+            addToLog(`Boss defeated! The expedition is a success!`, 'text-green-400 font-bold');
+            setTimeout(() => endBiomeRun('victory'), 1500);
+        } else {
+            setTimeout(renderPostBattleMenu, 1000);
+        }
+        // ------------------------------
 
-        // Standard post-battle (if not tutorial)
-        setTimeout(renderPostBattleMenu, 1000);
-        return true; // Indicate victory occurred
+        return true;
     }
-    return false; // Indicate no victory yet
+    return false;
 }
 
 function checkBattleStatus(isReaction = false) {
@@ -2863,6 +2741,9 @@ function checkBattleStatus(isReaction = false) {
     if (defeatedEnemiesThisCheck.length > 0) {
         defeatedEnemiesThisCheck.forEach(enemy => {
             addToLog(`You have defeated ${enemy.name}!`, 'text-green-400 font-bold');
+            
+            // --- NEW: Determine Quest/Reward Multiplier ---
+            const questMultiplier = enemy.isBoss ? 5 : 1;
 
             // --- Added Kill Counters & Key Drop Logic ---
             let droppedKey = null;
@@ -2923,6 +2804,12 @@ function checkBattleStatus(isReaction = false) {
 
 
             if (preTrainingState === null) {
+                // Apply multiplier to gold
+                player.gold += enemy.goldReward * questMultiplier; // <-- MODIFIED
+                addToLog(`You found <span class="font-bold">${enemy.goldReward * questMultiplier}</span> G.`, 'text-yellow-400');
+                
+                // Apply multiplier to XP
+                player.gainXp(enemy.xpReward * questMultiplier); // <-- MODIFIED
                 if (enemy.rarityData.name === 'Legendary') {
                     const speciesKey = enemy.speciesData.key;
                     if (!player.legacyQuestProgress[speciesKey]) {
@@ -3090,7 +2977,7 @@ function checkBattleStatus(isReaction = false) {
                 if (player.activeQuest && player.activeQuest.category === 'extermination') {
                     const quest = getQuestDetails(player.activeQuest);
                     if (quest && quest.target === enemy.speciesData.key) {
-                        player.questProgress++;
+                        player.questProgress += questMultiplier; // <-- MODIFIED
                         addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300');
                     }
                 }
@@ -4088,24 +3975,31 @@ async function checkPlayerDeath() {
     }
 
     gameState.playerIsDying = true;
-    gameState.activeDrone = null; // Clear drone on death
-    gameState.markedTarget = null; // Clear mark on death
+    gameState.activeDrone = null;
+    gameState.markedTarget = null;
 
     if (player.npcAlly) {
         player.npcAlly.isFled = true; // Ally flees if player dies
         addToLog(`${player.npcAlly.name} sees your fall and flees the battle!`, "text-gray-400");
     }
-    // --- END NPC ALLY --- 
+    
     const killer = currentEnemies.length > 0 ? currentEnemies[0].name : 'the wilderness';
     const template = document.getElementById('template-death');
     render(template.content.cloneNode(true));
     addToLog(`You were defeated by ${killer}...`, 'text-red-600 font-bold');
 
+    // Handle map-based end run (no change needed here, it handles difficulty)
+    if (gameState.currentMap) {
+        setTimeout(() => endBiomeRun('death'), 3000);
+        return; 
+    }
+
+    // --- Reworked Difficulty Penalties (For non-map Ambush/Training) ---
     switch (player.difficulty) {
         case 'easy':
             addToLog('You pass out from your injuries...', 'text-gray-400');
             setTimeout(() => {
-                addToLog('You awaken in a bed at the inn, fully restored.', 'text-green-400');
+                addToLog('You awaken in a bed at the inn, fully restored. (No penalty)', 'text-green-400');
                 restAtInn(0); // Respawn by resting for free
                 gameState.playerIsDying = false;
             }, 3000);
@@ -4114,13 +4008,14 @@ async function checkPlayerDeath() {
         case 'medium':
             addToLog('You collapse, your belongings scattering...', 'text-orange-400');
 
-            // Lose half gold
+            // --- Apply Penalty: Gold Loss ---
             const goldLost = Math.floor(player.gold / 2);
             player.gold -= goldLost;
             addToLog(`You lost <span class="font-bold">${goldLost}</span> G.`, 'text-red-500');
 
-            // Lose half items and equipment
+            // --- Apply Penalty: Item Loss ---
             let itemsDropped = 0;
+            // Loss of half stackables
             for (const itemKey in player.inventory.items) {
                 const amount = player.inventory.items[itemKey];
                 const amountToDrop = Math.floor(amount / 2);
@@ -4133,29 +4028,26 @@ async function checkPlayerDeath() {
                 }
             }
 
-            // --- MODIFIED EQUIPMENT DROPPING LOGIC ---
+            // Loss of half equipment (modified logic remains)
             ['weapons', 'armor', 'shields', 'catalysts'].forEach(category => {
                 const items = player.inventory[category];
-                if (!Array.isArray(items) || items.length === 0) return; // Safety check
+                if (!Array.isArray(items) || items.length === 0) return;
 
-                // Calculate how many to drop based on the *current* count in inventory
                 const initialCount = items.length;
                 const amountToDrop = Math.floor(initialCount / 2);
 
                 for (let i = 0; i < amountToDrop; i++) {
-                     // Ensure there are still items to potentially drop
                      if (items.length === 0) break;
 
                     const randomIndex = Math.floor(Math.random() * items.length);
-                    const droppedItemKey = items[randomIndex]; // Get the key before removing
+                    const droppedItemKey = items[randomIndex];
                     const itemDetails = getItemDetails(droppedItemKey);
 
-                    // Ensure we don't drop the default "None" items
                     if (itemDetails && itemDetails.rarity !== 'Broken') {
-                        items.splice(randomIndex, 1); // Remove from inventory first
+                        items.splice(randomIndex, 1);
                         itemsDropped++;
 
-                        // --- ADDED: Check if the dropped item was equipped ---
+                        // Unequip if the dropped item was the equipped one
                         let itemTypeToCheck = null;
                         let equippedItem = null;
                         switch (category) {
@@ -4164,18 +4056,13 @@ async function checkPlayerDeath() {
                             case 'shields': itemTypeToCheck = 'shield'; equippedItem = player.equippedShield; break;
                             case 'catalysts': itemTypeToCheck = 'catalyst'; equippedItem = player.equippedCatalyst; break;
                         }
-
-                        // Check if an item type was identified and if the dropped item's name matches the equipped item's name
                         if (itemTypeToCheck && equippedItem && equippedItem.name === itemDetails.name) {
                             addToLog(`Your equipped ${itemDetails.name} was dropped!`, 'text-red-600');
-                            unequipItem(itemTypeToCheck, false); // Unequip the item, don't re-render yet
+                            unequipItem(itemTypeToCheck, false);
                         }
-                        // --- END ADDED CHECK ---
                     }
                 }
             });
-            // --- END MODIFIED LOGIC ---
-
 
             if (itemsDropped > 0) {
                 addToLog('You lost some of your items and equipment in the fall.', 'text-red-500');
@@ -4185,12 +4072,12 @@ async function checkPlayerDeath() {
                 addToLog('You awaken at the inn, sore but alive.', 'text-yellow-300');
                 restAtInn(0); // Respawn by resting for free
                 gameState.playerIsDying = false;
-                // updateStatsView() will be called within restAtInn
             }, 3000);
             break;
 
         case 'hardcore':
         default:
+            // Hardcore logic remains permadeath
             addToLog('Your journey ends here.', 'text-gray-500');
             await addToGraveyard(player, killer);
             await deleteSave(player.firestoreId || 'local');

@@ -290,7 +290,22 @@ const BIOMES = {
         tier: 1,
         description: 'A dense forest where strange beasts and territorial humanoids roam.',
         monsters: { 'rabid_rabbit': 45, 'goblin': 45, 'slime': 10 },
-        obstacle: { char: '🌲', name: 'Tree' }
+        obstacle: { char: '🌲', name: 'Tree' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 8,  // Total floors (rows) including start and boss
+            width: 5,  // Max nodes per row
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are generated from the 'boss' rarity of these monster keys
+            bosses: ['goblin', 'slime', 'rabid_rabbit'] 
+        }
+        // --- END NEW ---
     },
     'catacombs': {
         name: 'Sunken Catacombs',
@@ -298,7 +313,22 @@ const BIOMES = {
         tier: 1,
         description: 'A dark, damp tomb where the dead and their grotesque guardians stir.',
         monsters: { 'skeleton': 50, 'slime': 40, 'rabid_rabbit': 10 },
-        obstacle: { char: '⚰️', name: 'Coffin' }
+        obstacle: { char: '⚰️', name: 'Coffin' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 8,
+            width: 5,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are
+            bosses: ['skeleton', 'slime', 'rabid_rabbit']
+        }
+        // --- END NEW ---
     },
 
     // Tier 2
@@ -308,7 +338,22 @@ const BIOMES = {
         tier: 2,
         description: 'A network of caves taken over by ruthless bandits and the monstrous creatures they consort with.',
         monsters: { 'bandit': 40, 'giant_rat': 40, 'armored_zombie': 10, 'dire_wolf': 4, 'goblin': 4, 'mountain_goliath': 1, 'dragon': 1},
-        obstacle: { char: '🗿', name: 'Rock Formation' }
+        obstacle: { char: '🗿', name: 'Rock Formation' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 10, // Deeper than Tier 1
+            width: 6,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are
+            bosses: ['bandit', 'giant_rat', 'armored_zombie', 'dire_wolf']
+        }
+        // --- END NEW ---
     },
     'deserted_warzone': {
         name: 'Deserted Warzone',
@@ -316,7 +361,22 @@ const BIOMES = {
         tier: 2,
         description: 'An old battlefield where restless spirits and savage beasts feast on the memories of conflict.',
         monsters: { 'dire_wolf': 40, 'armored_zombie': 40, 'bandit': 10, 'giant_rat': 4, 'skeleton': 4, 'livyatan': 1, 'dullahan': 1 },
-        obstacle: { char: '⚔️', name: 'Weapon Pile' }
+        obstacle: { char: '⚔️', name: 'Weapon Pile' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 10,
+            width: 6,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are
+            bosses: ['dire_wolf', 'armored_zombie', 'bandit']
+        }
+        // --- END NEW ---
     },
 
     // Tier 3
@@ -326,7 +386,22 @@ const BIOMES = {
         tier: 3,
         description: 'A haunted city of the dead, ruled by powerful undead and the desperate men who serve them.',
         monsters: { 'necromancer': 35, 'orc_berserker': 35, 'cockatrice': 10, 'cave_spider': 10, 'armored_zombie': 3, 'bandit': 3, 'dullahan': 2, 'mountain_goliath': 2 },
-        obstacle: { char: '💀', name: 'Bone Pile' }
+        obstacle: { char: '💀', name: 'Bone Pile' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 12, // Deeper than Tier 2
+            width: 6,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are
+            bosses: ['necromancer', 'orc_berserker', 'cockatrice', 'cave_spider']
+        }
+        // --- END NEW ---
     },
     'hidden_oasis': {
         name: 'The Hidden Oasis',
@@ -334,7 +409,22 @@ const BIOMES = {
         tier: 3,
         description: 'A lush, isolated paradise that hides some of the most dangerous beasts and monstrosities.',
         monsters: { 'cave_spider': 35, 'cockatrice': 35, 'necromancer': 10, 'orc_berserker': 10, 'dire_wolf': 3, 'giant_rat': 3, 'dragon': 2, 'livyatan': 2 },
-        obstacle: { char: '🌴', name: 'Palm Tree' }
+        obstacle: { char: '🌴', name: 'Palm Tree' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 12,
+            width: 6,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are
+            bosses: ['cave_spider', 'cockatrice', 'necromancer', 'orc_berserker']
+        }
+        // --- END NEW ---
     },
 
     // Tier 4
@@ -344,7 +434,22 @@ const BIOMES = {
         tier: 4,
         description: 'A forgotten, walled city where monstrous humanoids have built a new, brutal society.',
         monsters: { 'one_eyed_troll': 40, 'living_armor': 10, 'chimera': 5, 'orc_berserker': 20, 'necromancer': 20, 'livyatan': 5 },
-        obstacle: { char: '🛢️', name: 'Barrel' }
+        obstacle: { char: '🛢️', name: 'Barrel' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 14, // Deeper than Tier 3
+            width: 7,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are
+            bosses: ['one_eyed_troll', 'living_armor', 'chimera']
+        }
+        // --- END NEW ---
     },
     'secret_garden': {
         name: 'The Secret Garden',
@@ -352,7 +457,22 @@ const BIOMES = {
         tier: 4,
         description: 'A beautiful but deadly grove, protected by powerful and magical beasts of myth.',
         monsters: { 'unicorn': 40, 'chimera': 10, 'one_eyed_troll': 5, 'cave_spider': 20, 'cockatrice': 20, 'dragon': 5 },
-        obstacle: { char: '🌸', name: 'Flower Patch' }
+        obstacle: { char: '🌸', name: 'Flower Patch' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 14,
+            width: 7,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are
+            bosses: ['unicorn', 'chimera', 'one_eyed_troll']
+        }
+        // --- END NEW ---
     },
     'typhons_jaw': {
         name: 'Typhon\'s Jaw',
@@ -360,7 +480,22 @@ const BIOMES = {
         tier: 4,
         description: 'A jagged mountain pass filled with legendary monstrosities of immense power.',
         monsters: { 'chimera': 40, 'unicorn': 10, 'living_armor': 5, 'cockatrice': 20, 'cave_spider': 20, 'dullahan': 5 },
-        obstacle: { char: '🦷', name: 'Giant Tooth' }
+        obstacle: { char: '🦷', name: 'Giant Tooth' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 14,
+            width: 7,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are
+            bosses: ['chimera', 'unicorn', 'living_armor']
+        }
+        // --- END NEW ---
     },
     'tomb_of_the_dead': {
         name: 'Tomb of the Dead',
@@ -368,7 +503,22 @@ const BIOMES = {
         tier: 4,
         description: 'A grand mausoleum where the most powerful undead guard ancient treasures.',
         monsters: { 'living_armor': 40, 'one_eyed_troll': 10, 'unicorn': 5, 'necromancer': 20, 'orc_berserker': 20, 'mountain_goliath': 5 },
-        obstacle: { char: '🦴', name: 'Bone Pile' }
+        obstacle: { char: '🦴', name: 'Bone Pile' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 14,
+            width: 7,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are
+            bosses: ['living_armor', 'one_eyed_troll', 'unicorn']
+        }
+        // --- END NEW ---
     },
 
     // Tier 5
@@ -378,7 +528,22 @@ const BIOMES = {
         tier: 5,
         description: 'The highest point in the world, where only dragons and the strongest beasts dare to tread.',
         monsters: { 'dragon': 50, 'mountain_goliath': 20, 'livyatan': 20, 'chimera': 5, 'unicorn': 5 },
-        obstacle: { char: '💎', name: 'Crystal Formation' }
+        obstacle: { char: '💎', name: 'Crystal Formation' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 15, // Max depth
+            width: 7,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are
+            bosses: ['dragon', 'mountain_goliath', 'livyatan']
+        }
+        // --- END NEW ---
     },
     'gate_of_hades': {
         name: 'Gate of Hades',
@@ -386,7 +551,22 @@ const BIOMES = {
         tier: 5,
         description: 'A direct gateway to the underworld, guarded by its eternal, deathless warden.',
         monsters: { 'dullahan': 50, 'livyatan': 20, 'dragon': 20, 'living_armor': 5, 'chimera': 5 },
-        obstacle: { char: '🔥', name: 'Brimstone Pillar' }
+        obstacle: { char: '🔥', name: 'Brimstone Pillar' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 15,
+            width: 7,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are
+            bosses: ['dullahan', 'livyatan', 'dragon']
+        }
+        // --- END NEW ---
     },
     'el_dorado': {
         name: 'El Dorado, the Gilded City',
@@ -394,7 +574,22 @@ const BIOMES = {
         tier: 5,
         description: 'The lost city of gold, whose immense treasures are protected by an equally immense guardian.',
         monsters: { 'mountain_goliath': 50, 'dragon': 20, 'dullahan': 20, 'one_eyed_troll': 5, 'living_armor': 5 },
-        obstacle: { char: '🗿', name: 'Golden Statue' }
+        obstacle: { char: '🗿', name: 'Golden Statue' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 15,
+            width: 7,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses arev
+            bosses: ['mountain_goliath', 'dragon', 'dullahan']
+        }
+        // --- END NEW ---
     },
     'hanging_sacred_temple': {
         name: 'Hanging Sacred Temple',
@@ -402,7 +597,22 @@ const BIOMES = {
         tier: 5,
         description: 'A beautiful temple floating in the sky, home to the king of all beasts.',
         monsters: { 'livyatan': 50, 'mountain_goliath': 20, 'dullahan': 20, 'unicorn': 5, 'one_eyed_troll': 5 },
-        obstacle: { char: '🏛️', name: 'Temple Ruin' }
+        obstacle: { char: '🏛️', name: 'Temple Ruin' },
+        // --- NEW SECTION ---
+        map_generation: {
+            depth: 15,
+            width: 7,
+            node_pool: { 
+                'monster': 0.40,   // WAS 0.60
+                'elite': 0.25, 
+                'event': 0.15, 
+                'rest': 0.10,      // WAS 0.10
+                'shop': 0.10 
+            },
+            // Bosses are
+            bosses: ['livyatan', 'mountain_goliath', 'dullahan']
+        }
+        // --- END NEW ---
     },
 };
 
@@ -447,7 +657,7 @@ const RECIPE_DROPS_BY_TIER = {
         3: ['recipe_steak_of_divine_power', 'recipe_crystalline_energy_tart', 'recipe_livyatans_grand_steak', 'recipe_nectar_of_the_soul', 'recipe_feast_of_fortune', 'recipe_alacrity_sorbet', 'recipe_mindfire_curry', 'recipe_phoenix_down_roast', 'recipe_abyssal_ambrosia']
     },
     alchemy: {
-        1: ['recipe_brew_health_potion_home', 'recipe_brew_mana_potion_home', 'recipe_brew_cinderstop', 'recipe_brew_dampclear', 'recipe_brew_windwail', 'recipe_brew_rockshut', 'recipe_brew_zapsipper', 'recipe_brew_vinekill', 'recipe_brew_lightcloser', 'recipe_brew_lampside'],
+        1: ['recipe_brew_health_potion_home', 'recipe_brew_mana_potion_home', 'recipe_brew_cinderstop', 'recipe_brew_dampclear', 'recipe_brew_windwail', 'recipe_brew_rockshut', 'recipe_brew_zapsipper', 'recipe_brew_vinekill', 'recipe_brew_lightcloser', 'recipe_brew_lampside', 'recipe_brew_fire_grease_home', 'recipe_brew_water_grease_home', 'recipe_brew_earth_grease_home', 'recipe_brew_wind_grease_home', 'recipe_brew_lightning_grease_home', 'recipe_brew_nature_grease_home', 'recipe_brew_light_grease_home', 'recipe_brew_void_grease_home'],
         2: ['recipe_brew_condensed_health_potion_home', 'recipe_brew_condensed_mana_potion_home', 'recipe_brew_hearthstall', 'recipe_brew_waterdam', 'recipe_brew_gustshield', 'recipe_brew_quakestable', 'recipe_brew_strikestop', 'recipe_brew_growthstall', 'recipe_brew_sundown', 'recipe_brew_sunrise'], // Removed stonehide/strength from drops
         3: ['recipe_brew_superior_health_potion_home', 'recipe_brew_superior_mana_potion_home', 'recipe_brew_blazeback', 'recipe_brew_floodwall', 'recipe_brew_stormsapper', 'recipe_brew_fissurewalker', 'recipe_brew_thunderground', 'recipe_brew_jungleward', 'recipe_brew_smitestopper', 'recipe_brew_voidshield'] // Removed strength from drops
     }
@@ -506,7 +716,7 @@ const ENCHANTER_INVENTORY = {
 
 const BLACKSMITH_INVENTORY = {
     'Weapons': ['steel_longsword', 'rapier', 'longbow', 'heavy_greatsword', 'masterwork_spear', 'dual_longswords', 'elven_saber', 'dwarven_warhammer', 'caestus', 'shamshir', 'steel_mace', 'iron_ball', 'great_epee', 'sharpshots_beloved'],
-    'Tools': ['whetstone'],
+    'Tools': ['whetstone', 'fire_grease', 'water_grease', 'earth_grease', 'wind_grease', 'lightning_grease', 'nature_grease', 'light_grease', 'void_grease'],
     'Armor': ['chainmail_armor', 'half_plate_armor', 'steel_plate_armor'],
     'Shields': ['iron_kite_shield', 'iron_buckler', 'brass_shield', 'trollblood_shield', 'titanium_parrying_shield', 'maxwellian_dueling_shield', 'tower_greatshield'],
 };
@@ -516,6 +726,21 @@ const BLACK_MARKET_INVENTORY = {
     'Armor': ['silenced_leather_armor', 'assassin_cloak_armor'],
     'Enhancements': ['poisonous_grease', 'paralysis_grease'],
     'Lures': ['goblin_scent_gland', 'sweet_grass_scent', 'rotten_cheese', 'chemical_lure', 'bandit_coin', 'wolf_musk', 'war_horn_fragment', 'silken_cocoon', 'petrified_field_mouse', 'grave_dust']
+};
+
+const TRAVELING_MERCHANT_STOCK = {
+    'Potions & Utility': [
+        'condensed_health_potion', 'condensed_mana_potion', 
+        'natural_antidote', 'anti_paralytic_needle', 
+        'whetstone', 'magic_rock_dust', 'oil_bomb'
+    ],
+    'Rare Alchemy & Essences': [
+        'fire_essence', 'water_essence', 'earth_essence', 'wind_essence', 
+        'orc_liver', 'cockatrice_venom_gland', 'troll_blood'
+    ],
+    'Low-Tier Gear': [
+        'rusty_sword', 'wooden_wand', 'iron_buckler', 'padded_leather'
+    ]
 };
 
 const NPC_RANDOM_NAMES = {
@@ -546,6 +771,21 @@ const NPC_RANDOM_NAMES = {
     ]
 };
 const CHANGELOG_DATA = [
+    {
+        version: "v0.7.2 - Expedition System Rework ⚔️",
+        date: "2025-11-19",
+        changes: [
+            "<b>MAJOR GAMEPLAY OVERHAUL:</b> Biomes are no longer one-off encounters. They are now multi-stage, node-based expeditions (similar to roguelite maps) with structured paths, resource nodes, and escalating difficulty.",
+            "<b>New Enemy Type:</b> Introduces <b>Boss Type Enemies</b> for Boss nodes. These enemies receive 10x Max HP, 3x Strength, and grant a <b>5x multiplier</b> to all rewards and extermination quests upon defeat.",
+            "<b>Map Structure & Density:</b>",
+            "    - <b>Guaranteed Rest:</b> A Rest Site is now guaranteed at the halfway point of every expedition, providing a safe resource reset.",
+            "    - <b>Node Variety:</b> Node density has been increased. The probability of finding <b>Rest Sites</b> has been doubled, and <b>Elite</b> and <b>Event</b> node chances have been notably increased across all tiers.",
+            "<b>Expedition-Aware Logic:</b>",
+            "    - <b>Death:</b> Dying on an expedition triggers the appropriate difficulty penalty (Easy/Medium/Hardcore loss) specific to the run before returning to town.",
+            "    - <b>Fleeing:</b> The mid-battle 'Flee' action now uses the unified expedition penalty logic, enforcing the penalty-free exit from Rest Nodes is honored consistently.",
+            "    - <b>Ally Timer:</b> The ally's salary counter now advances only <b>once per Expedition</b> (victory or flee), instead of once per battle encounter."
+        ]
+    },
     {
         version: "v0.7.1 - Den of Sinners",
         date: "2025-11-07",

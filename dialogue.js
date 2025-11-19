@@ -742,8 +742,21 @@ const LIBRARY_BOOKS = {
             }
             // Dynamic chapters will be added here by renderBook
         ]
-    }
-
+    },
+    'home_grease_recipes': {
+        isDynamic: true,
+        recipeType: 'alchemy',
+        tier: 1, // Matches the new grease recipes
+        title: "Home Recipe for Homemade Grease",
+        author: "Nathalie Mahesvara",
+        chapters: [
+            {
+                title: "Introduction",
+                content: `<p class="italic">"Kiky keeps all their notes in those dreadfully dry 'Formulations' books, talking about 'thermal insulators' and 'anti-entropic fields.' It all sounds so complicated! I find it's much simpler. A bit of this, a bit of that, and you have a lovely paste to help you in a fight. Here are a few of my own recipes. They're much easier to follow, and they smell better, too!"</p>`
+            }
+            // Dynamic chapters for each grease recipe will be added here by renderBook()
+        ]
+    },
 };
 
 

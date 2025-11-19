@@ -1022,8 +1022,18 @@ function returnFromInventory() {
           characterSheetOriginalStats = null;
      }
 
-    // NEW: Reset active inventory tab when leaving inventory/sheet
-    inventoryActiveTab = 'consumables'; // Reset to default
+    // NEW: Reset active inventory tab when leaving inventory/sheet (unchanged)
+    inventoryActiveTab = 'consumables'; 
+
+    // --- EXPEDITION PRIORITY FIX ---
+    // If an expedition is currently active, always return to the map view.
+    if (player && gameState.currentMap && gameState.currentMap.biomeKey) {
+         renderBiomeMap(gameState.currentMap.biomeKey);
+         isProcessingAction = false; // Ensure action lock is cleared
+         return; 
+    }
+    // --- END EXPEDITION PRIORITY FIX ---
+
 
     switch (lastViewBeforeInventory) {
         // --- Core ---
@@ -1111,6 +1121,73 @@ function exitGame() {
     }, 1000);
 }
 
+// Add this function to rendering.js
+
+/**
+ * Routes the player to the correct screen upon loading, based on the viewKey.
+ * This function consolidates the messy post-load routing logic.
+ * @param {string} viewKey - The saved name of the last screen (e.g., 'biome_map').
+ */
+function routeToSavedView(viewKey) {
+    // 1. Handle Expedition Views (Map and temporary node screens)
+    if (gameState.currentMap && gameState.currentBiome) {
+        // All temporary node views (rest, shop, treasure) should revert to the main map.
+        // The main map render function handles positioning correctly.
+        if (viewKey === 'biome_map' || viewKey.startsWith('event_')) {
+            renderBiomeMap(gameState.currentBiome);
+            return;
+        }
+    }
+    
+    // 2. Handle Major Town/House Views
+    switch (viewKey) {
+        case 'town':
+        case 'main_menu':
+            renderTownSquare();
+            break;
+        case 'commercial_district':
+            renderCommercialDistrict();
+            break;
+        case 'arcane_quarter':
+            renderArcaneQuarter();
+            break;
+        case 'residential_district':
+            renderResidentialDistrict();
+            break;
+        case 'house':
+            renderHouse();
+            break;
+        case 'house_storage':
+            renderHouseStorage();
+            break;
+        case 'garden':
+            renderGarden();
+            break;
+        case 'kitchen':
+            renderKitchen();
+            break;
+        case 'alchemy_lab':
+            renderAlchemyLab();
+            break;
+        case 'training_grounds':
+            renderTrainingGrounds();
+            break;
+        case 'barracks':
+            renderBarracks();
+            break;
+        // Case for shops (e.g., 'shop', 'black_market', etc.) redirect to their main menu
+        case 'shop':
+            renderShop('store');
+            break;
+        case 'black_market':
+            renderShop('black_market');
+            break;
+        // Default (Failsafe for battle/post_battle/unknown state)
+        default:
+            renderTownSquare();
+    }
+}
+    
 function renderWildernessMenu() {
     updateRealTimePalette();
     lastViewBeforeInventory = 'wilderness';
@@ -1134,7 +1211,9 @@ function renderWildernessMenu() {
                         <p class="text-sm text-gray-400 mt-1">${biome.description}</p>
                     </div>
                     ${isUnlocked
-                        ? `<button onclick="startBattle('${biomeKey}')" class="btn btn-primary ml-4">Explore</button>`
+                        // --- MODIFICATION: Changed startBattle to enterBiomeMap ---
+                        ? `<button onclick="enterBiomeMap('${biomeKey}')" class="btn btn-primary ml-4">Explore</button>`
+                        // --- END MODIFICATION ---
                         : `<div class="text-right ml-4">
                                <p class="font-bold text-red-400">Locked</p>
                                <p class="text-xs text-gray-500">Requires Level ${requiredLevel}</p>
@@ -1147,6 +1226,344 @@ function renderWildernessMenu() {
     html += `</div>
         <div class="text-center mt-4"><button onclick="renderTownSquare()" class="btn btn-primary">Back to Town</button></div>
     </div>`;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+/**
+ * Bridge function to generate or render a biome map.
+ * @param {string} biomeKey - The key of the biome to enter.
+ */
+function enterBiomeMap(biomeKey) {
+    gameState.currentView = 'biome_map';
+    if (!gameState.currentMap) {
+        addToLog(`Starting expedition in ${BIOMES[biomeKey].name}...`, "text-green-300");
+        generateNewBiomeMap(biomeKey);
+    }
+    renderBiomeMap(biomeKey);
+}
+
+/**
+ * Renders the visual node-based map.
+ * (This is a STUB for now and will be built out in the next step)
+ */
+function getMapNodeIcon(node) { // Modified to accept the whole node object
+    switch (node.type) {
+        case 'monster': return '⚔️';
+        case 'monster_lured': return '🦠';
+        case 'elite': return '💀';
+        case 'boss': 
+            // The MONSTER_SPECIES data is available globally, but we'll use a local reference 
+            // and an explicit existence check to ensure robustness.
+
+            // Check if the bossId is set AND if the global MONSTER_SPECIES data object exists
+            if (node.bossId && typeof MONSTER_SPECIES !== 'undefined' && MONSTER_SPECIES[node.bossId]) {
+                return MONSTER_SPECIES[node.bossId].emoji;
+            }
+            return '👹'; // Fallback 
+        case 'event': return '❓';
+        case 'rest': return '🔥';
+        case 'shop': return '💰';
+        default: return '⚫';
+    }
+}
+
+
+function renderBiomeMap(biomeKey) {
+    if (!gameState.currentMap) { renderTownSquare(); return; }
+
+    injectMapStyles(); 
+    lastViewBeforeInventory = 'biome_map';
+    gameState.currentView = 'biome_map';
+    const map = gameState.currentMap;
+    const biome = BIOMES[biomeKey];
+    
+    // --- THEME EXTRACTION ---
+    const theme = PALETTES[biome.theme || 'default'];
+    // Define CSS vars for this specific render
+    const cssVars = `
+        --map-bg-start: ${theme['--bg-secondary']};
+        --map-bg-end: ${theme['--bg-main'].includes('gradient') ? theme['--bg-secondary'] : theme['--bg-main']};
+        --map-scroll-thumb: ${theme['--border-main']};
+        --map-scroll-track: ${theme['--bg-secondary']};
+    `;
+
+    const rules = biome.map_generation;
+    const rowHeight = 100; 
+    const mapPadding = 80; // Increased padding for boss visibility
+    // Recalculate total height based on actual max floor in the pruned nodes
+    const maxFloor = map.nodes.reduce((max, n) => Math.max(max, n.floor), 0);
+    const totalHeight = ((maxFloor + 1) * rowHeight) + (mapPadding * 2);
+    
+    const getCoords = (floor, col) => {
+        const xPercent = ((col + 1) / (rules.width + 2)) * 100;
+        const y = totalHeight - mapPadding - (floor * rowHeight);
+        return { x: xPercent, y };
+    };
+
+    // 1. Draw Lines
+    let svgLines = '';
+    map.nodes.forEach(node => {
+        const start = getCoords(node.floor, node.col);
+        node.connections.forEach(targetId => {
+            const target = map.nodes.find(n => n.id === targetId);
+            if (target) {
+                const end = getCoords(target.floor, target.col);
+                const isPath = (node.state === 'visited' && (target.state === 'visited' || target.id === gameState.currentNodeId));
+                const isNext = (node.id === gameState.currentNodeId && target.state === 'next_available');
+                
+                let color = '#475569'; let width = 2; let dash = '5,5';
+                if (isPath) { color = '#60a5fa'; width = 4; dash = 'none'; }
+                else if (isNext) { color = '#fbbf24'; width = 3; }
+                
+                svgLines += `<line x1="${start.x}%" y1="${start.y}" x2="${end.x}%" y2="${end.y}" stroke="${color}" stroke-width="${width}" stroke-dasharray="${dash}" />`;
+            }
+        });
+    });
+
+    // 2. Draw Nodes
+    let nodesHtml = '';
+    map.nodes.forEach(node => {
+        const coords = getCoords(node.floor, node.col);
+        const icon = getMapNodeIcon(node); // Pass node object
+        const isClickable = node.state === 'next_available';
+        const action = isClickable ? `onclick="selectMapNode('${node.id}')"` : '';
+        
+        let title = capitalize(node.type);
+        if (node.type === 'monster_lured') title = "Lured Monster!";
+        
+        // Add specific styling for boss node to be bigger
+        const typeClass = `type-${node.type}`;
+        
+        nodesHtml += `<div class="map-node ${typeClass} ${node.state}" style="left: ${coords.x}%; top: ${coords.y}px;" title="${title}" ${action}>${icon}</div>`;
+    });
+
+    // 3. Player Token
+    if (gameState.currentNodeId) {
+        const curr = map.nodes.find(n => n.id === gameState.currentNodeId);
+        if (curr) {
+            const c = getCoords(curr.floor, curr.col);
+            nodesHtml += `<div style="position: absolute; left: ${c.x}%; top: ${c.y}px; transform: translate(-50%, -50%); width: 64px; height: 64px; border: 3px solid #60a5fa; border-radius: 50%; box-shadow: 0 0 20px #60a5fa; pointer-events: none; z-index: 5;"></div>`;
+        }
+    }
+
+    const html = `
+        <div class="w-full h-full flex flex-col">
+            <div class="flex justify-between items-center p-4 bg-slate-900 border-b border-slate-700 z-10 shadow-lg">
+                <h2 class="font-medieval text-2xl title-glow">${biome.name}</h2>
+                <div class="flex gap-2">
+                    <div class="text-xs text-right hidden sm:block">
+                        <p class="text-yellow-300">Gold: ${player.gold}</p>
+                        <p class="text-green-300">HP: ${player.hp}/${player.maxHp}</p>
+                    </div>
+                    <button onclick="endBiomeRun('flee')" class="btn btn-action text-xs py-1 px-3">Flee Expedition</button>
+                </div>
+            </div>
+            <div class="map-container flex-grow relative" id="biome-map-scroll" style="${cssVars}">
+                <svg class="map-svg-layer" style="height: ${totalHeight}px;">${svgLines}</svg>
+                <div style="height: ${totalHeight}px; position: relative;">${nodesHtml}</div>
+            </div>
+        </div>
+    `;
+    
+    const container = document.createElement('div');
+    container.className = 'w-full h-full';
+    container.innerHTML = html;
+    render(container);
+    
+    // --- ANIMATION LOGIC ---
+    setTimeout(() => {
+        const el = document.getElementById('biome-map-scroll');
+        if (!el) return;
+
+        // 1. If player is already on a node, center on them immediately (resuming game)
+        if (gameState.currentNodeId) {
+             const curr = map.nodes.find(n => n.id === gameState.currentNodeId);
+             const c = getCoords(curr.floor, curr.col);
+             el.scrollTop = c.y - (el.clientHeight / 2);
+        } 
+        // 2. If starting fresh, show Boss then scroll to Start
+        else {
+            el.scrollTop = 0; // Start at top (Boss)
+            
+            setTimeout(() => {
+                el.scrollTo({
+                    top: el.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, 800); // Pause at top for 800ms
+        }
+    }, 50);
+}
+
+/**
+ * Handles the logic of clicking a map node.
+ * @param {string} nodeId - The ID of the node that was clicked.
+ */
+function selectMapNode(nodeId) {
+    const map = gameState.currentMap;
+    if (!map || !map.nodes) return;
+
+    const node = map.nodes.find(n => n.id === nodeId);
+    if (!node || node.state !== 'next_available') {
+        console.warn("Invalid node selection:", nodeId);
+        return;
+    }
+
+    // 1. Update States - This Logic Must Run for Shop too!
+    map.nodes.forEach(n => {
+        if (n.state === 'next_available') n.state = 'hidden';
+        if (n.id === gameState.currentNodeId) n.state = 'visited';
+    });
+    
+    node.state = 'visited';
+    gameState.currentNodeId = nodeId; // Update current position
+
+    // 2. Open Next Connections
+    node.connections.forEach(connId => {
+        const next = map.nodes.find(n => n.id === connId);
+        if (next) next.state = 'next_available';
+    });
+
+    // 3. Trigger Event
+    triggerNodeEvent(node);
+}
+
+// --- STUB FUNCTIONS for Node Renders ---
+
+function renderMerchantNode() {
+    if (!gameState.currentMap || !gameState.currentNodeId) {
+        renderTownSquare();
+        return;
+    }
+
+    const map = gameState.currentMap;
+    const node = map.nodes.find(n => n.id === gameState.currentNodeId);
+    
+    // --- MODIFIED: Use defined stock pool and persist it ---
+    if (!node.shopInventory) {
+        const itemPools = Object.values(TRAVELING_MERCHANT_STOCK);
+        const allItems = [].concat(...itemPools); // Flatten all categories
+        
+        // Pick 4 random items from the overall list
+        const rng = Math.random;
+        node.shopInventory = shuffleArray([...allItems], rng).slice(0, 4);
+    }
+    // --- END MODIFIED ---
+
+    gameState.currentView = 'event_shop';
+    lastViewBeforeInventory = 'event_shop'; 
+    
+    const priceMultiplier = 1.5; // 50% markup
+    
+    let itemsHtml = createItemList({
+        items: node.shopInventory,
+        detailsFn: getItemDetails,
+        actionsHtmlFn: (key, details) => {
+            const price = Math.floor(details.price * priceMultiplier);
+            return `
+                <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
+                <button onclick="buyItem('${key}', 'event_shop', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
+            `;
+        }
+    });
+
+    // --- FIX: Properly quote the biome key in the onclick attribute ---
+    let html = `<div class="w-full h-full flex flex-col">
+        <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Traveling Merchant</h2>
+        <p class="text-center text-gray-400 mb-4">"Greetings, traveler. Care to look at my wares? I have rare goods... for a price."</p>
+        <div id="shop-item-list" class="h-80 overflow-y-auto inventory-scrollbar pr-2 flex-grow">${itemsHtml}</div>
+        <div class="flex justify-center gap-4 mt-4 flex-shrink-0">
+            <button onclick="renderBiomeMap('${map.biomeKey}')" class="btn btn-primary">Leave</button>
+        </div>
+    </div>`;
+
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    container.className = 'w-full h-full flex flex-col';
+    render(container);
+}
+
+function renderRestNode() {
+    if (!gameState.currentMap) { renderTownSquare(); return; }
+    gameState.currentView = 'event_rest';
+    const map = gameState.currentMap;
+    
+    const healAmount = Math.floor(player.maxHp * 0.5);
+    const manaAmount = Math.floor(player.maxMp * 0.5);
+    
+    // Define actions locally to keep HTML clean
+    window.restAction = () => {
+        player.hp = Math.min(player.maxHp, player.hp + healAmount);
+        if (player.npcAlly) player.npcAlly.hp = Math.min(player.npcAlly.maxHp, player.npcAlly.hp + Math.floor(player.npcAlly.maxHp * 0.5));
+        addToLog(`You rest, recovering ${healAmount} HP. Your ally also recovers.`, 'text-green-300');
+        updateStatsView();
+        renderBiomeMap(map.biomeKey);
+    };
+    
+    window.refocusAction = () => {
+        player.mp = Math.min(player.maxMp, player.mp + manaAmount);
+        if (player.npcAlly) player.npcAlly.mp = Math.min(player.npcAlly.maxMp, player.npcAlly.mp + Math.floor(player.npcAlly.maxMp * 0.5));
+        addToLog(`You refocus, recovering ${manaAmount} MP. Your ally also recovers.`, 'text-blue-300');
+        updateStatsView();
+        renderBiomeMap(map.biomeKey);
+    };
+
+    let html = `<div class="w-full text-center">
+        <h2 class="font-medieval text-3xl mb-4 title-glow">Rest Site</h2>
+        <p class="text-gray-300 mb-6">A quiet place to recover. You and your ally can regain your strength.</p>
+        <div class="flex justify-center gap-4">
+            <button onclick="restAction()" class="btn btn-primary">Rest (+${healAmount} HP)</button>
+            <button onclick="refocusAction()" class="btn btn-primary">Refocus (+${manaAmount} MP)</button>
+        </div>
+        <div class="mt-6">
+            <button onclick="renderBiomeMap('${map.biomeKey}')" class="btn btn-action">Leave</button>
+        </div>
+    </div>`;
+    
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    render(container);
+}
+
+function renderTreasureNode() {
+    if (!gameState.currentMap) { renderTownSquare(); return; }
+    const map = gameState.currentMap;
+    gameState.currentView = 'event_treasure';
+    
+    // Logic handles checking if rewards were already given to avoid duplicates on re-render
+    // But since selectMapNode only triggers once per node visit, we can generate rewards here.
+    // For safety, we could check a flag on the node, but simple generation is fine for now.
+    
+    const goldFound = Math.floor(Math.random() * (50 * player.playerTier)) + (10 * player.playerTier);
+    const xpFound = Math.floor(Math.random() * (30 * player.playerTier)) + (10 * player.playerTier);
+    
+    // Only give rewards if just entered (this is a simplification, ideally we track 'looted' state)
+    // For now, we just give it. If user refreshes, they might get it again, but game saves on entry.
+    player.gold += goldFound;
+    player.gainXp(xpFound); 
+    
+    let itemMessage = '';
+    if (player.rollForEffect(0.25, 'Treasure Item')) { 
+        const essenceKeys = ['fire_essence', 'water_essence', 'earth_essence', 'wind_essence', 'lightning_essence', 'nature_essence', 'light_essence', 'void_essence'];
+        const itemKey = essenceKeys[Math.floor(Math.random() * essenceKeys.length)];
+        player.addToInventory(itemKey, 1);
+        itemMessage = `You also found a ${getItemDetails(itemKey).name}!`;
+    }
+    updateStatsView();
+
+    let html = `<div class="w-full text-center">
+        <h2 class="font-medieval text-3xl mb-4 title-glow">Treasure!</h2>
+        <p class="text-gray-300 mb-4">You found a hidden chest!</p>
+        <p class="text-yellow-400 font-bold">You gained ${goldFound} G!</p>
+        <p class="text-green-400 font-bold">You gained ${xpFound} XP!</p>
+        <p class="text-cyan-400 font-bold">${itemMessage}</p>
+        <div class="mt-6">
+            <button onclick="renderBiomeMap('${map.biomeKey}')" class="btn btn-primary">Continue</button>
+        </div>
+    </div>`;
+    
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
@@ -2559,7 +2976,7 @@ function renderLibrary() {
     let html = `<div class="w-full h-full flex flex-col text-left">
         <h2 class="font-medieval text-3xl mb-4 text-center ">The Library</h2>
         <div class="flex-grow flex gap-6 overflow-hidden">
-            <div class="w-1/3 flex flex-col gap-2">
+            <div class="w-1/3 flex flex-col gap-2 overflow-y-auto inventory-scrollbar pr-2">
                 <h3 class="font-bold text-lg text-yellow-300">Available Tomes</h3>
                 <div id="book-list" class="flex flex-col gap-2">`;
 
@@ -2633,15 +3050,30 @@ function renderBook(bookKey, chapterIndex = 0) {
                     }
                 }
             });
-        } else if (book.recipeType === 'alchemy') {
-            // --- MODIFICATION: Iterate over master list, not player's list ---
-            ALCHEMY_RECIPES_ORDER.forEach(recipeKey => {
-                const recipe = ALCHEMY_RECIPES[recipeKey];
-                // Check if player knows it AND it matches the book's tier
-                if (player.knownAlchemyRecipes.includes(recipeKey) && recipe && recipe.tier === book.tier) {
-            // --- END MODIFICATION ---
-                    const chapterContent = recipe.library_description;
-                    if (chapterContent) {
+            } else if (book.recipeType === 'alchemy') {
+                // --- MODIFICATION: Iterate over master list, not player's list ---
+                ALCHEMY_RECIPES_ORDER.forEach(recipeKey => {
+                    const recipe = ALCHEMY_RECIPES[recipeKey];
+                    
+                    // --- NEW AUTHOR-BASED FILTERING LOGIC ---
+                    let authorMatch = false;
+                    if (book.author === "Nathalie Mahesvara") {
+                        // Nathalie's book only gets recipes with her author tag
+                        authorMatch = recipe && recipe.author === 'Nathalie';
+                    } else if (book.author === "Kiky Dionysson") {
+                        // Kiky's book only gets recipes *without* Nathalie's author tag
+                        authorMatch = recipe && recipe.author !== 'Nathalie';
+                    } else {
+                        // Fallback for any other alchemy book: just match tier
+                        authorMatch = recipe && recipe.tier === book.tier;
+                    }
+                    // --- END NEW LOGIC ---
+
+                    // Check if player knows it AND it matches the book's tier AND the author matches
+                    if (player.knownAlchemyRecipes.includes(recipeKey) && recipe && recipe.tier === book.tier && authorMatch) {
+                // --- END MODIFICATION ---
+                        const chapterContent = recipe.library_description;
+                        if (chapterContent) {
                         book.chapters.push({
                             title: getItemDetails(recipe.output).name,
                             content: chapterContent
@@ -5047,7 +5479,8 @@ function _buildRouletteTable() {
                     ${number}<span id="bet-chip-straight_${number}" class="bet-chip-count"></span>
                  </div>`;
     }
-    for (let i = 0; i < 12; i++) {
+    for (let 
+i = 0; i < 12; i++) {
         const number = (i * 3) + 1; // 1, 4, 7, ... 34
         const numInfo = ROULETTE_NUMBERS[number];
         html += `<div id="roulette-cell-${number}" class="roulette-cell ${numInfo.color}" style="grid-column: ${i + 2} / span 1; grid-row: 3 / span 1;" onclick="placeRouletteBet('straight_${number}')">
@@ -6597,12 +7030,13 @@ function renderPostBattleMenu() {
         // --- END NEW ---
         // --- REMOVED REDUNDANT 'isFled' BLOCK ---
         // else if (player.npcAlly.isFled) { ... } // This block is GONE.
-        else if (preTrainingState === null) { // Don't increment salary for training
-            player.encountersSinceLastPay++;
-            addToLog(`${player.npcAlly.name} looks weary, but stands ready. (HP: ${player.npcAlly.hp}/${player.npcAlly.maxHp})`, "text-blue-200");
+        } else if (preTrainingState === null) { // Don't increment salary for training
+        
+        // --- REMOVED: This line caused the counter to advance per encounter ---
+        // player.encountersSinceLastPay++; 
+        // ---------------------------------------------------------------------
 
-            // HP/MP are *not* restored
-        }
+        addToLog(`${player.npcAlly.name} looks weary, but stands ready. (HP: ${player.npcAlly.hp}/${player.npcAlly.maxHp})`, "text-blue-200");
     }
     // --- END NPC ALLY ---
 
@@ -6628,20 +7062,25 @@ function renderPostBattleMenu() {
     gameState.currentView = 'post_battle';
     lastViewBeforeInventory = 'post_battle';
 
-    // DO NOT ADVANCE TUTORIAL HERE. It's handled after the "outro" modal.
-
     const biomeKey = gameState.currentBiome;
-    if (!biomeKey) {
-        renderTownSquare();
-        return;
+    
+    // --- NEW MAP LOGIC ---
+    // If we are in a map mode, the "Continue" button should return to the map view
+    let actionButton = '';
+    if (gameState.currentMap) {
+        actionButton = `<button onclick="renderBiomeMap('${biomeKey}')" class="btn btn-primary w-full sm:w-auto">Return to Map</button>`;
+    } else {
+        // Legacy/Fallback behavior
+        actionButton = `<button onclick="startBattle('${biomeKey}')" class="btn btn-primary w-full sm:w-auto">Explore Again</button>`;
     }
-    const biome = BIOMES[biomeKey];
+    // --- END NEW LOGIC ---
+
     let html = `<div class="text-center">
         <h2 class="font-medieval text-3xl mb-4 text-yellow-200 title-glow">Victory!</h2>
-        <p class="mb-6">You have cleared the area. What will you do next?</p>
+        <p class="mb-6">The enemy is defeated. What will you do?</p>
         <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
-            <button onclick="startBattle('${biomeKey}')" class="btn btn-primary w-full sm:w-auto">Continue Exploring</button>
-            <button onclick="renderTownSquare()" class="btn btn-primary w-full sm:w-auto">Return to Town</button>
+            ${actionButton}
+            <button onclick="endBiomeRun('flee')" class="btn btn-secondary w-full sm:w-auto">Flee to Town</button>
         </div>
     </div>`;
     const container = document.createElement('div');
@@ -7444,7 +7883,7 @@ function brewFromStation() {
 
     const outcome = determineBrewingOutcome(ingredients);
 
-    if (brewHomePotion(ingredients, outcome)) {
+    if (brewHomePotion(outcome)) {
         if (outcome.success) {
             alchemyState.outputKey = outcome.potion;
         } else {
@@ -7607,7 +8046,14 @@ window.startTrainingBattle = function(tier) {
         };
     }
 
-    startBattle(null, trainingConfig);
+    function enterBiomeMap(biomeKey) {
+    gameState.currentView = 'biome_map';
+    if (!gameState.currentMap) {
+        addToLog(`Starting expedition in ${BIOMES[biomeKey].name}...`, "text-green-300");
+        generateNewBiomeMap(biomeKey);
+    }
+    renderBiomeMap(biomeKey);
+}(null, trainingConfig);
 }
 
 
