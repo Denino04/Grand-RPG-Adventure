@@ -1870,6 +1870,25 @@ function injectMapStyles() {
             70% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
             100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
         }
+
+        /* --- MOBILE OPTIMIZATIONS --- */
+        @media (max-width: 768px) {
+            .map-node {
+                width: 40px; /* Increased from 34px for better visibility */
+                height: 40px;
+                font-size: 1.2rem;
+                border-width: 1.5px;
+            }
+            .map-node.type-boss {
+                width: 64px; /* Slightly larger for the boss */
+                height: 64px;
+                font-size: 2.2rem;
+            }
+            /* Maintain generous click target */
+            .map-node.next_available::after {
+                top: -20px; left: -20px; right: -20px; bottom: -20px;
+            }
+        }
     `;
     document.head.appendChild(style);
 }

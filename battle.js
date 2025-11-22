@@ -227,17 +227,26 @@ function startBattle(biomeKey, options = null) {
                  const species = MONSTER_SPECIES[options.speciesKey];
                  currentEnemies.push(new Enemy(species, MONSTER_RARITY['common'], player.level));
             } else {
-                 // --- NEW LOGIC: Use Ambush Scaling for standard 'monster' nodes ---
-                 let numEnemies = 1;
-                 if (player.level >= 20) numEnemies = 4; // 20+ = 4 enemies
-                 else if (player.level >= 6) numEnemies = 3; // 6+ = 3 enemies
-                 else if (player.level >= 4) numEnemies = 2; // 4-5 = 2 enemies
-                 // Player level 1-3 defaults to 1 enemy.
+                 // --- NEW LOGIC: Randomized Enemy Counts (Ranges) ---
+                 let minEnemies = 1;
+                 let maxEnemies = 1;
 
-                 // Scale further based on player level for 4 and 5 enemies (as requested)
-                 if (player.level >= 30) numEnemies = 5; // 30+ = 5 enemies
+                 if (player.level >= 20) {
+                     minEnemies = 3; maxEnemies = 5;
+                 } else if (player.level >= 10) {
+                     minEnemies = 2; maxEnemies = 4;
+                 } else if (player.level >= 6) {
+                     minEnemies = 1; maxEnemies = 3;
+                 } else if (player.level >= 4) {
+                     minEnemies = 1; maxEnemies = 2;
+                 }
+                 // Level 1-3 stays 1-1
 
-                 if (player.statusEffects.monster_lure) numEnemies = Math.min(5, numEnemies + 2);
+                 // Roll for count
+                 let numEnemies = Math.floor(Math.random() * (maxEnemies - minEnemies + 1)) + minEnemies;
+
+                 // Lure adds +2 enemies (max 6)
+                 if (player.statusEffects.monster_lure) numEnemies = Math.min(6, numEnemies + 2);
 
                  for (let i = 0; i < numEnemies; i++) {
                      let enemy = generateEnemy(biomeKey);
@@ -2871,7 +2880,12 @@ function checkBattleStatus(isReaction = false) {
 
                 // --- ADDED: Debug Logging ---
                 if (logChanceCalculations) {
-                    addToLog(`DEBUG: Recipe Roll Chance: Base = ${(baseRecipeDropChance * 100).toFixed(1)}%, Luck = +${(recipeLuckBonus * 100).toFixed(1)}% => Final = ${(finalRecipeDropChance * 100).toFixed(1)}%`, 'text-gray-500');
+                    // --- FIX: Safety check for itemDetails ---
+                    // If itemDetails is null (invalid item key), default to "Unknown Item" to prevent crash
+                    const itemName = itemDetails ? itemDetails.name : "Unknown Item";
+                    
+                    addToLog(`DEBUG: Loot Chance (${itemName}): Base = ${(baseDropChance * 100).toFixed(1)}%, Luck = +${(playerLuckBonus * 100).toFixed(1)}%, Mods = x${(player.foodBuffs.loot_chance?.value || 1).toFixed(1)} x${(player.race === 'Dwarf' && itemDetails && (WEAPONS[item] || ARMOR[item] || SHIELDS[item] || CATALYSTS[item])) ? 1.25 : 1} x${(player.equippedWeapon.effect?.lootBonus && itemDetails && (itemDetails.class || ['Armor', 'Weapon'].includes(itemDetails.type))) ? 2 : 1} => Final = ${(finalDropChance * 100).toFixed(1)}%`, 'text-gray-500');
+                    // --- END FIX ---
                 }
                 // --- END ADDED ---
 
@@ -3326,7 +3340,10 @@ async function enemyTurn() {
 
             // Only add delay if battle isn't over
             if (!gameState.battleEnded) {
-                 await new Promise(resolve => setTimeout(resolve, 200)); // Delay between enemy actions
+                 // --- SPEED SCALING: Dynamic turn delay ---
+                 // 1 Enemy = 150ms, 4 Enemies = 80ms
+                 const turnDelay = Math.max(50, 150 - (currentEnemies.length * 30));
+                 await new Promise(resolve => setTimeout(resolve, turnDelay)); 
             }
         }
     }

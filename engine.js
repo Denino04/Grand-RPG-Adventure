@@ -275,7 +275,8 @@ function generateNewBiomeMap(biomeKey) {
     if (!biome) return null;
 
     const rules = biome.map_generation;
-    const rng = Math.random;
+    // Use seeded random if available, otherwise Math.random
+    const rng = (player && typeof seededRandom === 'function' && player.seed) ? seededRandom(player.seed) : Math.random;
     
     let nodes = [];
     let nodesByFloor = [];
@@ -283,69 +284,87 @@ function generateNewBiomeMap(biomeKey) {
     // Constants
     const bossNodeId = 'node-boss';
     const preBossRestId = 'node-pre-boss-rest';
-    const halfwayRestId = 'node-halfway-rest'; // New constant
+    const halfwayRestId = 'node-halfway-rest'; 
 
     // --- NEW: Set initial gold for the run ---
     gameState.initialRunGold = player.gold; 
-    // --- END NEW ---
     
     // --- BOSS SELECTION ---
-    const bossKey = rules.bosses[Math.floor(Math.random() * rules.bosses.length)]; // <- This sets the key.     
+    const bossKey = rules.bosses[Math.floor(rng() * rules.bosses.length)];
     
-    // Calculate halfway point (e.g., floor 4 of 8)
     const halfwayFloor = Math.floor(rules.depth / 2);
 
     for (let f = 0; f < rules.depth; f++) {
         nodesByFloor[f] = [];
         let nodesInThisFloor = 0;
 
+        // Helper to generate random visual offset
+        // X is percentage based (so +/- 6%), Y is pixels (+/- 25px)
+        const getOffset = () => ({ x: (rng() * 12) - 6, y: (rng() * 50) - 25 });
+        const getStableOffset = () => ({ x: 0, y: 0 }); // For boss/rest nodes
+
         if (f === 0) {
-            // Floor 0: Start (2-3 nodes)
+            // Floor 0: Start
             nodesInThisFloor = Math.floor(rng() * 2) + 2;
             const segmentSize = rules.width / nodesInThisFloor;
             
             for (let i = 0; i < nodesInThisFloor; i++) {
                 const col = Math.floor((i * segmentSize) + (segmentSize / 2)); 
-                const node = { id: `node-${f}-${col}`, floor: f, col: col, type: 'monster', state: 'next_available', connections: [] };
+                const node = { 
+                    id: `node-${f}-${col}`, floor: f, col: col, type: 'monster', 
+                    state: 'next_available', connections: [], 
+                    offset: getOffset() // Chaotic offset
+                };
                 nodesByFloor[f].push(node); nodes.push(node);
             }
         } 
-        // --- NEW: Guaranteed Halfway Rest Site ---
         else if (f === halfwayFloor) {
-            // Always center
-            const node = { id: halfwayRestId, floor: f, col: Math.floor(rules.width / 2), type: 'rest', state: 'hidden', connections: [] };
+            // Halfway Rest (Guaranteed)
+            const node = { 
+                id: halfwayRestId, floor: f, col: Math.floor(rules.width / 2), type: 'rest', 
+                state: 'hidden', connections: [],
+                offset: getStableOffset() // Stable
+            };
             nodesByFloor[f].push(node); nodes.push(node);
             
-            // Connect ALL nodes from the previous floor to this single rest site
-            // This creates a "choke point" on the map
             if (nodesByFloor[f - 1]) {
                 nodesByFloor[f - 1].forEach(prev => prev.connections.push(node.id));
             }
         }
-        // --- END NEW ---
         else if (f === rules.depth - 2) {
-            // Pre-Boss: Rest Site (Always center)
-            const node = { id: preBossRestId, floor: f, col: Math.floor(rules.width / 2), type: 'rest', state: 'hidden', connections: [bossNodeId] };
+            // Pre-Boss Rest
+            const node = { 
+                id: preBossRestId, floor: f, col: Math.floor(rules.width / 2), type: 'rest', 
+                state: 'hidden', connections: [bossNodeId],
+                offset: getStableOffset() // Stable
+            };
             nodesByFloor[f].push(node); nodes.push(node);
             if (nodesByFloor[f - 1]) nodesByFloor[f - 1].forEach(prev => prev.connections.push(node.id));
         } else if (f === rules.depth - 1) {
-            // Final Floor: Boss (Always center)
-            // Ensure you are using the bossKey variable here for the icon fix to work
-            const node = { id: bossNodeId, floor: f, col: Math.floor(rules.width / 2), type: 'boss', bossId: bossKey, state: 'hidden', connections: [] }; 
+            // Boss Node
+            const node = { 
+                id: bossNodeId, floor: f, col: Math.floor(rules.width / 2), type: 'boss', 
+                bossId: bossKey, state: 'hidden', connections: [],
+                offset: getStableOffset() // Stable
+            }; 
             nodesByFloor[f].push(node); nodes.push(node);
         } else {
-                // Intermediate Floors
+            // Intermediate Floors
             const prevFloorNodes = nodesByFloor[f - 1];
             if (!prevFloorNodes || prevFloorNodes.length === 0) continue;
 
-            nodesInThisFloor = Math.floor(rng() * 3) + 2; // 2-4 nodes
+            // Chaotic node count: 2 to 5
+            nodesInThisFloor = Math.floor(rng() * 4) + 2; 
             const segmentSize = rules.width / nodesInThisFloor;
 
             for (let i = 0; i < nodesInThisFloor; i++) {
+                // Randomize column slightly to avoid perfect alignment
                 let col = Math.floor((i * segmentSize) + (segmentSize / 2));
-                if (i > 0 && col <= nodesByFloor[f][i-1].col) {
-                    col = nodesByFloor[f][i-1].col + 1;
-                }
+                // Add slight column jitter
+                if (rng() > 0.5) col += Math.floor(rng() * 2) - 1;
+                
+                // Clamp column
+                if (col < 0) col = 0;
                 if (col >= rules.width) col = rules.width - 1;
 
                 // Determine Type
@@ -356,24 +375,34 @@ function generateNewBiomeMap(biomeKey) {
                     cumulativeChance += rules.node_pool[type];
                     if (typeRoll < cumulativeChance) { nodeType = type; break; }
                 }
-                // Safety Rules
                 if (f < 4 && (nodeType === 'elite' || nodeType === 'rest')) nodeType = 'monster';
 
-                const node = { id: `node-${f}-${col}`, floor: f, col: col, type: nodeType, state: 'hidden', connections: [] };
+                const node = { 
+                    id: `node-${f}-${col}-${i}`, // Added index to ID to prevent collision
+                    floor: f, col: col, type: nodeType, 
+                    state: 'hidden', connections: [],
+                    offset: getOffset() // Chaotic offset
+                };
                 nodesByFloor[f].push(node); nodes.push(node);
             }
 
             // Connect Previous Floor to This Floor
             prevFloorNodes.forEach(prevNode => {
                 const createdNodes = nodesByFloor[f];
+                // Don't connect Rest/Shop/Elite to same type to allow variety
                 let validTargets = createdNodes.filter(n => !(['elite', 'rest', 'shop'].includes(n.type) && n.type === prevNode.type));
                 if (validTargets.length === 0) validTargets = createdNodes;
                 
-                validTargets.sort((a, b) => Math.abs(a.col - prevNode.col) - Math.abs(b.col - prevNode.col));
+                // --- CHAOTIC CONNECTIONS ---
+                // Instead of sorting by distance, we SHUFFLE valid targets.
+                // This allows paths to criss-cross wildly.
+                shuffleArray(validTargets, rng); 
 
+                // Connect to at least 1 random node
                 prevNode.connections.push(validTargets[0].id);
 
-                if (rng() < 0.3 && validTargets.length > 1) {
+                // 40% chance to connect to a second random node
+                if (rng() < 0.4 && validTargets.length > 1) {
                     prevNode.connections.push(validTargets[1].id);
                 }
             });
@@ -381,6 +410,7 @@ function generateNewBiomeMap(biomeKey) {
     }
 
     // 2. PRUNING (Remove unreachable nodes)
+    // (Logic remains same, just ensuring variables are correct)
     let accessibleIds = new Set(nodesByFloor[0].map(n => n.id));
     let queue = [...nodesByFloor[0]];
     while(queue.length > 0) {
@@ -412,6 +442,7 @@ function generateNewBiomeMap(biomeKey) {
     gameState.currentMap = map;
     return map;
 }
+
 
 function triggerNodeEvent(node) {
     if (!node) return;
@@ -538,6 +569,21 @@ function triggerNodeEvent(node) {
 function endBiomeRun(reason) {
     const map = gameState.currentMap;
     if (!map) return;
+
+    // --- FIX: Validate Biome Key ---
+    // If the save file has an old biome key that no longer exists in BIOMES, this prevents the crash.
+    const biome = BIOMES[map.biomeKey];
+    if (!biome) {
+        console.error(`Invalid biome key '${map.biomeKey}' detected. Forcing return to town.`);
+        addToLog("The magic of this expedition has faded. Returning to town...", "text-red-400");
+        // Clear invalid state so the player isn't stuck
+        gameState.currentMap = null;
+        gameState.currentNodeId = null;
+        gameState.currentEncounterType = null;
+        setTimeout(renderTownSquare, 1000);
+        return;
+    }
+    // --- END FIX ---
 
     // 1. Calculate Proportional Gold Loss (if fleeing)
     let goldMessage = "";
@@ -4463,7 +4509,6 @@ class Enemy extends Entity {
     // --- END NEW: Ability logic check ---
     async moveTowards(target) {
         // --- NEW MOVE LOGIC ---
-        // --- NEW MOVE LOGIC ---
         // If a specific target is provided (e.g., by the attack logic), move to it.
         // If not, find the closest target (player or ally).
         let finalTarget = target;
@@ -4491,6 +4536,11 @@ class Enemy extends Entity {
             addToLog(`${this.name} moves towards ${finalTarget.name}!`);
             const stepsToTake = Math.min(path.length - 1, this.movement.speed);
 
+            // --- SPEED SCALING: Dynamic movement delay ---
+            // Base: 300ms. Decreases by 40ms per enemy. Min: 50ms.
+            // 1 Enemy: 260ms | 5 Enemies: 100ms
+            const moveDelay = Math.max(50, 300 - (currentEnemies.length * 40)); 
+
             for (let i = 1; i <= stepsToTake; i++) {
                 const nextStep = path[i];
 
@@ -4509,8 +4559,9 @@ class Enemy extends Entity {
                 this.x = nextStep.x;
                 this.y = nextStep.y;
                 renderBattleGrid();
-                // MODIFIED: Increased delay from 150 to 300
-                await new Promise(resolve => setTimeout(resolve, 300)); // Delay between steps
+                
+                // Use the dynamic delay
+                await new Promise(resolve => setTimeout(resolve, moveDelay)); 
 
                 if (distanceAfterMove <= this.range) {
                     break; // In range, stop moving

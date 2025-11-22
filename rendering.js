@@ -1269,7 +1269,6 @@ function getMapNodeIcon(node) { // Modified to accept the whole node object
     }
 }
 
-
 function renderBiomeMap(biomeKey) {
     if (!gameState.currentMap) { renderTownSquare(); return; }
 
@@ -1278,6 +1277,15 @@ function renderBiomeMap(biomeKey) {
     gameState.currentView = 'biome_map';
     const map = gameState.currentMap;
     const biome = BIOMES[biomeKey];
+    
+    // --- FIX: Validate Biome Data ---
+    if (!biome) {
+        console.error(`renderBiomeMap: Invalid biome key '${biomeKey}'. Returning to town.`);
+        gameState.currentMap = null; // Clear invalid state
+        renderTownSquare();
+        return;
+    }
+    // --- END FIX ---
     
     // --- THEME EXTRACTION ---
     const theme = PALETTES[biome.theme || 'default'];
@@ -1291,25 +1299,35 @@ function renderBiomeMap(biomeKey) {
 
     const rules = biome.map_generation;
     const rowHeight = 100; 
-    const mapPadding = 80; // Increased padding for boss visibility
-    // Recalculate total height based on actual max floor in the pruned nodes
+    const mapPadding = 80; 
     const maxFloor = map.nodes.reduce((max, n) => Math.max(max, n.floor), 0);
     const totalHeight = ((maxFloor + 1) * rowHeight) + (mapPadding * 2);
     
-    const getCoords = (floor, col) => {
-        const xPercent = ((col + 1) / (rules.width + 2)) * 100;
-        const y = totalHeight - mapPadding - (floor * rowHeight);
-        return { x: xPercent, y };
+    // --- MODIFIED: Apply offsets ---
+    const getCoords = (node) => {
+        // Calculate base grid position
+        const xBase = ((node.col + 1) / (rules.width + 2)) * 100;
+        const yBase = totalHeight - mapPadding - (node.floor * rowHeight);
+        
+        // Apply chaotic offsets if present
+        const xOffset = node.offset ? node.offset.x : 0;
+        const yOffset = node.offset ? node.offset.y : 0;
+
+        return { 
+            x: xBase + xOffset, 
+            y: yBase + yOffset 
+        };
     };
+    // --- END MODIFICATION ---
 
     // 1. Draw Lines
     let svgLines = '';
     map.nodes.forEach(node => {
-        const start = getCoords(node.floor, node.col);
+        const start = getCoords(node); // Pass node object
         node.connections.forEach(targetId => {
             const target = map.nodes.find(n => n.id === targetId);
             if (target) {
-                const end = getCoords(target.floor, target.col);
+                const end = getCoords(target); // Pass node object
                 const isPath = (node.state === 'visited' && (target.state === 'visited' || target.id === gameState.currentNodeId));
                 const isNext = (node.id === gameState.currentNodeId && target.state === 'next_available');
                 
@@ -1325,15 +1343,14 @@ function renderBiomeMap(biomeKey) {
     // 2. Draw Nodes
     let nodesHtml = '';
     map.nodes.forEach(node => {
-        const coords = getCoords(node.floor, node.col);
-        const icon = getMapNodeIcon(node); // Pass node object
+        const coords = getCoords(node); // Pass node object
+        const icon = getMapNodeIcon(node); 
         const isClickable = node.state === 'next_available';
         const action = isClickable ? `onclick="selectMapNode('${node.id}')"` : '';
         
         let title = capitalize(node.type);
         if (node.type === 'monster_lured') title = "Lured Monster!";
         
-        // Add specific styling for boss node to be bigger
         const typeClass = `type-${node.type}`;
         
         nodesHtml += `<div class="map-node ${typeClass} ${node.state}" style="left: ${coords.x}%; top: ${coords.y}px;" title="${title}" ${action}>${icon}</div>`;
@@ -1343,7 +1360,7 @@ function renderBiomeMap(biomeKey) {
     if (gameState.currentNodeId) {
         const curr = map.nodes.find(n => n.id === gameState.currentNodeId);
         if (curr) {
-            const c = getCoords(curr.floor, curr.col);
+            const c = getCoords(curr);
             nodesHtml += `<div style="position: absolute; left: ${c.x}%; top: ${c.y}px; transform: translate(-50%, -50%); width: 64px; height: 64px; border: 3px solid #60a5fa; border-radius: 50%; box-shadow: 0 0 20px #60a5fa; pointer-events: none; z-index: 5;"></div>`;
         }
     }
@@ -1377,22 +1394,20 @@ function renderBiomeMap(biomeKey) {
         const el = document.getElementById('biome-map-scroll');
         if (!el) return;
 
-        // 1. If player is already on a node, center on them immediately (resuming game)
         if (gameState.currentNodeId) {
              const curr = map.nodes.find(n => n.id === gameState.currentNodeId);
-             const c = getCoords(curr.floor, curr.col);
+             const c = getCoords(curr);
              el.scrollTop = c.y - (el.clientHeight / 2);
         } 
-        // 2. If starting fresh, show Boss then scroll to Start
         else {
-            el.scrollTop = 0; // Start at top (Boss)
+            el.scrollTop = 0; 
             
             setTimeout(() => {
                 el.scrollTo({
                     top: el.scrollHeight,
                     behavior: 'smooth'
                 });
-            }, 800); // Pause at top for 800ms
+            }, 800); 
         }
     }, 50);
 }
@@ -7008,8 +7023,6 @@ function renderBattle(subView = 'main', actionData = null) {
 
 }
 
-
-
 function renderPostBattleMenu() {
     $('#inventory-btn').disabled = false;
     $('#character-sheet-btn').disabled = false;
@@ -7027,19 +7040,15 @@ function renderPostBattleMenu() {
             addToLog(`${player.npcAlly.name} has finished resting and is fully recovered!`, "text-green-300");
             // Do not increment encountersSinceLastPay
         }
-        // --- END NEW ---
-        // --- REMOVED REDUNDANT 'isFled' BLOCK ---
-        // else if (player.npcAlly.isFled) { ... } // This block is GONE.
-        } else if (preTrainingState === null) { // Don't increment salary for training
-        
-        // --- REMOVED: This line caused the counter to advance per encounter ---
-        // player.encountersSinceLastPay++; 
-        // ---------------------------------------------------------------------
-
-        addToLog(`${player.npcAlly.name} looks weary, but stands ready. (HP: ${player.npcAlly.hp}/${player.npcAlly.maxHp})`, "text-blue-200");
+        // --- FIX: This block is now correctly nested inside the ally check ---
+        else if (preTrainingState === null) { // Don't increment salary for training
+            addToLog(`${player.npcAlly.name} looks weary, but stands ready. (HP: ${player.npcAlly.hp}/${player.npcAlly.maxHp})`, "text-blue-200");
+        }
+        // --- END FIX ---
     }
     // --- END NPC ALLY ---
 
+    // Dialogue checks require the ally to exist AND have a position (x !== -1)
     if (player.npcAlly && player.npcAlly.x !== -1 && preTrainingState === null) {
         const dialogue = player.npcAlly._getDialogue('END_BATTLE', player.name);
         addToLog(`(${player.npcAlly.name})<br>"${dialogue}"`, 'text-gray-400');
