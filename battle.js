@@ -217,9 +217,9 @@ function startBattle(biomeKey, options = null) {
                  const species = MONSTER_SPECIES[bossKey] || generateEnemy(biomeKey).speciesData;
                  const rarityData = MONSTER_RARITY['legendary']; 
                  const boss = new Enemy(species, rarityData, player.level);
-                 boss.hp = Math.floor(boss.maxHp * 10);
+                 boss.hp = Math.floor(boss.maxHp * 5);
                  boss.maxHp = boss.hp;
-                 boss.strength = Math.floor(boss.strength * 3);
+                 boss.strength = Math.floor(boss.strength * 2);
                  boss.isBoss = true;
                  currentEnemies.push(boss);
             } else if (options.nodeType === 'monster_lured') {
@@ -3982,7 +3982,7 @@ function beginPlayerTurn() {
 async function checkPlayerDeath() {
     if (player.isAlive() || gameState.playerIsDying) return;
 
-    // First, check for any revive effects
+    // First, check for any revive effects (Void Greatsword, etc.)
     if(player.equippedWeapon.effect?.revive && !player.specialWeaponStates.void_greatsword_revive_used) {
         player.hp = Math.floor(player.maxHp * 0.5);
         player.specialWeaponStates.void_greatsword_revive_used = true;
@@ -4001,23 +4001,25 @@ async function checkPlayerDeath() {
     }
     
     const killer = currentEnemies.length > 0 ? currentEnemies[0].name : 'the wilderness';
+    
+    // --- MODIFICATION: Always render death screen first ---
     const template = document.getElementById('template-death');
     render(template.content.cloneNode(true));
     addToLog(`You were defeated by ${killer}...`, 'text-red-600 font-bold');
 
-    // Handle map-based end run (no change needed here, it handles difficulty)
-    if (gameState.currentMap) {
-        setTimeout(() => endBiomeRun('death'), 3000);
-        return; 
-    }
-
-    // --- Reworked Difficulty Penalties (For non-map Ambush/Training) ---
+    // --- Reworked Difficulty Penalties ---
     switch (player.difficulty) {
         case 'easy':
             addToLog('You pass out from your injuries...', 'text-gray-400');
             setTimeout(() => {
-                addToLog('You awaken in a bed at the inn, fully restored. (No penalty)', 'text-green-400');
-                restAtInn(0); // Respawn by resting for free
+                addToLog('You awaken, fully restored. (No penalty)', 'text-green-400');
+                
+                // Check if we are in an expedition
+                if (gameState.currentMap) {
+                    endBiomeRun('death'); // Clean up map and return to town
+                } else {
+                    restAtInn(0); // Standard respawn
+                }
                 gameState.playerIsDying = false;
             }, 3000);
             break;
@@ -4045,7 +4047,7 @@ async function checkPlayerDeath() {
                 }
             }
 
-            // Loss of half equipment (modified logic remains)
+            // Loss of half equipment
             ['weapons', 'armor', 'shields', 'catalysts'].forEach(category => {
                 const items = player.inventory[category];
                 if (!Array.isArray(items) || items.length === 0) return;
@@ -4055,7 +4057,6 @@ async function checkPlayerDeath() {
 
                 for (let i = 0; i < amountToDrop; i++) {
                      if (items.length === 0) break;
-
                     const randomIndex = Math.floor(Math.random() * items.length);
                     const droppedItemKey = items[randomIndex];
                     const itemDetails = getItemDetails(droppedItemKey);
@@ -4063,9 +4064,9 @@ async function checkPlayerDeath() {
                     if (itemDetails && itemDetails.rarity !== 'Broken') {
                         items.splice(randomIndex, 1);
                         itemsDropped++;
-
-                        // Unequip if the dropped item was the equipped one
-                        let itemTypeToCheck = null;
+                        // Unequip if dropped
+                        // (Logic to unequip if equipped item was dropped - same as before)
+                         let itemTypeToCheck = null;
                         let equippedItem = null;
                         switch (category) {
                             case 'weapons': itemTypeToCheck = 'weapon'; equippedItem = player.equippedWeapon; break;
@@ -4074,7 +4075,6 @@ async function checkPlayerDeath() {
                             case 'catalysts': itemTypeToCheck = 'catalyst'; equippedItem = player.equippedCatalyst; break;
                         }
                         if (itemTypeToCheck && equippedItem && equippedItem.name === itemDetails.name) {
-                            addToLog(`Your equipped ${itemDetails.name} was dropped!`, 'text-red-600');
                             unequipItem(itemTypeToCheck, false);
                         }
                     }
@@ -4086,15 +4086,21 @@ async function checkPlayerDeath() {
             }
 
             setTimeout(() => {
-                addToLog('You awaken at the inn, sore but alive.', 'text-yellow-300');
-                restAtInn(0); // Respawn by resting for free
+                addToLog('You awaken, sore but alive.', 'text-yellow-300');
+                
+                // Check if we are in an expedition
+                if (gameState.currentMap) {
+                    endBiomeRun('death'); // Clean up map and return to town
+                } else {
+                    restAtInn(0); // Standard respawn
+                }
                 gameState.playerIsDying = false;
             }, 3000);
             break;
 
         case 'hardcore':
         default:
-            // Hardcore logic remains permadeath
+            // Hardcore logic - Permadeath (Expedition state doesn't matter, save is gone)
             addToLog('Your journey ends here.', 'text-gray-500');
             await addToGraveyard(player, killer);
             await deleteSave(player.firestoreId || 'local');

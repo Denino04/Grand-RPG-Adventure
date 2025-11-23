@@ -629,19 +629,15 @@ function endBiomeRun(reason) {
     gameState.currentMap = null;
     gameState.currentNodeId = null;
     gameState.currentEncounterType = null;
-    gameState.initialRunGold = 0; // Reset
+    gameState.initialRunGold = 0;
     
     // 3. Handle outcome
     if (reason === 'victory') {
         addToLog(`You have conquered the ${BIOMES[map.biomeKey].name}!`, "text-green-400 font-bold");
-        
-        // --- NEW: Advance service counter once per expedition ---
         if (player.npcAlly && !player.npcAlly.isResting) {
             player.encountersSinceLastPay++;
             addToLog(`Your ally's service counter advanced. (${5 - player.encountersSinceLastPay} expeditions left until pay.)`, "text-gray-400");
         }
-        // --------------------------------------------------------
-
         setTimeout(renderTownSquare, 1500);
 
     } else if (reason === 'flee') {
@@ -650,12 +646,14 @@ function endBiomeRun(reason) {
             player.encountersSinceLastPay++;
             addToLog(`Your ally's service counter advanced. (${5 - player.encountersSinceLastPay} expeditions left until pay.)`, "text-gray-400");
         }
-        // --------------------------------------------------------
-        
         setTimeout(renderTownSquare, 1500);
 
     } else if (reason === 'death') {
-        setTimeout(renderTownSquare, 3000); 
+        // --- MODIFIED: Immediate return ---
+        // battle.js handles the delay and death screen. 
+        // This function just cleans up the state and renders town.
+        renderTownSquare(); 
+        // --- END MODIFICATION ---
     }
     
     player.clearBattleBuffs();
