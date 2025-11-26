@@ -6,29 +6,26 @@
 // SECTION 0: AUDIO ENGINE
 // =================================================================================
 
-// [FIX] Define SOUNDS as an empty object to prevent ReferenceErrors.
-// When you have audio files, uncomment the lines below and add your paths.
 const SOUNDS = {
-    // 'hover': new Audio('path/to/your/hover.mp3'),
-    // 'click': new Audio('path/to/your/click.mp3')
+    // IMPORTANT: Replace these paths with your own audio files
+    'hover': new Audio('path/to/your/hover.mp3'),
+    'click': new Audio('path/to/your/click.mp3')
 };
 
-// Optional volume settings (uncomment when sounds are added)
-// if (SOUNDS.hover) SOUNDS.hover.volume = 0.3;
-// if (SOUNDS.click) SOUNDS.click.volume = 0.5;
+// Set volumes (optional, 0.5 = 50% volume)
+SOUNDS.hover.volume = 0.3;
+SOUNDS.click.volume = 0.5;
 
 /**
  * Plays a pre-loaded sound effect.
  * @param {string} soundName - The key of the sound to play (e.g., 'hover', 'click').
  */
 function playSound(soundName) {
-    // This check prevents errors if SOUNDS is empty or the specific sound is missing
-    if (typeof SOUNDS === 'undefined') return;
-    
     const sound = SOUNDS[soundName];
     if (sound) {
         sound.currentTime = 0;
         sound.play().catch(error => {
+            // This catch prevents console errors if the user clicks too fast
             console.warn(`Audio play failed for [${soundName}]:`, error.message);
         });
     }

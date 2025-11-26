@@ -45,65 +45,7 @@ window.setEnchanterTab = function(tabName) {
     enchanterActiveTab = tabName;
     renderEnchanterShop();
 }
-// --- NEW: Dedicated Tooltip Handler to fix Quote/Syntax Errors ---
-window.showSkillNodeTooltip = function(skillId, event) {
-    if (typeof SKILL_TREE === 'undefined') return;
-    const node = SKILL_TREE[skillId];
-    if (!node) return;
 
-    let typeLabel = node.type.toUpperCase();
-    let typeColorClass = 'text-gray-400';
-    if (node.type === 'active') typeColorClass = 'text-red-400';
-    else if (node.type === 'toggle') typeColorClass = 'text-purple-400';
-    else if (node.type === 'passive') typeColorClass = 'text-cyan-400';
-    else if (node.type === 'trigger') typeColorClass = 'text-yellow-400';
-
-    // [MODIFICATION START] Description Parsing
-    // Expected format: "\"Flavor Text.\" Effect Text."
-    let descText = node.description;
-    let flavorText = "";
-    let statsText = descText;
-
-    // Regex to separate "Quote" from Rest
-    const match = descText.match(/^"(.+?)"\s*(.*)$/);
-    if (match) {
-        flavorText = `"${match[1]}"`;
-        statsText = match[2];
-    }
-
-    // Determine what to show based on toggle
-    let displayDesc = "";
-    const mode = player.skillDescriptionMode || 'detailed';
-
-    if (mode === 'simple') {
-        // Show Flavor primarily. If no flavor, show stats.
-        displayDesc = flavorText ? `<span class="italic text-yellow-100/80">${flavorText}</span>` : statsText;
-    } else {
-        // Show Stats primarily.
-        displayDesc = statsText || flavorText;
-    }
-    // [MODIFICATION END]
-
-    const content = `
-        <div class="text-left min-w-[200px] max-w-[250px]">
-            <div class="font-bold text-yellow-300 text-base mb-1">${node.name}</div>
-            <div class="text-xs ${typeColorClass} font-bold uppercase tracking-wider mb-2 border-b border-slate-600 pb-1">${typeLabel}</div>
-            <div class="text-sm text-gray-300 leading-snug">${displayDesc}</div>
-            ${mode === 'simple' && flavorText ? '<div class="mt-2 text-[10px] text-gray-500 uppercase">Detailed stats hidden</div>' : ''}
-        </div>`;
-
-    showSimpleTooltip(content, event);
-};
-// [NEW GLOBAL FUNCTIONS FOR SKILL TREE]
-window.toggleSkillDescMode = function() {
-    player.skillDescriptionMode = player.skillDescriptionMode === 'simple' ? 'detailed' : 'simple';
-    renderSkillTree(); // Refresh UI
-};
-
-window.toggleSkillEquip = function(skillId) {
-    player.toggleSkillEquip(skillId);
-    renderSkillTree(); // Refresh UI to show checkmark
-};
 /**
  * [REWRITTEN HELPER] Renders a standardized, tabbed shop interface.
  * This function now dynamically builds tabs based on the keys in the inventory object.
@@ -508,6 +450,7 @@ function renderCharacterSheet(isLevelUp = false) {
 
     // Snapshot current stats if opening the sheet for allocation
     if (!characterSheetOriginalStats) {
+        // *** MODIFICATION START: Save Base Stat values as well for accurate reversion ***
         characterSheetOriginalStats = {
             vigor: player.vigor, focus: player.focus, stamina: player.stamina,
             strength: player.strength, intelligence: player.intelligence, luck: player.luck,
@@ -515,483 +458,78 @@ function renderCharacterSheet(isLevelUp = false) {
             bonusVigor: player.bonusVigor || 0, bonusFocus: player.bonusFocus || 0, bonusStamina: player.bonusStamina || 0,
             bonusStrength: player.bonusStrength || 0, bonusIntelligence: player.bonusIntelligence || 0, bonusLuck: player.bonusLuck || 0
         };
+        // *** MODIFICATION END ***
     }
 
-    lastViewBeforeInventory = 'character_sheet';
-    gameState.currentView = isLevelUp ? 'character_sheet_levelup' : 'character_sheet';
+    lastViewBeforeInventory = 'character_sheet'; // Set the return view
+    gameState.currentView = isLevelUp ? 'character_sheet_levelup' : 'character_sheet'; // Set current view state
 
     const currentStatPoints = player.statPoints || 0;
     const hasChanges = currentStatPoints !== characterSheetOriginalStats.statPoints;
 
+    // --- Build HTML using helper functions ---
     const mainStatsHtml = _buildCharSheetMainStats(currentStatPoints);
     const derivedStatsHtml = _buildCharSheetDerivedStats();
     const { racialPassiveHtml, classAbilityHtml } = _buildCharSheetAbilities();
     const foodBuffsHtml = _buildCharSheetFoodBuffs();
 
-    // --- SKILL TREE BUTTON LOGIC ---
-    let skillTreeBtnHtml = '';
-    if (player.level >= 5) { 
-        const pts = player.skillPoints || 0;
-        const pulse = pts > 0 ? 'animate-pulse ring-2 ring-yellow-400' : '';
-        // Compact button style
-        skillTreeBtnHtml = `<button onclick="renderSkillTree()" class="btn btn-magic text-sm px-3 py-1 ${pulse}">Skills (${pts})</button>`;
-    }
 
+    // --- Assemble Final HTML ---
+    // This is now much cleaner and just assembles the parts.
     let html = `
-    <div class="w-full text-left flex flex-col h-full overflow-hidden">
-        <h2 class="font-medieval text-xl mb-1 text-center title-glow flex-shrink-0">Character Sheet</h2>
+    <div class="w-full text-left">
+        <h2 class="font-medieval text-2xl mb-2 text-center title-glow">Character Sheet</h2>
 
-        <div class="flex justify-between items-center mb-1 p-1 bg-slate-900/50 rounded-lg text-xs flex-shrink-0">
+        <!-- Allocation Controls -->
+        <div class="flex justify-between items-center mb-2 p-1 bg-slate-900/50 rounded-lg text-sm">
             <div>
-                <span class="mr-1 font-semibold">Allocate:</span>
-                <button onclick="setStatAllocationAmount(1)" class="btn ${statAllocationAmount === 1 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-0 px-2 h-6">1x</button>
-                <button onclick="setStatAllocationAmount(5)" class="btn ${statAllocationAmount === 5 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-0 px-2 h-6">5x</button>
+                <span class="mr-2 font-semibold">Allocate:</span>
+                <button onclick="setStatAllocationAmount(1)" class="btn ${statAllocationAmount === 1 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-10">1x</button>
+                <button onclick="setStatAllocationAmount(5)" class="btn ${statAllocationAmount === 5 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-10">5x</button>
+                <button onclick="setStatAllocationAmount(25)" class="btn ${statAllocationAmount === 25 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-10">25x</button>
             </div>
             <p class="text-green-400 font-bold">Points: <span id="stat-points">${currentStatPoints}</span></p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-2 flex-grow overflow-y-auto inventory-scrollbar pr-1">
-            <div class="space-y-1">
+        <!-- Stats & Abilities Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+            <!-- Left Column: Stats -->
+            <div class="space-y-2">
                 <div>
-                    <h3 class="font-bold text-sm text-yellow-300 mb-0.5">Main Stats</h3>
+                    <h3 class="font-bold text-lg text-yellow-300 mb-1">Main Stats</h3>
                     <div class="space-y-px">${mainStatsHtml}</div>
                 </div>
                 <div>
-                    <h3 class="font-bold text-sm text-yellow-300 mb-0.5 mt-1">Derived Stats</h3>
-                    <div class="space-y-0.5 bg-slate-800 p-1.5 rounded">${derivedStatsHtml}</div>
+                    <h3 class="font-bold text-lg text-yellow-300 mb-1 mt-2">Derived Stats</h3>
+                    <div class="space-y-0.5 bg-slate-800 p-2 rounded">${derivedStatsHtml}</div>
                 </div>
             </div>
-            <div class="space-y-1 mt-1 md:mt-0">
+            <!-- Right Column: Abilities & Buffs -->
+            <div class="space-y-2 mt-2 md:mt-0">
                  <div>
-                    <h3 class="font-bold text-sm text-yellow-300 mb-0.5">Racial Passive</h3>
-                    <div class="text-xs bg-slate-800 p-1.5 rounded leading-tight">${racialPassiveHtml}</div>
+                    <h3 class_ ="font-bold text-lg text-yellow-300 mb-1">Racial Passive</h3>
+                    <div class="text-xs bg-slate-800 p-2 rounded">${racialPassiveHtml}</div>
                 </div>
                 <div>
-                    <h3 class="font-bold text-sm text-yellow-300 mb-0.5">Class Ability</h3>
-                    <div class="text-xs bg-slate-800 p-1.5 rounded leading-tight">${classAbilityHtml}</div>
+                    <h3 class="font-bold text-lg text-yellow-300 mb-1">Class Ability</h3>
+                    <div class="text-xs bg-slate-800 p-2 rounded">${classAbilityHtml}</div>
                 </div>
                  <div>
-                    <h3 class="font-bold text-sm text-yellow-300 mb-0.5">Active Food Buffs</h3>
-                    <div id="food-buff-tracker" class="space-y-0.5 bg-slate-800 p-1.5 rounded leading-tight">${foodBuffsHtml}</div>
+                    <h3 class="font-bold text-lg text-yellow-300 mb-1">Active Food Buffs</h3>
+                    <div id="food-buff-tracker" class="space-y-0.5 bg-slate-800 p-2 rounded">${foodBuffsHtml}</div>
                  </div>
+                 <!-- Action Buttons moved to right column bottom -->
+                 <div class="text-center mt-2 flex justify-center gap-4">
+                    <button onclick="resetStatAllocation()" class="btn btn-action" ${!hasChanges ? 'disabled' : ''}>Reset</button>
+                    <button onclick="confirmStatAllocation()" class="btn btn-primary">Done</button>
+                </div>
             </div>
-        </div>
-
-        <div class="text-center mt-2 flex justify-center gap-3 flex-shrink-0 pt-1 border-t border-slate-700">
-            <button onclick="resetStatAllocation()" class="btn btn-action text-sm px-4 py-1" ${!hasChanges ? 'disabled' : ''}>Reset</button>
-            ${skillTreeBtnHtml}
-            <button onclick="confirmStatAllocation()" class="btn btn-primary text-sm px-4 py-1">Done</button>
         </div>
     </div>`;
 
     const container = document.createElement('div');
-    container.className = 'w-full h-full'; 
     container.innerHTML = html;
     render(container);
-    
-    // Tighten main view padding for this specific screen
-    mainView.classList.remove('items-center', 'p-6', 'p-4');
-    mainView.classList.add('p-2');
-}
-
-// Re-implementation of renderSkillTree with Inventory-Style List
-
-function renderSkillTree() {
-    lastViewBeforeInventory = 'skill_tree';
-    gameState.currentView = 'skill_tree';
-
-    // [FIX] Run migration BEFORE accessing skill data to prevent crashes
-    if (player && typeof player.checkSkillMigration === 'function') {
-        player.checkSkillMigration();
-    }
-
-    // --- 1. INITIALIZE CACHED STATE ---
-    if (!gameState.skillTreeConfig) {
-        gameState.skillTreeConfig = {
-            zoom: 1.0,
-            scrollLeft: 0,
-            scrollTop: 0,
-            layout: null 
-        };
-    }
-
-    // --- 2. CAPTURE SCROLL ---
-    const activeContainer = document.getElementById('skill-tree-canvas'); 
-    if (activeContainer) {
-        gameState.skillTreeConfig.scrollLeft = activeContainer.scrollLeft;
-        gameState.skillTreeConfig.scrollTop = activeContainer.scrollTop;
-    }
-    let listScrollTop = 0;
-    const activeList = document.getElementById('mastered-arts-list-content');
-    if (activeList) listScrollTop = activeList.scrollTop;
-
-    // --- 3. CALCULATE LAYOUT (Recursive Wedge - Radial) ---
-    if (!gameState.skillTreeConfig.layout) {
-        const layout = {};
-        
-        // A. Build Structure (Tree from DAG)
-        const treeChildren = {};
-        const allNodes = Object.keys(SKILL_TREE);
-        allNodes.forEach(id => treeChildren[id] = []);
-        
-        allNodes.forEach(id => {
-            if (id === 'the_root') return;
-            const node = SKILL_TREE[id];
-            const parentId = node.parents[0]; // Primary parent
-            if (parentId) {
-                if (!treeChildren[parentId]) treeChildren[parentId] = [];
-                treeChildren[parentId].push(id);
-            }
-        });
-
-        // B. Calculate Subtree Weights (Leaf Counting)
-        const leafCounts = {};
-        const countLeaves = (id) => {
-            if (!treeChildren[id] || treeChildren[id].length === 0) {
-                leafCounts[id] = 1;
-                return 1;
-            }
-            let sum = 0;
-            treeChildren[id].forEach(childId => sum += countLeaves(childId));
-            leafCounts[id] = sum;
-            return sum;
-        };
-        countLeaves('the_root');
-
-        // C. Assign Radial Positions
-        const spacing = 180; // Distance between depth layers
-        
-        const assignCoords = (id, startAngle, endAngle, depth) => {
-            // Place current node in the center of its allocated wedge
-            const midAngle = startAngle + (endAngle - startAngle) / 2;
-            const radius = depth * spacing;
-            
-            layout[id] = {
-                x: Math.cos(midAngle) * radius,
-                y: Math.sin(midAngle) * radius,
-                id: id
-            };
-
-            const children = treeChildren[id];
-            if (children && children.length > 0) {
-                const totalWeight = leafCounts[id];
-                let currentStart = startAngle;
-                
-                children.forEach(childId => {
-                    const weight = leafCounts[childId];
-                    // Calculate wedge size based on subtree weight
-                    const wedgeSize = (weight / totalWeight) * (endAngle - startAngle);
-                    
-                    assignCoords(childId, currentStart, currentStart + wedgeSize, depth + 1);
-                    
-                    currentStart += wedgeSize;
-                });
-            }
-        };
-
-        // Start recursion (rotate -PI/2 to put the "seam" at the top)
-        assignCoords('the_root', -Math.PI/2, 1.5 * Math.PI, 0);
-        
-        gameState.skillTreeConfig.layout = layout;
-    }
-
-    const layout = gameState.skillTreeConfig.layout;
-    const width = 6000; 
-    const height = 6000; 
-    const centerX = width / 2;
-    const centerY = height / 2; 
-
-    let svgLines = '';
-    let nodesHtml = '';
-
-    // --- 4. RENDER VISUALS ---
-    for (const id in SKILL_TREE) {
-        if (!layout[id]) continue;
-
-        const nodeData = SKILL_TREE[id];
-        const pos = layout[id]; 
-        const nodeX = centerX + pos.x;
-        const nodeY = centerY + pos.y; 
-
-        // Lines
-        nodeData.parents.forEach(parentId => {
-            if (layout[parentId]) {
-                const parentPos = layout[parentId];
-                const parentX = centerX + parentPos.x;
-                const parentY = centerY + parentPos.y;
-                const isOwned = player.hasSkill(id);
-                const isReachable = player.canUnlockSkill(id);
-                
-                let stroke = '#334155'; let lineWidth = 2;
-                if (isOwned) { stroke = '#fbbf24'; lineWidth = 4; } 
-                else if (isReachable) { stroke = '#94a3b8'; lineWidth = 2; }
-                
-                svgLines += `<line x1="${parentX}" y1="${parentY}" x2="${nodeX}" y2="${nodeY}" stroke="${stroke}" stroke-width="${lineWidth}" />`;
-            }
-        });
-
-        // Node Icon
-        const isOwned = player.hasSkill(id);
-        const canUnlock = player.canUnlockSkill(id);
-        // [FIX] This call is now safe due to engine.js update
-        const isEquipped = player.isSkillEquipped(id);
-        
-        let shapeStyles = 'width: 36px; height: 36px; border-radius: 50%;';
-        let colorClass = 'bg-slate-900 text-slate-600';
-        let borderClass = 'border-2 border-slate-700';
-        let contentIcon = '';
-        let glowClass = isEquipped ? 'filter: drop-shadow(0 0 6px #4ade80);' : '';
-
-        if (nodeData.type === 'mastery') { // Golden Star
-            shapeStyles = 'width: 50px; height: 50px; background: transparent; border: none;';
-            colorClass = ''; borderClass = '';
-            contentIcon = `
-                <svg viewBox="0 0 24 24" fill="${isOwned ? '#fbbf24' : '#475569'}" stroke="${isOwned ? '#f59e0b' : '#334155'}" stroke-width="1.5" class="w-full h-full ${isOwned ? 'drop-shadow-[0_0_10px_rgba(251,191,36,0.8)]' : ''}">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                </svg>`;
-        } 
-        else if (nodeData.type === 'active') {
-            shapeStyles = 'width: 40px; height: 40px; border-radius: 4px;';
-            if (isOwned) { colorClass = 'bg-red-600 text-white'; borderClass = 'border-2 border-white'; } 
-            else if (canUnlock) { colorClass = 'bg-red-900 text-red-200 animate-pulse cursor-pointer'; borderClass = 'border-2 border-red-500'; } 
-        } 
-        else if (nodeData.type === 'toggle') {
-            shapeStyles = 'width: 48px; height: 48px; background: transparent; border: none;';
-            colorClass = ''; borderClass = '';
-            let polyColor = isOwned ? '#a855f7' : (canUnlock ? '#581c87' : '#1e293b');
-            let borderColor = isOwned ? '#ffffff' : (canUnlock ? '#a855f7' : '#334155');
-            let pulse = (canUnlock && !isOwned) ? 'animate-pulse' : '';
-            contentIcon = `
-                <svg width="48" height="48" viewBox="0 0 100 100" class="${pulse}">
-                    <polygon points="50,15 15,85 85,85" fill="${polyColor}" stroke="${borderColor}" stroke-width="5" />
-                </svg>`;
-        }
-        else { // Passive
-            if (isOwned) { colorClass = 'bg-cyan-500 text-black font-bold'; borderClass = 'border-2 border-white'; } 
-            else if (canUnlock) { colorClass = 'bg-cyan-900 text-cyan-200 animate-pulse cursor-pointer'; borderClass = 'border-2 border-cyan-500'; } 
-        }
-
-        const clickAction = canUnlock ? `onclick="player.unlockSkill('${id}')"` : '';
-        const tooltipAction = `onmouseover="showSkillNodeTooltip('${id}', event)" ontouchstart="showSkillNodeTooltip('${id}', event)" onmouseout="hideSimpleTooltip()"`;
-        const cursor = canUnlock ? 'cursor-pointer' : 'cursor-default';
-
-        nodesHtml += `
-            <div class="absolute z-20 flex items-center justify-center ${colorClass} ${borderClass} ${cursor}" 
-                style="left: ${nodeX}px; top: ${nodeY}px; transform: translate(-50%, -50%); ${shapeStyles} ${glowClass}"
-                ${tooltipAction} ${clickAction}>
-                ${contentIcon}
-                ${isEquipped && nodeData.type !== 'toggle' ? '<div class="absolute -top-1 -right-1 text-[10px] text-green-400">✓</div>' : ''}
-                ${isEquipped && nodeData.type === 'toggle' ? '<div class="absolute bottom-0 font-bold text-[8px] text-green-300">ON</div>' : ''}
-            </div>`;
-
-        let textCol = isOwned ? 'text-white' : (canUnlock ? 'text-gray-300' : 'text-gray-600');
-        let labelOffset = nodeData.type === 'mastery' ? 35 : 25;
-        nodesHtml += `<div class="absolute z-30 text-[10px] font-bold ${textCol} text-center pointer-events-none w-32"
-                           style="left: ${nodeX}px; top: ${nodeY + labelOffset}px; transform: translateX(-50%); text-shadow: 0 1px 2px black;">
-                        ${nodeData.name}
-                      </div>`;
-    }
-
-    // --- 5. LIST GENERATION ---
-    const groupedSkills = { active: [], toggle: [], trigger: [], passive: [] };
-    player.unlockedSkills.forEach(id => {
-        const skill = SKILL_TREE[id];
-        if (skill) {
-            const type = skill.type === 'mastery' ? 'passive' : skill.type;
-            if (groupedSkills[type]) groupedSkills[type].push({ id, ...skill });
-        }
-    });
-    Object.values(groupedSkills).forEach(group => group.sort((a, b) => a.name.localeCompare(b.name)));
-
-    const mode = player.skillDescriptionMode || 'detailed';
-    const toggleBtnText = mode === 'simple' ? "Flavor" : "Stats";
-    const toggleBtnColor = mode === 'simple' ? "btn-secondary" : "btn-primary";
-
-    let listHtml = `
-        <div class="p-3 border-b border-slate-700 flex justify-between items-center bg-slate-900 sticky top-0 z-30">
-            <h3 class="text-yellow-300 font-bold text-lg uppercase tracking-wide">Mastered Arts</h3>
-            <div class="flex gap-2">
-                <button onclick="toggleSkillDescMode()" class="btn ${toggleBtnColor} text-xs py-1 px-3">${toggleBtnText}</button>
-                <button onclick="document.getElementById('mobile-skill-overlay').classList.add('hidden')" class="md:hidden btn btn-action text-xs py-1 px-3">Close</button>
-            </div>
-        </div>
-        <div id="mastered-arts-list-content" class="space-y-4 p-2 overflow-y-auto flex-grow inventory-scrollbar">`;
-    
-    const categories = [
-        { type: 'active', label: 'Active Arts', color: 'text-red-300', border: 'border-red-500/30', bg: 'bg-red-900/20' },
-        { type: 'toggle', label: 'Stances & Toggles', color: 'text-purple-300', border: 'border-purple-500/30', bg: 'bg-purple-900/20' },
-        { type: 'trigger', label: 'Triggers', color: 'text-yellow-300', border: 'border-yellow-500/30', bg: 'bg-yellow-900/20' },
-        { type: 'passive', label: 'Passives', color: 'text-cyan-300', border: 'border-cyan-500/30', bg: 'bg-cyan-900/20' }
-    ];
-
-    categories.forEach(cat => {
-        const skills = groupedSkills[cat.type];
-        if (skills && skills.length > 0) {
-            listHtml += `
-                <div class="bg-slate-900/50 rounded-lg p-1.5 border border-slate-800">
-                    <h4 class="text-[10px] font-bold ${cat.color} uppercase tracking-widest mb-1.5 text-center border-b border-slate-700/50 pb-0.5">${cat.label}</h4>
-                    <div class="grid grid-cols-2 gap-1.5">
-                        ${skills.map(skill => {
-                            const canEquip = cat.type === 'active' || cat.type === 'toggle';
-                            // [FIX] Safe call
-                            const isEquipped = player.isSkillEquipped(skill.id);
-                            const equipClass = isEquipped ? 'border-green-500 bg-green-900/20' : 'border-transparent';
-                            const equipIcon = isEquipped ? '<span class="absolute top-0.5 right-1 text-[8px] text-green-400">✓</span>' : '';
-                            const clickAction = canEquip ? `onclick="toggleSkillEquip('${skill.id}')"` : '';
-                            const cursor = canEquip ? 'cursor-pointer' : 'cursor-help';
-
-                            return `
-                            <div class="${cat.bg} ${cat.border} border rounded p-1 h-12 flex items-center justify-center text-center ${cursor} hover:bg-slate-800 hover:border-white transition-all shadow-sm group relative ${equipClass}"
-                                 onmouseover="showSkillNodeTooltip('${skill.id}', event)"
-                                 ontouchstart="showSkillNodeTooltip('${skill.id}', event)"
-                                 onmouseout="hideSimpleTooltip()"
-                                 ${clickAction}>
-                                ${equipIcon}
-                                <span class="text-[10px] font-semibold text-gray-300 group-hover:text-white leading-tight line-clamp-2">${skill.name}</span>
-                            </div>
-                        `}).join('')}
-                    </div>
-                </div>`;
-        }
-    });
-    listHtml += '</div>';
-
-    // --- 6. RENDER MAIN LAYOUT (Mobile Optimized) ---
-    const html = `
-        <div class="w-full h-full flex flex-col relative overflow-hidden">
-            <div class="flex justify-between items-center p-2 bg-slate-900 border-b border-slate-700 z-10 flex-shrink-0">
-                 <div class="flex flex-col items-start pointer-events-none">
-                    <h2 class="font-medieval text-xl title-glow leading-none">Constellation</h2>
-                    <p class="text-xs text-gray-400 mt-1">Points: <span class="text-yellow-300 font-bold">${player.skillPoints}</span></p>
-                 </div>
-                 <div class="flex items-center gap-2 pointer-events-auto">
-                    <div class="flex flex-col items-end mr-2">
-                        <p class="text-xs text-gray-400">Slots</p>
-                        <p class="text-xs text-white">${player.equippedSkills ? player.equippedSkills.length : 0}/8</p>
-                    </div>
-                    <button onclick="renderCharacterSheet()" class="btn btn-primary text-xs py-1 px-3">Back</button>
-                 </div>
-            </div>
-            
-            <div class="flex-grow relative overflow-hidden w-full h-full"> 
-                <div class="absolute inset-0 bg-slate-950 cursor-grab active:cursor-grabbing touch-none overflow-hidden" id="skill-tree-canvas" style="touch-action: none;">
-                    <div id="skill-tree-content" style="width: ${width}px; height: ${height}px; position: relative; transform-origin: 0 0;">
-                        <svg width="${width}" height="${height}" class="absolute top-0 left-0 pointer-events-none z-0">
-                            ${svgLines}
-                        </svg>
-                        ${nodesHtml}
-                    </div>
-                </div>
-                <div class="hidden md:flex absolute top-0 right-0 bottom-0 w-64 bg-slate-900 border-l border-slate-700 flex-col z-20 shadow-xl">
-                    ${listHtml}
-                </div>
-                <button onclick="document.getElementById('mobile-skill-overlay').classList.remove('hidden')" 
-                        class="md:hidden absolute bottom-4 right-4 w-14 h-14 rounded-full bg-yellow-600 border-2 border-yellow-400 shadow-2xl flex items-center justify-center z-30 active:scale-95 transition-transform">
-                    <span class="text-2xl">⚔️</span>
-                </button>
-            </div>
-
-            <div id="mobile-skill-overlay" class="absolute inset-0 z-50 bg-slate-900 flex flex-col hidden md:hidden">
-                ${listHtml}
-            </div>
-        </div>
-    `;
-    
-    const container = document.createElement('div');
-    container.className = 'w-full h-full overflow-hidden';
-    container.innerHTML = html;
-    render(container);
-    
-    mainView.classList.remove('p-6', 'p-2');
-    mainView.classList.add('p-0');
-
-    // --- 7. RESTORE & EVENTS ---
-    const scrollContainer = document.getElementById('skill-tree-canvas');
-    const contentDiv = document.getElementById('skill-tree-content');
-    const listContent = document.getElementById('mastered-arts-list-content');
-    
-    if (listContent && listScrollTop > 0) listContent.scrollTop = listScrollTop;
-    
-    if(scrollContainer && contentDiv) {
-        contentDiv.style.transform = `scale(${gameState.skillTreeConfig.zoom})`;
-        
-        if (gameState.skillTreeConfig.scrollLeft === 0 && gameState.skillTreeConfig.scrollTop === 0) {
-             requestAnimationFrame(() => {
-                 scrollContainer.scrollTop = (height / 2) - (scrollContainer.clientHeight / 2);
-                 scrollContainer.scrollLeft = (width / 2) - (scrollContainer.clientWidth / 2);
-            });
-        } else {
-            scrollContainer.scrollLeft = gameState.skillTreeConfig.scrollLeft;
-            scrollContainer.scrollTop = gameState.skillTreeConfig.scrollTop;
-        }
-
-        // --- Mouse Events ---
-        let isDown = false;
-        let startX, startY, scrollLeft, scrollTop;
-
-        scrollContainer.addEventListener('mousedown', (e) => {
-            isDown = true;
-            scrollContainer.style.cursor = 'grabbing';
-            startX = e.pageX - scrollContainer.offsetLeft;
-            startY = e.pageY - scrollContainer.offsetTop;
-            scrollLeft = scrollContainer.scrollLeft;
-            scrollTop = scrollContainer.scrollTop;
-        });
-        scrollContainer.addEventListener('mouseleave', () => { isDown = false; scrollContainer.style.cursor = 'grab'; });
-        scrollContainer.addEventListener('mouseup', () => { isDown = false; scrollContainer.style.cursor = 'grab'; });
-        scrollContainer.addEventListener('mousemove', (e) => {
-            if (!isDown) return;
-            e.preventDefault();
-            const x = e.pageX - scrollContainer.offsetLeft;
-            const y = e.pageY - scrollContainer.offsetTop;
-            scrollContainer.scrollLeft = scrollLeft - (x - startX);
-            scrollContainer.scrollTop = scrollTop - (y - startY);
-        });
-
-        // --- Touch Events (Mobile Pan) ---
-        scrollContainer.addEventListener('touchstart', (e) => {
-            if (e.touches.length === 1) {
-                isDown = true;
-                startX = e.touches[0].pageX - scrollContainer.offsetLeft;
-                startY = e.touches[0].pageY - scrollContainer.offsetTop;
-                scrollLeft = scrollContainer.scrollLeft;
-                scrollTop = scrollContainer.scrollTop;
-            }
-        }, { passive: false });
-        
-        scrollContainer.addEventListener('touchend', () => { isDown = false; });
-        
-        scrollContainer.addEventListener('touchmove', (e) => {
-            if (!isDown || e.touches.length !== 1) return;
-            e.preventDefault();
-            const x = e.touches[0].pageX - scrollContainer.offsetLeft;
-            const y = e.touches[0].pageY - scrollContainer.offsetTop;
-            scrollContainer.scrollLeft = scrollLeft - (x - startX);
-            scrollContainer.scrollTop = scrollTop - (y - startY);
-        }, { passive: false });
-
-        // --- Zoom ---
-        scrollContainer.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            const currentZoom = gameState.skillTreeConfig.zoom;
-            const rect = scrollContainer.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-            const contentX = (mouseX + scrollContainer.scrollLeft) / currentZoom;
-            const contentY = (mouseY + scrollContainer.scrollTop) / currentZoom;
-            const delta = e.deltaY * -0.001;
-            const newZoom = Math.min(Math.max(0.2, currentZoom + delta), 3.0);
-
-            if (newZoom !== currentZoom) {
-                contentDiv.style.transform = `scale(${newZoom})`;
-                scrollContainer.scrollLeft = (contentX * newZoom) - mouseX;
-                scrollContainer.scrollTop = (contentY * newZoom) - mouseY;
-                gameState.skillTreeConfig.zoom = newZoom;
-                gameState.skillTreeConfig.scrollLeft = scrollContainer.scrollLeft;
-                gameState.skillTreeConfig.scrollTop = scrollContainer.scrollTop;
-            }
-        }, { passive: false });
-    }
 }
 
 function renderCharacterCreation() {
@@ -7404,160 +6942,7 @@ function renderBattle(subView = 'main', actionData = null) {
         const container = document.createElement('div');
         container.innerHTML = html;
         render(container);
-     } else if (subView === 'skills') {
-        
-        // 1. Capture previous scroll position
-        const existingList = document.getElementById('skills-list-scroll');
-        const scrollPos = existingList ? existingList.scrollTop : 0;
-
-        let html = `<div class="w-full text-center h-full flex flex-col">
-                        <h2 class="font-medieval text-3xl mb-2 title-glow flex-shrink-0">Combat Arts</h2>
-                        <div id="skills-list-scroll" class="flex-grow overflow-y-auto inventory-scrollbar pr-2 space-y-4 text-left">`;
-
-        // --- 1. Class Signature Ability ---
-        if (player.signatureAbilityData && player.signatureAbilityData.type !== 'passive_action') {
-            const ability = player.signatureAbilityData;
-            let statusText = "";
-            let btnClass = "btn-primary";
-            let isDisabled = false;
-            let subText = ability.description;
-
-            if (ability.type === 'signature') {
-                if (player.signatureAbilityUsed) {
-                    statusText = "<span class='text-gray-500 text-xs uppercase font-bold'>Depleted</span>";
-                    isDisabled = true;
-                    btnClass = "btn-primary opacity-50";
-                } else {
-                    statusText = `<span class='text-blue-300 text-xs font-bold'>${ability.cost} MP</span>`;
-                    if (player.mp < ability.cost) {
-                         isDisabled = true;
-                         btnClass = "btn-primary opacity-50";
-                    }
-                }
-            } else if (ability.type === 'toggle') {
-                const isActive = player.signatureAbilityToggleActive;
-                statusText = isActive ? "<span class='text-green-400 text-xs font-bold uppercase'>Active</span>" : "<span class='text-gray-400 text-xs uppercase'>Inactive</span>";
-                btnClass = isActive ? "btn-item" : "btn-primary"; 
-                
-                if (player._classKey === 'magus' && ability.modes) {
-                    const modeName = player.activeModeIndex > -1 ? ability.modes[player.activeModeIndex] : "Off";
-                    statusText = `<span class='text-cyan-300 text-xs font-bold'>${modeName}</span>`;
-                }
-            }
-
-            html += `<div class="bg-slate-800/80 rounded-lg p-3 border border-blue-900/50 shadow-sm">
-                        <div class="flex justify-between items-center mb-2">
-                            <h4 class="font-bold text-cyan-300 text-sm uppercase tracking-wider">Signature</h4>
-                            ${statusText}
-                        </div>
-                        <button onclick="battleAction('signature_ability')" class="btn ${btnClass} w-full py-2 mb-1 flex justify-center items-center" ${isDisabled ? 'disabled' : ''}>
-                            ${ability.name}
-                        </button>
-                        <p class="text-xs text-gray-400 leading-tight">${subText}</p>
-                     </div>`;
-        }
-
-        player.checkSkillMigration(); 
-
-        const treeSkills = player.equippedSkills // Iterate EQUIPPED, not UNLOCKED
-            .map(id => ({ id, data: SKILL_TREE[id] }))
-            .filter(item => item.data); // Filter invalid
-
-        if (treeSkills.length > 0) {
-             // Split into Active and Toggle
-             const activeSkills = treeSkills.filter(s => s.data.type === 'active');
-             const toggleSkills = treeSkills.filter(s => s.data.type === 'toggle');
-
-             // [MODIFICATION] Render as Grid Button
-             const renderSkillGridButton = (skill) => {
-                 const { id, data } = skill;
-                 const cost = data.effect.cost || 0;
-                 let btnClass = data.type === 'active' ? "btn-action" : "btn-primary";
-                 let statusLabel = cost > 0 ? `${cost} MP` : "";
-                 let isDisabled = false;
-                 
-                 // Check Weapon Requirements
-                 if (typeof checkSkillRequirements === 'function') {
-                     const reqCheck = checkSkillRequirements(id);
-                     if (!reqCheck.allowed) {
-                         isDisabled = true;
-                         btnClass += " opacity-50 grayscale";
-                         statusLabel = "REQ"; // Shorten for grid
-                     }
-                 }
-
-                 // Handle Toggles
-                 if (data.type === 'toggle') {
-                     const isActive = player.skillToggles[data.effect.toggle];
-                     if (isActive) {
-                         btnClass = "btn-item border-green-500"; // Green style + border
-                         statusLabel = "ON";
-                     } else {
-                         statusLabel = "OFF";
-                     }
-                 } else {
-                     if (player.mp < cost && !isDisabled) {
-                         isDisabled = true;
-                         btnClass += " opacity-50";
-                     }
-                 }
-
-                 // Compact Grid Layout
-                 return `<button onclick="battleAction('use_skill', '${id}')" 
-                            class="btn ${btnClass} flex flex-col justify-center items-center h-14 p-1 text-xs relative overflow-hidden" 
-                            ${isDisabled ? 'disabled' : ''}
-                            onmouseover="showSkillNodeTooltip('${id}', event)" 
-                            onmouseout="hideSimpleTooltip()">
-                                <span class="font-bold leading-tight line-clamp-2">${data.name}</span>
-                                <span class="text-[10px] opacity-80 mt-0.5">${statusLabel}</span>
-                        </button>`;
-             };
-
-             if (activeSkills.length > 0) {
-                 html += `<div class="bg-slate-900/40 rounded-lg p-2">
-                            <h4 class="font-bold text-yellow-300 text-xs uppercase tracking-widest mb-2 border-b border-slate-700 pb-1">Active Abilities</h4>
-                            <div class="grid grid-cols-2 gap-2">
-                                ${activeSkills.map(renderSkillGridButton).join('')}
-                            </div>
-                          </div>`;
-             }
-             
-             if (toggleSkills.length > 0) {
-                 html += `<div class="bg-slate-900/40 rounded-lg p-2">
-                            <h4 class="font-bold text-purple-300 text-xs uppercase tracking-widest mb-2 border-b border-slate-700 pb-1">Stances & Toggles</h4>
-                            <div class="grid grid-cols-2 gap-2">
-                                ${toggleSkills.map(renderSkillGridButton).join('')}
-                            </div>
-                          </div>`;
-             }
-        } else if (!player.signatureAbilityData) {
-            html += `<div class="flex-grow flex flex-col items-center justify-center text-gray-500 italic">
-                        <p>No combat skills learned.</p>
-                        <p class="text-xs mt-2">Visit the Skill Tree in your Character Sheet.</p>
-                     </div>`;
-        }
-
-        html += `</div>
-                 <div class="mt-2 flex-shrink-0">
-                    <button onclick="renderBattleGrid()" class="btn btn-primary w-full py-3 text-lg">Back to Battle</button>
-                 </div>
-            </div>`;
-
-        const container = document.createElement('div');
-        // Match grid size
-        container.className = 'w-full h-full max-w-[300px] mx-auto'; 
-        container.innerHTML = html;
-        render(container);
-
-        // 2. Restore scroll position
-        const newList = document.getElementById('skills-list-scroll');
-        if(newList) newList.scrollTop = scrollPos;
-        
-        // Ensure padding matches battle grid style
-        mainView.classList.remove('p-6');
-        mainView.classList.add('p-2');
-        
-    } else if (subView === 'item') {
+     } else if (subView === 'item') {
         // --- MODIFICATION START: Remove Weapons section ---
         let itemsHtml = '';
         // Removed: let weaponsHtml = ''; // New variable for weapons
@@ -7635,6 +7020,7 @@ function renderBattle(subView = 'main', actionData = null) {
         container.innerHTML = html;
         render(container);
      }
+
 }
 
 function renderPostBattleMenu() {

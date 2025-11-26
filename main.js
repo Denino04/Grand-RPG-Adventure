@@ -647,16 +647,9 @@ async function loadGameFromKey(docId, isImport = false) {
         // MODIFIED: Constructor now only needs raceKey initially
         player = new Player("Loading...", parsedData.race || "Human");
         
-        // [FIX START] Pre-set seed from saved data to prevent NpcAlly constructor warning
-        if (parsedData.seed !== undefined) {
-            player.seed = parsedData.seed;
-        } else {
-             // Fallback if seed is missing in save
-             player.seed = Math.floor(Math.random() * 1000000);
-        }
-        // [FIX END]
-
         // --- NPC ALLY: Re-instantiate ally object BEFORE assigning player data ---
+        // This is crucial. We must rebuild the NpcAlly object from its saved data
+        // because the saved data is just a plain object, not a class instance.
         if (parsedData.npcAlly) {
             console.log("Re-instantiating NpcAlly...");
             const allyData = parsedData.npcAlly;
@@ -735,10 +728,7 @@ async function loadGameFromKey(docId, isImport = false) {
         if (player.barracksRoster === undefined) player.barracksRoster = [];
         // --- END NEW ---
         // --- END NPC ALLY ---
-        if (!player.skillPoints) player.skillPoints = 0;
-        if (!player.unlockedSkills) player.unlockedSkills = ['the_root'];
-        // [FIX] Ensure equippedSkills exists
-        if (!player.equippedSkills) player.equippedSkills = [];
+
         // Ensure inventory structure is correct
         // --- Added Defaults for Progression ---
         if (player.killsSinceLevel4 === undefined) player.killsSinceLevel4 = 0;
@@ -960,17 +950,6 @@ async function loadGameFromKey(docId, isImport = false) {
         }
         player.recalculateLevelFromTotalXp(); // Recalculate level JUST IN CASE XP curve changed
         player.recalculateGrowthBonuses(); // Recalculate derived stats based on loaded points
-        
-        // --- [INSERT NEW CODE START] SKILL POINT SYNC ---
-        // Fix skill points for old saves or desynced data
-        if (typeof player.recalculateSkillPoints === 'function') {
-            player.recalculateSkillPoints();
-        } else {
-            // Fallback if engine.js isn't updated yet
-            player.skillPoints = Math.max(0, player.level - 5);
-        }
-        // --- [INSERT NEW CODE END] ---
-
         player.hp = Math.min(parsedData.hp, player.maxHp); // Ensure HP/MP aren't above recalculated max
         player.mp = Math.min(parsedData.mp, player.maxMp);
                 // --- NEW: Sync Ally Level on Load ---
@@ -1188,20 +1167,14 @@ function setupEventListeners() {
     document.body.addEventListener('mousedown', (event) => {
         // 'mousedown' feels more responsive for a "pressed" sound
         if (event.target.closest('.btn')) {
-            // [FIX] Check if playSound exists before calling
-            if (typeof playSound === 'function') {
-                playSound('click');
-            }
+            playSound('click');
         }
     });
     
     document.body.addEventListener('mouseenter', (event) => {
         // 'mouseenter' fires only once when entering, unlike 'mouseover'
         if (event.target.closest('.btn')) {
-            // [FIX] Check if playSound exists before calling
-            if (typeof playSound === 'function') {
-                playSound('hover');
-            }
+            playSound('hover');
         }
     }, true); // Use capture phase to catch the event early
     // --- END: Global Button Sound Listeners ---
