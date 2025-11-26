@@ -894,10 +894,13 @@ class Player extends Entity {
 
     // [NEW] Skill Loadout Methods
     isSkillEquipped(skillId) {
+        // [FIX] Safety check: Init array if missing
+        if (!this.equippedSkills) this.equippedSkills = [];
         return this.equippedSkills.includes(skillId);
     }
 
     equipSkill(skillId) {
+        if (!this.equippedSkills) this.equippedSkills = []; // [FIX] Safety check
         if (this.isSkillEquipped(skillId)) return;
         // Limit check (Optional, set to 8 for UI sanity)
         if (this.equippedSkills.length >= 8) {

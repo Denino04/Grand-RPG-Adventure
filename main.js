@@ -735,7 +735,10 @@ async function loadGameFromKey(docId, isImport = false) {
         if (player.barracksRoster === undefined) player.barracksRoster = [];
         // --- END NEW ---
         // --- END NPC ALLY ---
-
+        if (!player.skillPoints) player.skillPoints = 0;
+        if (!player.unlockedSkills) player.unlockedSkills = ['the_root'];
+        // [FIX] Ensure equippedSkills exists
+        if (!player.equippedSkills) player.equippedSkills = [];
         // Ensure inventory structure is correct
         // --- Added Defaults for Progression ---
         if (player.killsSinceLevel4 === undefined) player.killsSinceLevel4 = 0;

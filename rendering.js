@@ -600,6 +600,11 @@ function renderSkillTree() {
     lastViewBeforeInventory = 'skill_tree';
     gameState.currentView = 'skill_tree';
 
+    // [FIX] Run migration BEFORE accessing skill data to prevent crashes
+    if (player && typeof player.checkSkillMigration === 'function') {
+        player.checkSkillMigration();
+    }
+
     // --- 1. INITIALIZE CACHED STATE ---
     if (!gameState.skillTreeConfig) {
         gameState.skillTreeConfig = {
@@ -620,12 +625,11 @@ function renderSkillTree() {
     const activeList = document.getElementById('mastered-arts-list-content');
     if (activeList) listScrollTop = activeList.scrollTop;
 
-    // --- 3. CALCULATE LAYOUT (Recursive Wedge) ---
+    // --- 3. CALCULATE LAYOUT (Recursive Wedge - Radial) ---
     if (!gameState.skillTreeConfig.layout) {
         const layout = {};
         
         // A. Build Structure (Tree from DAG)
-        // We treat the first parent as the "structural" parent for layout purposes
         const treeChildren = {};
         const allNodes = Object.keys(SKILL_TREE);
         allNodes.forEach(id => treeChildren[id] = []);
@@ -634,7 +638,8 @@ function renderSkillTree() {
             if (id === 'the_root') return;
             const node = SKILL_TREE[id];
             const parentId = node.parents[0]; // Primary parent
-            if (parentId && treeChildren[parentId]) {
+            if (parentId) {
+                if (!treeChildren[parentId]) treeChildren[parentId] = [];
                 treeChildren[parentId].push(id);
             }
         });
@@ -684,7 +689,7 @@ function renderSkillTree() {
             }
         };
 
-        // Start recursion (rotate -PI/2 to put the "seam" at the top, usually splits branches nicely)
+        // Start recursion (rotate -PI/2 to put the "seam" at the top)
         assignCoords('the_root', -Math.PI/2, 1.5 * Math.PI, 0);
         
         gameState.skillTreeConfig.layout = layout;
@@ -728,6 +733,7 @@ function renderSkillTree() {
         // Node Icon
         const isOwned = player.hasSkill(id);
         const canUnlock = player.canUnlockSkill(id);
+        // [FIX] This call is now safe due to engine.js update
         const isEquipped = player.isSkillEquipped(id);
         
         let shapeStyles = 'width: 36px; height: 36px; border-radius: 50%;';
@@ -787,7 +793,6 @@ function renderSkillTree() {
     }
 
     // --- 5. LIST GENERATION ---
-    if(player.checkSkillMigration) player.checkSkillMigration();
     const groupedSkills = { active: [], toggle: [], trigger: [], passive: [] };
     player.unlockedSkills.forEach(id => {
         const skill = SKILL_TREE[id];
@@ -828,6 +833,7 @@ function renderSkillTree() {
                     <div class="grid grid-cols-2 gap-1.5">
                         ${skills.map(skill => {
                             const canEquip = cat.type === 'active' || cat.type === 'toggle';
+                            // [FIX] Safe call
                             const isEquipped = player.isSkillEquipped(skill.id);
                             const equipClass = isEquipped ? 'border-green-500 bg-green-900/20' : 'border-transparent';
                             const equipIcon = isEquipped ? '<span class="absolute top-0.5 right-1 text-[8px] text-green-400">✓</span>' : '';
@@ -850,7 +856,7 @@ function renderSkillTree() {
     });
     listHtml += '</div>';
 
-    // --- 6. FINAL HTML (Mobile Optimized) ---
+    // --- 6. RENDER MAIN LAYOUT (Mobile Optimized) ---
     const html = `
         <div class="w-full h-full flex flex-col relative overflow-hidden">
             <div class="flex justify-between items-center p-2 bg-slate-900 border-b border-slate-700 z-10 flex-shrink-0">
@@ -861,7 +867,7 @@ function renderSkillTree() {
                  <div class="flex items-center gap-2 pointer-events-auto">
                     <div class="flex flex-col items-end mr-2">
                         <p class="text-xs text-gray-400">Slots</p>
-                        <p class="text-xs text-white">${player.equippedSkills.length}/8</p>
+                        <p class="text-xs text-white">${player.equippedSkills ? player.equippedSkills.length : 0}/8</p>
                     </div>
                     <button onclick="renderCharacterSheet()" class="btn btn-primary text-xs py-1 px-3">Back</button>
                  </div>
@@ -919,10 +925,10 @@ function renderSkillTree() {
             scrollContainer.scrollTop = gameState.skillTreeConfig.scrollTop;
         }
 
+        // --- Mouse Events ---
         let isDown = false;
         let startX, startY, scrollLeft, scrollTop;
 
-        // Mouse Events
         scrollContainer.addEventListener('mousedown', (e) => {
             isDown = true;
             scrollContainer.style.cursor = 'grabbing';
@@ -942,7 +948,7 @@ function renderSkillTree() {
             scrollContainer.scrollTop = scrollTop - (y - startY);
         });
 
-        // Touch Events
+        // --- Touch Events (Mobile Pan) ---
         scrollContainer.addEventListener('touchstart', (e) => {
             if (e.touches.length === 1) {
                 isDown = true;
@@ -964,7 +970,7 @@ function renderSkillTree() {
             scrollContainer.scrollTop = scrollTop - (y - startY);
         }, { passive: false });
 
-        // Zoom
+        // --- Zoom ---
         scrollContainer.addEventListener('wheel', (e) => {
             e.preventDefault();
             const currentZoom = gameState.skillTreeConfig.zoom;
@@ -980,7 +986,6 @@ function renderSkillTree() {
                 contentDiv.style.transform = `scale(${newZoom})`;
                 scrollContainer.scrollLeft = (contentX * newZoom) - mouseX;
                 scrollContainer.scrollTop = (contentY * newZoom) - mouseY;
-                
                 gameState.skillTreeConfig.zoom = newZoom;
                 gameState.skillTreeConfig.scrollLeft = scrollContainer.scrollLeft;
                 gameState.skillTreeConfig.scrollTop = scrollContainer.scrollTop;
