@@ -180,7 +180,6 @@ function getPlayerEmoji() {
     return raceEmojis[player.gender] || raceEmojis['Neutral'] || '🧑'; // Default to Neutral then generic
 }
 
-
 /**
  * Finds the key of an item instance within a larger data object (e.g., finding 'steel_longsword' in WEAPONS).
  * @param {object} dataObject The object to search within (e.g., WEAPONS, ARMOR).
@@ -802,6 +801,15 @@ class Player extends Entity {
             statusMessage: '',
             shopStock: [],
         };
+
+                    // --- Skill Tree and abilities ---
+        this.skillPoints = 0;
+        this.unlockedSkills = ['the_root']; // Auto-unlock root
+        this.skillToggles = {}; // For Power Blast, Mana Overload, etc.
+        this.tilesMovedThisTurn = 0; // For 'Charge'
+        this.woodcutterStacks = 0; // For 'Woodcutter'
+        this.lastTargetId = null; // Existing, but Ensure it is therethis.equippedSkills = []; // Array of skill IDs
+        this.skillDescriptionMode = 'detailed'; // 'simple' (Lore) or 'detailed' (Stats)
         // --- End Added ---
 
 
@@ -882,6 +890,52 @@ class Player extends Entity {
         // Recalculate HP/MP now that base stats are set
         this.hp = this.maxHp;
         this.mp = this.maxMp;
+    }
+
+    // [NEW] Skill Loadout Methods
+    isSkillEquipped(skillId) {
+        return this.equippedSkills.includes(skillId);
+    }
+
+    equipSkill(skillId) {
+        if (this.isSkillEquipped(skillId)) return;
+        // Limit check (Optional, set to 8 for UI sanity)
+        if (this.equippedSkills.length >= 8) {
+            addToLog("Skill Loadout full (Max 8). Unequip something first.", "text-red-400");
+            return;
+        }
+        this.equippedSkills.push(skillId);
+    }
+
+    unequipSkill(skillId) {
+        const index = this.equippedSkills.indexOf(skillId);
+        if (index > -1) {
+            this.equippedSkills.splice(index, 1);
+        }
+    }
+
+    toggleSkillEquip(skillId) {
+        if (this.isSkillEquipped(skillId)) {
+            this.unequipSkill(skillId);
+        } else {
+            this.equipSkill(skillId);
+        }
+    }
+    
+    // [NEW] Auto-equip migration for old saves
+    checkSkillMigration() {
+        if (!this.equippedSkills) this.equippedSkills = [];
+        if (this.equippedSkills.length === 0 && this.unlockedSkills.length > 0) {
+            // Auto-equip existing active/toggles up to limit
+            this.unlockedSkills.forEach(id => {
+                const skill = SKILL_TREE[id];
+                if (skill && (skill.type === 'active' || skill.type === 'toggle')) {
+                    if (this.equippedSkills.length < 8) {
+                        this.equippedSkills.push(id);
+                    }
+                }
+            });
+        }
     }
 
     // Method to link ability data after class/race are set
@@ -1184,6 +1238,22 @@ class Player extends Entity {
         this.applyBonusForStat('luck', this.bonusLuck || 0, rng);
     }
 
+    recalculateSkillPoints() {
+        // 1. Calculate Total Points Earned
+        // Formula: 1 Point per level starting at Level 6.
+        const totalEarned = Math.max(0, this.level - 5);
+        
+        // 2. Calculate Points Spent
+        // 'the_root' is free, so we subtract 1 from the total unlocked count.
+        const uniqueUnlocked = new Set(this.unlockedSkills); // Safety for duplicates
+        const spent = Math.max(0, uniqueUnlocked.size - 1); 
+        
+        // 3. Set Available Points
+        this.skillPoints = Math.max(0, totalEarned - spent);
+        
+        console.log(`Skill Points Sync: Level ${this.level} -> Earned ${totalEarned}, Spent ${spent}, Available ${this.skillPoints}`);
+    }
+    
     applyBonusForStat(stat, points, rng, isWretchProc = false) {
          // Ensure points is a non-negative number
          points = Math.max(0, points || 0);
@@ -1435,7 +1505,12 @@ class Player extends Entity {
         this.xp -= this.xpToNextLevel;
         this.level++;
         this.xpToNextLevel = this.calculateXpToNextLevel();
-        this.statPoints = (this.statPoints || 0) + 5; // Ensure statPoints is number
+        this.statPoints = (this.statPoints || 0) + 5; 
+// NEW: Skill Points after level 5
+        if (this.level >= 6) {
+            this.skillPoints = (this.skillPoints || 0) + 1;
+            addToLog(`You gained <span class="font-bold text-purple-300">1 Skill Point</span>!`, 'text-purple-300');
+        }
         this.hp = this.maxHp; // Full heal on level up
         this.mp = this.maxMp; // Full mana on level up
         addToLog(`*** LEVEL UP! You are now level ${this.level}! ***`, 'text-yellow-200 font-bold text-lg');
@@ -1893,11 +1968,22 @@ class Player extends Entity {
         // Apply defense buffs/debuffs
         if (this.statusEffects.stonehide) totalDefense *= this.statusEffects.stonehide.multiplier;
         if (this.statusEffects.buff_defense) totalDefense *= this.statusEffects.buff_defense.multiplier;
+        if (this.statusEffects.buff_monolith) totalDefense *= this.statusEffects.buff_monolith.multiplier;
         if (this.statusEffects.buff_magic_defense && isMagicAttack) totalDefense *= this.statusEffects.buff_magic_defense.multiplier;
         if (this.statusEffects.buff_divine && isMagicAttack) totalDefense *= this.statusEffects.buff_divine.multiplier;
         if (this.statusEffects.buff_titan) totalDefense *= this.statusEffects.buff_titan.defMultiplier;
         if (this.statusEffects.buff_chaos_strength) totalDefense *= this.statusEffects.buff_chaos_strength.defMultiplier;
 
+        // [FIX START] Metallurgy (Heavy Armor Defense)
+        if (this.hasSkill('high_quality_alloy') && armor && armor.metallic) {
+             totalDefense = Math.floor(totalDefense * 1.2);
+        }
+        // [FIX END]
+
+        // [FIX START] Hardened Hide (Light Armor Defense)
+        if (this.hasSkill('leather_padding') && (!armor || !armor.metallic)) {
+             totalDefense = Math.floor(totalDefense * 1.5);
+        }
         // Apply Penetration/Bypass
         // MODIFIED: Use attacker parameter here (already null-checked with ?)
         if (attacker?.element === 'void') {
@@ -1907,6 +1993,7 @@ class Player extends Entity {
 
         // Log buff applications (can add specific logs here if desired)
         if(this.statusEffects.stonehide) addToLog(`Your stone-like skin absorbs the blow!`, `text-gray-400`);
+        if(this.statusEffects.buff_monolith) addToLog(`The Monolith of Earth hardens your resolve!`, `text-yellow-400`); // Added Log
         if(this.statusEffects.buff_defense) addToLog(`Your magical shield bolsters your defense!`, `text-yellow-300`);
         if(this.statusEffects.buff_magic_defense && isMagicAttack) addToLog(`Your faith shields you from the magic!`, `text-yellow-200`);
         if(this.statusEffects.buff_divine && isMagicAttack) addToLog(`Divine power shields you!`, `text-yellow-100`);
@@ -2040,7 +2127,56 @@ _handleReflectEffects(finalDamageDealt, originalDamage, attacker) {
 
         // 5. Calculate Effective Defense
         // MODIFIED: Pass the 'attacker' object itself
-        const effectiveDefense = this._calculateEffectiveDefense(isMagicAttack, attacker?.element, ignoresDefense, attacker);
+        let skillDefMod = 1.0;
+
+        // 1. Barbaric Strength (Toggle: -20% Defense)
+        if (this.skillToggles && this.skillToggles['barbaric_strength']) {
+            // Check if wielding Fist, Axe, or Hammer
+            const wClass = this.equippedWeapon.class;
+            if (['Hand-to-Hand', 'Axe', 'Hammer'].includes(wClass)) {
+                skillDefMod -= 0.20;
+                addToLog("Barbaric Strength leaves you open! (-20% Def)", "text-red-400");
+            }
+        }
+
+        // 2. Honor-Bound Teaching (Passive: +10% Def in 1v1)
+        if (this.hasSkill('honor_bound_teaching') && currentEnemies) {
+            const livingEnemies = currentEnemies.filter(e => e.isAlive());
+            // 1v1 condition: 1 enemy alive AND (no ally OR ally is dead/fled)
+            const isDuel = livingEnemies.length === 1 && (!this.npcAlly || !this.npcAlly.isAlive() || this.npcAlly.isFled);
+            
+            // Check if weapon is Longsword or Lance
+            const wClass = this.equippedWeapon.class;
+            if (isDuel && ['Longsword', 'Lance'].includes(wClass)) {
+                skillDefMod += 0.10;
+                addToLog("Honor-Bound: Duelist Stance! (+10% Def)", "text-blue-300");
+            }
+        }
+        
+        if (this.hasSkill('riposte') && this.skillToggles['riposte'] && this.equippedWeapon.class === 'Longsword' && damage > 0 && attacker && attacker.isAlive()) {
+            if (this.mp >= 10) {
+                this.mp -= 10;
+                addToLog("Vengeful Guard! You counter-attack!", "text-yellow-300 font-bold");
+                
+                // Calculate Counter Damage (20% of normal)
+                // Note: We can't easily call performAttack here due to async/context issues, 
+                // so we do a simplified calculation based on weapon damage.
+                const baseDmg = (this.equippedWeapon.damage[0] * (this.equippedWeapon.damage[1] / 2 + 0.5)) + this.physicalDamageBonus;
+                const counterDmg = Math.floor(baseDmg * 0.20);
+                
+                // Apply counter damage
+                const counterResult = attacker.takeDamage(counterDmg, { isMagic: false, element: this.weaponElement });
+                addToLog(`Your riposte deals ${counterResult.damageDealt} damage!`, "text-yellow-200");
+                
+                if (!attacker.isAlive()) {
+                     // Handle death if possible, or let main loop handle it
+                }
+            }
+        }
+
+        // 5. Calculate Effective Defense (Apply Modifier)
+        let effectiveDefense = this._calculateEffectiveDefense(isMagicAttack, attacker?.element, ignoresDefense, attacker); // Fixed: options.ignore_defense -> ignoresDefense
+        effectiveDefense = Math.floor(effectiveDefense * skillDefMod);
 
         // 6. Apply Damage & Log
         const finalDamageDealt = this._applyAndLogDamage(damage, effectiveDefense, attacker, isMagicAttack);
@@ -2356,6 +2492,8 @@ class NpcAlly extends Entity {
     }
     isAlive() { return this.hp > 0; }
 
+    // [FIX] Add hasSkill stub to prevent crashes when sharing logic with Player
+    hasSkill(skillId) { return false; }
 
     updateAbilityReferences() {
         console.log(`DEBUG: updateAbilityReferences called for Ally. Race Key: "${this.raceKey}"`);
@@ -2756,6 +2894,16 @@ class NpcAlly extends Entity {
             blockChance *= 1.25;
         }
 
+        // [FIX START] Iron Clad (Heavy Armor Block)
+        if (this.hasSkill('heavy_armor_proficiency') && armor && armor.metallic) {
+            blockChance += 0.05;
+        }
+        // [FIX END]
+        
+        // [FIX START] Second Skin (Light Armor Dodge)
+        if (this.hasSkill('light_armor_proficiency') && (!armor || !armor.metallic)) {
+            dodgeChance += 0.05;
+        }
         // Status Effects Modifiers (Simplified for Ally)
         if (this.statusEffects.buff_shroud || this.statusEffects.buff_voidwalker) dodgeChance *= 1.5;
         if (this.statusEffects.buff_hermes) dodgeChance *= 2;
@@ -3675,8 +3823,10 @@ class NpcAlly extends Entity {
                     if (!target.isAlive()) { if (!gameState.battleEnded) checkBattleStatus(true); }
                     break;
                 case 'nature':
-                    const natureLifestealPercent = 0.10 + (tierIndex * 0.02); // 10% base + 2% per tier
-                    const lifestealAmount = Math.floor(damageDealt * natureLifestealPercent);
+                    const allySpellTierIndex = (this.spells[spellKey] ? this.spells[spellKey].tier : 1) - 1;
+                    const allyNatureLifestealPercent = 0.10 + (allySpellTierIndex * 0.05);
+
+                    const lifestealAmount = Math.floor(damageDealt * allyNatureLifestealPercent);
                     if (lifestealAmount > 0) {
                         this.hp = Math.min(this.maxHp, this.hp + lifestealAmount); // Heal the ally
                         addToLog(`${this.name} drains <span class="font-bold text-green-400">${lifestealAmount}</span> HP.`, 'text-green-300');
@@ -4046,13 +4196,19 @@ class Enemy extends Entity {
 
 
         // --- NEW VOID BYPASS LOGIC ---
-        const rarityIndex = this.rarityData.rarityIndex; // Get rarity index
-        const voidBypassChance = 0.20 + (Math.max(0, rarityIndex - 1) * 0.05); // 20% base + 5% per rarity
+        const rarityIndex = this.rarityData.rarityIndex; 
+        let voidBypassChance = 0.20 + (Math.max(0, rarityIndex - 1) * 0.05); 
+        
+        // [MODIFICATION START] Darkness' Contract
+        if (player.hasSkill('darkness_contract')) {
+            voidBypassChance *= 0.8; // Reduce chance by 20%
+        }
+        // [MODIFICATION END]
+
         if (this.element === 'void' && this.rollForEffect(voidBypassChance, 'Enemy Void Bypass')) {
-            attackOptions.ignore_defense = true; // Set ignore defense flag
+            attackOptions.ignore_defense = true; 
             addToLog(`${this.name}'s void attack tears through reality, bypassing defenses!`, 'text-purple-500');
         }
-        // --- END NEW VOID LOGIC ---
 
 
         // Apply damage to target (this is where parry/dodge/block checks happen inside Player.takeDamage)
@@ -4187,102 +4343,78 @@ class Enemy extends Entity {
         // --- END MODIFIED ---
 }
 // --- END NEW/RE-ADDED FUNCTION ---
-    takeDamage(damageTaken, effects = {}) {
-        // --- START FIX: Reworked Defense Calculation ---
-        let currentDefense = 0; // Start defense at 0
-        const isMagicAttack = (effects.element && effects.element !== 'none') || effects.isMagic; // Don't include ignore_defense here
-
-        // Check if magic attack
+    takeDamage(damage, options = {}) {
+        // 1. Calculate Defense (Simplified for Enemy)
+        let currentDefense = 0;
+        const isMagicAttack = (options.element && options.element !== 'none') || options.isMagic;
+        
         if (isMagicAttack) {
-            // Magic attacks use spell_resistance (a 0-1 multiplier)
-            let effectiveSpellResist = this.spell_resistance || 0;
-            // Apply spell penetration *first*
-            if (effects.spell_penetration) {
-                effectiveSpellResist = Math.max(0, effectiveSpellResist - effects.spell_penetration);
-            }
-            // Apply resistance as a damage multiplier
-            damageTaken = Math.floor(damageTaken * (1 - effectiveSpellResist));
-            // Magic attacks ignore base physical defense
-            currentDefense = 0; 
+             let effectiveSpellResist = this.spell_resistance || 0;
+             if (options.spell_penetration) {
+                 effectiveSpellResist = Math.max(0, effectiveSpellResist - options.spell_penetration);
+             }
+             damage = Math.floor(damage * (1 - effectiveSpellResist));
+             currentDefense = 0;
         } else {
-            // Physical attacks use flat physical defense
-            currentDefense = this.defense;
-            // --- MODIFIED: Living Shield defense double ---
-            if (this.statusEffects.living_shield) {
-                currentDefense *= 2.0; // Double defense
-                addToLog(`${this.name}'s shield is hardened!`, 'text-gray-300');
-            }
-            // --- END MODIFIED ---
+             currentDefense = this.defense;
+             if (this.statusEffects.living_shield) currentDefense *= 2.0;
+        }
+
+        if (this.statusEffects.arcane_sigil && (options.isMagic || options.element)) {
+            damage = Math.floor(damage * this.statusEffects.arcane_sigil.multiplier);
+            // addToLog("Arcane Sigil amplifies the damage!", "text-purple-400"); // Optional spam reduction
+        }
+
+        // 2. Apply Penetration/Ignore
+        if (options.ignore_defense === true) {
+             currentDefense = 0;
+             addToLog(`The attack ignores ${this.name}'s defense!`, 'text-yellow-500 font-bold');
+        } else if (typeof options.ignore_defense === 'number') {
+             currentDefense *= (1 - options.ignore_defense);
+        } else if (!isMagicAttack && options.armorPierce) {
+             currentDefense *= (1 - options.armorPierce);
+        }
+
+        // Void Pierce Logic (Enemy taking damage)
+        const attacker = options.attacker; // Attacker might be passed
+        if (options.element === 'void') {
+             currentDefense *= 0.5; // Void pierces 50% of enemy defense too
+             addToLog(`The void energy bypasses ${this.name}'s defenses!`, 'text-purple-400');
+        }
+
+        // 3. Apply Vulnerabilities
+        if (this.statusEffects.enrage) {
+            damage = Math.floor(damage * 2.0);
+            addToLog(`${this.name} takes extra damage due to rage!`, 'text-red-500');
         }
         
-        // Apply ignore defense / penetration (affects physical defense)
-        // --- MODIFIED: Check for Ultra Focus ---
-        if (effects.ignore_defense || (this.statusEffects.ultra_focus && this.statusEffects.ultra_focus.duration > 0)) {
-             const pierceAmount = 1.0; // Full defense pierce
-             currentDefense = 0; // Set defense to 0
-             if(this.statusEffects.ultra_focus) {
-                 addToLog(`The focused attack bypasses all defense!`, 'text-yellow-500');
-             }
-        // --- END MODIFIED ---
-         } else if (!isMagicAttack && effects.armorPierce) {
-             const pierceAmount = Math.max(0, Math.min(1, effects.armorPierce));
-             currentDefense *= (1 - pierceAmount);
-         }
-        // --- END FIX ---
-
-        // Apply Enrage vulnerability
-        // --- MODIFIED: Enrage vulnerability ---
-        if (this.statusEffects.enrage) {
-            damageTaken = Math.floor(damageTaken * 2.0); // Take 2x damage
-            addToLog(`${this.name} takes a heavy blow in its rage!`, 'text-red-500');
+        // Elemental Weakness
+        if (options.element && this.element !== 'none') {
+            const modifier = calculateElementalModifier(options.element, this.element);
+            if (modifier !== 1) {
+                damage = Math.floor(damage * modifier);
+                addToLog(modifier > 1 ? "It's super effective!" : "It's not very effective...", modifier > 1 ? 'text-green-400' : 'text-red-500');
+            }
         }
-        // --- END MODIFIED ---
-        // --- Elemental Calculation & Debuff Interactions ---
-        let knockbackAmount = 0; // Initialize knockback amount for this damage instance
-        if (effects.element && effects.element !== 'none') {
-            // Apply Elemental Weakness/Resistance first
-            if (this.element !== 'none') {
-                const modifier = calculateElementalModifier(effects.element, this.element);
-                if (modifier !== 1) {
-                    damageTaken = Math.floor(damageTaken * modifier);
-                    addToLog(modifier > 1 ? "It's super effective!" : "It's not very effective...", modifier > 1 ? 'text-green-400' : 'text-red-500');
-                }
-            }
 
-            // --- Oil Bomb Interaction (Fire) ---
-            if (effects.element === 'fire' && this.statusEffects.debuff_oiled) {
-                damageTaken *= 2;
-                addToLog(`${this.name} bursts into flames from the oil!`, "text-orange-600 font-bold");
-                delete this.statusEffects.debuff_oiled; // Consume the debuff
-            }
-            // --- NEW: Artificial Light Stone Interaction (Wind) ---
-            else if (effects.element === 'wind' && this.statusEffects.debuff_lightstone_primed) {
-                 const multiplier = this.statusEffects.debuff_lightstone_primed.damageMultiplier || 1.5; // Get multiplier from debuff
-                 damageTaken = Math.floor(damageTaken * multiplier); // Apply damage multiplier
-                 knockbackAmount = this.statusEffects.debuff_lightstone_primed.knockback || 2; // Get knockback from debuff
-                 addToLog(`Light Stone energizes the wind attack!`, "text-yellow-300");
-                 delete this.statusEffects.debuff_lightstone_primed; // Consume the debuff
-            }
-            // --- END NEW LIGHT STONE LOGIC ---
-        }
-        // --- End Elemental Calculation & Debuff Interactions ---
-
-
-        // Apply defense
-        // Ensure currentDefense is a non-negative number before subtraction
-        currentDefense = Math.max(0, currentDefense || 0);
-        const finalDamage = Math.max(0, Math.floor(damageTaken - currentDefense));
+        // 4. Final Calc
+        const finalDamage = Math.max(0, Math.floor(damage - currentDefense));
         this.hp -= finalDamage;
-        this.hp = Math.max(0, this.hp); // Prevent HP going below zero visually
+        this.hp = Math.max(0, this.hp);
 
-        // Update grid immediately to show HP change
-        if (gameState.currentView === 'battle') {
-            renderBattleGrid();
+        // [MODIFICATION START] Divine Blessing Tracking
+        if (this.hp <= 0 && options.element === 'light') {
+            this.killedByLight = true;
+        } else {
+            this.killedByLight = false; 
         }
+        // [MODIFICATION END]
 
-        // Return an object containing final damage and any triggered effects like knockback
-        return { damageDealt: finalDamage, knockback: knockbackAmount };
+        if (gameState.currentView === 'battle') renderBattleGrid();
+        
+        return { damageDealt: finalDamage, knockback: 0 };
     }
+
     _findEmptyAdjacentCell() {
         const neighbors = [ 
             { x: this.x, y: this.y - 1 }, { x: this.x, y: this.y + 1 },
@@ -4505,7 +4637,7 @@ class Enemy extends Entity {
     } // <<< --- ADD THIS BRACE. AGAIN.
 
     // --- END NEW: Ability logic check ---
-    async moveTowards(target) {
+  async moveTowards(target) {
         // --- NEW MOVE LOGIC ---
         // If a specific target is provided (e.g., by the attack logic), move to it.
         // If not, find the closest target (player or ally).
@@ -4532,7 +4664,16 @@ class Enemy extends Entity {
 
         if (path && path.length > 1) {
             addToLog(`${this.name} moves towards ${finalTarget.name}!`);
-            const stepsToTake = Math.min(path.length - 1, this.movement.speed);
+            
+            // [MODIFICATION START] Crashing Wake (Movement Reduction)
+            let speed = this.movement.speed;
+            // Check if player has the skill (need to check player existence just in case, though engine.js should have it)
+            if (this.statusEffects.drenched && typeof player !== 'undefined' && player.hasSkill('crashing_wake')) {
+                 speed = Math.ceil(speed / 2);
+            }
+            // [MODIFICATION END]
+
+            const stepsToTake = Math.min(path.length - 1, speed);
 
             // --- SPEED SCALING: Dynamic movement delay ---
             // Base: 300ms. Decreases by 40ms per enemy. Min: 50ms.
@@ -4569,6 +4710,7 @@ class Enemy extends Entity {
             addToLog(`${this.name} is blocked and cannot move!`);
         }
     }
+
     isValidMove(x, y) {
         // Check grid bounds
         if (x < 0 || x >= gameState.gridWidth || y < 0 || y >= gameState.gridHeight) {
@@ -4749,6 +4891,48 @@ function applyStatusEffect(target, effectType, effectData, sourceName) {
      if (target instanceof Player) {
         updateStatsView();
     }
+}
+
+Player.prototype.hasSkill = function(skillId) {
+    return this.unlockedSkills.includes(skillId);
+};
+
+Player.prototype.canUnlockSkill = function(skillId) {
+    if (this.hasSkill(skillId)) return false;
+    if (this.skillPoints <= 0) return false;
+    
+    const node = SKILL_TREE[skillId];
+    if (!node) return false;
+    
+    // OR Logic: Only need ONE unlocked parent
+    if (node.parents.length === 0) return true; // Root
+    return node.parents.some(parentId => this.hasSkill(parentId));
+};
+
+Player.prototype.unlockSkill = function(skillId) {
+    if (!this.canUnlockSkill(skillId)) return;
+    
+    this.skillPoints--;
+    this.unlockedSkills.push(skillId);
+    addToLog(`Learned Skill: <span class="font-bold text-yellow-300">${SKILL_TREE[skillId].name}</span>`, 'text-yellow-300');
+    
+    // Re-render if on skill screen
+    if (gameState.currentView === 'skill_tree') {
+        renderSkillTree();
+    }
+};
+
+// Helper to upgrade dice
+function getUpgradedDice(currentDice) {
+    // currentDice is [numDice, sides] e.g., [1, 6]
+    const sides = currentDice[1];
+    const index = DICE_PROGRESSION.indexOf(sides);
+    
+    if (index === -1 || index >= DICE_PROGRESSION.length - 1) {
+        return currentDice; // Can't upgrade or maxed
+    }
+    
+    return [currentDice[0], DICE_PROGRESSION[index + 1]];
 }
 
 

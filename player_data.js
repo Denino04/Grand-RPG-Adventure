@@ -639,9 +639,9 @@ const SPELLS = {
     'none_aoe': {
         element: 'none', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Magical Grenade', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'earth_essence': 5, 'wind_essence': 5 }, description: "Lob an explosive sphere of magical energy that damages nearby foes." },
-            { name: 'Rain of Arrow', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'fire_essence': 10, 'water_essence': 10 }, description: "Summon a volley of phantom arrows to strike multiple enemies." },
-            { name: 'Meteor Shower', cost: 60, damage: [6, 6], cap: 10, description: "Call down a cataclysmic shower of meteors to bombard the battlefield." }
+            { splash: 0.25, name: 'Magical Grenade', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'earth_essence': 5, 'wind_essence': 5 }, description: "Lob an explosive sphere of magical energy that damages nearby foes." },
+            { splash: 0.5, name: 'Rain of Arrow', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'fire_essence': 10, 'water_essence': 10 }, description: "Summon a volley of phantom arrows to strike multiple enemies." },
+            { splash: 0.75, name: 'Meteor Shower', cost: 60, damage: [6, 6], cap: 10, description: "Call down a cataclysmic shower of meteors to bombard the battlefield." }
         ]
     },
     // Fire
@@ -656,9 +656,9 @@ const SPELLS = {
     'fire_aoe': {
         element: 'fire', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Fireball', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'fire_essence': 10 }, description: "Hurl a classic exploding sphere of fire, engulfing enemies in a fiery blast." },
-            { name: 'Fire Orb', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'fire_essence': 20 }, description: "Create a slow-moving but intensely hot orb of fire that detonates with great force." },
-            { name: 'Great Chaos Orb', cost: 60, damage: [6, 6], cap: 10, description: "Hurl a massive, churning orb of chaotic flame that leaves a pool of lava in its wake." }
+            { splash: 0.25, name: 'Fireball', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'fire_essence': 10 }, description: "Hurl a classic exploding sphere of fire, engulfing enemies in a fiery blast." },
+            { splash: 0.5, name: 'Fire Orb', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'fire_essence': 20 }, description: "Create a slow-moving but intensely hot orb of fire that detonates with great force." },
+            { splash: 0.75, name: 'Great Chaos Orb', cost: 60, damage: [6, 6], cap: 10, description: "Hurl a massive, churning orb of chaotic flame that leaves a pool of lava in its wake." }
         ]
     },
     'fire_support': {
@@ -680,9 +680,9 @@ const SPELLS = {
     'water_aoe': {
         element: 'water', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Water Spout', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'water_essence': 10 }, description: "Summon a whirling spout of water to drench and damage a group of enemies." },
-            { name: 'Water Surf', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'water_essence': 20 }, description: "Unleash a massive wave that crashes across the battlefield." },
-            { name: 'Grand Flood', cost: 60, damage: [6, 6], cap: 10, description: "Inundate the area with a cataclysmic flood, drowning all who stand against you." }
+            { splash: 0.25, name: 'Water Spout', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'water_essence': 10 }, description: "Summon a whirling spout of water to drench and damage a group of enemies." },
+            { splash: 0.5, name: 'Water Surf', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'water_essence': 20 }, description: "Unleash a massive wave that crashes across the battlefield." },
+            { splash: 0.75, name: 'Grand Flood', cost: 60, damage: [6, 6], cap: 10, description: "Inundate the area with a cataclysmic flood, drowning all who stand against you." }
         ]
     },
     'water_support': {
@@ -704,9 +704,9 @@ const SPELLS = {
     'earth_aoe': {
         element: 'earth', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Tremorstrike', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'earth_essence': 10 }, description: "Slam your power into the ground, creating a localized tremor to stagger nearby foes." },
-            { name: 'Earthquake', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'earth_essence': 20 }, description: "Shake the very foundations of the earth, causing the ground to rupture and damage your enemies." },
-            { name: 'Ravine Creation', cost: 60, damage: [6, 6], cap: 10, description: "Violently tear the earth asunder, crushing all who stand against you." }
+            { splash: 0.25, name: 'Tremorstrike', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'earth_essence': 10 }, description: "Slam your power into the ground, creating a localized tremor to stagger nearby foes." },
+            { splash: 0.5, name: 'Earthquake', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'earth_essence': 20 }, description: "Shake the very foundations of the earth, causing the ground to rupture and damage your enemies." },
+            { splash: 0.75, name: 'Ravine Creation', cost: 60, damage: [6, 6], cap: 10, description: "Violently tear the earth asunder, crushing all who stand against you." }
         ]
     },
     'earth_support': {
@@ -728,9 +728,9 @@ const SPELLS = {
     'wind_aoe': {
         element: 'wind', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Wind Gust', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'wind_essence': 10 }, description: "Create a powerful gust of wind to buffet and damage a group of foes." },
-            { name: 'Sweeping Edge', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'wind_essence': 20 }, description: "Unleash a wide, scythe-like blade of wind that cuts across the battlefield." },
-            { name: 'Hurricane Storm', cost: 60, damage: [6, 6], cap: 10, description: "Conjure a ferocious hurricane, trapping and shredding enemies in its chaotic embrace." }
+            { splash: 0.25, name: 'Wind Gust', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'wind_essence': 10 }, description: "Create a powerful gust of wind to buffet and damage a group of foes." },
+            { splash: 0.5, name: 'Sweeping Edge', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'wind_essence': 20 }, description: "Unleash a wide, scythe-like blade of wind that cuts across the battlefield." },
+            { splash: 0.75, name: 'Hurricane Storm', cost: 60, damage: [6, 6], cap: 10, description: "Conjure a ferocious hurricane, trapping and shredding enemies in its chaotic embrace." }
         ]
     },
     'wind_support': {
@@ -752,9 +752,9 @@ const SPELLS = {
     'lightning_aoe': {
         element: 'lightning', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Plasma Pulse', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'lightning_essence': 10 }, description: "Release a pulse of raw plasma that arcs between nearby enemies." },
-            { name: 'Electromagnetic Barrier', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'lightning_essence': 20 }, description: "Create a deadly barrier of electricity that shocks all foes in an area." },
-            { name: 'Thundercloud Form', cost: 60, damage: [6, 6], cap: 10, description: "Become a living thundercloud, raining down chaotic lightning strikes across the area." }
+            { splash: 0.25, name: 'Plasma Pulse', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'lightning_essence': 10 }, description: "Release a pulse of raw plasma that arcs between nearby enemies." },
+            { splash: 0.5, name: 'Electromagnetic Barrier', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'lightning_essence': 20 }, description: "Create a deadly barrier of electricity that shocks all foes in an area." },
+            { splash: 0.75, name: 'Thundercloud Form', cost: 60, damage: [6, 6], cap: 10, description: "Become a living thundercloud, raining down chaotic lightning strikes across the area." }
         ]
     },
     'lightning_support': {
@@ -776,9 +776,9 @@ const SPELLS = {
     'nature_aoe': {
         element: 'nature', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Seed Bomb', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'nature_essence': 10 }, description: "Hurl a seed that explodes into a burst of thorny shrapnel." },
-            { name: 'Bamboo Field Strike', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'nature_essence': 20 }, description: "Instantly grow a dense field of razor-sharp bamboo, impaling enemies in an area." },
-            { name: 'Sea of Vines', cost: 60, damage: [6, 6], cap: 10, description: "Transform the ground into a writhing sea of thorny vines that tear at all enemies within." }
+            { splash: 0.25, name: 'Seed Bomb', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'nature_essence': 10 }, description: "Hurl a seed that explodes into a burst of thorny shrapnel." },
+            { splash: 0.5, name: 'Bamboo Field Strike', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'nature_essence': 20 }, description: "Instantly grow a dense field of razor-sharp bamboo, impaling enemies in an area." },
+            { splash: 0.75, name: 'Sea of Vines', cost: 60, damage: [6, 6], cap: 10, description: "Transform the ground into a writhing sea of thorny vines that tear at all enemies within." }
         ]
     },
     'nature_support': {
@@ -800,9 +800,9 @@ const SPELLS = {
     'light_aoe': {
         element: 'light', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Lantern Spread', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'light_essence': 10 }, description: "Release a gentle but searing wave of light, like the glow of a lantern." },
-            { name: 'Beacon of Light', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'light_essence': 20 }, description: "Erupt in a blinding flash of holy light, damaging and staggering nearby foes." },
-            { name: 'Shine of the Archangel', cost: 60, damage: [6, 6], cap: 10, description: "Unfurl ethereal wings and release a devastating wave of archangelic power." }
+            { splash: 0.25, name: 'Lantern Spread', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'light_essence': 10 }, description: "Release a gentle but searing wave of light, like the glow of a lantern." },
+            { splash: 0.5, name: 'Beacon of Light', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'light_essence': 20 }, description: "Erupt in a blinding flash of holy light, damaging and staggering nearby foes." },
+            { splash: 0.75, name: 'Shine of the Archangel', cost: 60, damage: [6, 6], cap: 10, description: "Unfurl ethereal wings and release a devastating wave of archangelic power." }
         ]
     },
     'light_support': {
@@ -824,9 +824,9 @@ const SPELLS = {
     'void_aoe': {
         element: 'void', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Shadow Bolt', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'void_essence': 10 }, description: "Hurl a bolt of shadow that explodes on impact, damaging nearby enemies." },
-            { name: 'Void Engulf', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'void_essence': 20 }, description: "Engulf an area in a sphere of pure void, draining the life from those within." },
-            { name: 'Black Hole', cost: 60, damage: [6, 6], cap: 10, description: "Conjure a miniature black hole that pulls in and crushes all enemies in its vicinity." }
+            { splash: 0.25, name: 'Shadow Bolt', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'void_essence': 10 }, description: "Hurl a bolt of shadow that explodes on impact, damaging nearby enemies." },
+            { splash: 0.5, name: 'Void Engulf', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'void_essence': 20 }, description: "Engulf an area in a sphere of pure void, draining the life from those within." },
+            { splash: 0.75, name: 'Black Hole', cost: 60, damage: [6, 6], cap: 10, description: "Conjure a miniature black hole that pulls in and crushes all enemies in its vicinity." }
         ]
     },
     'void_support': {
