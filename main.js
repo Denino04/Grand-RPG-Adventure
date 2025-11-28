@@ -459,6 +459,11 @@ async function saveGame(manual = false) {
     }
 
     try {
+        // --- DDOS PROTECTION UPDATE START ---
+        // We MUST add this field, otherwise the Security Rules will reject the save.
+        saveData.lastUpdated = firebase.firestore.FieldValue.serverTimestamp();
+        // --- DDOS PROTECTION UPDATE END ---
+
         const charactersCollection = db.collection(`artifacts/${appId}/users/${userId}/characters`);
         if (player.firestoreId) {
              console.log(`Saving to existing doc: ${player.firestoreId}`);
@@ -468,17 +473,13 @@ async function saveGame(manual = false) {
             const docRef = await charactersCollection.add(saveData);
             player.firestoreId = docRef.id;
              console.log(`New character saved with ID: ${player.firestoreId}`);
-             // The player object in memory now has the ID if it was new
         }
         console.log("Game Saved to Cloud.");
         if (manual) addToLog('Game Saved to Cloud!', 'text-green-400 font-bold');
 
-        // --- NEW: Public Ghost Snapshot ---
-        // We also save a public "snapshot" of the character for the Barracks system
-        // Only do this for non-anonymous cloud saves.
-        if (db && userId && !auth.currentUser.isAnonymous && player.firestoreId) { // Added check for player.firestoreId
+        // --- PUBLIC GHOST SNAPSHOT UPDATE ---
+        if (db && userId && !auth.currentUser.isAnonymous && player.firestoreId) {
             try {
-                // This snapshot contains only the data needed to generate an ally
                 const snapshotData = {
                     name: saveData.name,
                     raceKey: saveData.race,
@@ -489,10 +490,12 @@ async function saveGame(manual = false) {
                     baseGender: saveData.gender,
                     lastSaveTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     
-                    // --- ADDED: The owner's User ID ---
+                    // --- DDOS PROTECTION UPDATE START ---
+                    // The 'characters' (ghosts) collection also has the rate limit rule.
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+                    // --- DDOS PROTECTION UPDATE END ---
+                    
                     userId: userId, 
-                    // --- END ADDED ---
-
                     equippedWeaponKey: saveData.equippedWeaponKey,
                     equippedCatalystKey: saveData.equippedCatalystKey,
                     equippedArmorKey: saveData.equippedArmorKey,
@@ -501,19 +504,14 @@ async function saveGame(manual = false) {
                     items: saveData.inventory.items
                 };
                 
-                // --- CHANGED: Use player.firestoreId as the doc ID ---
                 const publicRef = db.collection(`artifacts/${appId}/public/data/characters`).doc(player.firestoreId);
-                // --- END CHANGED ---
-                
                 await publicRef.set(snapshotData, { merge: true });
                 console.log(`Public 'ghost' snapshot saved for ${saveData.name}.`);
 
             } catch (snapshotError) {
                 console.error("Could not save public character snapshot:", snapshotError);
-                // Don't bother the user with this error, it's non-critical.
             }
         }
-        // --- END NEW ---
 
     } catch (error) {
         console.error("Could not save game to Firestore:", error);

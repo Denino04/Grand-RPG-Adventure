@@ -4121,7 +4121,11 @@ async function addToGraveyard(deadPlayer, killer) {
             name: deadPlayer.name,
             level: deadPlayer.level,
             cause: `Slain by ${killer}`,
-            date: new Date().toLocaleString()
+            date: new Date().toLocaleString(),
+            
+            // --- DDOS PROTECTION UPDATE ---
+            // Required for the 'isValidWrite()' security rule check
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
         });
     } catch (error) {
         console.error("Could not add to graveyard:", error);
