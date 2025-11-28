@@ -70,10 +70,24 @@ async function initFirebase() {
             ? JSON.parse(__firebase_config)
             : fallbackFirebaseConfig;
 
-        // Updated to modern Firebase v9+ syntax
         app = firebase.initializeApp(firebaseConfig);
         auth = firebase.auth();
         db = firebase.firestore();
+        
+        // --- CACHING UPDATE START ---
+        // Enable offline persistence. This acts as a local cache.
+        try {
+            await db.enablePersistence({ synchronizeTabs: true });
+            console.log("Firestore Offline Persistence enabled.");
+        } catch (err) {
+            if (err.code == 'failed-precondition') {
+                console.warn("Persistence failed: Multiple tabs open.");
+            } else if (err.code == 'unimplemented') {
+                console.warn("Persistence failed: Browser not supported.");
+            }
+        }
+        // --- CACHING UPDATE END ---
+
         firebaseInitialized = true;
         console.log("Firebase Initialized. Waiting for auth state...");
 
@@ -407,7 +421,22 @@ function setDifficulty(newDifficulty) {
 }
 
 async function saveGame(manual = false) {
-    if (!player) { /* ... log ... */ return; }
+    if (!player) return;
+
+    // --- SEMI-SPAM PROTECTION (CLIENT SIDE) ---
+    const now = Date.now();
+    const COOLDOWN_MS = 1000; // 2 seconds
+
+    // If we saved less than 2 seconds ago, just exit silently.
+    // This prevents the "Error: Could not save" log from appearing.
+    if (now - lastSaveTimestamp < COOLDOWN_MS) {
+        if (manual) console.log("Save throttled: You are clicking too fast.");
+        return; 
+    }
+    
+    // Update the local timestamp
+    lastSaveTimestamp = now;
+    // ------------------------------------------
     
     // Deep copy player data for saving
     const saveData = JSON.parse(JSON.stringify(player));
