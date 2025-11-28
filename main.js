@@ -412,40 +412,36 @@ async function saveGame(manual = false) {
     // Deep copy player data for saving
     const saveData = JSON.parse(JSON.stringify(player));
 
-    // Clean up non-serializable data before saving (unchanged)
+    // Clean up non-serializable data before saving
     delete saveData.racialPassive;
     delete saveData.signatureAbilityData;
     
-    // --- NEW: Save necessary global state variables ---
+    // Save necessary global state variables
     saveData.lastView = gameState.currentView;
     saveData.currentMap = gameState.currentMap;
     saveData.currentNodeId = gameState.currentNodeId;
     saveData.currentBiome = gameState.currentBiome;
 
-    // --- NEW: Add keys for equipped items for robust loading ---
+    // Add keys for equipped items for robust loading
     saveData.equippedWeaponKey = findKeyByInstance(WEAPONS, player.equippedWeapon);
     saveData.equippedCatalystKey = findKeyByInstance(CATALYSTS, player.equippedCatalyst);
     saveData.equippedArmorKey = findKeyByInstance(ARMOR, player.equippedArmor);
     saveData.equippedShieldKey = findKeyByInstance(SHIELDS, player.equippedShield);
-    // Lure is already stored by key (player.equippedLure)
     
-    // --- NPC ALLY: Serialize ally equipment ---
+    // NPC ALLY: Serialize ally equipment
     if (saveData.npcAlly) {
-        // Clean up non-serializable data for ally
         delete saveData.npcAlly.racialPassive;
         delete saveData.npcAlly.signatureAbilityData;
         
-        // Add keys for ally's equipped items
         saveData.npcAlly.equippedWeaponKey = findKeyByInstance(WEAPONS, player.npcAlly.equippedWeapon);
         saveData.npcAlly.equippedCatalystKey = findKeyByInstance(CATALYSTS, player.npcAlly.equippedCatalyst);
         saveData.npcAlly.equippedArmorKey = findKeyByInstance(ARMOR, player.npcAlly.equippedArmor);
         saveData.npcAlly.equippedShieldKey = findKeyByInstance(SHIELDS, player.npcAlly.equippedShield);
     }
-    // --- END NPC ALLY ---
 
-     console.log("Preparing save data (includes equipment keys):", saveData);
+    console.log("Preparing save data (includes equipment keys):", saveData);
 
-
+    // --- Local Storage (Guest) Save ---
     if (!auth?.currentUser || auth.currentUser.isAnonymous) {
         try {
             localStorage.setItem('rpgSaveData_local', JSON.stringify(saveData));
@@ -458,13 +454,14 @@ async function saveGame(manual = false) {
         return;
     }
 
+    // --- Cloud (Firestore) Save ---
     try {
-        // --- DDOS PROTECTION UPDATE START ---
-        // We MUST add this field, otherwise the Security Rules will reject the save.
+        // [DDOS PROTECTION] Add server timestamp. 
+        // The Security Rules will REJECT the write if this field is missing or incorrect.
         saveData.lastUpdated = firebase.firestore.FieldValue.serverTimestamp();
-        // --- DDOS PROTECTION UPDATE END ---
 
         const charactersCollection = db.collection(`artifacts/${appId}/users/${userId}/characters`);
+        
         if (player.firestoreId) {
              console.log(`Saving to existing doc: ${player.firestoreId}`);
             await charactersCollection.doc(player.firestoreId).set(saveData, { merge: true });
@@ -474,10 +471,12 @@ async function saveGame(manual = false) {
             player.firestoreId = docRef.id;
              console.log(`New character saved with ID: ${player.firestoreId}`);
         }
+        
         console.log("Game Saved to Cloud.");
         if (manual) addToLog('Game Saved to Cloud!', 'text-green-400 font-bold');
 
-        // --- PUBLIC GHOST SNAPSHOT UPDATE ---
+        // --- Public Ghost Snapshot ---
+        // Only save snapshot if we have a valid firestoreId
         if (db && userId && !auth.currentUser.isAnonymous && player.firestoreId) {
             try {
                 const snapshotData = {
@@ -488,12 +487,9 @@ async function saveGame(manual = false) {
                     backgroundName: saveData.background,
                     level: saveData.level,
                     baseGender: saveData.gender,
-                    lastSaveTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     
-                    // --- DDOS PROTECTION UPDATE START ---
-                    // The 'characters' (ghosts) collection also has the rate limit rule.
+                    // [DDOS PROTECTION] Snapshot must also have the timestamp to pass the public rules
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
-                    // --- DDOS PROTECTION UPDATE END ---
                     
                     userId: userId, 
                     equippedWeaponKey: saveData.equippedWeaponKey,
@@ -504,11 +500,13 @@ async function saveGame(manual = false) {
                     items: saveData.inventory.items
                 };
                 
+                // Save to the public collection using the same ID as the private doc
                 const publicRef = db.collection(`artifacts/${appId}/public/data/characters`).doc(player.firestoreId);
                 await publicRef.set(snapshotData, { merge: true });
                 console.log(`Public 'ghost' snapshot saved for ${saveData.name}.`);
 
             } catch (snapshotError) {
+                // Don't fail the main save if the ghost snapshot fails
                 console.error("Could not save public character snapshot:", snapshotError);
             }
         }
