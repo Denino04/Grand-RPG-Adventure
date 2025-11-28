@@ -3,7 +3,7 @@ let db, auth, userId, app;
 let firebaseInitialized = false;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 let initialAuthCheckCompleted = false;
-
+let lastSaveTimestamp = 0;
 // --- GAME STATE ---
 let player;
 let currentEnemies = [];
