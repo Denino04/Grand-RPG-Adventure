@@ -9397,7 +9397,10 @@ async function performAttack(targetOrIndex, options = {}) {
     // 5. FINALIZATION
     // -------------------------------------------------------------------------
     if (isInitiation) {
-        if (gameState.battleEnded) { isProcessingAction = false; return; }
+        if (gameState.battleEnded) {
+            isProcessingAction = false;
+            return;
+        }
 
         if (player.equippedShield.effect?.attack_follow_up && isEntity && target.isAlive()) {
             await new Promise(r => setTimeout(r, 250));
@@ -9410,6 +9413,10 @@ async function performAttack(targetOrIndex, options = {}) {
             addToLog("You strike again!", "text-yellow-300");
             await performAttack(target, { isInitiation: false, strikeIndex: 2 });
         }
+
+        // --- [FIX] ADD THIS LINE HERE ---
+        if (!gameState.battleEnded) checkBattleStatus();
+        // --------------------------------
 
         finalizePlayerAction();
     } else {
