@@ -841,7 +841,11 @@ const WITCH_COVEN_SERVICES = {
     resetStats: { gold: 5000, hearts: 5 },
     changeRace: { gold: 10000, hearts: 10 },
     changeClass: { gold: 10000, hearts: 10 },
-    changeBackground: { gold: 10000, hearts: 10 }
+    changeBackground: { gold: 10000, hearts: 10 },
+    resetSkills: { 
+        base: { gold: 5000, hearts: 5 },
+        perMastery: { gold: 2500, hearts: 3 } // Scaling cost per spent mastery point
+    }
 };
 
 const COOKING_RECIPES = {

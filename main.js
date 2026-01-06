@@ -1,13 +1,19 @@
-// Firebase variables
+// =============================================================================
+// GLOBAL STATE & CONFIGURATION
+// =============================================================================
+
+// Firebase & Auth
 let db, auth, userId, app;
 let firebaseInitialized = false;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 let initialAuthCheckCompleted = false;
 let lastSaveTimestamp = 0;
-// --- GAME STATE ---
+
+// Game State
 let player;
 let currentEnemies = [];
 let lastViewBeforeInventory = 'main_menu';
+
 let gameState = {
     currentView: 'main_menu',
     isPlayerTurn: true,
@@ -24,21 +30,22 @@ let gameState = {
     gridObjects: [], 
     battleEnded: false, 
     activeDrone: null, 
-    // --- NEW PROPERTIES ---
+    // Expedition State
     currentMap: null,       
     currentNodeId: null,    
     currentEncounterType: null,
-    initialRunGold: 0 // <-- ADD THIS: Tracks gold at start of run
-    // --- END NEW ---
+    initialRunGold: 0
 };
+
+// System & Timers
 let isDebugVisible = false;
 let realTimeInterval = null;
 let gardenInterval = null;
 let isTutorialEnabled = true;
-const IDLE_TIMEOUT_MS = 60000; // 60 seconds of inactivity to trigger idle dialogue
+const IDLE_TIMEOUT_MS = 60000; 
 let lastUserActivity = Date.now();
-// --- INITIALIZATION ---
-// Fallback config for local development if not provided by the environment
+
+// Fallback Config (Local Dev)
 const fallbackFirebaseConfig = {
     apiKey: "AIzaSyD4exnjoWEpKGkrGeiRe4A8dvX74-tjdyk",
     authDomain: "epic-rpg-adventure.firebaseapp.com",
@@ -49,84 +56,66 @@ const fallbackFirebaseConfig = {
     measurementId: "G-11EKCNE68D"
 };
 
-// ADDED: Local findClassKeyByName for loading fallback
-function findClassKeyByName_local(className) {
-    if (!className) return null;
-    const lowerClassName = className.toLowerCase();
-    // Assuming CLASSES is globally available from game_data.js
-    if (typeof CLASSES === 'undefined') {
-        console.error("CLASSES object not found during findClassKeyByName_local call!");
-        return null;
-    }
-    return Object.keys(CLASSES).find(key => CLASSES[key].name.toLowerCase() === lowerClassName);
-}
-
+// =============================================================================
+// FIREBASE INITIALIZATION
+// =============================================================================
 
 async function initFirebase() {
     if (firebaseInitialized) return;
 
     try {
-        const firebaseConfig = (typeof __firebase_config !== 'undefined' && __firebase_config)
+        const config = (typeof __firebase_config !== 'undefined' && __firebase_config)
             ? JSON.parse(__firebase_config)
             : fallbackFirebaseConfig;
 
-        app = firebase.initializeApp(firebaseConfig);
+        app = firebase.initializeApp(config);
         auth = firebase.auth();
         db = firebase.firestore();
         
-        // --- CACHING UPDATE START ---
-        // Enable offline persistence. This acts as a local cache.
+        // Offline Persistence (Cache)
         try {
             await db.enablePersistence({ synchronizeTabs: true });
-            console.log("Firestore Offline Persistence enabled.");
+            console.log("Firestore Persistence enabled.");
         } catch (err) {
-            if (err.code == 'failed-precondition') {
-                console.warn("Persistence failed: Multiple tabs open.");
-            } else if (err.code == 'unimplemented') {
-                console.warn("Persistence failed: Browser not supported.");
-            }
+            console.warn(`Persistence failed: ${err.code}`);
         }
-        // --- CACHING UPDATE END ---
 
         firebaseInitialized = true;
-        console.log("Firebase Initialized. Waiting for auth state...");
-
         document.body.classList.add('logged-out');
 
         auth.onAuthStateChanged(async (user) => {
             userId = user ? user.uid : null;
-            console.log(user ? `User is signed in with UID: ${userId}` : "User is signed out.");
-
             document.body.classList.toggle('logged-in', !!user);
             document.body.classList.toggle('logged-out', !user);
-
-            $('#user-display').textContent = user ? (user.isAnonymous ? 'Playing as Guest' : `Welcome, ${user.displayName}!`) : '';
+            
+            const userDisplay = $('#user-display');
+            if (userDisplay) {
+                userDisplay.textContent = user ? (user.isAnonymous ? 'Playing as Guest' : `Welcome, ${user.displayName}!`) : '';
+            }
 
             await updateLoadGameButtonVisibility();
 
             if (!initialAuthCheckCompleted) {
                 initialAuthCheckCompleted = true;
-                handleRouteChange(); // Handle initial route after auth check
+                handleRouteChange(); 
             } else {
-                 handleRouteChange(); // Also handle route change if user signs in/out later
+                 handleRouteChange(); 
             }
         });
 
     } catch (error) {
-        console.error("Firebase initialization failed:", error);
-        addToLog("Could not connect to game services. Running in offline mode.", "text-red-500");
+        console.error("Firebase Init Error:", error);
+        addToLog("Could not connect to game services. Offline mode.", "text-red-500");
     }
 }
-
 
 async function signInWithProvider(provider) {
     if (!auth) return;
     try {
         await auth.signInWithPopup(provider);
-        // No explicit route change needed here, onAuthStateChanged will handle it
     } catch (error) {
-        console.error(`${provider.providerId} Sign-In failed:`, error);
-        addToLog("Sign-In failed. Please try again.", "text-red-400");
+        console.error("Sign-In Error:", error);
+        addToLog("Sign-In failed.", "text-red-400");
     }
 }
 
@@ -135,10 +124,9 @@ const signInAnonymously = async () => {
     if (!auth) return;
     try {
         await auth.signInAnonymously();
-         // No explicit route change needed here, onAuthStateChanged will handle it
     } catch (error) {
-        console.error("Anonymous Sign-In failed:", error);
-        addToLog("Could not start a guest session.", "text-red-400");
+        console.error("Guest Sign-In Error:", error);
+        addToLog("Could not start guest session.", "text-red-400");
     }
 };
 
@@ -146,224 +134,173 @@ async function signOutUser() {
     if (!auth) return;
     try {
         await auth.signOut();
-        // onAuthStateChanged will trigger showStartScreen via handleRouteChange
-        window.location.hash = 'menu'; // Explicitly set hash to menu
-        // Ensure player object is cleared immediately on sign out
+        window.location.hash = 'menu';
         player = null;
-        if(realTimeInterval) clearInterval(realTimeInterval);
-        if(gardenInterval) clearInterval(gardenInterval);
-        realTimeInterval = gardenInterval = null;
-        showStartScreen(); // Directly show start screen to avoid race conditions
+        cleanupIntervals();
+        showStartScreen();
     } catch (error) {
-        console.error("Sign out failed:", error);
+        console.error("Sign Out Error:", error);
     }
 }
 
+// =============================================================================
+// CORE GAME LOOP & ROUTING
+// =============================================================================
+
+function cleanupIntervals() {
+    if(realTimeInterval) clearInterval(realTimeInterval);
+    if(gardenInterval) clearInterval(gardenInterval);
+    realTimeInterval = gardenInterval = null;
+}
+
 function handleRouteChange() {
-    console.log("Handling route change. Hash:", window.location.hash);
     const route = window.location.hash || '#menu';
     const activeSaveKey = sessionStorage.getItem('activeSaveKey');
 
-    if (route === '#game' && activeSaveKey && auth?.currentUser) { // Ensure user is authenticated before trying to load game data associated with them
-        console.log(`Route is #game, activeSaveKey found: ${activeSaveKey}. Attempting to load game.`);
-        // Only load if player isn't already loaded or if body class indicates not in game yet
+    if (route === '#game' && activeSaveKey && auth?.currentUser) {
+        // Prevent double loading
         if (!player || !document.body.classList.contains('in-game')) {
              loadGameFromKey(activeSaveKey);
         } else {
-            console.log("Game already loaded, skipping loadGameFromKey.");
-            // If game is loaded but view isn't battle, ensure town is rendered (e.g., after refresh)
+            // Refresh view if already loaded
             if (gameState.currentView !== 'battle' && gameState.currentView !== 'character_sheet_levelup') {
                  renderTownSquare();
             }
         }
     } else {
-        console.log("Route is not #game or no activeSaveKey/user found. Showing start screen.");
-        showStartScreen(); // Fallback to start screen
+        showStartScreen();
     }
 }
 
+// Helper to safely find class keys if data is messy
+function findClassKeyByName_local(className) {
+    if (!className || typeof CLASSES === 'undefined') return null;
+    return Object.keys(CLASSES).find(key => CLASSES[key].name.toLowerCase() === className.toLowerCase());
+}
 
 async function initGame(playerName, gender, raceKey, classKey, backgroundKey, difficulty, elementalAffinity = null) {
-    console.log("initGame started...");
+    console.log("Initializing Game...");
+    
+    // Base Player Object
     player = new Player(playerName, raceKey, classKey);
+    
+    // Bulk Assignment
     Object.assign(player, {
         gender,
         class: CLASSES[classKey].name,
         background: BACKGROUNDS[backgroundKey].name,
         backgroundKey,
         difficulty,
-        elementalAffinity: elementalAffinity,
+        elementalAffinity,
         totalXp: 0,
         inventory: { items: {}, weapons: [], catalysts: [], armor: [], shields: [], lures: {} },
         spells: {},
         dialogueFlags: {},
         knownCookingRecipes: [],
         knownAlchemyRecipes: [],
-        enchantments: {}, // <-- NEW: Initialize enchantments
-        biomeClears: {}, // <--- NEW
+        enchantments: {},
+        biomeClears: {},
         seed: Math.floor(Math.random() * 1000000),
-        // --- Initialize Progression Properties ---
         killsSinceLevel4: 0,
         killsSinceLevel7: 0,
         unlocks: {
-            blacksmith: false,
-            sageTower: false,
-            houseAvailable: false, // Starts locked
-            blackMarket: false,    // Starts locked
-            enchanter: false,
-            witchCoven: false,
-            hasBlacksmithKey: false,
-            hasTowerKey: false,
-            barracks: false // Barracks unlock
+            blacksmith: false, sageTower: false, houseAvailable: false,
+            blackMarket: false, enchanter: false, witchCoven: false,
+            hasBlacksmithKey: false, hasTowerKey: false, barracks: false,
+            arcaneCasino: false
         },
-        // --- End Initialization ---
-        
-        // --- NEW: Roster for Barracks ---
-        barracksRoster: [],
-        // --- END NEW ---
-        arcaneCasino: false // Add casino unlock flag
+        barracksRoster: []
     });
-     console.log("Player object base created:", player);
 
     const classData = CLASSES[classKey];
+
+    // Apply Class Stats
     for (const stat in classData.bonusStats) {
         const statLower = stat.toLowerCase();
-        if (player.hasOwnProperty(statLower)) {
-            player[statLower] += classData.bonusStats[stat];
-        }
+        if (player.hasOwnProperty(statLower)) player[statLower] += classData.bonusStats[stat];
     }
-    console.log("Class stats applied.");
 
-    // Add starting items (like seeds for Cook)
-    for (const itemKey in classData.startingItems) {
-        player.addToInventory(itemKey, classData.startingItems[itemKey], false);
-    }
-     console.log("Starting items added.");
-
-    // Add starting equipment and equip it
+    // Starting Gear & Spells
+    for (const itemKey in classData.startingItems) player.addToInventory(itemKey, classData.startingItems[itemKey], false);
     Object.values(classData.startingEquipment).forEach(itemKey => {
         if(itemKey) {
             player.addToInventory(itemKey, 1, false);
-            equipItem(itemKey); // Equip immediately after adding
+            equipItem(itemKey);
         }
     });
-    console.log("Starting equipment added and equipped.");
+    for (const spellKey in classData.startingSpells) player.spells[spellKey] = { tier: classData.startingSpells[spellKey] };
 
-
-    // Learn starting spells
-    for (const spellKey in classData.startingSpells) {
-        player.spells[spellKey] = { tier: classData.startingSpells[spellKey] };
-    }
-    console.log("Starting spells learned.");
-
-
-    // Add starting random lures for Ranger/Rogue
+    // Class Specifics (Ranger/Magus/Cook)
     if (classData.randomLures) {
-        const availableLures = Object.keys(LURES).filter(key => {
-            const lure = LURES[key];
-            if (!lure.lureTarget) return false;
-            const target = MONSTER_SPECIES[lure.lureTarget];
+        const validLures = Object.keys(LURES).filter(k => {
+            const target = MONSTER_SPECIES[LURES[k].lureTarget];
             return target && classData.randomLures.types.includes(target.class.toLowerCase());
         });
         for (let i = 0; i < classData.randomLures.count; i++) {
-            if (availableLures.length > 0) {
-                const randomLureKey = availableLures[Math.floor(Math.random() * availableLures.length)];
-                player.addToInventory(randomLureKey, 1, false); // Add lure uses
-            }
+            if (validLures.length) player.addToInventory(validLures[Math.floor(Math.random() * validLures.length)], 1, false);
         }
-        console.log("Starting lures added.");
     }
 
-    // Add starting random spells for Magus
     if (classData.randomSpells) {
-         const availableSpells = shuffleArray([...classData.randomSpells.types]);
+         const spells = shuffleArray([...classData.randomSpells.types]);
          for(let i = 0; i < classData.randomSpells.count; i++) {
-             if (availableSpells.length > 0) {
-                const spellKey = availableSpells.pop();
-                player.spells[spellKey] = { tier: 1 };
-             }
+             if (spells.length) player.spells[spells.pop()] = { tier: 1 };
          }
-         console.log("Starting random spells added.");
     }
 
-    // --- NEW: Add starting random cooking recipes for Cook ---
     if (classData.randomCookingRecipes) {
-        const availableRecipeKeys = shuffleArray([...classData.randomCookingRecipes.keys]);
+        const recipes = shuffleArray([...classData.randomCookingRecipes.keys]);
         for (let i = 0; i < classData.randomCookingRecipes.count; i++) {
-            if (availableRecipeKeys.length > 0) {
-                const recipeItemKey = `recipe_${availableRecipeKeys.pop()}`; // Assuming recipe item keys follow this pattern
-                player.learnRecipe(recipeItemKey, false); // Learn silently
-            }
+            if (recipes.length) player.learnRecipe(`recipe_${recipes.pop()}`, false);
         }
-         console.log("Starting recipes learned.");
     }
-    // --- End New Recipe Logic ---
 
-    // *** THIS CALL IS CRUCIAL ***
-    console.log(`DEBUG initGame: Player class before updateAbilityReferences: "${player.class}"`); // Keep this log
-    player.updateAbilityReferences(); // Sets signatureAbilityData using the _classKey stored in constructor
-    console.log("...updateAbilityReferences finished.");
-
-
+    // Ability Link & Vitals
+    player.updateAbilityReferences();
     player.hp = player.maxHp;
     player.mp = player.maxMp;
-
     gameState.playerIsDying = false;
+
+    // World Gen
     generateRandomizedBiomeOrder();
     generateBlackMarketStock();
-    generateBarracksRoster(); // --- NEW: Generate initial roster ---
+    generateBarracksRoster();
     updatePlayerTier();
 
+    // Save & Launch
     sessionStorage.setItem('isNewGame', 'true');
-    await saveGame(); // Save initial state
-    console.log("Initial save complete.");
-
+    await saveGame();
+    
     const saveKey = player.firestoreId || 'local';
     sessionStorage.setItem('activeSaveKey', saveKey);
-    console.log(`Setting hash to #game, activeSaveKey: ${saveKey}`);
-    
-    // --- MODIFICATION START ---
-    // Set the hash, but don't rely on the event.
-    window.location.hash = 'game'; 
-    
-    // Directly call loadGameFromKey to ensure the flow continues
-    // without relying on the hashchange event firing.
-    console.log("initGame finished. Directly calling loadGameFromKey...");
-    await loadGameFromKey(saveKey); 
-    // --- MODIFICATION END ---
-    
-    // The old line "window.location.hash = 'game';" was here and has been replaced.
-    console.log("initGame fully finished after loadGameFromKey.");
+    window.location.hash = 'game';
+    await loadGameFromKey(saveKey);
 }
-    
+
+// =============================================================================
+// GAME LOGIC & UPDATES
+// =============================================================================
 
 function checkIdleDialogue() {
     if (player && gameState.currentView !== 'battle' && Date.now() - lastUserActivity > IDLE_TIMEOUT_MS) {
-        // Only trigger if an ally exists and isn't fighting
         if (player.npcAlly && player.npcAlly._getDialogue) {
-            // Log dialogue if roll is successful
             logAllyDialogueChance(player.npcAlly, 'ON_IDLE');
         }
     }
 }
 
-function resetActivityTimer() {
-    lastUserActivity = Date.now();
-}
+function resetActivityTimer() { lastUserActivity = Date.now(); }
 
 function generateRandomizedBiomeOrder() {
-    // Make sure player exists before seeding
-    if (!player || player.seed === null || player.seed === undefined || isNaN(Number(player.seed))) {
-         console.warn("Player seed not available for biome order generation. Using Math.random().");
-         player.seed = Math.floor(Math.random() * 1000000); // Ensure seed exists if called early
-    }
+    if (!player) return;
+    if (!player.seed) player.seed = Math.floor(Math.random() * 1000000);
+    
     const rng = seededRandom(player.seed);
-
-
     const biomesByTier = {};
-    for (const biomeKey in BIOMES) {
-        const biome = BIOMES[biomeKey];
-        (biomesByTier[biome.tier] = biomesByTier[biome.tier] || []).push(biomeKey);
+    
+    for (const k in BIOMES) {
+        const b = BIOMES[k];
+        (biomesByTier[b.tier] = biomesByTier[b.tier] || []).push(k);
     }
 
     player.biomeOrder = [];
@@ -373,32 +310,26 @@ function generateRandomizedBiomeOrder() {
 
     player.biomeUnlockLevels = {};
     let currentLvl = 1, increment = 3, step = 0;
-    player.biomeOrder.forEach(biomeKey => {
-        player.biomeUnlockLevels[biomeKey] = currentLvl;
+    player.biomeOrder.forEach(k => {
+        player.biomeUnlockLevels[k] = currentLvl;
         currentLvl += increment;
         step++;
         if (step === 2) increment = 4;
         else if (step === 3) { increment = 3; step = 0; }
     });
-    console.log("Biome order generated:", player.biomeOrder, player.biomeUnlockLevels);
 }
 
 function updatePlayerTier() {
     if (!player) return;
-    let maxTier = 0;
-     // Ensure biomeOrder exists before iterating
-    if (!player.biomeOrder || player.biomeOrder.length === 0) {
-        console.warn("Biome order not set, generating now.");
-        generateRandomizedBiomeOrder();
-    }
-    player.biomeOrder.forEach(biomeKey => {
-        // Ensure biomeUnlockLevels exists
-        if (player.biomeUnlockLevels && player.level >= player.biomeUnlockLevels[biomeKey]) {
-            maxTier = Math.max(maxTier, BIOMES[biomeKey]?.tier || 0); // Add safety check for BIOMES data
+    if (!player.biomeOrder || player.biomeOrder.length === 0) generateRandomizedBiomeOrder();
+    
+    let maxTier = 1;
+    player.biomeOrder.forEach(k => {
+        if (player.biomeUnlockLevels && player.level >= player.biomeUnlockLevels[k]) {
+            maxTier = Math.max(maxTier, BIOMES[k]?.tier || 0);
         }
     });
-    player.playerTier = maxTier || 1;
-     console.log("Player tier updated:", player.playerTier);
+    player.playerTier = maxTier;
 }
 
 function updateRealTimePalette() {
@@ -420,882 +351,533 @@ function setDifficulty(newDifficulty) {
     renderSettingsMenu();
 }
 
+// =============================================================================
+// SAVE & LOAD SYSTEM
+// =============================================================================
+
 async function saveGame(manual = false) {
     if (!player) return;
 
-    // --- SEMI-SPAM PROTECTION (CLIENT SIDE) ---
+    // Spam Protection (2s cooldown)
     const now = Date.now();
-    const COOLDOWN_MS = 1000; // 2 seconds
-
-    // If we saved less than 2 seconds ago, just exit silently.
-    // This prevents the "Error: Could not save" log from appearing.
-    if (now - lastSaveTimestamp < COOLDOWN_MS) {
-        if (manual) console.log("Save throttled: You are clicking too fast.");
-        return; 
-    }
-    
-    // Update the local timestamp
+    if (now - lastSaveTimestamp < 1000) return;
     lastSaveTimestamp = now;
-    // ------------------------------------------
-    
-    // Deep copy player data for saving
-    const saveData = JSON.parse(JSON.stringify(player));
 
-    // Clean up non-serializable data before saving
+    // Serialize Data
+    const saveData = JSON.parse(JSON.stringify(player));
+    
+    // Clean ephemeral data
     delete saveData.racialPassive;
     delete saveData.signatureAbilityData;
-    
-    // Save necessary global state variables
-    saveData.lastView = gameState.currentView;
-    saveData.currentMap = gameState.currentMap;
-    saveData.currentNodeId = gameState.currentNodeId;
-    saveData.currentBiome = gameState.currentBiome;
-
-    // Add keys for equipped items for robust loading
-    saveData.equippedWeaponKey = findKeyByInstance(WEAPONS, player.equippedWeapon);
-    saveData.equippedCatalystKey = findKeyByInstance(CATALYSTS, player.equippedCatalyst);
-    saveData.equippedArmorKey = findKeyByInstance(ARMOR, player.equippedArmor);
-    saveData.equippedShieldKey = findKeyByInstance(SHIELDS, player.equippedShield);
-    
-    // NPC ALLY: Serialize ally equipment
     if (saveData.npcAlly) {
         delete saveData.npcAlly.racialPassive;
         delete saveData.npcAlly.signatureAbilityData;
-        
+        // Convert objects to keys for storage
         saveData.npcAlly.equippedWeaponKey = findKeyByInstance(WEAPONS, player.npcAlly.equippedWeapon);
         saveData.npcAlly.equippedCatalystKey = findKeyByInstance(CATALYSTS, player.npcAlly.equippedCatalyst);
         saveData.npcAlly.equippedArmorKey = findKeyByInstance(ARMOR, player.npcAlly.equippedArmor);
         saveData.npcAlly.equippedShieldKey = findKeyByInstance(SHIELDS, player.npcAlly.equippedShield);
     }
 
-    console.log("Preparing save data (includes equipment keys):", saveData);
+    // Global State
+    saveData.lastView = gameState.currentView;
+    saveData.currentMap = gameState.currentMap;
+    saveData.currentNodeId = gameState.currentNodeId;
+    saveData.currentBiome = gameState.currentBiome;
 
-    // --- Local Storage (Guest) Save ---
+    // Convert Player Equipment to Keys
+    saveData.equippedWeaponKey = findKeyByInstance(WEAPONS, player.equippedWeapon);
+    saveData.equippedCatalystKey = findKeyByInstance(CATALYSTS, player.equippedCatalyst);
+    saveData.equippedArmorKey = findKeyByInstance(ARMOR, player.equippedArmor);
+    saveData.equippedShieldKey = findKeyByInstance(SHIELDS, player.equippedShield);
+
+    // 1. Local Storage (Guest)
     if (!auth?.currentUser || auth.currentUser.isAnonymous) {
         try {
             localStorage.setItem('rpgSaveData_local', JSON.stringify(saveData));
-            console.log("Game Saved Locally.");
             if (manual) addToLog('Game Saved Locally!', 'text-green-400 font-bold');
-        } catch (error) {
-            console.error("Could not save game to localStorage:", error);
-            addToLog('Error: Could not save game locally.', 'text-red-400');
-        }
+        } catch (e) { console.error("Local Save Error:", e); }
         return;
     }
 
-    // --- Cloud (Firestore) Save ---
+    // 2. Cloud Storage
     try {
-        // [DDOS PROTECTION] Add server timestamp. 
-        // The Security Rules will REJECT the write if this field is missing or incorrect.
         saveData.lastUpdated = firebase.firestore.FieldValue.serverTimestamp();
+        const charRef = db.collection(`artifacts/${appId}/users/${userId}/characters`);
 
-        const charactersCollection = db.collection(`artifacts/${appId}/users/${userId}/characters`);
-        
         if (player.firestoreId) {
-             console.log(`Saving to existing doc: ${player.firestoreId}`);
-            await charactersCollection.doc(player.firestoreId).set(saveData, { merge: true });
+            await charRef.doc(player.firestoreId).set(saveData, { merge: true });
         } else {
-             console.log("Saving new character doc...");
-            const docRef = await charactersCollection.add(saveData);
+            const docRef = await charRef.add(saveData);
             player.firestoreId = docRef.id;
-             console.log(`New character saved with ID: ${player.firestoreId}`);
         }
-        
-        console.log("Game Saved to Cloud.");
+
         if (manual) addToLog('Game Saved to Cloud!', 'text-green-400 font-bold');
 
-        // --- Public Ghost Snapshot ---
-        // Only save snapshot if we have a valid firestoreId
-        if (db && userId && !auth.currentUser.isAnonymous && player.firestoreId) {
-            try {
-                const snapshotData = {
-                    name: saveData.name,
-                    raceKey: saveData.race,
-                    _classKey: saveData._classKey,
-                    backgroundKey: saveData.backgroundKey,
-                    backgroundName: saveData.background,
-                    level: saveData.level,
-                    baseGender: saveData.gender,
-                    
-                    // [DDOS PROTECTION] Snapshot must also have the timestamp to pass the public rules
-                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
-                    
-                    userId: userId, 
-                    equippedWeaponKey: saveData.equippedWeaponKey,
-                    equippedCatalystKey: saveData.equippedCatalystKey,
-                    equippedArmorKey: saveData.equippedArmorKey,
-                    equippedShieldKey: saveData.equippedShieldKey,
-                    spells: saveData.spells,
-                    items: saveData.inventory.items
-                };
-                
-                // Save to the public collection using the same ID as the private doc
-                const publicRef = db.collection(`artifacts/${appId}/public/data/characters`).doc(player.firestoreId);
-                await publicRef.set(snapshotData, { merge: true });
-                console.log(`Public 'ghost' snapshot saved for ${saveData.name}.`);
-
-            } catch (snapshotError) {
-                // Don't fail the main save if the ghost snapshot fails
-                console.error("Could not save public character snapshot:", snapshotError);
-            }
+        // 3. Public Ghost Snapshot
+        if (player.firestoreId) {
+            const snapshotData = {
+                name: saveData.name,
+                raceKey: saveData.race,
+                _classKey: saveData._classKey,
+                backgroundKey: saveData.backgroundKey,
+                backgroundName: saveData.background,
+                level: saveData.level,
+                baseGender: saveData.gender,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+                userId: userId,
+                equippedWeaponKey: saveData.equippedWeaponKey,
+                equippedCatalystKey: saveData.equippedCatalystKey,
+                equippedArmorKey: saveData.equippedArmorKey,
+                equippedShieldKey: saveData.equippedShieldKey,
+                spells: saveData.spells,
+                items: saveData.inventory.items
+            };
+            // Async fire-and-forget for ghost data
+            db.collection(`artifacts/${appId}/public/data/characters`)
+              .doc(player.firestoreId)
+              .set(snapshotData, { merge: true })
+              .catch(e => console.error("Ghost Snapshot Error:", e));
         }
-
     } catch (error) {
-        console.error("Could not save game to Firestore:", error);
+        console.error("Cloud Save Error:", error);
         addToLog('Error: Could not save game to cloud.', 'text-red-400');
     }
 }
 
-async function renderLoadMenu() {
-    console.log("Rendering Load Menu...");
-    let html = `<div class="w-full text-center">
-        <h2 class="font-medieval text-3xl mb-4 text-center">Load Character</h2>
-        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`;
-    let hasSaves = false;
-
-    // --- THIS IS THE FIX ---
-    // The onclick handler is modified to manually call handleRouteChange()
-    const createSaveHTML = (charData, key, isGuest) => `
-        <div class="p-3 bg-slate-800 ${isGuest ? 'border-l-4 border-yellow-400' : ''} rounded-lg flex justify-between items-center">
-            <div>
-                <p class="font-bold text-yellow-300">${charData.name} ${isGuest ? '<span class="text-sm font-normal text-gray-400">(Guest)</span>' : ''}</p>
-                <p class="text-sm text-gray-400">Level ${charData.level} ${charData.race || ''} ${charData.class || ''}</p>
-            </div>
-            <div>
-                <button onclick="sessionStorage.setItem('activeSaveKey', '${key}'); window.location.hash = 'game'; handleRouteChange();" class="btn btn-primary text-sm py-1 px-3">Load</button>
-                <button onclick="deleteSave('${key}')" class="btn btn-action text-sm py-1 px-3 ml-2">Delete</button>
-            </div>
-        </div>`;
-    // --- END FIX ---
-
-    // Check Local Storage (Guest Save)
-    const localSaveDataString = localStorage.getItem('rpgSaveData_local');
-    if (localSaveDataString) {
-        try {
-            console.log("Local save found.");
-            hasSaves = true;
-            html += createSaveHTML(JSON.parse(localSaveDataString), 'local', true);
-        } catch (e) { console.error("Error parsing local save:", e); }
-    } else {
-        console.log("No local save found.");
-    }
-
-    // Check Firestore (Cloud Saves)
-    if (db && userId) {
-         console.log(`Checking Firestore for user ${userId}...`);
-        try {
-            const querySnapshot = await db.collection(`artifacts/${appId}/users/${userId}/characters`).get();
-            if (!querySnapshot.empty) {
-                console.log(`Found ${querySnapshot.size} cloud saves.`);
-                hasSaves = true;
-                querySnapshot.forEach(doc => html += createSaveHTML(doc.data(), doc.id, false));
-            } else {
-                console.log("No cloud saves found for user.");
-            }
-        } catch (error) {
-            console.error("Error loading characters from Firestore:", error);
-            html += `<p class="text-red-400">Could not load cloud characters.</p>`;
-        }
-    } else {
-         console.log("Firestore DB or userId not available, skipping cloud save check.");
-    }
-
-
-    if (!hasSaves) html += `<p class="text-gray-400">No saved games found.</p>`;
-
-    html += `</div><div class="text-center mt-4"><button onclick="showStartScreen()" class="btn btn-primary">Back</button></div></div>`;
-
-    $('#start-screen').classList.add('hidden');
-    const screenContainer = $('#changelog-screen');
-    screenContainer.innerHTML = html;
-    screenContainer.classList.remove('hidden');
-     console.log("Load Menu rendered.");
-}
-
-async function deleteSave(docId) {
-     if (docId === 'local') {
-         localStorage.removeItem('rpgSaveData_local');
-         addToLog("Guest save file deleted.", "text-yellow-400");
-     } else if (db && userId) {
-         try {
-             await db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId).delete();
-             addToLog("Cloud save file deleted.", "text-yellow-400");
-             // Clear active key if the deleted save was the active one
-             if (sessionStorage.getItem('activeSaveKey') === docId) {
-                sessionStorage.removeItem('activeSaveKey');
-             }
-         } catch (error) { console.error("Error deleting save:", error); }
-     }
-     await renderLoadMenu(); // Refresh the load menu
-     await updateLoadGameButtonVisibility(); // Update button visibility on start screen
-}
-
-
 async function loadGameFromKey(docId, isImport = false) {
-    console.log(`loadGameFromKey called with docId: ${docId}, isImport: ${isImport}`);
+    console.log(`Loading Game: ${docId}`);
     let parsedData;
 
     try {
         if (docId === 'local') {
-            console.log("Loading from local storage...");
             const localSave = localStorage.getItem('rpgSaveData_local');
-            if (!localSave) throw new Error("Local save file not found!");
+            if (!localSave) throw new Error("No local save found.");
             parsedData = JSON.parse(localSave);
-            console.log("Local data parsed.");
         } else {
-            console.log(`Loading from Firestore, docId: ${docId}, userId: ${userId}`);
-            if (!db || !userId) { // Added check for db/userId
-                console.error("Firestore DB or userId not available for cloud load.");
-                throw new Error("Cannot load cloud save - connection issue.");
-            }
-            const docRef = db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId);
-            const docSnap = await docRef.get(); // Changed to get specific doc
-            if (!docSnap.exists) {
-                console.error(`Save file ${docId} not found for user ${userId}.`);
-                 sessionStorage.removeItem('activeSaveKey'); // Clear invalid key
-                 window.location.hash = 'menu'; // Go back to menu
-                throw new Error("Save file not found in the cloud! Returning to menu.");
-            }
-            parsedData = docSnap.data();
-             console.log("Firestore data fetched and parsed.");
+            if (!db || !userId) throw new Error("DB connection missing.");
+            const doc = await db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId).get();
+            if (!doc.exists) throw new Error("Save file missing.");
+            parsedData = doc.data();
         }
     } catch (e) {
-        console.error("Error loading game data:", e);
-        alert(e.message); // Use alert for critical load errors
-        sessionStorage.removeItem('activeSaveKey'); // Clear potentially bad key
+        console.error("Load Error:", e);
+        alert(e.message);
+        sessionStorage.removeItem('activeSaveKey');
         window.location.hash = 'menu';
         return;
     }
 
     if (parsedData) {
-        console.log("Parsed data exists, creating player object...");
-        // MODIFIED: Constructor now only needs raceKey initially
+        // Rehydrate Player
         player = new Player("Loading...", parsedData.race || "Human");
-        
-        // --- NPC ALLY: Re-instantiate ally object BEFORE assigning player data ---
-        // This is crucial. We must rebuild the NpcAlly object from its saved data
-        // because the saved data is just a plain object, not a class instance.
+        player.seed = parsedData.seed || Math.floor(Math.random() * 1000000);
+
+        // Rehydrate NPC Ally
         if (parsedData.npcAlly) {
-            console.log("Re-instantiating NpcAlly...");
-            const allyData = parsedData.npcAlly;
-            
-            // --- THIS IS THE FIX ---
-            // Pass the raceKey from the saved data, not the level
-            const newAlly = new NpcAlly(allyData.name, allyData._classKey, allyData.raceKey, allyData.level, allyData.backgroundKey, allyData.background);
-            // --- END FIX ---
-            
-            // Now, copy all saved properties *back* onto the new instance
-            Object.assign(newAlly, allyData);
-
-            // --- ADDED: Link ally's racial/class abilities ---
+            const ad = parsedData.npcAlly;
+            const newAlly = new NpcAlly(ad.name, ad._classKey, ad.raceKey, ad.level, ad.backgroundKey, ad.background);
+            Object.assign(newAlly, ad);
             newAlly.updateAbilityReferences();
-            // --- END ADDED ---
             
-            // --- MIGRATION (for ally) ---
-            if (!newAlly.inventory) newAlly.inventory = { items: {}, size: 10, stack: 10 };
-            if (!newAlly.equipmentOrder) newAlly.equipmentOrder = [];
-            if (newAlly.isResting === undefined) newAlly.isResting = false; // <<< NEW
-            if (!newAlly.enchantments) newAlly.enchantments = {}; // <-- NEW: Ally enchantment migration
+            // Ally defaults
+            newAlly.inventory = newAlly.inventory || { items: {}, size: 10, stack: 10 };
+            newAlly.equipmentOrder = newAlly.equipmentOrder || [];
+            newAlly.isResting = newAlly.isResting || false;
+            newAlly.enchantments = newAlly.enchantments || {};
 
-            // --- END MIGRATION ---
-            
-            // Re-link equipment details from keys
-            newAlly.equippedWeapon = WEAPONS[allyData.equippedWeaponKey] || WEAPONS[findKeyByName(allyData.equippedWeapon?.name, WEAPONS)] || WEAPONS['fists'];
-            newAlly.equippedCatalyst = CATALYSTS[allyData.equippedCatalystKey] || CATALYSTS[findKeyByName(allyData.equippedCatalyst?.name, CATALYSTS)] || CATALYSTS['no_catalyst'];
-            newAlly.equippedArmor = ARMOR[allyData.equippedArmorKey] || ARMOR[findKeyByName(allyData.equippedArmor?.name, ARMOR)] || ARMOR['travelers_garb'];
-            newAlly.equippedShield = SHIELDS[allyData.equippedShieldKey] || SHIELDS[findKeyByName(allyData.equippedShield?.name, SHIELDS)] || SHIELDS['no_shield'];
+            // Ally Gear
+            newAlly.equippedWeapon = WEAPONS[ad.equippedWeaponKey] || WEAPONS['fists'];
+            newAlly.equippedCatalyst = CATALYSTS[ad.equippedCatalystKey] || CATALYSTS['no_catalyst'];
+            newAlly.equippedArmor = ARMOR[ad.equippedArmorKey] || ARMOR['travelers_garb'];
+            newAlly.equippedShield = SHIELDS[ad.equippedShieldKey] || SHIELDS['no_shield'];
 
-            parsedData.npcAlly = newAlly; // Replace plain object with class instance
-            console.log("NpcAlly re-instantiated.", parsedData.npcAlly);
+            parsedData.npcAlly = newAlly;
         }
-        // --- END NPC ALLY ---
-        
-        Object.assign(player, parsedData); // Load all saved data
 
-        // --- NEW: Restore essential global state from loaded data ---
+        Object.assign(player, parsedData);
+        if(docId !== 'local') player.firestoreId = docId;
+
+        // Restore Global State
         gameState.currentMap = parsedData.currentMap || null;
         gameState.currentNodeId = parsedData.currentNodeId || null;
         gameState.currentBiome = parsedData.currentBiome || null;
-        
-        // --- NEW: Capture the last view key ---
         const lastView = parsedData.lastView || 'town';
 
-        // Set firestoreId if loaded from cloud
-        if(docId !== 'local') player.firestoreId = docId;
+        // --- MIGRATION & DEFAULTS ---
+        if (!player.house) player.house = { owned: false, storage: { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} }, garden: [], treePlots: [] };
+        ['storageTier', 'gardenTier', 'kitchenTier', 'alchemyTier', 'trainingTier'].forEach(t => { if (player.house[t] === undefined) player.house[t] = 0; });
+        
+        // Arrays
+        player.house.garden = Array.isArray(player.house.garden) ? player.house.garden : [];
+        player.house.treePlots = Array.isArray(player.house.treePlots) ? player.house.treePlots : [];
+        player.knownCookingRecipes = player.knownCookingRecipes || [];
+        player.knownAlchemyRecipes = player.knownAlchemyRecipes || [];
+        player.enchantments = player.enchantments || {};
+        player.biomeClears = player.biomeClears || {};
+        player.barracksRoster = player.barracksRoster || [];
+        player.equippedSkills = player.equippedSkills || [];
+        player.unlockedSkills = player.unlockedSkills || ['the_root'];
 
-         console.log("Player object created from saved data:", player);
+        // Progression & Unlocks
+        if (!player.unlocks) player.unlocks = {};
+        const u = player.unlocks;
+        
+        // Retroactive Unlocks Logic
+        if (player.level >= 5) { u.houseAvailable = true; u.blackMarket = true; }
+        if (player.level >= 8) { u.barracks = true; }
+        if (player.level >= 10) { u.arcaneCasino = true; }
+        if (player.inventory?.items?.['blacksmith_key']) u.blacksmith = true;
+        if (player.inventory?.items?.['tower_key']) u.sageTower = true;
 
-
-        // --- DATA MIGRATION & DEFAULTS ---
-         console.log("Applying data migrations and defaults...");
-         
-         const inv = player.inventory;
-         
-        if (!player.house) player.house = { owned: false, storage: { items: {}, weapons: [], armor: [], shields: [], catalysts: [], lures: {} }, garden: [] }; // Added empty arrays
-        ['storageTier', 'gardenTier', 'kitchenTier', 'alchemyTier', 'trainingTier'].forEach(tier => {
-            if (player.house[tier] === undefined) player.house[tier] = 0;
-        });
-        if (player.house.alchemyTier === undefined) player.house.alchemyTier = 0;
-        if (player.house.trainingTier === undefined) player.house.trainingTier = 0;
-        if (!Array.isArray(player.house.garden)) player.house.garden = [];
-        if (!player.house.treePlots || !Array.isArray(player.house.treePlots)) player.house.treePlots = [];
-        if (!player.difficulty) player.difficulty = 'hardcore';
-        if (!player.knownCookingRecipes) player.knownCookingRecipes = [];
-        if (!player.knownAlchemyRecipes) player.knownAlchemyRecipes = [];
-        if (!player.enchantments) player.enchantments = {}; // <-- NEW: Player enchantment migration
-        if (!player.biomeClears) player.biomeClears = {}; // <--- NEW
-        if (!player.seed) player.seed = Math.floor(Math.random() * 1000000);
-        if (player.elementalAffinity === undefined) player.elementalAffinity = null; // Add default for old saves
-        // --- NPC ALLY: Migration for Player ---
-        if (player.npcAlly === undefined) player.npcAlly = null;
-        if (player.encountersSinceLastPay === undefined) player.encountersSinceLastPay = 0;
-        // --- NEW: Barracks Roster Migration ---
-        if (player.barracksRoster === undefined) player.barracksRoster = [];
-        // --- END NEW ---
-        // --- END NPC ALLY ---
-
-        // Ensure inventory structure is correct
-        // --- Added Defaults for Progression ---
-        if (player.killsSinceLevel4 === undefined) player.killsSinceLevel4 = 0;
-        if (player.killsSinceLevel7 === undefined) player.killsSinceLevel7 = 0;
-        if (!player.unlocks) { // If unlocks object doesn't exist at all
-            player.unlocks = {
-                blacksmith: false, sageTower: false, houseAvailable: false,
-                blackMarket: false, enchanter: false, witchCoven: false,
-                hasBlacksmithKey: false, hasTowerKey: false,
-                barracks: false // --- NPC ALLY ---
+        // Roguelike Casino State
+        if (!player.roguelikeBlackjackState) {
+            player.roguelikeBlackjackState = {
+                runActive: false, buyIn: 500, currentAnteIndex: 0, currentVingtUnIndex: 0,
+                currentCrookards: 0, passiveModifiers: [], consumables: [], patronSkills: [],
+                runUpgrades: { passiveSlots: 5, consumableSlots: 2, handSize: 5, shopRerollCost: 1, bonusHandsPerVingtUn: 0, bonusRerollsPerVingtUn: 0, baseMultiplier: 0 },
+                currentChips: 0, currentHandsLeft: 0, currentRerollsLeft: 0, vingtUnBustSafety: true,
+                deck: [], playerHand: [], dealerHand: [], sharedPool: [], lastScore: 0,
+                gamePhase: 'buy_in', statusMessage: '', shopStock: [], masterDeckList: [], discardPile: [],
+                shopLockedSlots: [], shopLockCost: 2, deckAbilities: {}, cardEnhancements: {}, cardPairs: [], 
+                purchasedArcana: [], conjurePackDisplay: { packKey: null, cards: [], chosenIndices: [] },
+                highestAnteCleared: 0
             };
-        } else { // Check individual flags if object exists
-            if (player.unlocks.blacksmith === undefined) player.unlocks.blacksmith = false;
-            if (player.unlocks.sageTower === undefined) player.unlocks.sageTower = false;
-            // Check house based on level for older saves
-            if (player.unlocks.houseAvailable === undefined) player.unlocks.houseAvailable = player.level >= 5;
-            // Check black market based on level for older saves
-            if (player.unlocks.blackMarket === undefined) player.unlocks.blackMarket = player.level >= 5;
-            if (player.unlocks.enchanter === undefined) player.unlocks.enchanter = false;
-            if (player.unlocks.witchCoven === undefined) player.unlocks.witchCoven = false;
-            // Infer key possession from inventory for older saves
-            if (player.unlocks.hasBlacksmithKey === undefined) player.unlocks.hasBlacksmithKey = !!player.inventory?.items?.['blacksmith_key'];
-            if (player.unlocks.hasTowerKey === undefined) player.unlocks.hasTowerKey = !!player.inventory?.items?.['tower_key'];
-            // --- NPC ALLY: Barracks migration ---
-            if (player.unlocks.barracks === undefined) player.unlocks.barracks = (player.level >= 8);
-            if (player.lastCasinoBet === undefined) player.lastCasinoBet = 10; // <-- NEW
-            if (player.lastCasinoAnte === undefined) player.lastCasinoAnte = 10; // <-- NEW
-
-            // --- NEW: Add roguelike state for old saves ---
-            if (!player.roguelikeBlackjackState) {
-                console.log("Migrating old save: Adding default roguelikeBlackjackState.");
-                player.roguelikeBlackjackState = {
-                    runActive: false,
-                    buyIn: 500,
-                    currentAnteIndex: 0,
-                    currentVingtUnIndex: 0,
-                    currentCrookards: 0,
-                    passiveModifiers: [],
-                    consumables: [],
-                    patronSkills: [],
-                    runUpgrades: {
-                        passiveSlots: 5,
-                        consumableSlots: 2,
-                        handSize: 5,
-                        shopRerollCost: 1,
-                        bonusHandsPerVingtUn: 0,
-                        bonusRerollsPerVingtUn: 0,
-                        baseMultiplier: 0
-                    },
-                    currentChips: 0,
-                    currentHandsLeft: 0,
-                    currentRerollsLeft: 0,
-                    vingtUnBustSafety: true,
-                    deck: [],
-                    playerHand: [],
-                    dealerHand: [],
-                    sharedPool: [],
-                    lastScore: 0,
-                    gamePhase: 'buy_in',
-                    statusMessage: '',
-                    shopStock: [],
-                    masterDeckList: [],
-                    discardPile: [],
-                    shopLockedSlots: [],
-                    shopLockCost: 2,
-                    deckAbilities: {},      // For deck-wide buffs like Polychrome
-                    cardEnhancements: {}, // Stores ability per unique card ID
-                    cardPairs: [],          // Stores pairs of unique card IDs for Lovers
-                    purchasedArcana: [],    // <-- ADD THIS LINE
-                    conjurePackDisplay: { packKey: null, cards: [], chosenIndices: [] }
-                }
-            }
-            if (player.roguelikeBlackjackState.patronSkills === undefined) {
-                console.log("Migrating old roguelike state: Adding missing patronSkills array.");
-                player.roguelikeBlackjackState.patronSkills = [];
-            }
-            // --- NEW MIGRATION FOR DECK UNLOCKS ---
-            if (player.roguelikeBlackjackState.highestAnteCleared === undefined) {
-                // If the value doesn't exist, migrate it.
-                // currentAnteIndex (0-based) is the ante they are *on*.
-                // So, highestAnteCleared (number of cleared antes) should be equal to currentAnteIndex.
-                player.roguelikeBlackjackState.highestAnteCleared = player.roguelikeBlackjackState.currentAnteIndex || 0;
-                console.log(`Migrating old save: Set highestAnteCleared to ${player.roguelikeBlackjackState.highestAnteCleared}`);
-            }
-            // --- END MIGRATION ---
-            if (player.roguelikeBlackjackState.masterDeckList === undefined) {
-                console.log("Migrating old roguelike state: Adding missing masterDeckList array.");
-                player.roguelikeBlackjackState.masterDeckList = [];
-            }
-            if (player.roguelikeBlackjackState.discardPile === undefined) {
-                player.roguelikeBlackjackState.discardPile = [];
-            }
-            // --- ADD THESE LINES ---
-            if (player.roguelikeBlackjackState.deckAbilities === undefined) {
-                player.roguelikeBlackjackState.deckAbilities = {};
-            }
-            if (player.roguelikeBlackjackState.cardEnhancements === undefined) {
-                player.roguelikeBlackjackState.cardEnhancements = {};
-            }
-            if (player.roguelikeBlackjackState.cardPairs === undefined) {
-                player.roguelikeBlackjackState.cardPairs = [];
-            }
-            if (player.roguelikeBlackjackState.purchasedArcana === undefined) {
-                console.log("Migrating old roguelike state: Adding missing purchasedArcana array.");
-                player.roguelikeBlackjackState.purchasedArcana = [];
-            }
-            if (player.roguelikeBlackjackState.shopLockedSlots === undefined) {
-                console.log("Migrating old roguelike state: Adding missing shopLockedSlots array.");
-                player.roguelikeBlackjackState.shopLockedSlots = [];
-            }
-            if (player.roguelikeBlackjackState.shopLockCost === undefined) {
-                console.log("Migrating old roguelike state: Adding default shopLockCost.");
-                player.roguelikeBlackjackState.shopLockCost = 2;
-            }
-            // --- END ADDITION ---
-            if (player.roguelikeBlackjackState.conjurePackDisplay === undefined) {
-                console.log("Migrating old roguelike state: Adding missing conjurePackDisplay object.");
-                player.roguelikeBlackjackState.conjurePackDisplay = { packKey: null, cards: [], chosenIndices: [] };
-            }
-            if (player.roguelikeBlackjackState.arcanaPackDisplay === undefined) { player.roguelikeBlackjackState.arcanaPackDisplay = null; }
-            if (player.roguelikeBlackjackState.arcanaSelection === undefined) { player.roguelikeBlackjackState.arcanaSelection = null; }
-            if (player.roguelikeBlackjackState.arcanaSelection === undefined) { player.roguelikeBlackjackState.arcanaSelection = null; }
-            if (player.roguelikeBlackjackState.playerFinalEval === undefined) { player.roguelikeBlackjackState.playerFinalEval = null; }
-            if (player.roguelikeBlackjackState.dealerFinalEval === undefined) { player.roguelikeBlackjackState.dealerFinalEval = null; }
-            // --- END NEW ---
+        } else {
+            // Patch existing RL state
+            const rl = player.roguelikeBlackjackState;
+            if (rl.highestAnteCleared === undefined) rl.highestAnteCleared = rl.currentAnteIndex || 0;
+            if (!rl.masterDeckList) rl.masterDeckList = [];
+            if (!rl.purchasedArcana) rl.purchasedArcana = [];
+            if (!rl.shopLockedSlots) rl.shopLockedSlots = [];
+            if (!rl.deckAbilities) rl.deckAbilities = {};
         }
-        // --- ADD THESE LINES for migration ---
-
-            // --- END ADDED LINES ---
-            // --- END NPC ALLY ---
-        // --- End Added ---
-                // --- NEW: Retroactive Unlock Fix for saves that have 'false' ---
-        // This runs *after* the initial migration, catching old saves
-        if (player.level >= 5 && !player.unlocks.houseAvailable) {
-            player.unlocks.houseAvailable = true;
-            console.log("Retroactively unlocked House.");
-        }
-        if (player.level >= 5 && !player.unlocks.blackMarket) {
-            player.unlocks.blackMarket = true;
-            console.log("Retroactively unlocked Black Market.");
-        }
-        if (player.level >= 8 && !player.unlocks.barracks) {
-            player.unlocks.barracks = true;
-            console.log("Retroactively unlocked Barracks.");
-        }
-        if (player.level >= 10 && !player.unlocks.arcaneCasino) {
-            player.unlocks.arcaneCasino = true;
-            console.log("Retroactively unlocked Arcane Casino.");
-        }
-        // Check for keys, then unlock the location
-        if (player.inventory?.items?.['blacksmith_key'] && !player.unlocks.blacksmith) {
-            player.unlocks.blacksmith = true;
-            console.log("Retroactively unlocked Blacksmith (key found).");
-        }
-        if (player.inventory?.items?.['tower_key'] && !player.unlocks.sageTower) {
-            player.unlocks.sageTower = true;
-            console.log("Retroactively unlocked Sage Tower (key found).");
-        }
-        // --- END NEW ---
-
-        if (!inv.items) inv.items = {};
-        if (!inv.weapons) inv.weapons = [];
-        if (!inv.catalysts) inv.catalysts = [];
-        if (!inv.armor) inv.armor = [];
-        if (!inv.shields) inv.shields = [];
-        if (!inv.lures) inv.lures = {};
-         console.log("Migrations applied.");
-
-
-        // --- CHARACTER COMPLETION CHECKS ---
+        if (!player.inventory.craftedCounts) player.inventory.craftedCounts = {}; 
+        if (!player.inventory.craftedAvgValues) player.inventory.craftedAvgValues = {}; // <-- NEW
+        // --- COMPLETENESS CHECKS ---
         if (!player.race) {
-            console.log("Player race missing, rendering race selection.");
-            renderRaceSelectionForOldSave(player, player.firestoreId || 'local', isImport);
+            renderRaceSelectionForOldSave(player, docId, isImport);
             return;
         }
         if (!player.class || !player.backgroundKey) {
-             console.log("Player class or backgroundKey missing, rendering selection.");
-            renderClassBackgroundSelectionForOldSave(player, player.firestoreId || 'local', isImport);
+            renderClassBackgroundSelectionForOldSave(player, docId, isImport);
             return;
         }
-        // Check for Elemental affinity if race is Elemental but affinity is missing
-        if (player.race === 'Elementals' && !player.elementalAffinity) {
-            console.log("Player is Elemental but missing affinity, rendering selection.");
-            renderRaceSelectionForOldSave(player, player.firestoreId || 'local', isImport); // Re-use race screen logic for this
-            return;
-        }
-
-
-        // --- HANDLE MISSING _classKey FOR OLD SAVES ---
+        
+        // Fix Class Key
         if (!player._classKey && player.class) {
-            console.warn("Save data missing _classKey. Attempting to derive from player.class:", player.class);
-            player._classKey = findClassKeyByName_local(player.class); // Use local helper
-            if (!player._classKey) {
-                console.error("Could not derive _classKey from player.class. Ability data may be missing.");
-                // Optionally handle this error, maybe force class selection?
-            } else {
-                console.log("Derived _classKey successfully:", player._classKey);
-            }
-        } else if (!player.class && player._classKey) {
-             // If save only has _classKey (unlikely but possible future state), set display name
-             player.class = CLASSES[player._classKey]?.name || "Unknown Class";
+            player._classKey = findClassKeyByName_local(player.class);
         }
 
-
-        // *** THIS CALL IS CRUCIAL ***
-        console.log(`DEBUG loadGame: Player class before updateAbilityReferences: "${player.class}", _classKey: "${player._classKey}"`);
-        player.updateAbilityReferences(); // Should now use the correct _classKey
-        console.log("...updateAbilityReferences finished. Player signatureAbilityData:", player.signatureAbilityData ? {...player.signatureAbilityData} : null);
-
-
-        // --- STAT RECALCULATION ---
-        console.log("Recalculating stats...");
+        // Recalculate Stats & Abilities
+        player.updateAbilityReferences();
         if (player.totalXp === undefined) {
-             console.log("Estimating total XP for older save...");
-            let estimatedTotalXp = 0;
-            // Use calculateXpToNextLevel for accuracy
-            for (let i = 1; i < player.level; i++) estimatedTotalXp += player.calculateXpToNextLevel(i);
-            player.totalXp = estimatedTotalXp + player.xp;
+            let estXp = 0;
+            for (let i = 1; i < player.level; i++) estXp += player.calculateXpToNextLevel(i);
+            player.totalXp = estXp + player.xp;
         }
-        player.recalculateLevelFromTotalXp(); // Recalculate level JUST IN CASE XP curve changed
-        player.recalculateGrowthBonuses(); // Recalculate derived stats based on loaded points
-        player.hp = Math.min(parsedData.hp, player.maxHp); // Ensure HP/MP aren't above recalculated max
-        player.mp = Math.min(parsedData.mp, player.maxMp);
-                // --- NEW: Sync Ally Level on Load ---
+        player.recalculateLevelFromTotalXp();
+        player.recalculateGrowthBonuses();
+        if (typeof player.recalculateSkillPoints === 'function') player.recalculateSkillPoints();
+        
+        // --- NEW: Run skill migration once on load ---
+        if (typeof player.checkSkillMigration === 'function') player.checkSkillMigration();
+        // ---------------------------------------------
+        
+        // Clamp HP/MP
+        player.hp = Math.min(player.hp, player.maxHp);
+        player.mp = Math.min(player.mp, player.maxMp);
+
+        // Sync Ally
         if (player.npcAlly) {
-            // Get HP/MP percentages *before* recalculating stats
-            const oldMaxHp = player.npcAlly.maxHp || player.maxHp; // Use player max as fallback
-            const oldHp = player.npcAlly.hp;
-            const oldMaxMp = player.npcAlly.maxMp || player.maxMp;
-            const oldMp = player.npcAlly.mp;
-
-            // Recalculate level and stats based on player's *current* level
-            player.npcAlly.calculateStats(player.level); 
-            
-            // Preserve HP/MP percentage from save
-            const hpPercent = (oldMaxHp > 0) ? (oldHp / oldMaxHp) : 1;
-            const mpPercent = (oldMaxMp > 0) ? (oldMp / oldMaxMp) : 1;
-            
-            // Apply percentages to *new* max values
-            player.npcAlly.hp = Math.max(1, Math.floor(player.npcAlly.maxHp * hpPercent));
-            player.npcAlly.mp = Math.floor(player.npcAlly.maxMp * mpPercent);
-            
-            console.log(`Synced ally ${player.npcAlly.name} to Lvl ${player.npcAlly.level}.`);
+            player.npcAlly.calculateStats(player.level);
+            player.npcAlly.hp = Math.min(player.npcAlly.hp, player.npcAlly.maxHp);
         }
-        // --- END NEW ---
-        console.log("Stats recalculated.");
 
-        // --- EQUIPMENT RE-ASSIGNMENT (Prioritize Key, Fallback to Name) ---
-        console.log("Re-assigning equipment (using keys first)...");
+        // Restore Equipment Objects from Keys
+        player.equippedWeapon = WEAPONS[parsedData.equippedWeaponKey] || WEAPONS['fists'];
+        player.equippedCatalyst = CATALYSTS[parsedData.equippedCatalystKey] || CATALYSTS['no_catalyst'];
+        player.equippedArmor = ARMOR[parsedData.equippedArmorKey] || ARMOR['travelers_garb'];
+        player.equippedShield = SHIELDS[parsedData.equippedShieldKey] || SHIELDS['no_shield'];
 
-        // --- THIS IS THE FIX (FOR PLAYER) ---
-        player.equippedWeapon = WEAPONS[parsedData.equippedWeaponKey] || WEAPONS[findKeyByName(parsedData.equippedWeapon?.name, WEAPONS)] || WEAPONS['fists'];
-        player.equippedCatalyst = CATALYSTS[parsedData.equippedCatalystKey] || CATALYSTS[findKeyByName(parsedData.equippedCatalyst?.name, CATALYSTS)] || CATALYSTS['no_catalyst'];
-        player.equippedArmor = ARMOR[parsedData.equippedArmorKey] || ARMOR[findKeyByName(parsedData.equippedArmor?.name, ARMOR)] || ARMOR['travelers_garb'];
-        player.equippedShield = SHIELDS[parsedData.equippedShieldKey] || SHIELDS[findKeyByName(parsedData.equippedShield?.name, SHIELDS)] || SHIELDS['no_shield'];
-        // --- END FIX ---
-
-        // Lure (already stored by key)
-        player.equippedLure = parsedData.equippedLure || 'no_lure';
-        console.log("Equipment re-assigned.");
-
-
-        // --- Final Setup ---
+        // Finalize
         document.body.classList.add('in-game');
-         console.log("Added 'in-game' class to body.");
-
         const isNewGame = sessionStorage.getItem('isNewGame') === 'true';
-        if (isNewGame) {
-            addToLog(`Welcome to Cocytus, ${player.name}!`);
-            sessionStorage.removeItem('isNewGame'); // Clear the flag
-        } else {
-            addToLog(`Welcome back, ${player.name}!`);
-        }
+        addToLog(isNewGame ? `Welcome to Cocytus, ${player.name}!` : `Welcome back, ${player.name}!`);
+        if (isNewGame) sessionStorage.removeItem('isNewGame');
 
-        // Delay rendering slightly to ensure DOM is ready
         requestAnimationFrame(() => {
-            console.log("Requesting animation frame for final rendering...");
             updateRealTimePalette();
             updateStatsView();
-
-            if (isNewGame && isTutorialEnabled) {
-                setTimeout(() => startTutorialSequence('main_game_screen'), 500);
-            } else if (player.statPoints > 0) {
-                setTimeout(() => renderCharacterSheet(true), 1500);
-            } else {
-                // Route to the specific saved view
-                routeToSavedView(lastView); // <-- Use the new router
-            }
-            console.log("loadGameFromKey finished execution.");
+            if (isNewGame && isTutorialEnabled) setTimeout(() => startTutorialSequence('main_game_screen'), 500);
+            else if (player.statPoints > 0) setTimeout(() => renderCharacterSheet(true), 1500);
+            else routeToSavedView(lastView);
         });
 
     } else {
-        console.error("Parsed data was null or undefined after loading attempt.");
-        alert("Failed to load character data.");
-        sessionStorage.removeItem('activeSaveKey');
+        alert("Failed to parse save data.");
         window.location.hash = 'menu';
     }
 }
 
-
-async function exportSave() {
-    if (!player) return;
-    try {
-        const saveDataString = JSON.stringify(player);
-        const base64Save = btoa(unescape(encodeURIComponent(saveDataString)));
-        // Use document.execCommand for broader compatibility within potential iframe restrictions
-        const textArea = document.createElement("textarea");
-        textArea.value = base64Save;
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        addToLog('Save data copied to clipboard!', 'text-green-400');
-    } catch (error) {
-        addToLog('Could not export save data. Try manually copying.', 'text-red-400');
-        console.error('Export failed:', error);
-        // Fallback: Display the key for manual copy
-        const saveDataString = JSON.stringify(player);
-        const base64Save = btoa(unescape(encodeURIComponent(saveDataString)));
-        prompt("Could not copy automatically. Please copy this key manually:", base64Save);
+async function deleteSave(docId) {
+    if (docId === 'local') {
+        localStorage.removeItem('rpgSaveData_local');
+        addToLog("Guest save deleted.", "text-yellow-400");
+    } else if (db && userId) {
+        try {
+            await db.collection(`artifacts/${appId}/users/${userId}/characters`).doc(docId).delete();
+            addToLog("Cloud save deleted.", "text-yellow-400");
+            if (sessionStorage.getItem('activeSaveKey') === docId) sessionStorage.removeItem('activeSaveKey');
+        } catch (e) { console.error(e); }
     }
+    await renderLoadMenu();
+    await updateLoadGameButtonVisibility();
 }
 
+// =============================================================================
+// UI RENDERING & INPUT
+// =============================================================================
 
-async function importSave(saveString) {
-    try {
-        const jsonString = decodeURIComponent(escape(atob(saveString)));
-        const parsedData = JSON.parse(jsonString);
-        if (!parsedData?.name) throw new Error("Invalid save data format.");
+async function renderLoadMenu() {
+    let html = `<div class="w-full text-center"><h2 class="font-medieval text-3xl mb-4">Load Character</h2><div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3">`;
+    let hasSaves = false;
 
-        delete parsedData.firestoreId; // Ensure we don't overwrite the ID if importing to a new account
-        // Pass classKey if available in parsedData, otherwise fallback handling in loadGameFromKey will trigger
-        player = new Player(parsedData.name, parsedData.race || "Human", parsedData._classKey);
-        Object.assign(player, parsedData); // Load data
-        player.updateAbilityReferences(); // Link abilities *after* loading data
+    const createSaveHTML = (data, key, isGuest) => `
+        <div class="p-3 bg-slate-800 ${isGuest ? 'border-l-4 border-yellow-400' : ''} rounded-lg flex justify-between items-center">
+            <div><p class="font-bold text-yellow-300">${data.name} ${isGuest ? '(Guest)' : ''}</p><p class="text-sm text-gray-400">Lvl ${data.level} ${data.race} ${data.class}</p></div>
+            <div>
+                <button onclick="sessionStorage.setItem('activeSaveKey', '${key}'); window.location.hash = 'game'; handleRouteChange();" class="btn btn-primary text-sm py-1 px-3">Load</button>
+                <button onclick="deleteSave('${key}')" class="btn btn-action text-sm py-1 px-3 ml-2">Delete</button>
+            </div>
+        </div>`;
 
-        await saveGame(); // Save the newly imported character (will create new doc if cloud)
-
-        addToLog(`Successfully imported character: ${player.name}! Loading game...`, "text-green-400");
-        const saveKey = player.firestoreId || 'local'; // Get the *new* ID or 'local'
-        sessionStorage.setItem('activeSaveKey', saveKey);
-        window.location.hash = 'game'; // Trigger load via hash change
-    } catch (error) {
-        console.error("Could not import save:", error);
-        alert("Failed to import save. The key might be invalid or corrupted.");
+    const localSave = localStorage.getItem('rpgSaveData_local');
+    if (localSave) {
+        try {
+            html += createSaveHTML(JSON.parse(localSave), 'local', true);
+            hasSaves = true;
+        } catch (e) {}
     }
-}
 
+    if (db && userId) {
+        try {
+            const snaps = await db.collection(`artifacts/${appId}/users/${userId}/characters`).get();
+            if (!snaps.empty) {
+                hasSaves = true;
+                snaps.forEach(doc => html += createSaveHTML(doc.data(), doc.id, false));
+            }
+        } catch (e) { console.error(e); html += `<p class="text-red-400">Cloud error.</p>`; }
+    }
+
+    if (!hasSaves) html += `<p class="text-gray-400">No saves found.</p>`;
+    html += `</div><div class="text-center mt-4"><button onclick="showStartScreen()" class="btn btn-primary">Back</button></div></div>`;
+    
+    $('#start-screen').classList.add('hidden');
+    const container = $('#changelog-screen');
+    container.innerHTML = html;
+    container.classList.remove('hidden');
+}
 
 function showStartScreen() {
-    console.log("Showing Start Screen.");
     document.body.classList.remove('in-game');
-    ['#changelog-screen', '#character-creation-screen', '#old-save-race-selection-screen', '#old-save-class-background-screen'].forEach(s => $(s)?.classList.add('hidden')); // Added safety check
-    $('#start-screen')?.classList.remove('hidden'); // Added safety check
+    ['#changelog-screen', '#character-creation-screen', '#old-save-race-selection-screen', '#old-save-class-background-screen'].forEach(s => {
+        const el = $(s);
+        if(el) el.classList.add('hidden');
+    });
+    
+    const start = $('#start-screen');
+    if(start) start.classList.remove('hidden');
 
-    if(logElement) logElement.innerHTML = ''; // Added safety check
-    player = null; // Ensure player object is cleared
+    if(logElement) logElement.innerHTML = '';
+    player = null;
     sessionStorage.removeItem('activeSaveKey');
     updateLoadGameButtonVisibility();
-    if(realTimeInterval) clearInterval(realTimeInterval);
-    if(gardenInterval) clearInterval(gardenInterval);
-    realTimeInterval = gardenInterval = null;
+    cleanupIntervals();
     applyTheme('default');
-    // Ensure persistent buttons are hidden
-    $('#persistent-buttons')?.classList.add('hidden');
+    const btns = $('#persistent-buttons');
+    if(btns) btns.classList.add('hidden');
 }
 
-
 async function updateLoadGameButtonVisibility() {
-    console.log("Updating Load Game Button Visibility...");
-    const localSaveExists = !!localStorage.getItem('rpgSaveData_local');
-    const loadGameBtn = $('#load-game-btn');
-    const graveyardBtn = $('#graveyard-btn');
-     if (!loadGameBtn || !graveyardBtn) {
-         console.warn("Load/Graveyard buttons not found in DOM yet.");
-         return; // Exit if elements aren't ready
-     }
+    const btn = $('#load-game-btn');
+    const graveBtn = $('#graveyard-btn');
+    if (!btn || !graveBtn) return;
 
-    graveyardBtn.classList.add('hidden'); // Hide by default
+    graveBtn.classList.add('hidden');
+    const hasLocal = !!localStorage.getItem('rpgSaveData_local');
 
     if (!db || !userId) {
-        console.log("DB/userId not available, checking only local save.");
-        loadGameBtn.classList.toggle('hidden', !localSaveExists);
-        return; // Can't check cloud or graveyard without db/userId
+        btn.classList.toggle('hidden', !hasLocal);
+        return;
     }
 
     try {
-        // Check for character saves for the current user
-        console.log(`Checking Firestore for saves for user ${userId}...`);
-        const charactersSnapshot = await db.collection(`artifacts/${appId}/users/${userId}/characters`).limit(1).get();
-        const cloudSaveExists = !charactersSnapshot.empty;
-        console.log(`Cloud saves exist: ${cloudSaveExists}`);
-        loadGameBtn.classList.toggle('hidden', !cloudSaveExists && !localSaveExists);
+        const snaps = await db.collection(`artifacts/${appId}/users/${userId}/characters`).limit(1).get();
+        btn.classList.toggle('hidden', !hasLocal && snaps.empty);
 
-        // Check if the public graveyard collection has any documents
-        console.log("Checking Firestore Graveyard...");
-        const graveyardSnapshot = await db.collection(`artifacts/${appId}/public/data/graveyard`).limit(1).get();
-        const graveyardHasEntries = !graveyardSnapshot.empty;
-         console.log(`Graveyard has entries: ${graveyardHasEntries}`);
-        graveyardBtn.classList.toggle('hidden', !graveyardHasEntries); // Show if not empty
-    } catch (error) {
-        console.error("Could not check for saved games or graveyard:", error);
-        // Fallback: only show load button if local save exists
-        loadGameBtn.classList.toggle('hidden', !localSaveExists);
-        graveyardBtn.classList.add('hidden'); // Ensure graveyard button is hidden on error
+        const graveSnaps = await db.collection(`artifacts/${appId}/public/data/graveyard`).limit(1).get();
+        graveBtn.classList.toggle('hidden', graveSnaps.empty);
+    } catch (e) {
+        btn.classList.toggle('hidden', !hasLocal);
     }
-     console.log("Load Game Button Visibility updated.");
 }
 
-
-// Event delegation for the start screen
-function handleStartScreenClicks(event) {
-    const target = event.target.closest('button');
-    if (!target) return;
-
-    const id = target.id;
-    console.log(`Start screen button clicked: ${id}`);
+function handleStartScreenClicks(e) {
+    const t = e.target.closest('button');
+    if (!t) return;
+    
+    const id = t.id;
     if (id === 'google-signin-btn') signInWithGoogle();
     else if (id === 'anonymous-signin-btn') signInAnonymously();
     else if (id === 'start-game-btn') renderCharacterCreation();
     else if (id === 'load-game-btn') renderLoadMenu();
     else if (id === 'sign-out-btn') signOutUser();
-    else if (id === 'import-save-btn') {
-        const saveString = $('#import-save-input').value.trim();
-        if (saveString) importSave(saveString);
-        else addToLog("Paste your save key first.", "text-yellow-400"); // Added feedback
-    }
     else if (id === 'graveyard-btn') renderGraveyard();
     else if (id === 'changelog-btn') renderChangelog();
+    else if (id === 'import-save-btn') {
+        const val = $('#import-save-input').value.trim();
+        val ? importSave(val) : addToLog("Paste key first.", "text-yellow-400");
+    }
 }
 
+async function importSave(saveString) {
+    try {
+        const json = decodeURIComponent(escape(atob(saveString)));
+        const data = JSON.parse(json);
+        if (!data?.name) throw new Error("Invalid data");
+
+        delete data.firestoreId; 
+        player = new Player(data.name, data.race || "Human", data._classKey);
+        Object.assign(player, data);
+        player.updateAbilityReferences();
+
+        await saveGame();
+        addToLog(`Imported: ${player.name}`, "text-green-400");
+        const key = player.firestoreId || 'local';
+        sessionStorage.setItem('activeSaveKey', key);
+        window.location.hash = 'game';
+    } catch (e) {
+        alert("Import Failed: Key invalid.");
+    }
+}
+
+async function exportSave() {
+    if (!player) return;
+    try {
+        const str = btoa(unescape(encodeURIComponent(JSON.stringify(player))));
+        const ta = document.createElement("textarea");
+        ta.value = str;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        addToLog('Save Key copied to clipboard!', 'text-green-400');
+    } catch (e) {
+        addToLog('Export failed.', 'text-red-400');
+    }
+}
+
+// =============================================================================
+// EVENT LISTENERS
+// =============================================================================
 
 function setupEventListeners() {
-    // --- NEW: Global Button Sound Listeners ---
-    document.body.addEventListener('mousedown', (event) => {
-        // 'mousedown' feels more responsive for a "pressed" sound
-        if (event.target.closest('.btn')) {
-            playSound('click');
-        }
+    // UI Sounds
+    document.body.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.btn') && typeof playSound === 'function') playSound('click');
     });
-    
-    document.body.addEventListener('mouseenter', (event) => {
-        // 'mouseenter' fires only once when entering, unlike 'mouseover'
-        if (event.target.closest('.btn')) {
-            playSound('hover');
-        }
-    }, true); // Use capture phase to catch the event early
-    // --- END: Global Button Sound Listeners ---
+    document.body.addEventListener('mouseenter', (e) => {
+        if (e.target.closest('.btn') && typeof playSound === 'function') playSound('hover');
+    }, true);
 
     $('#start-screen').addEventListener('click', handleStartScreenClicks);
 
     const tutorialToggle = $('#tutorial-toggle');
-    tutorialToggle.addEventListener('change', () => {
-        isTutorialEnabled = tutorialToggle.checked;
-        localStorage.setItem('rpgTutorialEnabled', isTutorialEnabled);
-         console.log(`Tutorial enabled set to: ${isTutorialEnabled}`);
-    });
+    if(tutorialToggle) {
+        tutorialToggle.addEventListener('change', () => {
+            isTutorialEnabled = tutorialToggle.checked;
+            localStorage.setItem('rpgTutorialEnabled', isTutorialEnabled);
+        });
+    }
 
-    // --- Konami Code & Mobile Debug ---
-    const konamiCode = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright'];
-    let keySequence = [];
+    // Konami Code
+    const konami = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright'];
+    let kIdx = 0;
     document.addEventListener('keydown', (e) => {
-        if (!e.key) return;
-        keySequence.push(e.key.toLowerCase());
-        keySequence.splice(0, keySequence.length - konamiCode.length);
-        if (keySequence.join('') === konamiCode.join('')) {
-            e.preventDefault();
-            toggleDebug();
-            keySequence = [];
-            addToLog("Developer access granted.", "text-purple-400");
-        }
+        if (e.key.toLowerCase() === konami[kIdx]) {
+            kIdx++;
+            if (kIdx === konami.length) {
+                e.preventDefault();
+                toggleDebug();
+                kIdx = 0;
+                addToLog("Dev Mode Active.", "text-purple-400");
+            }
+        } else kIdx = 0;
     });
 
-    const mobileCode = ['tl', 'tr', 'bl', 'br'];
-    let touchSequence = [];
-    const cornerSize = 100; // Increased size for easier tapping
-    document.addEventListener('touchstart', (e) => {
-        // Only trigger if exactly one touch point
-        if (e.touches.length !== 1) {
-             touchSequence = []; // Reset sequence if multi-touch
-             return;
-        }
-        const { clientX: x, clientY: y } = e.touches[0];
-        const { innerWidth: w, innerHeight: h } = window;
-        let corner = '';
+    const debugSeq = ['m', 'y', 'd', 'e', 'b', 'u', 'g'];
+    let dIdx = 0;
+    document.addEventListener('keydown', (e) => {
+        // Ignore inputs if typing in an input field (optional safety, but good practice)
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-        // Determine which corner was touched
-        if (y < cornerSize) { // Top row
-            if (x < cornerSize) corner = 'tl'; // Top-left
-            else if (x > w - cornerSize) corner = 'tr'; // Top-right
-        } else if (y > h - cornerSize) { // Bottom row
-             if (x < cornerSize) corner = 'bl'; // Bottom-left
-             else if (x > w - cornerSize) corner = 'br'; // Bottom-right
-        }
-
-        if (corner) {
-            touchSequence.push(corner);
-            // Keep only the last N touches needed for the code
-            touchSequence.splice(0, touchSequence.length - mobileCode.length);
-            // Check if the sequence matches
-            if (touchSequence.join(',') === mobileCode.join(',')) {
-                e.preventDefault(); // Prevent default touch behavior (like scrolling)
+        if (e.key.toLowerCase() === debugSeq[dIdx]) {
+            dIdx++;
+            if (dIdx === debugSeq.length) {
+                e.preventDefault();
                 toggleDebug();
-                touchSequence = []; // Reset sequence after successful entry
-                addToLog("Developer access granted (Mobile).", "text-purple-400");
+                dIdx = 0;
+                addToLog("Dev Mode Active.", "text-purple-400");
             }
         } else {
-             // If touch is not in a corner, reset the sequence
-             touchSequence = [];
+            // Reset, but checking if the "wrong" key was actually the start of "debug" (d)
+            dIdx = (e.key.toLowerCase() === 'd') ? 1 : 0;
         }
-    }, { passive: false }); // Need passive: false to allow preventDefault
-     console.log("Event listeners set up.");
+    });
+
+    // Mobile Corner Code (TL, TR, BL, BR)
+    const corners = ['tl', 'tr', 'bl', 'br'];
+    let cIdx = 0;
+    const cSize = 100;
+    document.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) { cIdx = 0; return; }
+        const t = e.touches[0];
+        const w = window.innerWidth, h = window.innerHeight;
+        let hit = '';
+
+        if (t.clientY < cSize) hit = t.clientX < cSize ? 'tl' : (t.clientX > w - cSize ? 'tr' : '');
+        else if (t.clientY > h - cSize) hit = t.clientX < cSize ? 'bl' : (t.clientX > w - cSize ? 'br' : '');
+
+        if (hit === corners[cIdx]) {
+            cIdx++;
+            if (cIdx === corners.length) {
+                e.preventDefault();
+                toggleDebug();
+                cIdx = 0;
+                addToLog("Dev Mode Active (Mobile).", "text-purple-400");
+            }
+        } else cIdx = 0;
+    }, { passive: false });
 }
 
-
 window.addEventListener('load', async () => {
-    console.log("Window loaded.");
     initUIElements();
-    await initFirebase(); // Initialize Firebase first
+    await initFirebase();
 
-    // Start intervals after Firebase is ready
     if (!realTimeInterval) realTimeInterval = setInterval(updateRealTimePalette, 60000);
-    if (!gardenInterval) gardenInterval = setInterval(updateGarden, 1000); // Check garden every second
-    setInterval(checkIdleDialogue, 15000); // Check every 15 seconds
-    window.addEventListener('hashchange', handleRouteChange); // Listen for navigation changes
+    if (!gardenInterval) gardenInterval = setInterval(updateGarden, 1000);
+    setInterval(checkIdleDialogue, 15000);
+    window.addEventListener('hashchange', handleRouteChange);
 
-    // Load tutorial preference
-    const savedTutorialPref = localStorage.getItem('rpgTutorialEnabled');
-    isTutorialEnabled = savedTutorialPref !== 'false'; // Default to true if not set
-    $('#tutorial-toggle').checked = isTutorialEnabled;
+    const savedTut = localStorage.getItem('rpgTutorialEnabled');
+    isTutorialEnabled = savedTut !== 'false';
+    const toggle = $('#tutorial-toggle');
+    if(toggle) toggle.checked = isTutorialEnabled;
 
-    setupEventListeners(); // Setup button clicks, debug codes, etc.
-
-    // Initial route handling might happen within onAuthStateChanged now,
-    // but ensure it runs if auth state is already known or doesn't change quickly.
-    // handleRouteChange(); // Let onAuthStateChanged handle the initial route
-     console.log("Initial setup complete.");
-
+    setupEventListeners();
+    
     document.addEventListener('mousemove', resetActivityTimer, { passive: true });
     document.addEventListener('keydown', resetActivityTimer, { passive: true });
     document.addEventListener('mousedown', resetActivityTimer, { passive: true });
-
-
 });

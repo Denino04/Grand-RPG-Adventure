@@ -267,12 +267,11 @@ const MONSTER_SPECIES = {
 };
 
 const MONSTER_RARITY = {
-    // Keep the keys as 'common', 'uncommon', etc. for the constructor logic
-    'common': { key: 'common', name: 'Common', multiplier: 1.0, rewardMultiplier: 1.0, rarityIndex: 1 },
-    'uncommon': { key: 'uncommon', name: 'Uncommon', multiplier: 1.2, rewardMultiplier: 1.3, rarityIndex: 2 },
-    'rare': { key: 'rare', name: 'Rare', multiplier: 1.5, rewardMultiplier: 1.8, rarityIndex: 3 },
-    'epic': { key: 'epic', name: 'Epic', multiplier: 2.0, rewardMultiplier: 2.5, rarityIndex: 4 },
-    'legendary': { key: 'legendary', name: 'Legendary', multiplier: 2.5, rewardMultiplier: 3.5, rarityIndex: 5 }
+    'common': { key: 'common', name: 'Common', multiplier: 1.0, rewardMultiplier: 1.0, rarityIndex: 1, critChance: 0.01 },
+    'uncommon': { key: 'uncommon', name: 'Uncommon', multiplier: 1.2, rewardMultiplier: 1.3, rarityIndex: 2, critChance: 0.02 },
+    'rare': { key: 'rare', name: 'Rare', multiplier: 1.5, rewardMultiplier: 1.8, rarityIndex: 3, critChance: 0.03 },
+    'epic': { key: 'epic', name: 'Epic', multiplier: 2.0, rewardMultiplier: 2.5, rarityIndex: 4, critChance: 0.04 },
+    'legendary': { key: 'legendary', name: 'Legendary', multiplier: 2.5, rewardMultiplier: 3.5, rarityIndex: 5, critChance: 0.05 }
 };
 
 const MONSTER_CLASS_DAMAGE = {
@@ -716,7 +715,7 @@ const ENCHANTER_INVENTORY = {
 
 const BLACKSMITH_INVENTORY = {
     'Weapons': ['steel_longsword', 'rapier', 'longbow', 'heavy_greatsword', 'masterwork_spear', 'dual_longswords', 'elven_saber', 'dwarven_warhammer', 'caestus', 'shamshir', 'steel_mace', 'iron_ball', 'great_epee', 'sharpshots_beloved'],
-    'Tools': ['whetstone', 'fire_grease', 'water_grease', 'earth_grease', 'wind_grease', 'lightning_grease', 'nature_grease', 'light_grease', 'void_grease'],
+    'Tools': ['whetstone', 'caltrops', 'fire_grease', 'water_grease', 'earth_grease', 'wind_grease', 'lightning_grease', 'nature_grease', 'light_grease', 'void_grease'],
     'Armor': ['chainmail_armor', 'half_plate_armor', 'steel_plate_armor'],
     'Shields': ['iron_kite_shield', 'iron_buckler', 'brass_shield', 'trollblood_shield', 'titanium_parrying_shield', 'maxwellian_dueling_shield', 'tower_greatshield'],
 };
@@ -771,6 +770,31 @@ const NPC_RANDOM_NAMES = {
     ]
 };
 const CHANGELOG_DATA = [
+    { version: "v0.8.1 - The Tree of Knowledge",
+        date: "2026-01-06",
+        changes: [
+
+            "<b>MAJOR FEATURE: SKILL TREE SYSTEM:</b>",
+            "    - <b>Massive Expansion:</b> Added <b>200+ Skills</b> to learn and combine, drastically increasing replayability and build flexibility.",
+            "    - <b>Branching Paths:</b> Skills are divided into <b>Weapon, Magic, Elemental, and Utility</b> branches.",
+            "    - <b>Synergy:</b> Players can now combo weapons, gears, spells, magic, and elements together. We have intentionally left <b>broken combos</b> for you to discover.",
+
+            "<b>System Mechanics Updates:</b>",
+            "    - <b>Loadout System:</b> Added the ability to save and swap builds on the fly.",
+            "    - <b>Improved Weapon Infusion:</b> The infusion system has been reworked for better compatibility with the new skills.",
+            "    - <b>Damage Calculation:</b> The damage formula has been updated to handle the new combo multipliers.",
+
+            "<b>Quality of Life Improvements:</b>",
+            "    - <b>Inventory Management:</b> Weapons, Spells, and Equipment are now fully organized.",
+            "    - <b>Training Grounds:</b> Expanded the training area so you can actually test these 200+ new skills.",
+            "    - <b>Discovery:</b> Implemented an easier system to help players discover new content and mechanics.",
+
+            "<b>Bug Fixes:</b>",
+            "    - <b>General Stability:</b> Fixed various debugs, glitches, and exploits found in previous versions."
+
+        ]
+
+    },
     {
         version: "v0.7.2 - Expedition System Rework ⚔️",
         date: "2025-11-19",

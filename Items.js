@@ -114,7 +114,15 @@ const ITEMS = {
     'anti_paralytic_needle': { name: 'Anti-Paralytic Needle', type: 'cleanse_specific', effects_to_cleanse: ['paralyzed', 'petrified'], price: 180, rarity: 'Uncommon', description: 'A sharp needle full of something stimulating. Immediately removes Paralysis and Petrify effects by giving your nervous system a very aggressive pep talk. The sudden jolt is better than coffee.' },
     'poisonous_grease': { name: 'Poisonous Grease', type: 'buff', price: 200, rarity: 'Uncommon', description: 'Smear this foul-smelling gunk on your weapon. For 3 turns, your attacks have a chance to inflict a nasty poison that deals ¼ of your weapon’s average damage for 3 more turns. The gift that keeps on giving... sepsis. (Chance: 20%+Luck%/2)', effect: { type: 'buff_poison_grease', duration: 4, poisonChance: 0.20 } },
     'paralysis_grease': { name: 'Paralysis Grease', type: 'buff', price: 250, rarity: 'Uncommon', description: 'A sticky paste that makes your weapon shockingly effective. For 3 turns, your attacks have a chance to inflict paralysis for 1 turn, causing enemies to suddenly stop and stare blankly into the middle distance. (Chance: 20%+Luck%/2. Stacks with Earth Element effects for extra stillness.)', effect: { type: 'buff_paralysis_grease', duration: 4, paralyzeChance: 0.20 } },
-
+    'caltrops': { 
+        name: 'Caltrops', 
+        type: 'trap', 
+        price: 50, 
+        rarity: 'Common', 
+        range: 3, 
+        description: "Scatter sharp spikes on the ground. Deals 1% Max HP damage and stops movement when stepped on. Consumed on use.", 
+        effect: { type: 'trap_caltrops', damagePercent: 0.01 } 
+    },
     'fire_grease': { 
         name: 'Fire Grease', 
         type: 'buff', 

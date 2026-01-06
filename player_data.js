@@ -438,44 +438,44 @@ const WEAPONS = {
     'caestus': { name: 'Caestus', class: 'Hand-to-Hand', damage: [2, 2], price: 50, rarity: 'Common', description: "A simple caestus made for brawling. Made from hardened leather and soft cotton, designed to protect the hand of a fighter while they tenderize someone's face." },
     'iron_ball': { name: 'Iron Ball', class: 'Hand-to-Hand', damage: [1, 6], price: 200, rarity: 'Uncommon', description: "Two iron balls fashioned in the shape of a boxing glove. Heavy, hefty, and they hit like... well, two iron balls." },
     'assassins_claw': { name: 'Assassin’s Claw', class: 'Hand-to-Hand', damage: [2, 4], price: 1000, rarity: 'Rare', description: "Claws resembling those of a feline, used by a gang of underworld assassins on their jobs. Its sharp designs are meant to strike at weak points.", effect: { critChance: 0.1, critMultiplier: 2.0 } },
-    'claw_of_chimera': { name: 'Claw of Chimera', class: 'Hand-to-Hand', damage: [3, 4], damageType: 'physical', price: 4000, rarity: 'Epic', description: "Freshly cut, minimally modified claws of a Chimera, its tip still dripping with fresh poison. No one knows if this is ethical, to the monster or the target.", effect: { toxicChance: 0.15 } },
-    'livyatans_scaleclaw': { name: 'Livyatan’s Scaleclaw', class: 'Hand-to-Hand', damage: [3, 6], damageType: 'void', price: 20000, rarity: 'Legendary', description: "A claw made from the reality-shifting scales of a Livyatan, capable of ignoring the armor and shield of an enemy to strike their soft flesh with ease. Quote: \"Why knock on the door when you can just phase through the wall?\"", effect: { armorPierce: 0.5 } },
+    'claw_of_chimera': { name: 'Claw of Chimera', class: 'Hand-to-Hand', damage: [3, 4], damageType: 'physical', price: 4000, rarity: 'Epic', description: "Freshly cut, minimally modified claws of a Chimera, its tip still dripping with fresh poison. No one knows if this is ethical, to the monster or the target.", effect: { toxicChance: 0.10 } },
+    'livyatans_scaleclaw': { name: 'Livyatan’s Scaleclaw', class: 'Hand-to-Hand', damage: [3, 6], damageType: 'void', price: 20000, rarity: 'Legendary', description: "A claw made from the reality-shifting scales of a Livyatan, capable of ignoring the armor and shield of an enemy to strike their soft flesh with ease. Quote: \"Why knock on the door when you can just phase through the wall?\"", effect: { armorPierce: 0.2 } },
 
     // --- Daggers ---
     'dagger': { name: 'Dagger', class: 'Dagger', damage: [1, 4], price: 50, rarity: 'Common', description: "Simple hunting daggers for new adventurers. It's not glamorous, but the pointy end reliably goes into the other guy." },
     'parrying_dagger': { name: 'Parrying Dagger', class: 'Dagger', damage: [2, 4], price: 250, rarity: 'Uncommon', description: "A finely crafted dagger capable of parrying and striking in a single movement. For those who believe the best offense is not getting a sword stuck in your face.", effect: { parry: 0.2 } },
     'psychic_blade': { name: 'Psychic Blade', class: 'Dagger', damage: [2, 6], damageType: 'psychic', price: 1200, rarity: 'Rare', range: 4, description: "A blade made from the beating hearts of the undead. Capable of coming back to its user after being thrown, which saves a lot of awkward searching mid-battle." },
-    'vampiric_dagger': { name: 'Vampiric Dagger', class: 'Dagger', damage: [3, 4], price: 3200, rarity: 'Epic', description: "A dagger with a mind of its own, demanding blood sacrifice in exchange for an unending life. It's a high-maintenance relationship, but the health benefits are undeniable.", effect: { lifesteal: 0.25 } },
-    'the_black_knife': { name: 'The Black Knife', class: 'Dagger', damage: [3, 6], damageType: 'void', price: 18000, rarity: 'Legendary', description: "A knife made of the void skin of Livyatan, capable of phasing in and out of reality to strike the most important target at will. Quote: \"...To this blade, armor is merely a suggestion.\"", effect: { critChance: 0.15, critMultiplier: 2.5, armorPierce: 0.25 } },
+    'vampiric_dagger': { name: 'Vampiric Dagger', class: 'Dagger', damage: [3, 4], price: 3200, rarity: 'Epic', description: "A dagger with a mind of its own, demanding blood sacrifice in exchange for an unending life. It's a high-maintenance relationship, but the health benefits are undeniable.", effect: { lifesteal: 0.2 } },
+    'the_black_knife': { name: 'The Black Knife', class: 'Dagger', damage: [3, 6], damageType: 'void', price: 18000, rarity: 'Legendary', description: "A knife made of the void skin of Livyatan, capable of phasing in and out of reality to strike the most important target at will. Quote: \"...To this blade, armor is merely a suggestion.\"", effect: { critChance: 0.10, critMultiplier: 2, armorPierce: 0.2 } },
 
     // --- Longswords ---
     'rusty_sword': { name: 'Rusty Sword', class: 'Longsword', damage: [1, 6], price: 20, rarity: 'Broken', description: "A sword well past its prime. Probably a tetanus risk." },
     'steel_longsword': { name: 'Steel Longsword', class: 'Longsword', damage: [1, 8], price: 120, rarity: 'Common', description: "Standard issue Longsword used by soldiers and adventurers alike. Unremarkable, dependable, and unlikely to get you arrested for practicing dark magic." },
     'heavy_greatsword': { name: 'Heavy Greatsword', class: 'Longsword', damage: [2, 6], price: 350, rarity: 'Uncommon', description: "A heavy and hefty greatsword capable of dishing out heavy strikes. Preferably held by both hands, unless you enjoy dislocating your shoulder." },
     'dual_longswords': { name: 'Dual Longswords', class: 'Longsword', damage: [2, 4], price: 1800, rarity: 'Rare', description: "Two longswords to cover both sides with double the attack power. People advised adventurers against using them like this, but it does look very cool.", effect: { doubleStrike: true, dualWield: true } },
-    'trolls_knight_sword': { name: 'Troll’s Knight Sword', class: 'Longsword', damage: [3, 8], price: 4500, rarity: 'Epic', description: "A heavy greatsword made from the blood of a troll, capable of resonating with the soul of its user. The more understanding the user has, the stronger it is.", effect: { intScaling: 0.2 } },
+    'trolls_knight_sword': { name: 'Troll’s Knight Sword', class: 'Longsword', damage: [3, 8], price: 4500, rarity: 'Epic', description: "A heavy greatsword made from the blood of a troll, capable of resonating with the soul of its user. The more understanding the user has, the stronger it is.", effect: { adaptiveScaling: true } },    
     'void_greatsword': { name: 'Void Greatsword', class: 'Longsword', damage: [3, 10], damageType: 'void', price: 20000, rarity: 'Legendary', description: "A greatsword ripped straight out of a Dullahan’s possession. It sucks the soul out of your enemy and can even possess you when you die, just long enough to get you back on your feet. Quote: \"Death is a contract, and this blade is an expert in renegotiation.\"", effect: { lifesteal: 0.25, revive: true } },
     'the_greatsword': { name: 'The Greatsword', class: 'Longsword', damage: [4, 12], price: 50000, rarity: 'Legendary', description: "A colossal slab of iron, more a monument than a weapon. Said to have been used to slay a god... or at least give one a very bad headache.", effect: { type: 'godslayer', percent_hp_damage: 0.1 } },
 
     // --- Thrusting Swords ---
     'rapier': { name: 'Rapier', class: 'Thrusting Sword', damage: [1, 6], price: 150, rarity: 'Common', description: "A finely crafted piercing armament capable of piercing armors, especially the gaps that most adventurers forget to cover." },
     'great_epee': { name: 'Great Épée', class: 'Thrusting Sword', damage: [1, 10], price: 400, rarity: 'Uncommon', description: "A heavy Épée blade, capable of delivering heavier strikes on a single pinpoint target with rather unsubtle force." },
-    'spellblade_of_echoes': { name: 'Spellblade of Echoes', class: 'Thrusting Sword', damage: [2, 8], damageType: 'physical', price: 1600, rarity: 'Rare', description: "A blade created using empty essence shells so it can resonate with the elements. Perfect for the indecisive mage who wants to cast a fireball and stab someone in the same turn.", effect: { spellFollowUp: true } },
-    'the_bloodletter': { name: 'The Bloodletter', class: 'Thrusting Sword', damage: [3, 6], price: 3800, rarity: 'Epic', description: "A sinister twisting thrusting blade, capable of easily piercing skins and rendering the insides perfect for a bloodletting ritual. Messy, but highly effective.", effect: { lifesteal: 0.25 } },
-    'dragon_scale_cragblade': { name: 'Dragonscale Cragblade', class: 'Thrusting Sword', damage: [3, 8], damageType: 'lightning', price: 15000, rarity: 'Legendary', range: 3, description: "A straight cragblade made from the reversed scale of a dragon and imbued with lightning. It's capable of piercing even a Dragon’s mighty impenetrable scales. Quote: \"Fighting fire with fire is cliché. Fight dragons with something they're made of.\"", effect: { bonusVsDragon: 1.5, doubleStrikeChance: 0.25 } },
+    'spellblade_of_echoes': { name: 'Spellblade of Echoes', class: 'Thrusting Sword', damage: [2, 8], damageType: 'physical', price: 1600, rarity: 'Rare', description: "A blade created using empty essence shells so it can resonate with the elements. Perfect for the indecisive mage who wants to cast a fireball and stab someone in the same turn.", effect: { adaptiveScaling: true } },
+    'the_bloodletter': { name: 'The Bloodletter', class: 'Thrusting Sword', damage: [3, 6], price: 3800, rarity: 'Epic', description: "A sinister twisting thrusting blade, capable of easily piercing skins and rendering the insides perfect for a bloodletting ritual. Messy, but highly effective.", effect: { lifesteal: 0.15 } },
+    'dragon_scale_cragblade': { name: 'Dragonscale Cragblade', class: 'Thrusting Sword', damage: [3, 8], damageType: 'lightning', price: 15000, rarity: 'Legendary', range: 3, description: "A straight cragblade made from the reversed scale of a dragon and imbued with lightning. It's capable of piercing even a Dragon’s mighty impenetrable scales. Quote: \"Fighting fire with fire is cliché. Fight dragons with something they're made of.\"", effect: { bonusVsDragon: 1.5} },
 
     // --- Curved Swords ---
     'shamshir': { name: 'Shamshir', class: 'Curved Sword', damage: [1, 6], price: 100, rarity: 'Common', description: "A simple curved blade, often used in festivities and self-defense. One of those is significantly more dangerous than the other." },
     'flowing_blade': { name: 'Flowing Blade', class: 'Curved Sword', damage: [1, 8], price: 300, rarity: 'Uncommon', description: "A finely crafted curved sword, intended to be used alongside sword dance traditions. It also allows the user to strike the same place multiple times with ease." },
     'elven_saber': { name: 'Elven Saber', class: 'Curved Sword', damage: [3, 4], price: 1200, rarity: 'Rare', description: "A traditional elven saber, made by using their special Cold Smithing techniques. It combines the power of a flowing river and growing forest into one very sharp object.", effect: { critChance: 0.1, critMultiplier: 2.0 } },
-    'elemental_sword': { name: 'Elemental Sword', class: 'Curved Sword', damage: [2, 8], damageType: 'elemental', price: 5000, rarity: 'Epic', description: "Made using active essences of all elements, this blade is unstable and will pursue whatever element it has touched last. Handle with care, and preferably with gloves.", effect: { intScaling: 1.0, elementalBolt: true } },
-    'unending_dance': { name: 'Unending Dance', class: 'Curved Sword', damage: [3, 6], price: 22000, rarity: 'Legendary', description: "A legendary blade made to ignore the laws of the universe, capable of speeding up unceasingly until it can cut the very fabric of reality apart. Quote: \"Strike once. Then strike again, faster. Repeat until the problem is solved.\"", effect: { uncapCombo: true } },
+    'elemental_sword': { name: 'Elemental Sword', class: 'Curved Sword', damage: [2, 8], damageType: 'elemental', price: 5000, rarity: 'Epic', description: "Made using active essences of all elements, this blade is unstable and will pursue whatever element it has touched last. Handle with care, and preferably with gloves.", effect: { adaptiveScaling: true } },
+    'unending_dance': { name: 'Unending Dance', class: 'Curved Sword', damage: [3, 6], price: 22000, rarity: 'Legendary', description: "A legendary blade made to ignore the laws of the universe, capable of speeding up unceasingly until it can cut the very fabric of reality apart. Quote: \"Strike once. Then strike again, faster. Repeat until the problem is solved.\"", effect: {} },
 
     // --- Axes ---
     'battleaxe': { name: 'Battleaxe', class: 'Axe', damage: [1, 10], price: 200, rarity: 'Common', description: "A hefty battleaxe. The proud choice for a barbarian, or anyone who sees a problem that can be solved with a single, forceful application of sharpened metal." },
     'obsidian_axe': { name: 'Obsidian Axe', class: 'Axe', damage: [2, 8], price: 400, rarity: 'Uncommon', description: "A sharp and brittle Axe made of volcanic glass. It's designed to break inside the flesh of its target, adding pain, suffering, and a very bad day." },
-    'bloody_butchering_knife': { name: 'Bloody Butchering Knife', class: 'Axe', damage: [2, 10], price: 1400, rarity: 'Rare', description: "A giant cleaver made specifically to butcher humanoids and monsters alike. Its groove is made so blood easily flows from the prey to its butcher.", effect: { healOnKill: 0.1 } },
-    'sunderers_battleaxe': { name: 'Sunderer’s Battleaxe', class: 'Axe', damage: [4, 6], price: 3500, rarity: 'Epic', description: "A heroic battleaxe made to sunder earth and break open armors. Its power rivals that of an earthquake, making it a terrible choice for delicate negotiations.", effect: { armorPierce: 0.5 } },
+    'bloody_butchering_knife': { name: 'Bloody Butchering Knife', class: 'Axe', damage: [2, 10], price: 1400, rarity: 'Rare', description: "A giant cleaver made specifically to butcher humanoids and monsters alike. Its groove is made so blood easily flows from the prey to its butcher.", effect: { lifesteal: 0.15 } },
+    'sunderers_battleaxe': { name: 'Sunderer’s Battleaxe', class: 'Axe', damage: [4, 6], price: 3500, rarity: 'Epic', description: "A heroic battleaxe made to sunder earth and break open armors. Its power rivals that of an earthquake, making it a terrible choice for delicate negotiations.", effect: { armorPierce: 0.2 } },
     'headless_executioner': { name: 'Headless Executioner', class: 'Axe', damage: [3, 10], damageType: 'necrotic', price: 17000, rarity: 'Legendary', description: "The execution weapon for those unwilling to die, capable of severing life from death in a single heavy swing. It slowly pulses as if it has a soul of its own. Quote: \"There are no appeals.\"", effect: { execute: 0.25 } },
 
     // --- Hammers ---
@@ -484,21 +484,21 @@ const WEAPONS = {
     'battlestaff': { name: 'Battlestaff', class: 'Hammer', damage: [1, 8], price: 300, rarity: 'Uncommon', description: "A sturdy staff reinforced for physical combat. Your melee attacks scale with both Strength and Intelligence.", effect: { intScaling: 1.0 } },
     'dwarven_warhammer': { name: 'Dwarven Warhammer', class: 'Hammer', damage: [2, 8], price: 1300, rarity: 'Rare', description: "A prized possession of the Dwarves. A hammer so heavy and dense, every time it is swung, the earth quakes and the wind blows.", effect: { paralyzeChance: 0.1 } },
     'blacksmiths_workhammer': { name: 'Blacksmith’s Workhammer', class: 'Hammer', damage: [3, 8], price: 4800, rarity: 'Epic', description: "An enchanted hammer usually only used by a Blacksmith. Magic that dwells inside it can recognize armors and weapons, letting it seek weak points and potential prizes.", effect: { armorPierce: 0.3, lootBonus: true } },
-    'earthshaker_hammer': { name: 'Earthshaker Hammer', class: 'Hammer', damage: [3, 10], price: 10000, rarity: 'Legendary', description: "A hammer made of the bone of a Goliath. Its heft is so otherworldly that a single slam to the ground would shake the Earth so hard Mother Gaia herself will wake up. Quote: \"If violence doesn't solve it, you aren't using a big enough hammer.\"", effect: { paralyzeChance: 0.2 } },
+    'earthshaker_hammer': { name: 'Earthshaker Hammer', class: 'Hammer', damage: [3, 10], price: 10000, rarity: 'Legendary', description: "A hammer made of the bone of a Goliath. Its heft is so otherworldly that a single slam to the ground would shake the Earth so hard Mother Gaia herself will wake up. Quote: \"If violence doesn't solve it, you aren't using a big enough hammer.\"", effect: { critChance: 0.10, critMultiplier: 2, paralyzeChance: 0.2 } },
 
     // --- Lances ---
     'soldiers_spear': { name: 'Soldier’s Spear', class: 'Lance', damage: [1, 6], price: 90, rarity: 'Common', description: "Standard issue soldier’s spear. Often used in war conscription, and now often used for keeping monsters at a comfortable, non-mauling distance." },
     'masterwork_spear': { name: 'Masterwork Spear', class: 'Lance', damage: [3, 4], price: 500, rarity: 'Uncommon', description: "A masterfully made spear. A talented user will be able to use this spear to keep a very safe distance between themself and the enemy." },
-    'lightning_javelin': { name: 'Lightning Javelin', class: 'Lance', damage: [3, 6], price: 1500, rarity: 'Rare', range: 4, description: "A thunderous javelin, said to be the crystallization of a thunderbolt. Capable of being thrown, reenacting the Battle of Gods on a much smaller, more mortal scale." },
+    'lightning_javelin': { name: 'Lightning Javelin', class: 'Lance', damage: [3, 6], price: 1500, rarity: 'Rare', range: 6, description: "A thunderous javelin, said to be the crystallization of a thunderbolt. Capable of being thrown, reenacting the Battle of Gods on a much smaller, more mortal scale." },
     'holy_beast_halberd': { name: 'Holy Beast Halberd', class: 'Lance', damage: [2, 10], damageType: 'holy', price: 5200, rarity: 'Epic', range: 3, description: "A golden halberd blessed by a Holy Beast. Its power smites down the evil and monstrous while protecting those worthy of its divinity.", effect: { cleanseChance: 0.25 } },
     'giant_hunter': { name: 'Giant Hunter', class: 'Lance', damage: [3, 8], price: 16000, rarity: 'Legendary', description: "An ancient Lance rediscovered after the melting of Cocytus. It is said that its shape and size is the direct result of its frequent usage of slaying Gods and Monsters alike. Quote: \"Sure, it's overkill for goblins, but you don't bring a flyswatter to a dragon fight.\"", effect: { bonusVsLegendary: 1.5 } },
 
     // --- Bows ---
     'longbow': { name: 'Longbow', class: 'Bow', damage: [1, 6], price: 100, rarity: 'Common', range: 6, description: "The quintessential weapon for a hunter. Simple, easy to use, and keeps you far away from the teeth and claws." },
     'golden_greatbow': { name: 'Golden Greatbow', class: 'Bow', damage: [1, 10], price: 600, rarity: 'Uncommon', range: 6, description: "A heavy, gold-coated greatbow. While mostly used for display, it turns out that being shot by a very expensive arrow hurts just as much." },
-    'sharpshots_beloved': { name: 'Sharpshot’s Beloved', class: 'Bow', damage: [2, 6], price: 1700, rarity: 'Rare', range: 7, description: "A seemingly simple shortbow, jet-black in color. It has a particular quality for helping its user find their target’s weak points.", effect: { critChance: 0.15, critMultiplier: 2.5 } },
+    'sharpshots_beloved': { name: 'Sharpshot’s Beloved', class: 'Bow', damage: [2, 6], price: 1700, rarity: 'Rare', range: 7, description: "A seemingly simple shortbow, jet-black in color. It has a particular quality for helping its user find their target’s weak points.", effect: { critChance: 0.10, critMultiplier: 2 } },
     'eye_of_medusa': { name: 'Eye of Medusa', class: 'Bow', damage: [4, 4], price: 4000, rarity: 'Epic', range: 6, description: "A crossbow made of the eye of a Cockatrice, but called the Eye of Medusa because it has a better ring to it. Capable of turning its targets into statues from a long range.", effect: { petrifyChance: 0.3 } },
-    'vacuum_greatbow': { name: 'Vacuum Greatbow', class: 'Bow', damage: [2, 10], damageType: 'void', price: 12000, rarity: 'Legendary', range: 8, description: "A vacuous greatbow made from the vacuum lining and hollow bone of a Livyatan. Its shot blinks in and out of existence, piercing reality itself to hit its target. Quote: \"Why shoot through armor when you can just shoot around it in the fourth dimension?\"", effect: { armorPierce: 0.5 } },
+    'vacuum_greatbow': { name: 'Vacuum Greatbow', class: 'Bow', damage: [2, 10], damageType: 'void', price: 12000, rarity: 'Legendary', range: 8, description: "A vacuous greatbow made from the vacuum lining and hollow bone of a Livyatan. Its shot blinks in and out of existence, piercing reality itself to hit its target. Quote: \"Why shoot through armor when you can just shoot around it in the fourth dimension?\"", effect: { armorPierce: 0.3 } },
 
     // --- Reapers ---
     'farmers_glaive': { name: 'Farmer’s Glaive', class: 'Reaper', damage: [1, 6], price: 80, rarity: 'Common', description: "A simple glaive easily found in a farmer’s shed. Sometimes used as a defensive weapon when wolves get a little too interested in the sheep." },
@@ -538,35 +538,304 @@ const CATALYSTS = {
 };
 
 const SHIELDS = {
-    'no_shield': {name: 'None', defense: 0, blockChance: 0, price: 0, rarity: 'Broken', description: "No protection on your arm."},
-    'wooden_shield': {name: 'Wooden Shield', defense: 1, blockChance: 0.10, price: 75, rarity: 'Common', description: "A simple, roughly made wooden shield. Mostly keeps the rain off."},
-    'iron_kite_shield': {name: 'Iron Kite Shield', defense: 2, blockChance: 0.15, price: 250, rarity: 'Common', description: "A sturdy shield shaped for cavalry, offering decent protection."},
-    'iron_buckler': { name: 'Iron Buckler', defense: 1, price: 300, rarity: 'Uncommon', description: "A small, agile shield designed for parrying attacks. Or a very large dinner plate.", effect: { type: 'parry', chance: 0.15 } },
-    'brass_shield': { name: 'Brass Shield', defense: 3, blockChance: 0.15, price: 500, rarity: 'Uncommon', description: "A polished brass shield that's both durable and stylish." },
-    'trollblood_shield': { name: 'Trollblood Shield', defense: 3, price: 1400, rarity: 'Rare', description: "A shield imbued with the legendary regenerative powers of trolls. Smells faintly of wet dog.", effect: { hp_regen_percent: 0.05 } },
-    'titanium_parrying_shield': { name: 'Titanium Parrying Shield', defense: 3, price: 1200, rarity: 'Rare', description: "A lightweight yet incredibly tough shield perfect for turning aside deadly blows.", effect: { type: 'parry', chance: 0.20 } },
-    'spiked_retaliator': { name: 'Spiked Retaliator', defense: 2, price: 1500, rarity: 'Rare', description: "A vicious shield that lashes out with a punishing counter-attack whenever you strike an enemy. It has anger issues.", effect: { attack_follow_up: { damage: [1, 4], paralyze_chance: 0.1, duration: 1 } } },
-    'tower_greatshield': {name: 'Tower Greatshield', defense: 5, blockChance: 0.4, price: 3500, rarity: 'Epic', description: "A shield so large it has its own zip code, offering immense protection at the cost of seeing where you're going."},
-    'purifying_crystal_shield': { name: 'Purifying Crystal Shield', defense: 5, blockChance: 0.20, price: 6000, rarity: 'Epic', description: "A shield with a crystal that pulses with clean energy, shrugging off curses and hexes.", effect: { type: 'debuff_resist', chance: 0.5 } },
-    'maxwellian_dueling_shield': { name: 'Maxwellian Dueling Shield', defense: 5, price: 4000, rarity: 'Epic', description: "An ornate and perfectly balanced shield, a masterpiece of defensive art. So beautiful it's almost a shame to block things with it.", effect: { type: 'parry', chance: 0.25 } },
-    'heavy_slabshield': { name: 'Heavy Slabshield', defense: 10, blockChance: 0.20, price: 5000, rarity: 'Legendary', description: "Less of a shield and more of a personal, portable wall. Effective, but not exactly nimble.", effect: { type: 'reflect', amount: 0.1 } },
-    'exa_reflector': { name: 'Exa-Reflector', defense: 5, price: 8000, rarity: 'Legendary', description: "An advanced shield of strange design that reflects a portion of incoming damage back at the attacker. 'No, you!'", effect: { type: 'reflect', amount: 0.25 } }
+    'no_shield': {
+        name: 'None', 
+        defense: 0, 
+        magicDefense: 0, 
+        blockChance: 0, 
+        price: 0, 
+        rarity: 'Broken', 
+        description: "No protection on your arm."
+    },
+
+    // --- BLOCKING SHIELDS ---
+    'wooden_shield': {
+        name: 'Wooden Shield', 
+        defense: 2, 
+        magicDefense: 1, 
+        blockChance: 0.05, 
+        price: 75, 
+        rarity: 'Common', 
+        description: "A simple, roughly made wooden shield. Good for stopping splinters, mostly."
+    },
+    'iron_kite_shield': {
+        name: 'Iron Kite Shield', 
+        defense: 5, 
+        magicDefense: 2, 
+        blockChance: 0.10, 
+        price: 250, 
+        rarity: 'Common', 
+        description: "A sturdy shield shaped for cavalry, offering decent protection."
+    },
+    'brass_shield': {
+        name: 'Brass Shield', 
+        defense: 5, 
+        magicDefense: 3, 
+        blockChance: 0.15, 
+        price: 500, 
+        rarity: 'Uncommon', 
+        description: "A polished shield that's bold, brazen, and quite durable."
+    },
+    'tower_greatshield': {
+        name: 'Tower Greatshield', 
+        defense: 10, 
+        magicDefense: 5, 
+        blockChance: 0.25, 
+        price: 3500, 
+        rarity: 'Epic', 
+        description: "A shield so large it has its own zip code, offering immense protection."
+    },
+    'heavy_slabshield': {
+        name: 'Heavy Slabshield', 
+        defense: 15, 
+        magicDefense: 10, 
+        blockChance: 0.30, 
+        price: 5000, 
+        rarity: 'Legendary', 
+        description: "Less of a shield and more of a personal, portable wall."
+    },
+
+    // --- PARRYING SHIELDS ---
+    'iron_buckler': {
+        name: 'Iron Buckler', 
+        defense: 1, 
+        magicDefense: 1, 
+        price: 300, 
+        rarity: 'Uncommon', 
+        description: "A small, agile shield designed for parrying attacks.", 
+        effect: { type: 'parry', chance: 0.05 } 
+    },
+    'titanium_parrying_shield': {
+        name: 'Titanium Parrying Shield', 
+        defense: 3, 
+        magicDefense: 3, 
+        price: 1200, 
+        rarity: 'Rare', 
+        description: "Lightweight yet incredibly tough. Perfect for turning aside deadly blows.", 
+        effect: { type: 'parry', chance: 0.10 } 
+    },
+    'maxwellian_dueling_shield': {
+        name: 'Maxwellian Dueling Shield', 
+        defense: 5, 
+        magicDefense: 5, 
+        price: 4000, 
+        rarity: 'Epic', 
+        description: "An ornate and perfectly balanced shield, a masterpiece of defensive art.", 
+        effect: { type: 'parry', chance: 0.15 } 
+    },
+    'spiked_retaliator': {
+        name: 'Spiked Retaliator', 
+        defense: 5, 
+        magicDefense: 5, 
+        price: 1500, 
+        rarity: 'Rare', 
+        description: "A vicious shield that bites back when you deflect a blow.", 
+        effect: { type: 'parry', chance: 0.15, parryDamage: [1, 4] } 
+    },
+    'exa_reflector': {
+        name: 'Exa Reflector', 
+        defense: 5, 
+        magicDefense: 10, 
+        price: 8000, 
+        rarity: 'Legendary', 
+        description: "An advanced shield that redirects kinetic energy with lethal force.", 
+        effect: { type: 'parry', chance: 0.15, parryDamage: [1, 6] } 
+    },
+
+    // --- UNIQUE SHIELDS ---
+    'trollblood_shield': {
+        name: 'Trollblood Shield', 
+        defense: 5, 
+        magicDefense: 10, 
+        price: 1400, 
+        rarity: 'Rare', 
+        description: "Imbued with the regenerative powers of trolls.", 
+        effect: { hp_regen_percent: 0.05 } 
+    },
+    'purifying_crystal_shield': {
+        name: 'Purifying Crystal Shield', 
+        defense: 5, 
+        magicDefense: 10, 
+        blockChance: 0.15,
+        price: 6000, 
+        rarity: 'Epic', 
+        description: "Pulses with clean energy, shrugging off curses and hexes.", 
+        effect: { type: 'debuff_resist', chance: 0.50 } 
+    },
+    'crystal_bubble_barrier': {
+        name: 'Crystal Bubble Barrier', 
+        defense: 1, 
+        magicDefense: 20, 
+        price: 4500, 
+        rarity: 'Rare', 
+        description: "A fragile-looking sphere of hardened mana that excels at dampening spells."
+    },
+    'rabbits_foot_shield': {
+        name: 'Rabbit’s Foot Shield', 
+        defense: 5, 
+        magicDefense: 5, 
+        price: 2500, 
+        rarity: 'Rare', 
+        description: "A shield covered in lucky fur. It seems to make you lighter on your feet.", 
+        effect: { movement_speed: 2 } 
+    }
 };
 
 const ARMOR = {
-    'travelers_garb': {name: 'Traveler\'s Garb', defense: 1, price: 0, rarity: 'Broken', description: "Simple clothes for a long journey. Offers minimal protection."},
-    'leather_armor': {name: 'Leather Armor', defense: 3, price: 50, rarity: 'Common', description: "Hardened leather plates, a solid choice for any adventurer."},
-    'padded_leather': {name: 'Padded Leather', defense: 5, price: 150, rarity: 'Common', description: "Reinforced leather with thick padding underneath. Surprisingly comfy."},
-    'chainmail_armor': {name: 'Chainmail Armor', defense: 8, price: 400, rarity: 'Uncommon', description: "A tunic of interlocking metal rings. Heavy, but better than being stabbed.", metallic: true},
-    'half_plate_armor': {name: 'Half-Plate Armor', defense: 10, price: 800, rarity: 'Uncommon', description: "A mix of chainmail and solid metal plates, offering good protection with some mobility.", blockChance: 0.10, metallic: true},
-    'silenced_leather_armor': {name: 'Silenced Leather Armor', defense: 3, price: 750, rarity: 'Rare', description: "Specially treated leather that muffles sound, making you unnervingly quiet. Perfect for sneaking up on people... or refrigerators at midnight.", effect: { type: 'dodge', chance: 0.10 }},
-    'steel_plate_armor': {name: 'Steel Plate Armor', defense: 15, price: 1500, rarity: 'Rare', description: "A full suit of articulated steel plates. Makes a lot of noise.", blockChance: 0.15, metallic: true},
-    'assassin_cloak_armor': {name: 'Assassin Cloak Armor', defense: 5, price: 2000, rarity: 'Epic', description: "Dark, flowing robes with hidden armor plates, designed for evasion and looking mysterious in dark corners.", effect: { type: 'dodge', chance: 0.20 }},
-    'archmages_robes': {name: 'Archmage\'s Robes', defense: 8, price: 5000, rarity: 'Epic', description: "Woven with threads of pure mana, these robes constantly regenerate your magical energy and make spells easier to cast. Also surprisingly comfortable.", effect: { mp_regen_percent: 0.05, mana_discount: 5 }},
-    'adamantine_armor': {name: 'Adamantine Armor', defense: 20, price: 5000, rarity: 'Legendary', description: "Armor forged from a legendary, nigh-unbreakable metal. You feel ridiculously safe wearing this.", blockChance: 0.15, metallic: true},
-    'mirror_mail': { name: 'Mirror Mail', defense: 18, price: 6000, rarity: 'Legendary', description: "A suit of highly polished armor that reflects a portion of every blow back at the attacker. Very high maintenance.", effect: { reflect_damage: 0.25 }, metallic: true },
-    'soul_steel_armor': {name: 'Soul Steel Armor', defense: 25, price: 10000, rarity: 'Legendary', description: "Adamantine infused with the captured souls of ancient warriors, creating the ultimate defense. The whispers are mostly harmless.", blockChance: 0.2, metallic: true},
-    'vacuum_encaser': {name: 'Vacuum Encaser', defense: 10, price: 7500, rarity: 'Legendary', description: "A bizarre armor crafted with Livyatan parts that seems to warp space around the wearer. Causes mild nausea in bystanders.", effect: { type: 'dodge', chance: 0.25 }}
+    // --- LIGHT ARMOR (Evasion & Mobility) ---
+    'travelers_garb': {
+        name: 'Traveler’s Armor',
+        defense: 1, // 1% Phys
+        magicDefense: 1, // 1% Mag
+        price: 30,
+        rarity: 'Common',
+        description: "Essentially just heavy clothing with a few extra buckles. It protects you from public indecency and light breezes, but not much else."
+    },
+    'leather_armor': {
+        name: 'Leather Armor',
+        defense: 3,
+        magicDefense: 3,
+        price: 100,
+        rarity: 'Common',
+        description: "Boiled and hardened leather. It smells like a tannery, but it's light enough that you can run away from whatever is trying to kill you."
+    },
+    'padded_leather': {
+        name: 'Padded Leather',
+        defense: 5,
+        magicDefense: 5,
+        price: 250,
+        rarity: 'Common',
+        description: "Reinforced leather with thick cotton quilting underneath. Surprisingly comfortable, like wearing a very aggressive sleeping bag."
+    },
+    'silenced_leather_armor': {
+        name: 'Silenced Leather',
+        defense: 3,
+        magicDefense: 5,
+        price: 750,
+        rarity: 'Rare',
+        description: "Specially treated with oils to prevent squeaking. Perfect for sneaking up on people, or for grabbing a midnight snack without waking the party.",
+        effect: { type: 'dodge', chance: 0.10 } // 10% Dodge
+    },
+    'assassin_cloak_armor': {
+        name: 'Assassin’s Cloak',
+        defense: 5,
+        magicDefense: 10,
+        price: 2000,
+        rarity: 'Epic',
+        description: "Dark, flowing fabric woven with shadow-silk. It breaks up your silhouette so effectively that sometimes you lose track of your own limbs.",
+        effect: { type: 'dodge', chance: 0.20 } // 20% Dodge
+    },
+    'vacuum_encaser': {
+        name: 'Vacuum Encaser',
+        defense: 10,
+        magicDefense: 20,
+        price: 7500,
+        rarity: 'Legendary',
+        description: "Crafted from Livyatan lining, this suit creates a low-pressure field around you. Attacks seem to slide off, repelled by the very laws of physics throwing a tantrum.",
+        effect: { type: 'dodge', chance: 0.25 } // 25% Dodge
+    },
+
+    // --- HEAVY ARMOR (Block & Mitigation) ---
+    'chainmail_armor': {
+        name: 'Chainmail Armor',
+        defense: 10,
+        magicDefense: 5,
+        price: 400,
+        rarity: 'Uncommon',
+        description: "Thousands of interlocking steel rings. It's heavy, noisy, and pinches your skin, but it stops teeth and blades remarkably well.",
+        metallic: true
+    },
+    'half_plate_armor': {
+        name: 'Half-Plate Armor',
+        defense: 15,
+        magicDefense: 10,
+        price: 800,
+        rarity: 'Uncommon',
+        description: "Solid plates covering the vital organs, with mail covering the joints. A practical compromise between 'tank' and 'mobile target'.",
+        effect: { blockChance: 0.10 }, // 10% Block
+        metallic: true
+    },
+    'steel_plate_armor': {
+        name: 'Steel Plate Armor',
+        defense: 20,
+        magicDefense: 10,
+        price: 1500,
+        rarity: 'Rare',
+        description: "A full suit of articulated steel. You sound like a walking kitchen cabinet, but you feel invincible. Don't fall in the water.",
+        effect: { blockChance: 0.15 }, // 15% Block
+        metallic: true
+    },
+    'adamantine_armor': {
+        name: 'Adamantine Armor',
+        defense: 25,
+        magicDefense: 20,
+        price: 5000,
+        rarity: 'Epic',
+        description: "Forged from a legendary, distinctive green metal that is harder than dragon bone. It turns lethal blows into mere dents.",
+        effect: { blockChance: 0.20 }, // 20% Block
+        metallic: true
+    },
+    'soul_steel_armor': {
+        name: 'Soul Steel Armor',
+        defense: 25,
+        magicDefense: 25,
+        price: 10000,
+        rarity: 'Legendary',
+        description: "Adamantine infused with the willing souls of ancient guardians. The armor whispers tactical advice to you. It's usually right, which is annoying.",
+        effect: { blockChance: 0.25 }, // 25% Block
+        metallic: true
+    },
+    'mirror_mail': {
+        name: 'Mirror Mail',
+        defense: 20,
+        magicDefense: 20,
+        price: 8000,
+        rarity: 'Legendary',
+        description: "Each scale of this mail is polished to a perfect mirror finish. It blinds your enemies and literally reflects their malice back at them.",
+        effect: { type: 'reflect', amount: 0.25 }, // 25% Reflect
+        metallic: true
+    },
+
+    // --- MAGIC ARMOR (Regen & Spell Utility) ---
+    'apprentices_robe': {
+        name: 'Apprentice’s Robe',
+        defense: 2,
+        magicDefense: 10,
+        price: 100,
+        rarity: 'Common',
+        description: "Simple linen robes stained with ink and minor potion spills. It smells faintly of ozone and desperation."
+    },
+    'scholars_hood': {
+        name: 'Scholar’s Hood',
+        defense: 5,
+        magicDefense: 20,
+        price: 600,
+        rarity: 'Uncommon',
+        description: "A cowl enchanted to keep the mind cool and focused. It helps you recall complex incantations without getting a headache.",
+        effect: { mana_discount_flat: 2 } // -2 MP per spell
+    },
+    'warmages_armor': {
+        name: 'Warmage’s Armor',
+        defense: 10,
+        magicDefense: 20,
+        price: 2500,
+        rarity: 'Rare',
+        description: "A coat reinforced with spell-hardened leather and mana-conductive threads. Designed for the wizard who likes to stand on the front lines.",
+        effect: { hp_regen_percent: 0.05, mp_regen_percent: 0.05 } // +5% HP/MP Regen
+    },
+    'archmages_robes': {
+        name: 'Archmage’s Robe',
+        defense: 10,
+        magicDefense: 40,
+        price: 15000,
+        rarity: 'Legendary',
+        description: "Woven from threads of pure, crystallized mana. It pulses in rhythm with your heartbeat and amplifies every ounce of magic you channel.",
+        effect: { 
+            spell_amp: 1, // [CHANGED] Now uses standard amplification (Same as Catalyst)
+            mp_regen_percent: 0.05, 
+            mana_discount_flat: 5 
+        }
+    }
 };
 
 const LURES = {
@@ -639,9 +908,9 @@ const SPELLS = {
     'none_aoe': {
         element: 'none', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Magical Grenade', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'earth_essence': 5, 'wind_essence': 5 }, description: "Lob an explosive sphere of magical energy that damages nearby foes." },
-            { name: 'Rain of Arrow', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'fire_essence': 10, 'water_essence': 10 }, description: "Summon a volley of phantom arrows to strike multiple enemies." },
-            { name: 'Meteor Shower', cost: 60, damage: [6, 6], cap: 10, description: "Call down a cataclysmic shower of meteors to bombard the battlefield." }
+            { splash: 0.25, name: 'Magical Grenade', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'earth_essence': 5, 'wind_essence': 5 }, description: "Lob an explosive sphere of magical energy that damages nearby foes." },
+            { splash: 0.5, name: 'Rain of Arrow', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'fire_essence': 10, 'water_essence': 10 }, description: "Summon a volley of phantom arrows to strike multiple enemies." },
+            { splash: 0.75, name: 'Meteor Shower', cost: 60, damage: [6, 6], cap: 10, description: "Call down a cataclysmic shower of meteors to bombard the battlefield." }
         ]
     },
     // Fire
@@ -656,9 +925,9 @@ const SPELLS = {
     'fire_aoe': {
         element: 'fire', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Fireball', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'fire_essence': 10 }, description: "Hurl a classic exploding sphere of fire, engulfing enemies in a fiery blast." },
-            { name: 'Fire Orb', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'fire_essence': 20 }, description: "Create a slow-moving but intensely hot orb of fire that detonates with great force." },
-            { name: 'Great Chaos Orb', cost: 60, damage: [6, 6], cap: 10, description: "Hurl a massive, churning orb of chaotic flame that leaves a pool of lava in its wake." }
+            { splash: 0.25, name: 'Fireball', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'fire_essence': 10 }, description: "Hurl a classic exploding sphere of fire, engulfing enemies in a fiery blast." },
+            { splash: 0.5, name: 'Fire Orb', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'fire_essence': 20 }, description: "Create a slow-moving but intensely hot orb of fire that detonates with great force." },
+            { splash: 0.75, name: 'Great Chaos Orb', cost: 60, damage: [6, 6], cap: 10, description: "Hurl a massive, churning orb of chaotic flame that leaves a pool of lava in its wake." }
         ]
     },
     'fire_support': {
@@ -680,9 +949,9 @@ const SPELLS = {
     'water_aoe': {
         element: 'water', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Water Spout', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'water_essence': 10 }, description: "Summon a whirling spout of water to drench and damage a group of enemies." },
-            { name: 'Water Surf', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'water_essence': 20 }, description: "Unleash a massive wave that crashes across the battlefield." },
-            { name: 'Grand Flood', cost: 60, damage: [6, 6], cap: 10, description: "Inundate the area with a cataclysmic flood, drowning all who stand against you." }
+            { splash: 0.25, name: 'Water Spout', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'water_essence': 10 }, description: "Summon a whirling spout of water to drench and damage a group of enemies." },
+            { splash: 0.5, name: 'Water Surf', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'water_essence': 20 }, description: "Unleash a massive wave that crashes across the battlefield." },
+            { splash: 0.75, name: 'Grand Flood', cost: 60, damage: [6, 6], cap: 10, description: "Inundate the area with a cataclysmic flood, drowning all who stand against you." }
         ]
     },
     'water_support': {
@@ -704,9 +973,9 @@ const SPELLS = {
     'earth_aoe': {
         element: 'earth', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Tremorstrike', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'earth_essence': 10 }, description: "Slam your power into the ground, creating a localized tremor to stagger nearby foes." },
-            { name: 'Earthquake', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'earth_essence': 20 }, description: "Shake the very foundations of the earth, causing the ground to rupture and damage your enemies." },
-            { name: 'Ravine Creation', cost: 60, damage: [6, 6], cap: 10, description: "Violently tear the earth asunder, crushing all who stand against you." }
+            { splash: 0.25, name: 'Tremorstrike', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'earth_essence': 10 }, description: "Slam your power into the ground, creating a localized tremor to stagger nearby foes." },
+            { splash: 0.5, name: 'Earthquake', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'earth_essence': 20 }, description: "Shake the very foundations of the earth, causing the ground to rupture and damage your enemies." },
+            { splash: 0.75, name: 'Ravine Creation', cost: 60, damage: [6, 6], cap: 10, description: "Violently tear the earth asunder, crushing all who stand against you." }
         ]
     },
     'earth_support': {
@@ -728,9 +997,9 @@ const SPELLS = {
     'wind_aoe': {
         element: 'wind', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Wind Gust', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'wind_essence': 10 }, description: "Create a powerful gust of wind to buffet and damage a group of foes." },
-            { name: 'Sweeping Edge', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'wind_essence': 20 }, description: "Unleash a wide, scythe-like blade of wind that cuts across the battlefield." },
-            { name: 'Hurricane Storm', cost: 60, damage: [6, 6], cap: 10, description: "Conjure a ferocious hurricane, trapping and shredding enemies in its chaotic embrace." }
+            { splash: 0.25, name: 'Wind Gust', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'wind_essence': 10 }, description: "Create a powerful gust of wind to buffet and damage a group of foes." },
+            { splash: 0.5, name: 'Sweeping Edge', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'wind_essence': 20 }, description: "Unleash a wide, scythe-like blade of wind that cuts across the battlefield." },
+            { splash: 0.75, name: 'Hurricane Storm', cost: 60, damage: [6, 6], cap: 10, description: "Conjure a ferocious hurricane, trapping and shredding enemies in its chaotic embrace." }
         ]
     },
     'wind_support': {
@@ -752,9 +1021,9 @@ const SPELLS = {
     'lightning_aoe': {
         element: 'lightning', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Plasma Pulse', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'lightning_essence': 10 }, description: "Release a pulse of raw plasma that arcs between nearby enemies." },
-            { name: 'Electromagnetic Barrier', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'lightning_essence': 20 }, description: "Create a deadly barrier of electricity that shocks all foes in an area." },
-            { name: 'Thundercloud Form', cost: 60, damage: [6, 6], cap: 10, description: "Become a living thundercloud, raining down chaotic lightning strikes across the area." }
+            { splash: 0.25, name: 'Plasma Pulse', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'lightning_essence': 10 }, description: "Release a pulse of raw plasma that arcs between nearby enemies." },
+            { splash: 0.5, name: 'Electromagnetic Barrier', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'lightning_essence': 20 }, description: "Create a deadly barrier of electricity that shocks all foes in an area." },
+            { splash: 0.75, name: 'Thundercloud Form', cost: 60, damage: [6, 6], cap: 10, description: "Become a living thundercloud, raining down chaotic lightning strikes across the area." }
         ]
     },
     'lightning_support': {
@@ -776,9 +1045,9 @@ const SPELLS = {
     'nature_aoe': {
         element: 'nature', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Seed Bomb', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'nature_essence': 10 }, description: "Hurl a seed that explodes into a burst of thorny shrapnel." },
-            { name: 'Bamboo Field Strike', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'nature_essence': 20 }, description: "Instantly grow a dense field of razor-sharp bamboo, impaling enemies in an area." },
-            { name: 'Sea of Vines', cost: 60, damage: [6, 6], cap: 10, description: "Transform the ground into a writhing sea of thorny vines that tear at all enemies within." }
+            { splash: 0.25, name: 'Seed Bomb', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'nature_essence': 10 }, description: "Hurl a seed that explodes into a burst of thorny shrapnel." },
+            { splash: 0.5, name: 'Bamboo Field Strike', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'nature_essence': 20 }, description: "Instantly grow a dense field of razor-sharp bamboo, impaling enemies in an area." },
+            { splash: 0.75, name: 'Sea of Vines', cost: 60, damage: [6, 6], cap: 10, description: "Transform the ground into a writhing sea of thorny vines that tear at all enemies within." }
         ]
     },
     'nature_support': {
@@ -800,9 +1069,9 @@ const SPELLS = {
     'light_aoe': {
         element: 'light', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Lantern Spread', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'light_essence': 10 }, description: "Release a gentle but searing wave of light, like the glow of a lantern." },
-            { name: 'Beacon of Light', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'light_essence': 20 }, description: "Erupt in a blinding flash of holy light, damaging and staggering nearby foes." },
-            { name: 'Shine of the Archangel', cost: 60, damage: [6, 6], cap: 10, description: "Unfurl ethereal wings and release a devastating wave of archangelic power." }
+            { splash: 0.25, name: 'Lantern Spread', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'light_essence': 10 }, description: "Release a gentle but searing wave of light, like the glow of a lantern." },
+            { splash: 0.5, name: 'Beacon of Light', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'light_essence': 20 }, description: "Erupt in a blinding flash of holy light, damaging and staggering nearby foes." },
+            { splash: 0.75, name: 'Shine of the Archangel', cost: 60, damage: [6, 6], cap: 10, description: "Unfurl ethereal wings and release a devastating wave of archangelic power." }
         ]
     },
     'light_support': {
@@ -824,9 +1093,9 @@ const SPELLS = {
     'void_aoe': {
         element: 'void', type: 'aoe', learnCost: 250,
         tiers: [
-            { name: 'Shadow Bolt', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'void_essence': 10 }, description: "Hurl a bolt of shadow that explodes on impact, damaging nearby enemies." },
-            { name: 'Void Engulf', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'void_essence': 20 }, description: "Engulf an area in a sphere of pure void, draining the life from those within." },
-            { name: 'Black Hole', cost: 60, damage: [6, 6], cap: 10, description: "Conjure a miniature black hole that pulls in and crushes all enemies in its vicinity." }
+            { splash: 0.25, name: 'Shadow Bolt', cost: 15, damage: [2, 6], cap: 4, upgradeCost: 1000, upgradeEssences: { 'void_essence': 10 }, description: "Hurl a bolt of shadow that explodes on impact, damaging nearby enemies." },
+            { splash: 0.5, name: 'Void Engulf', cost: 35, damage: [4, 6], cap: 7, upgradeCost: 4000, upgradeEssences: { 'void_essence': 20 }, description: "Engulf an area in a sphere of pure void, draining the life from those within." },
+            { splash: 0.75, name: 'Black Hole', cost: 60, damage: [6, 6], cap: 10, description: "Conjure a miniature black hole that pulls in and crushes all enemies in its vicinity." }
         ]
     },
     'void_support': {

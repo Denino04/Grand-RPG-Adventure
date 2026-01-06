@@ -10,7 +10,6 @@ let blacksmithActiveTab = 'all';
 let blackMarketActiveTab = 'all'; 
 let sageTowerActiveTab = 'all'; 
 let enchanterActiveTab = 'all';
-
 function setStorageSortOrder(order) {
     storageSortOrder = order;
     renderHouseStorage();
@@ -46,6 +45,306 @@ window.setEnchanterTab = function(tabName) {
     renderEnchanterShop();
 }
 
+window.openMirror = function() {
+    const modal = document.getElementById('mirror-modal');
+    // Safety check if the HTML modal exists
+    if (!modal) {
+        console.error("Mirror modal HTML element not found! Please check index.html.");
+        addToLog("The mirror seems cracked... (Missing HTML Modal)", "text-red-400");
+        return;
+    }
+
+    // Populate inputs with current player data
+    const nameInput = document.getElementById('mirror-name-input');
+    const iconInput = document.getElementById('mirror-icon-input');
+    const colorInput = document.getElementById('mirror-color-input');
+    const colorPreview = document.getElementById('mirror-color-preview');
+
+    if (nameInput) nameInput.value = player.name || "Wanderer";
+    if (iconInput) iconInput.value = player.icon || "🧙‍♂️";
+    
+    // Default green if no custom color set yet
+    const currentColor = player.tileColor || '#16a34a'; 
+    if (colorInput) {
+        colorInput.value = currentColor;
+        // Live preview listener
+        colorInput.oninput = (e) => {
+            if (colorPreview) {
+                colorPreview.textContent = e.target.value;
+                colorPreview.style.color = e.target.value;
+            }
+        };
+    }
+    if (colorPreview) {
+        colorPreview.textContent = currentColor;
+        colorPreview.style.color = currentColor;
+    }
+
+    modal.classList.remove('hidden');
+}
+
+window.closeMirror = function() {
+    const modal = document.getElementById('mirror-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+window.saveMirrorChanges = function() {
+    const nameInput = document.getElementById('mirror-name-input');
+    const iconInput = document.getElementById('mirror-icon-input');
+    const colorInput = document.getElementById('mirror-color-input');
+
+    const newName = nameInput ? nameInput.value.trim() : player.name;
+    const newIcon = iconInput ? iconInput.value.trim() : player.icon;
+    const newColor = colorInput ? colorInput.value : player.tileColor;
+
+    if (!newName) {
+        addToLog("Reflections cannot be nameless...", "text-red-400");
+        return;
+    }
+
+    // Apply Changes
+    player.name = newName;
+    
+    // Handle Emoji parsing (ensure we only grab the first emoji/char)
+    if (newIcon && newIcon.length > 0) {
+        const chars = Array.from(newIcon);
+        player.icon = chars[0]; 
+    }
+
+    player.tileColor = newColor;
+
+    addToLog("You step away from the mirror, looking... different.", "text-purple-400");
+    
+    closeMirror();
+    
+    // Refresh views to show new name/color
+    if (typeof updateStatsView === 'function') updateStatsView(); 
+    if (typeof renderHouse === 'function') renderHouse();
+}
+// --- NEW: Dedicated Tooltip Handler to fix Quote/Syntax Errors ---
+window.showSkillNodeTooltip = function(skillId, event) {
+    if (gameState.blockTooltips) return; // [FIX] Abort if blocked
+    if (typeof SKILL_TREE === 'undefined') return;
+    const node = SKILL_TREE[skillId];
+    if (!node) return;
+
+    let typeLabel = node.type.toUpperCase();
+    let typeColorClass = 'text-gray-400';
+    
+    if (node.type === 'active') typeColorClass = 'text-red-400';
+    else if (node.type === 'toggle') typeColorClass = 'text-purple-400';
+    else if (node.type === 'passive') typeColorClass = 'text-cyan-400';
+    else if (node.type === 'trigger') typeColorClass = 'text-yellow-400';
+    else if (node.type === 'synergy') typeColorClass = 'text-amber-400 font-bold';
+    else if (node.type === 'mastery') typeColorClass = 'text-fuchsia-400 font-bold uppercase tracking-widest border-b-2 border-fuchsia-500'; // Regal style
+
+    let descText = node.description;
+    let flavorText = "";
+    let statsText = descText;
+
+    const match = descText.match(/^"(.+?)"\s*(.*)$/);
+    if (match) {
+        flavorText = `"${match[1]}"`;
+        statsText = match[2];
+    }
+
+    let displayDesc = "";
+    const mode = player.skillDescriptionMode || 'detailed';
+
+    if (mode === 'simple') {
+        displayDesc = flavorText ? `<span class="italic text-yellow-100/80">${flavorText}</span>` : statsText;
+    } else {
+        displayDesc = statsText || flavorText;
+    }
+
+    const content = `
+        <div class="text-left min-w-[200px] max-w-[250px]">
+            <div class="font-bold text-yellow-300 text-base mb-1">${node.name}</div>
+            <div class="text-xs ${typeColorClass} font-bold uppercase tracking-wider mb-2 border-b border-slate-600 pb-1">${typeLabel}</div>
+            <div class="text-sm text-gray-300 leading-snug">${displayDesc}</div>
+            ${mode === 'simple' && flavorText ? '<div class="mt-2 text-[10px] text-gray-500 uppercase">Detailed stats hidden</div>' : ''}
+        </div>`;
+
+    showSimpleTooltip(content, event);
+};
+// [NEW GLOBAL FUNCTIONS FOR SKILL TREE]
+window.toggleSkillDescMode = function(shouldRender = true) { // Add parameter, default true
+    hideSimpleTooltip(); 
+    player.skillDescriptionMode = player.skillDescriptionMode === 'simple' ? 'detailed' : 'simple';
+    
+    if (shouldRender) {
+        renderSkillTree(); 
+    }
+};
+
+window.toggleSkillEquip = function(skillId) {
+    hideSimpleTooltip(); // Force close existing
+    
+    // [FIX] Block tooltips for 300ms to prevent ghost mouseover on mobile re-render
+    gameState.blockTooltips = true;
+    setTimeout(() => { gameState.blockTooltips = false; }, 300);
+
+    player.toggleSkillEquip(skillId);
+    renderSkillTree(); 
+};
+
+window.handleUnequipAll = function() {
+    if (player) {
+        player.unequipAllSkills();
+        renderSkillTree(); // Refresh UI to show empty slots/unchecked boxes
+    }
+};
+
+window.togglePassivePin = function(skillId) {
+    if (!player.pinnedPassives) player.pinnedPassives = [];
+    
+    const index = player.pinnedPassives.indexOf(skillId);
+    if (index > -1) {
+        player.pinnedPassives.splice(index, 1);
+    } else {
+        player.pinnedPassives.push(skillId);
+    }
+    // Re-render the selection screen to show the update
+    renderBattle('passives_select');
+}
+
+window.setSkillTreeSortPrimary = function(mode) {
+    if (player) {
+        player.skillTreeSortPrimary = mode;
+        renderSkillTree();
+    }
+}
+
+window.setSkillTreeSortSecondary = function(mode) {
+    if (player) {
+        player.skillTreeSortSecondary = mode;
+        renderSkillTree();
+    }
+}
+
+function _getSortedSkills(unlockedIds) {
+    // 1. Convert IDs to Objects and ensure the 'id' key exists
+    const skills = unlockedIds
+        .map(id => SKILL_TREE[id])
+        .filter(s => s) // Filter out nulls
+        .map(s => ({ ...s, id: findKeyByInstance(SKILL_TREE, s) }));
+
+    const mode = player.skillTreeSortMode || 'type';
+
+    // --- SORT BY NAME (Alphabetical) ---
+    if (mode === 'alpha') {
+        return { 'All': skills.sort((a, b) => a.name.localeCompare(b.name)) };
+    } 
+    
+    // --- SORT BY TIER (Distance from Root) ---
+    if (mode === 'tier') {
+        const groups = {};
+        skills.forEach(s => {
+            let depth = 0;
+            let current = s;
+            while (current && current.parents && current.parents.length > 0 && current.parents[0] !== 'the_root') {
+                depth++;
+                current = SKILL_TREE[current.parents[0]];
+            }
+            if (s.parents.includes('the_root')) depth = 1;
+            if (s.id === 'the_root') depth = 0;
+            const key = `Tier ${depth}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(s);
+        });
+        return Object.keys(groups)
+            .sort((a, b) => parseInt(a.split(' ')[1]) - parseInt(b.split(' ')[1]))
+            .reduce((acc, key) => { acc[key] = groups[key]; return acc; }, {});
+    }
+
+    // --- SORT BY BRANCH (The new 'branch' property) ---
+    if (mode === 'branch') {
+        const groups = {};
+        skills.forEach(s => {
+            const key = s.branch || 'Miscellaneous';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(s);
+        });
+        const orderedGroups = {};
+        const sortOrder = ['Core', 'Physical', 'Strength', 'Dexterity', 'Magic', 'Magic - AoE', 'Magic - ST', 'Magic - Elemental'];
+        sortOrder.forEach(key => { if (groups[key]) orderedGroups[key] = groups[key]; });
+        Object.keys(groups).forEach(key => { if (!orderedGroups[key]) orderedGroups[key] = groups[key]; });
+        return orderedGroups;
+    }
+
+    // --- SORT BY WEAPON REQUIREMENT (New Mode) ---
+    if (mode === 'weapon') {
+        const groups = {};
+        skills.forEach(s => {
+            let key = 'General';
+            // Check SKILL_WEAPON_REQ from battle.js (Global)
+            if (typeof SKILL_WEAPON_REQ !== 'undefined') {
+                // Direct check for specific weapon requirement
+                if (SKILL_WEAPON_REQ[s.id]) {
+                    const reqs = SKILL_WEAPON_REQ[s.id];
+                    if (reqs === STR_WEAPONS) key = 'Strength Weapons';
+                    else if (reqs === DEX_WEAPONS) key = 'Dexterity Weapons';
+                    else if (reqs.includes('Hand-to-Hand')) key = 'Hand-to-Hand';
+                    else if (reqs.includes('Bow')) key = 'Bow';
+                    else if (reqs.includes('Dagger')) key = 'Dagger';
+                    else if (reqs.includes('Longsword')) key = 'Longsword';
+                    else if (reqs.includes('Axe')) key = 'Axe';
+                    else if (reqs.includes('Hammer')) key = 'Hammer';
+                    else if (reqs.includes('Reaper')) key = 'Scythe';
+                    else if (reqs.includes('Lance')) key = 'Lance';
+                    else if (reqs.includes('Thrusting Sword')) key = 'Rapier';
+                    else if (reqs.includes('Curved Sword')) key = 'Curved Sword';
+                } 
+                // Fallback logic for passives that imply a weapon but aren't strictly enforced in battle.js
+                // This catches things like 'Light Armor Proficiency' or general passives
+                else if (s.branch === 'Strength') {
+                     // Try to infer from description or parents if not explicit
+                     if (s.description.includes("Heavy Armor")) key = "Heavy Armor";
+                     else if (s.description.includes("Light Armor")) key = "Light Armor";
+                     else key = "Strength General";
+                }
+                else if (s.branch === 'Dexterity') {
+                     if (s.description.includes("Light Armor")) key = "Light Armor";
+                     else key = "Dexterity General";
+                }
+            }
+            
+            // Magic remains separate
+            if (s.branch && s.branch.includes('Magic')) key = 'Magic';
+            if (s.branch === 'Core' || s.id === 'the_root') key = 'Core';
+
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(s);
+        });
+        return groups;
+    }
+
+    // --- DEFAULT: SORT BY TYPE ---
+    const groups = { 'Mastery Arts': [], 'Active': [], 'Stance': [], 'Synergy': [], 'Trigger': [], 'Passive': [] }; 
+    skills.forEach(s => {
+        let key = 'Passive';
+        if (s.costType === 'mastery') key = 'Mastery Arts'; 
+        else if (s.type === 'active') key = 'Active';
+        else if (s.type === 'toggle') key = 'Stance';
+        else if (s.type === 'synergy') key = 'Synergy';
+        else if (s.type === 'trigger') key = 'Trigger';
+        else if (s.type === 'mastery') key = 'Passive'; 
+        
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(s);
+    });
+    
+    Object.keys(groups).forEach(key => {
+        if (groups[key].length === 0) delete groups[key];
+    });
+    
+    return groups;
+}
+
+// Helper to find key if missing (safety check)
+function findKeyByInstance(obj, val) {
+    return Object.keys(obj).find(key => obj[key] === val) || val.name; // Fallback
+}
 /**
  * [REWRITTEN HELPER] Renders a standardized, tabbed shop interface.
  * This function now dynamically builds tabs based on the keys in the inventory object.
@@ -100,9 +399,18 @@ function _renderTabbedShopUI(config) {
         items: filteredItems,
         detailsFn: getItemDetails,
         actionsHtmlFn: (key, details) => {
-            const price = Math.floor(details.price * priceMultiplier);
+            // [FIX] Use Centralized Price Calculation
+            // calculates the price with all player discounts applied
+            const price = window.calculateAdjustedPrice(key, priceMultiplier);
+            
+            // Check for discount for styling
+            const base = Math.floor(details.price * priceMultiplier);
+            const isDiscounted = price < base;
+            // Green text if discounted, Yellow if normal
+            const priceClass = isDiscounted ? "text-green-400 font-bold" : "text-yellow-400 font-semibold";
+            
             return `
-                <span class="text-yellow-400 font-semibold mr-4">${price} G</span>
+                <span class="${priceClass} mr-4">${price} G</span>
                 <button onclick="buyItem('${key}', '${shopType}', ${price})" class="btn btn-primary text-sm py-1 px-3" ${player.gold < price ? 'disabled' : ''}>Buy</button>
             `;
         }
@@ -145,17 +453,20 @@ function getWeaponStatsString(weapon) {
     const elementText = player.weaponElement !== 'none' ? ` <span class="font-bold text-cyan-300">[${capitalize(player.weaponElement)}]</span>` : '';
 
     if (player.weaponElement !== 'none') {
-        damageString += ' + 1d8'; // Add the bonus dice string
+        damageString += ' + 1d8'; 
     }
     stats.push(damageString);
-    // --- END MODIFICATION ---
+    
+    // [MODIFICATION START] Add Range to Stats String
+    if (weapon.range) {
+        stats.push(`Range: ${weapon.range}`);
+    }
+    // [MODIFICATION END]
 
     // Add specific weapon effect stats
     if(weapon.effect?.critChance) stats.push(`Crit: ${weapon.effect.critChance*100}%`);
     if(weapon.effect?.armorPierce) stats.push(`Pierce: ${weapon.effect.armorPierce*100}%`);
 
-
-    // --- REMOVED old elementText line ---
     return `${weapon.name} (${stats.join(', ')})${elementText}`;
 }
 
@@ -450,7 +761,6 @@ function renderCharacterSheet(isLevelUp = false) {
 
     // Snapshot current stats if opening the sheet for allocation
     if (!characterSheetOriginalStats) {
-        // *** MODIFICATION START: Save Base Stat values as well for accurate reversion ***
         characterSheetOriginalStats = {
             vigor: player.vigor, focus: player.focus, stamina: player.stamina,
             strength: player.strength, intelligence: player.intelligence, luck: player.luck,
@@ -458,79 +768,1078 @@ function renderCharacterSheet(isLevelUp = false) {
             bonusVigor: player.bonusVigor || 0, bonusFocus: player.bonusFocus || 0, bonusStamina: player.bonusStamina || 0,
             bonusStrength: player.bonusStrength || 0, bonusIntelligence: player.bonusIntelligence || 0, bonusLuck: player.bonusLuck || 0
         };
-        // *** MODIFICATION END ***
     }
 
-    lastViewBeforeInventory = 'character_sheet'; // Set the return view
-    gameState.currentView = isLevelUp ? 'character_sheet_levelup' : 'character_sheet'; // Set current view state
+    lastViewBeforeInventory = 'character_sheet';
+    gameState.currentView = isLevelUp ? 'character_sheet_levelup' : 'character_sheet';
 
     const currentStatPoints = player.statPoints || 0;
     const hasChanges = currentStatPoints !== characterSheetOriginalStats.statPoints;
 
-    // --- Build HTML using helper functions ---
     const mainStatsHtml = _buildCharSheetMainStats(currentStatPoints);
     const derivedStatsHtml = _buildCharSheetDerivedStats();
     const { racialPassiveHtml, classAbilityHtml } = _buildCharSheetAbilities();
     const foodBuffsHtml = _buildCharSheetFoodBuffs();
 
+    // --- SKILL TREE BUTTON LOGIC ---
+    let skillTreeBtnHtml = '';
+    if (player.level >= 5) { 
+        const pts = player.skillPoints || 0;
+        const pulse = pts > 0 ? 'animate-pulse ring-2 ring-yellow-400' : '';
+        skillTreeBtnHtml = `<button onclick="renderSkillTree()" class="btn btn-magic text-sm px-3 py-1 ${pulse}">Skills (${pts})</button>`;
+    }
 
-    // --- Assemble Final HTML ---
-    // This is now much cleaner and just assembles the parts.
     let html = `
-    <div class="w-full text-left">
-        <h2 class="font-medieval text-2xl mb-2 text-center title-glow">Character Sheet</h2>
+    <div class="w-full text-left flex flex-col h-full overflow-hidden">
+        <h2 class="font-medieval text-xl mb-1 text-center title-glow">Character Sheet</h2>
 
-        <!-- Allocation Controls -->
-        <div class="flex justify-between items-center mb-2 p-1 bg-slate-900/50 rounded-lg text-sm">
+        <div class="flex justify-between items-center mb-1 p-1 bg-slate-900/50 rounded-lg text-xs flex-shrink-0">
             <div>
-                <span class="mr-2 font-semibold">Allocate:</span>
-                <button onclick="setStatAllocationAmount(1)" class="btn ${statAllocationAmount === 1 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-10">1x</button>
-                <button onclick="setStatAllocationAmount(5)" class="btn ${statAllocationAmount === 5 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-10">5x</button>
-                <button onclick="setStatAllocationAmount(25)" class="btn ${statAllocationAmount === 25 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-1 px-2 w-10">25x</button>
-            </div>
+                <span class="mr-1 font-semibold">Allocate:</span>
+                <button onclick="setStatAllocationAmount(1)" class="btn ${statAllocationAmount === 1 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-0 px-2 h-6">1x</button>
+                <button onclick="setStatAllocationAmount(5)" class="btn ${statAllocationAmount === 5 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-0 px-2 h-6">5x</button>
+                <button onclick="setStatAllocationAmount(25)" class="btn ${statAllocationAmount === 25 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-0 px-2 h-6">25x</button>
+                <button onclick="setStatAllocationAmount(100)" class="btn ${statAllocationAmount === 100 ? 'bg-yellow-600 border-yellow-800' : 'btn-primary'} text-xs py-0 px-2 h-6">100x</button>
+                </div>
             <p class="text-green-400 font-bold">Points: <span id="stat-points">${currentStatPoints}</span></p>
         </div>
 
-        <!-- Stats & Abilities Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4">
-            <!-- Left Column: Stats -->
-            <div class="space-y-2">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-2 flex-grow overflow-y-auto inventory-scrollbar pr-1">
+            <div class="space-y-1">
                 <div>
-                    <h3 class="font-bold text-lg text-yellow-300 mb-1">Main Stats</h3>
+                    <h3 class="font-bold text-sm text-yellow-300 mb-0.5">Main Stats</h3>
                     <div class="space-y-px">${mainStatsHtml}</div>
                 </div>
                 <div>
-                    <h3 class="font-bold text-lg text-yellow-300 mb-1 mt-2">Derived Stats</h3>
-                    <div class="space-y-0.5 bg-slate-800 p-2 rounded">${derivedStatsHtml}</div>
+                    <h3 class="font-bold text-sm text-yellow-300 mb-0.5 mt-1">Derived Stats</h3>
+                    <div class="space-y-0.5 bg-slate-800 p-1.5 rounded">${derivedStatsHtml}</div>
                 </div>
             </div>
-            <!-- Right Column: Abilities & Buffs -->
-            <div class="space-y-2 mt-2 md:mt-0">
+            <div class="space-y-1 mt-1 md:mt-0">
                  <div>
-                    <h3 class_ ="font-bold text-lg text-yellow-300 mb-1">Racial Passive</h3>
-                    <div class="text-xs bg-slate-800 p-2 rounded">${racialPassiveHtml}</div>
+                    <h3 class="font-bold text-sm text-yellow-300 mb-0.5">Racial Passive</h3>
+                    <div class="text-xs bg-slate-800 p-1.5 rounded leading-tight">${racialPassiveHtml}</div>
                 </div>
                 <div>
-                    <h3 class="font-bold text-lg text-yellow-300 mb-1">Class Ability</h3>
-                    <div class="text-xs bg-slate-800 p-2 rounded">${classAbilityHtml}</div>
+                    <h3 class="font-bold text-sm text-yellow-300 mb-0.5">Class Ability</h3>
+                    <div class="text-xs bg-slate-800 p-1.5 rounded leading-tight">${classAbilityHtml}</div>
                 </div>
                  <div>
-                    <h3 class="font-bold text-lg text-yellow-300 mb-1">Active Food Buffs</h3>
-                    <div id="food-buff-tracker" class="space-y-0.5 bg-slate-800 p-2 rounded">${foodBuffsHtml}</div>
+                    <h3 class="font-bold text-sm text-yellow-300 mb-0.5">Active Food Buffs</h3>
+                    <div id="food-buff-tracker" class="space-y-0.5 bg-slate-800 p-1.5 rounded leading-tight">${foodBuffsHtml}</div>
                  </div>
-                 <!-- Action Buttons moved to right column bottom -->
-                 <div class="text-center mt-2 flex justify-center gap-4">
-                    <button onclick="resetStatAllocation()" class="btn btn-action" ${!hasChanges ? 'disabled' : ''}>Reset</button>
-                    <button onclick="confirmStatAllocation()" class="btn btn-primary">Done</button>
-                </div>
             </div>
+        </div>
+
+        <div class="text-center mt-2 flex justify-center gap-3 flex-shrink-0 pt-1 border-t border-slate-700">
+            <button onclick="resetStatAllocation()" class="btn btn-action text-sm px-4 py-1" ${!hasChanges ? 'disabled' : ''}>Reset</button>
+            ${skillTreeBtnHtml}
+            <button onclick="confirmStatAllocation()" class="btn btn-primary text-sm px-4 py-1">Done</button>
         </div>
     </div>`;
 
     const container = document.createElement('div');
+    container.className = 'w-full h-full'; 
     container.innerHTML = html;
     render(container);
+    
+    mainView.classList.remove('items-center', 'p-6', 'p-4');
+    mainView.classList.add('p-2');
 }
+
+window.toggleSkillTreeFullScreen = function() {
+    const container = document.getElementById('skill-tree-container');
+    if (!container) return;
+
+    const constraintClasses = ['md:relative', 'md:inset-auto', 'md:z-auto'];
+    const isFullScreen = !container.classList.contains('md:relative');
+
+    if (isFullScreen) {
+        container.classList.add(...constraintClasses);
+        container.classList.remove('z-[100]'); 
+    } else {
+        container.classList.remove(...constraintClasses);
+        container.classList.add('z-[100]');
+    }
+}
+
+// --- SKILL TREE HELPERS (Global Scope) ---
+function _getSkillCategoryName(skill) {
+    if (skill.id === 'the_root' || skill.branch === 'Core') return 'Core / Passive';
+    if (skill.branch === 'Mercantile') return 'Mercantile';
+    if (skill.branch === 'Craftsmanship') return 'Craftsmanship';
+    if (skill.branch === 'Gardener') return 'Gardener';
+    
+    if (skill.armorReq === 'Heavy') return 'Heavy Armor Defense';
+    if (skill.armorReq === 'Light') return 'Light Armor Defense';
+    
+    if (skill.weaponReq) return skill.weaponReq + ' Arts';
+    
+    if (skill.elementReq === 'elemental') return 'Elemental Mastery';
+    if (skill.elementReq) return capitalize(skill.elementReq) + ' Magic';
+    
+    if (skill.branch === 'Magic - ST') return 'Single Target Magic';
+    if (skill.branch === 'Magic - AoE') return 'Area of Effect Magic';
+    if (skill.branch === 'Magic - Utility') return 'Utility Magic';
+    if (skill.branch === 'Magic') return 'General Magic';
+    
+    if (skill.branch === 'Strength') return 'Strength General';
+    if (skill.branch === 'Dexterity') return 'Dexterity General';
+    if (skill.branch === 'Physical') return 'Physical';
+    
+    if (skill.costType === 'mastery') return 'Mastery Arts';
+    
+    return skill.branch || 'Miscellaneous';
+}
+
+function _getSkillTypeColor(type, costType) {
+    if (costType === 'mastery') return '#4a044e'; 
+    if (type === 'active') return '#450a0a';      
+    if (type === 'toggle') return '#3b0764';      
+    if (type === 'synergy') return '#431407';     
+    if (type === 'trigger') return '#422006';     
+    return '#083344';                             
+}
+
+function _getSkillCategoryColor(skill) {
+    if (skill.elementReq) {
+        switch(skill.elementReq) {
+            case 'fire': return '#b91c1c';
+            case 'water': return '#0369a1';
+            case 'earth': return '#57534e';
+            case 'wind': return '#0d9488';
+            case 'lightning': return '#facc15';
+            case 'nature': return '#15803d';
+            case 'light': return '#e2e8f0';
+            case 'void': return '#171717';
+            case 'elemental': return '#7c3aed';
+        }
+    }
+    
+    if (skill.weaponReq) {
+        switch(skill.weaponReq) {
+            case 'Hand-to-Hand': return '#c2410c';
+            case 'Longsword': return '#1e40af';
+            case 'Axe': return '#991b1b';
+            case 'Hammer': return '#92400e';
+            case 'Lance': return '#b45309';
+            case 'Dagger': return '#1e293b';
+            case 'Thrusting Sword': return '#be185d';
+            case 'Curved Sword': return '#0f766e';
+            case 'Reaper': return '#6b21a8';
+            case 'Bow': return '#15803d';
+        }
+    }
+    
+    if (skill.branch === 'Mercantile') return '#fbbf24';    
+    if (skill.branch === 'Craftsmanship') return '#2dd4bf'; 
+    if (skill.branch === 'Gardener') return '#a3e635';      
+    if (skill.branch === 'Magic - ST') return '#be185d'; 
+    if (skill.branch === 'Magic - AoE') return '#a21caf'; 
+    if (skill.branch === 'Magic - Utility') return '#0ea5e9'; 
+    if (skill.branch && skill.branch.startsWith('Magic')) return '#581c87';      
+    if (skill.branch === 'Strength') return '#450a0a'; 
+    if (skill.branch === 'Dexterity') return '#064e3b'; 
+    return '#334155'; 
+}
+
+function getDualSortedSkills(unlockedIds) {
+    const skills = unlockedIds
+        .map(id => SKILL_TREE[id])
+        .filter(s => s)
+        .map(s => ({ ...s, id: findKeyByInstance(SKILL_TREE, s) }));
+
+    const primary = player.skillTreeSortPrimary || 'branch';
+    const secondary = player.skillTreeSortSecondary || 'tier';
+
+    const getDepth = (nodeId) => {
+        if (nodeId === 'the_root') return 0;
+        const node = SKILL_TREE[nodeId];
+        if (!node || !node.parents || node.parents.length === 0) return 0;
+        return Math.max(...node.parents.map(pid => getDepth(pid))) + 1;
+    };
+
+    const getComparator = (mode) => {
+        if (mode === 'alpha') return (a, b) => a.name.localeCompare(b.name);
+        if (mode === 'tier') return (a, b) => getDepth(a.id) - getDepth(b.id);
+        if (mode === 'type') {
+            const order = ['mastery', 'active', 'toggle', 'synergy', 'trigger', 'passive'];
+            return (a, b) => {
+                let typeA = a.type; if(a.costType==='mastery') typeA='mastery';
+                let typeB = b.type; if(b.costType==='mastery') typeB='mastery';
+                return order.indexOf(typeA) - order.indexOf(typeB);
+            };
+        }
+        if (mode === 'branch') {
+             // USE GLOBAL HELPER HERE
+             return (a, b) => _getSkillCategoryName(a).localeCompare(_getSkillCategoryName(b));
+        }
+        return (a, b) => 0; 
+    };
+
+    const groups = {};
+
+    skills.forEach(skill => {
+        let groupKey = 'General';
+
+        if (primary === 'alpha') groupKey = 'All Skills';
+        else if (primary === 'tier') groupKey = `Tier ${getDepth(skill.id)}`;
+        else if (primary === 'type') {
+            // ... (keep existing type logic) ...
+            if (skill.costType === 'mastery') groupKey = 'Mastery Arts';
+            else if (skill.type === 'active') groupKey = 'Active';
+            else if (skill.type === 'toggle') groupKey = 'Stance';
+            else if (skill.type === 'synergy') groupKey = 'Synergy';
+            else if (skill.type === 'trigger') groupKey = 'Trigger';
+            else groupKey = 'Passive';
+        }
+        else if (primary === 'branch') { 
+            // USE GLOBAL HELPER HERE
+            groupKey = _getSkillCategoryName(skill);
+        }
+
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(skill);
+    });
+
+    // --- Equipped Group Logic ---
+    const comparator = getComparator(secondary);
+    const fallbackComparator = getComparator('alpha'); 
+    
+    if (player.equippedSkills && player.equippedSkills.length > 0) {
+        const equipped = player.equippedSkills
+            .map(id => SKILL_TREE[id])
+            .filter(s => s)
+            .map(s => ({ ...s, id: findKeyByInstance(SKILL_TREE, s) }));
+        
+        if (equipped.length > 0) {
+            equipped.sort((a, b) => {
+                const result = comparator(a, b);
+                if (result !== 0) return result;
+                return fallbackComparator(a, b);
+            });
+            groups['Equipped Skills'] = equipped;
+        }
+    }
+
+    Object.keys(groups).forEach(key => {
+        groups[key].sort((a, b) => {
+            const result = comparator(a, b);
+            if (result !== 0) return result;
+            return fallbackComparator(a, b);
+        });
+    });
+
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+        if (a.startsWith('Tier') && b.startsWith('Tier')) {
+                return parseInt(a.split(' ')[1]) - parseInt(b.split(' ')[1]);
+        }
+        const order = [
+            'Equipped Skills', 
+            'Core / Passive', 
+            'Mercantile', 'Craftsmanship', 'Gardener', 
+            'Physical', 
+            'Strength General', 'Heavy Armor Defense', 
+            'Dexterity General', 'Light Armor Defense', 
+            'Hand-to-Hand Arts', 'Longsword Arts', 'Axe Arts', 'Hammer Arts', 'Lance Arts', 
+            'Dagger Arts', 'Thrusting Sword Arts', 'Curved Sword Arts', 'Reaper Arts', 'Bow Arts',
+            'General Magic', 'Utility Magic', 'Single Target Magic', 'Area of Effect Magic', 'Elemental Mastery',
+            'Fire Magic', 'Water Magic', 'Earth Magic', 'Wind Magic', 'Lightning Magic', 'Nature Magic', 'Light Magic', 'Void Magic',
+            'Mastery Arts',
+            'Active', 'Stance', 'Synergy', 'Trigger', 'Passive'
+        ];
+        let idxA = order.indexOf(a);
+        let idxB = order.indexOf(b);
+        
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return a.localeCompare(b);
+    });
+
+    const orderedGroups = {};
+    sortedKeys.forEach(k => orderedGroups[k] = groups[k]);
+    return orderedGroups;
+}
+
+function generateSkillListHtml(groups) {
+    let html = '';
+    const searchTerm = (gameState.skillTreeSearchTerm || '').toLowerCase().trim();
+
+    Object.keys(groups).forEach(groupName => {
+        let skills = groups[groupName];
+        
+        // --- UPDATED FILTER LOGIC ---
+        if (searchTerm) {
+            skills = skills.filter(s => {
+                // 1. Check Name
+                const matchName = s.name.toLowerCase().includes(searchTerm);
+                
+                // 2. Check Raw Branch (e.g. "Magic - ST")
+                const matchBranch = (s.branch || '').toLowerCase().includes(searchTerm);
+                
+                // 3. Check Smart Category (e.g. "Lance Arts", "Earth Magic")
+                // This covers weaponReq and elementReq implicitly
+                const categoryName = _getSkillCategoryName(s).toLowerCase();
+                const matchCategory = categoryName.includes(searchTerm);
+
+                return matchName || matchBranch || matchCategory;
+            });
+            
+            if (skills.length === 0) return; // Skip empty groups
+        }
+        // --------------------
+
+        let headerColor = 'text-gray-300';
+        
+        if (groupName === 'Equipped Skills') headerColor = 'text-green-400 font-bold tracking-widest border-green-600/50';
+        else if (groupName.includes('Single Target')) headerColor = 'text-pink-400';
+        else if (groupName.includes('Area of Effect')) headerColor = 'text-fuchsia-400';
+        else if (groupName.includes('Utility')) headerColor = 'text-cyan-400';
+        else if (groupName.includes('Elemental Mastery')) headerColor = 'text-violet-300';
+        else if (groupName.includes('Fire')) headerColor = 'text-red-400';
+        else if (groupName.includes('Water')) headerColor = 'text-blue-400';
+        else if (groupName.includes('Earth')) headerColor = 'text-stone-400';
+        else if (groupName.includes('Wind')) headerColor = 'text-teal-400';
+        else if (groupName.includes('Lightning')) headerColor = 'text-yellow-400';
+        else if (groupName.includes('Nature')) headerColor = 'text-green-400';
+        else if (groupName.includes('Light')) headerColor = 'text-slate-100';
+        else if (groupName.includes('Void')) headerColor = 'text-slate-400';
+        else if (groupName.includes('Hand-to-Hand')) headerColor = 'text-orange-400';
+        else if (groupName.includes('Longsword')) headerColor = 'text-blue-400';
+        else if (groupName.includes('Axe')) headerColor = 'text-red-600';
+        else if (groupName.includes('Hammer')) headerColor = 'text-amber-600';
+        else if (groupName.includes('Lance')) headerColor = 'text-amber-400';
+        else if (groupName.includes('Dagger')) headerColor = 'text-slate-300';
+        else if (groupName.includes('Thrusting Sword')) headerColor = 'text-pink-400';
+        else if (groupName.includes('Curved Sword')) headerColor = 'text-teal-400';
+        else if (groupName.includes('Reaper')) headerColor = 'text-purple-400';
+        else if (groupName.includes('Bow')) headerColor = 'text-emerald-400';
+        else if (groupName.includes('Heavy Armor')) headerColor = 'text-slate-400'; 
+        else if (groupName.includes('Light Armor')) headerColor = 'text-teal-200'; 
+        else if (groupName.includes('Strength')) headerColor = 'text-red-300';
+        else if (groupName.includes('Dexterity')) headerColor = 'text-green-300';
+        else if (groupName.includes('Mastery')) headerColor = 'text-fuchsia-400';
+        else if (groupName.includes('Physical')) headerColor = 'text-stone-300'; 
+        else if (groupName.includes('Core') || groupName.includes('Tier')) headerColor = 'text-yellow-400';
+        else if (groupName.includes('Magic')) headerColor = 'text-purple-400';
+
+        html += `
+            <div class="bg-slate-800/50 rounded border border-slate-700 p-2">
+                <h4 class="text-[10px] font-bold ${headerColor} uppercase mb-2 border-b border-slate-700 pb-1">${groupName}</h4>
+                <div class="grid grid-cols-2 gap-2">
+                    ${skills.map(skill => {
+                        const canEquip = skill.type === 'active' || skill.type === 'toggle';
+                         const isEquipped = player.isSkillEquipped(skill.id);
+                         const leftColor = _getSkillTypeColor(skill.type, skill.costType);
+                         const rightColor = _getSkillCategoryColor(skill);
+                         const gradientStyle = `background-image: linear-gradient(135deg, ${leftColor} 20%, ${rightColor} 80%);`;
+                         const borderClass = isEquipped ? 'border-2 border-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : 'border border-transparent opacity-90 hover:opacity-100 hover:border-white/20';
+                         const action = canEquip ? `onclick="toggleSkillEquip('${skill.id}')"` : '';
+                        
+                        return `
+                        <div class="rounded p-2 min-h-[3rem] flex items-center justify-center text-center relative cursor-pointer shadow-md transition-all ${borderClass}" 
+                             style="${gradientStyle}"
+                             ${action} onmouseover="showSkillNodeTooltip('${skill.id}', event)" onmouseout="hideSimpleTooltip()">
+                            ${isEquipped ? '<div class="absolute -top-1 -right-1 bg-slate-900 text-green-400 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center border border-green-500 shadow-sm">✓</div>' : ''}
+                            <span class="text-[10px] font-bold text-white leading-tight line-clamp-2 pointer-events-none drop-shadow-sm tracking-wide" style="text-shadow: 0 1px 3px black;">${skill.name}</span>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+    });
+    
+    if (html === '') {
+        html = `<div class="p-4 text-center text-gray-500 text-xs italic">No skills matching "${searchTerm}"</div>`;
+    }
+    
+    return html;
+}
+
+window.filterSkillTreeList = function(searchTerm) {
+    // 1. Update State
+    gameState.skillTreeSearchTerm = searchTerm;
+
+    // 2. Get Data
+    const sortedGroups = getDualSortedSkills(player.unlockedSkills);
+
+    // 3. Generate HTML with filtering
+    const listHtml = generateSkillListHtml(sortedGroups);
+
+    // 4. Update DOM (PC and Mobile lists)
+    const pcList = document.getElementById('skill-tree-list-pc');
+    const mobileList = document.getElementById('skill-tree-list-mobile');
+    
+    if (pcList) pcList.innerHTML = listHtml;
+    if (mobileList) mobileList.innerHTML = listHtml;
+    
+    // Sync inputs if user switches view (optional, but good polish)
+    const pcInput = document.getElementById('skill-search-pc');
+    const mobileInput = document.getElementById('skill-search-mobile');
+    if (pcInput && pcInput.value !== searchTerm) pcInput.value = searchTerm;
+    if (mobileInput && mobileInput.value !== searchTerm) mobileInput.value = searchTerm;
+}
+
+function renderLoadoutUI() {
+    const maxSlots = player.getMaxLoadoutSlots(); // Now returns 3
+    const openSlot = gameState.skillLoadoutOpenSlot; 
+
+    // --- 1. THE "HALLWAY" (Compact Strip) ---
+    let html = `
+    <div class="bg-slate-900/50 border-y border-slate-700/50 py-2 mb-2 select-none">
+        <div class="flex justify-between items-center mb-1 px-1">
+            <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Loadouts</span>
+        </div>
+        
+        <div class="flex flex-wrap gap-1 px-1">`;
+
+    for (let i = 0; i < maxSlots; i++) {
+        const loadout = player.skillLoadouts[i];
+        const hasData = loadout && loadout.skills.length > 0;
+        const isOpen = openSlot === i;
+        
+        // Display custom name initials or number
+        let label = (i + 1).toString();
+        if (hasData && loadout.name) {
+            // If name is customized (not "Loadout X"), use first 2 chars
+            if (!loadout.name.startsWith("Loadout")) {
+                label = loadout.name.substring(0, 2).toUpperCase();
+            }
+        }
+
+        let baseClass = "w-8 h-8 rounded border flex items-center justify-center cursor-pointer transition-all shadow-sm relative group";
+        let stateClass = "";
+
+        if (isOpen) {
+            stateClass = "bg-yellow-900/40 border-yellow-500 text-yellow-200 ring-1 ring-yellow-500/50 z-10";
+        } else if (hasData) {
+            stateClass = "bg-slate-800 border-slate-600 text-cyan-400 hover:bg-slate-700 hover:border-cyan-500/50";
+        } else {
+            stateClass = "bg-slate-900/50 border-slate-800 border-dashed text-gray-600 hover:border-gray-500 hover:text-gray-400";
+        }
+        
+        html += `
+        <div onclick="toggleLoadoutDetail(${i})" 
+             class="${baseClass} ${stateClass}"
+             title="${hasData ? (loadout.name || 'Loadout ' + (i+1)) : 'Empty Slot'}">
+            <span class="font-bold text-xs font-mono">${label}</span>
+            ${hasData ? `<div class="absolute bottom-1 right-1 w-1 h-1 rounded-full bg-cyan-400 shadow-[0_0_4px_cyan]"></div>` : ''}
+        </div>`;
+    }
+    
+    html += `</div>`; 
+
+    // --- 2. THE "INSIDE" (Detail Panel) ---
+    if (openSlot !== undefined && openSlot !== null && openSlot < maxSlots) {
+        const loadout = player.skillLoadouts[openSlot];
+        const hasData = loadout && loadout.skills.length > 0;
+        const displayName = hasData ? (loadout.name || `Loadout ${openSlot + 1}`) : `Empty Slot ${openSlot + 1}`;
+        
+        html += `
+        <div class="mx-1 mb-2 p-2 bg-slate-800/80 rounded border border-slate-600 shadow-xl relative animate-in fade-in slide-in-from-top-1 duration-150">
+            <div class="absolute -top-1.5 left-4 w-3 h-3 bg-slate-800 border-t border-l border-slate-600 transform rotate-45"></div>
+
+            <div class="flex justify-between items-center mb-2 border-b border-slate-700/50 pb-1 relative z-10">
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-bold ${hasData ? 'text-cyan-100' : 'text-gray-500'}">
+                        ${displayName}
+                    </span>
+                    ${hasData ? `<button onclick="handleRenameLoadout(${openSlot})" class="text-[10px] text-gray-500 hover:text-yellow-300 transition-colors" title="Rename Loadout">✏️</button>` : ''}
+                </div>
+                ${hasData ? `<span class="text-[9px] text-gray-500 font-mono">${loadout.skills.length} Skills</span>` : ''}
+            </div>`;
+
+        if (hasData) {
+            html += `<div class="flex flex-wrap gap-1 mb-3 max-h-32 overflow-y-auto custom-scrollbar relative z-10">`;
+            
+            const sortedSkills = [...loadout.skills].sort((a, b) => {
+                const sA = SKILL_TREE[a], sB = SKILL_TREE[b];
+                if (!sA || !sB) return 0;
+                const typeScore = t => t === 'active' ? 1 : (t === 'toggle' ? 2 : 3);
+                return typeScore(sA.type) - typeScore(sB.type);
+            });
+
+            sortedSkills.forEach(skillId => {
+                const skill = SKILL_TREE[skillId];
+                if (skill) {
+                    let style = 'border-slate-700 text-gray-300 bg-slate-900';
+                    if (skill.type === 'active') style = 'border-red-900/50 text-red-200 bg-red-950/30';
+                    if (skill.type === 'toggle') style = 'border-purple-900/50 text-purple-200 bg-purple-950/30';
+                    
+                    html += `<div class="px-1.5 py-0.5 rounded border ${style} text-[9px] truncate max-w-full" title="${skill.name}">${skill.name}</div>`;
+                }
+            });
+            html += `</div>`;
+            
+            html += `
+            <div class="flex gap-2 relative z-10">
+                <button onclick="handleLoadLoadout(${openSlot})" class="flex-1 btn btn-primary text-[10px] py-1 shadow-md">Equip Build</button>
+                <button onclick="handleSaveLoadout(${openSlot})" class="px-3 btn btn-secondary text-[10px] py-1 border-red-900/30 hover:border-red-500 text-gray-400 hover:text-red-200" title="Overwrite">Save Over</button>
+            </div>`;
+        } else {
+            html += `
+            <div class="text-center py-2 relative z-10">
+                <p class="text-[10px] text-gray-500 mb-2 italic">No skills stored in this slot.</p>
+                <button onclick="handleSaveLoadout(${openSlot})" class="w-full btn btn-secondary text-[10px] py-1 border-dashed border-gray-600 text-gray-400 hover:text-white hover:border-white hover:bg-slate-700">
+                    Save Current Equipped Skills Here
+                </button>
+            </div>`;
+        }
+        html += `</div>`;
+    }
+
+    html += `</div>`;
+    return html;
+}
+
+window.handleRenameLoadout = function(index) {
+    if (!player || !player.skillLoadouts[index]) return;
+    
+    const currentName = player.skillLoadouts[index].name || `Loadout ${index + 1}`;
+    const newName = prompt("Enter a name for this loadout (max 20 chars):", currentName);
+    
+    if (newName !== null && newName.trim() !== "") {
+        player.renameLoadout(index, newName);
+        renderSkillTree(); // Re-render to show new name
+    }
+}
+
+window.handleSaveLoadout = function(index) {
+    if (player.equippedSkills.length === 0) {
+        addToLog("Equip some skills before saving a loadout!", "text-yellow-300");
+        return;
+    }
+    
+    if (confirm(`Overwrite Loadout Slot ${index + 1} with current equipped skills?`)) {
+        player.saveLoadout(index);
+        addToLog(`Loadout ${index + 1} saved.`, "text-green-300");
+        
+        // Re-render UI to update buttons
+        if (gameState.currentView === 'skill_tree') renderSkillTree(); 
+    }
+}
+
+window.handleLoadLoadout = function(index) {
+    const success = player.loadLoadout(index);
+    if (success) {
+        addToLog(`Loadout ${index + 1} equipped!`, "text-cyan-300");
+        if (gameState.currentView === 'skill_tree') renderSkillTree();
+    } else {
+        addToLog("Empty slot.", "text-gray-400");
+    }
+}
+
+function renderSkillTree() {
+    lastViewBeforeInventory = 'skill_tree';
+    gameState.currentView = 'skill_tree';
+
+    // --- CAPTURE SCROLL STATE ---
+    const pcListEl = document.getElementById('skill-tree-list-pc');
+    const mobileListEl = document.getElementById('skill-tree-list-mobile');
+    const pcScrollTop = pcListEl ? pcListEl.scrollTop : 0;
+    const mobileScrollTop = mobileListEl ? mobileListEl.scrollTop : 0;
+
+    // --- CAPTURE DRAWER STATE ---
+    const existingDrawer = document.getElementById('mobile-skill-drawer');
+    const isDrawerOpen = existingDrawer ? !existingDrawer.classList.contains('translate-y-full') : false;
+
+    // --- INIT STATE ---
+    if (!gameState.skillTreeConfig) {
+        gameState.skillTreeConfig = { zoom: 0.8, scrollLeft: 0, scrollTop: 0, layout: null };
+    }
+    
+    // --- INIT PLAYER DEFAULTS ---
+    if (!player.skillTreeSortPrimary) player.skillTreeSortPrimary = 'branch';
+    if (!player.skillTreeSortSecondary) player.skillTreeSortSecondary = 'tier';
+
+    // [FIX] Force Layout Reset to prevent NaN errors
+    gameState.skillTreeConfig.layout = null;
+
+    // --- LAYOUT GENERATION (Standard Radial) ---
+    if (!gameState.skillTreeConfig.layout) {
+        const layout = {};
+        const treeChildren = {};
+        const allNodes = Object.keys(SKILL_TREE);
+        allNodes.forEach(id => treeChildren[id] = []);
+        
+        allNodes.forEach(id => {
+            if (id === 'the_root') return;
+            const node = SKILL_TREE[id];
+            const parentId = (node.parents && node.parents.length > 0) ? node.parents[0] : 'the_root'; 
+            if (!treeChildren[parentId]) treeChildren[parentId] = [];
+            treeChildren[parentId].push(id);
+        });
+
+        const leafCounts = {};
+        const countLeaves = (id) => {
+            if (!treeChildren[id] || treeChildren[id].length === 0) { leafCounts[id] = 1; return 1; }
+            let sum = 0;
+            treeChildren[id].forEach(childId => sum += countLeaves(childId));
+            leafCounts[id] = sum;
+            return sum;
+        };
+        const totalLeaves = countLeaves('the_root');
+        
+        const spacing = 600; 
+        
+        const assignCoords = (id, startAngle, endAngle, depth) => {
+            const midAngle = startAngle + (endAngle - startAngle) / 2;
+            const radius = depth * spacing;
+            
+            const x = Math.cos(midAngle) * radius;
+            const y = Math.sin(midAngle) * radius;
+            layout[id] = { x: isNaN(x) ? 0 : x, y: isNaN(y) ? 0 : y, angle: midAngle, id: id };
+            
+            const children = treeChildren[id];
+            if (children && children.length > 0) {
+                const totalWeight = leafCounts[id];
+                let currentStart = startAngle;
+                const angleRange = endAngle - startAngle;
+
+                children.forEach(childId => {
+                    const weight = leafCounts[childId];
+                    let wedgeFraction = weight / totalWeight;
+                    let wedgeSize = wedgeFraction * angleRange;
+                    assignCoords(childId, currentStart, currentStart + wedgeSize, depth + 1);
+                    currentStart += wedgeSize;
+                });
+            }
+        };
+
+        assignCoords('the_root', 0, 2 * Math.PI, 0); 
+        gameState.skillTreeConfig.layout = layout;
+    }
+
+    const layout = gameState.skillTreeConfig.layout;
+    const safeVal = (n) => (typeof n === 'number' && !isNaN(n)) ? n : 0;
+
+    // --- DYNAMIC BOUNDING BOX ---
+    let maxDist = 0;
+    for (const id in layout) {
+        const pos = layout[id];
+        const nodeData = SKILL_TREE[id];
+        const trueX = nodeData && nodeData.x !== undefined ? (nodeData.x * 200) : pos.x;
+        const trueY = nodeData && nodeData.y !== undefined ? (nodeData.y * 200) : pos.y;
+        
+        const dist = Math.max(Math.abs(trueX), Math.abs(trueY));
+        if (dist > maxDist) maxDist = dist;
+    }
+    const canvasSize = Math.max(2000, (maxDist * 2) + 2000); 
+    const width = canvasSize; 
+    const height = canvasSize; 
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    // --- GENERATE MAP VISUALS ---
+    let svgLines = '';
+    let nodesHtml = '';
+    
+    for (const id in layout) {
+        const pos = layout[id]; 
+        const nodeData = SKILL_TREE[id];
+        if (!nodeData) continue;
+
+        const nodeX = centerX + safeVal(nodeData.x !== undefined ? (nodeData.x * 200) : pos.x);
+        const nodeY = centerY + safeVal(nodeData.y !== undefined ? (nodeData.y * 200) : pos.y);
+
+        const isOwned = player.hasSkill(id);
+        const isVisible = isOwned || (id === 'the_root') || (nodeData.parents && nodeData.parents.some(p => player.hasSkill(p)));
+        if (!isVisible) continue;
+
+        const parentsToDraw = nodeData.visualConnections || nodeData.parents;
+        if (parentsToDraw) {
+            parentsToDraw.forEach(parentId => {
+                const pNode = SKILL_TREE[parentId];
+                const pPos = layout[parentId];
+                if (pPos || pNode) {
+                    const parentX = centerX + safeVal(pNode && pNode.x !== undefined ? (pNode.x * 200) : (pPos ? pPos.x : 0));
+                    const parentY = centerY + safeVal(pNode && pNode.y !== undefined ? (pNode.y * 200) : (pPos ? pPos.y : 0));
+
+                    const isReachable = player.canUnlockSkill(id);
+                    
+                    let stroke = '#334155'; let lineWidth = 15; let dashArray = "none"; let opacity = 0.5;
+                    if (isOwned) { stroke = '#fbbf24'; lineWidth = 25; opacity = 1.0; } 
+                    else if (isReachable) { stroke = '#94a3b8'; lineWidth = 15; dashArray = "20,20"; opacity = 0.8; }
+                    svgLines += `<line x1="${parentX}" y1="${parentY}" x2="${nodeX}" y2="${nodeY}" stroke="${stroke}" stroke-width="${lineWidth}" stroke-dasharray="${dashArray}" stroke-linecap="round" opacity="${opacity}" />`;
+                }
+            });
+        }
+
+        const canUnlock = player.canUnlockSkill(id);
+        const isEquipped = player.isSkillEquipped(id);
+        let glowClass = isEquipped ? 'filter: drop-shadow(0 0 25px #4ade80);' : '';
+        
+        let opacityClass = 'opacity-100';
+        let grayscaleClass = '';
+        if (nodeData.exclusiveWith && player.hasSkill(nodeData.exclusiveWith)) {
+            opacityClass = 'opacity-40';
+            grayscaleClass = 'grayscale cursor-not-allowed';
+        }
+
+        let baseClass = `absolute z-20 flex items-center justify-center transition-transform duration-200 hover:scale-110 active:scale-95 ${opacityClass} ${grayscaleClass}`;
+        let shapeStyles = ''; 
+        let contentIcon = '';
+        
+        if (nodeData.costType === 'mastery' || nodeData.type === 'mastery') {
+             shapeStyles = 'width: 240px; height: 240px; transform: translate(-50%, -50%);';
+             const points = "50,2 63,38 98,38 69,59 79,92 50,75 21,92 31,59 2,38 37,38";
+             let polyColor = isOwned ? '#fbbf24' : (canUnlock ? '#b45309' : '#1e293b'); 
+             let borderColor = isOwned ? '#f59e0b' : (canUnlock ? '#fbbf24' : '#475569'); 
+             let pulse = (canUnlock && !isOwned) ? 'animate-pulse' : '';
+             contentIcon = `<div class="relative w-full h-full flex items-center justify-center drop-shadow-lg ${pulse}"><svg viewBox="0 0 100 100" class="absolute inset-0 w-full h-full overflow-visible"><polygon points="${points}" fill="${polyColor}" stroke="${borderColor}" stroke-width="8" stroke-linejoin="round" /></svg><span class="relative z-10 text-6xl filter drop-shadow-md select-none">${nodeData.icon || '⭐'}</span></div>`;
+        } else if (nodeData.type === 'toggle') {
+            shapeStyles = 'width: 200px; height: 200px; transform: translate(-50%, -50%);';
+            let polyColor = isOwned ? '#a855f7' : (canUnlock ? '#581c87' : '#0f172a');
+            let borderColor = isOwned ? '#e9d5ff' : (canUnlock ? '#a855f7' : '#334155');
+            let pulse = (canUnlock && !isOwned) ? 'animate-pulse' : '';
+            contentIcon = `<svg width="100%" height="100%" viewBox="0 0 100 100" class="${pulse} drop-shadow-md"><polygon points="50,10 10,90 90,90" fill="${polyColor}" stroke="${borderColor}" stroke-width="10" stroke-linejoin="round" /></svg>`;
+        } else if (nodeData.type === 'active') {
+             shapeStyles = 'width: 150px; height: 150px; transform: translate(-50%, -50%); border-radius: 20px;';
+             let bg = isOwned ? '#dc2626' : (canUnlock ? '#7f1d1d' : '#0f172a');
+             let border = isOwned ? '#fecaca' : (canUnlock ? '#dc2626' : '#334155');
+             let pulse = (canUnlock && !isOwned) ? 'animate-pulse' : '';
+             contentIcon = `<div class="w-full h-full ${pulse} border-[12px] shadow-lg" style="background:${bg}; border-color:${border}; border-radius:20px;"></div>`;
+        } else if (nodeData.type === 'synergy') {
+            shapeStyles = 'width: 175px; height: 175px; transform: translate(-50%, -50%);';
+            let polyColor = isOwned ? '#d97706' : (canUnlock ? '#92400e' : '#0f172a'); 
+            let borderColor = isOwned ? '#fcd34d' : (canUnlock ? '#d97706' : '#334155'); 
+            let pulse = (canUnlock && !isOwned) ? 'animate-pulse' : '';
+            contentIcon = `<svg width="100%" height="100%" viewBox="0 0 100 100" class="${pulse} drop-shadow-md"><polygon points="50,5 95,50 50,95 5,50" fill="${polyColor}" stroke="${borderColor}" stroke-width="10" stroke-linejoin="round" /></svg>`;
+        } else {
+            shapeStyles = 'width: 120px; height: 120px; transform: translate(-50%, -50%); border-radius: 50%;';
+            let bg = isOwned ? '#06b6d4' : (canUnlock ? '#155e75' : '#0f172a');
+            let border = isOwned ? '#cffafe' : (canUnlock ? '#06b6d4' : '#334155');
+            let pulse = (canUnlock && !isOwned) ? 'animate-pulse' : '';
+             contentIcon = `<div class="w-full h-full ${pulse} border-[10px] shadow-lg" style="background:${bg}; border-color:${border}; border-radius:50%;"></div>`;
+        }
+
+        nodesHtml += `
+            <div class="${baseClass}" 
+                style="left: ${nodeX}px; top: ${nodeY}px; ${shapeStyles} ${glowClass}"
+                onclick="handleNodeClick('${id}', ${canUnlock})">
+                ${contentIcon}
+                ${isEquipped && nodeData.type !== 'toggle' ? '<div class="absolute -top-4 -right-4 text-3xl bg-black/70 rounded-full px-3 text-green-400 font-bold border-4 border-green-500">✓</div>' : ''}
+                ${isEquipped && nodeData.type === 'toggle' ? '<div class="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-lg bg-black/80 px-4 py-1 rounded text-green-300 font-bold border-2 border-green-500">ON</div>' : ''}
+            </div>
+            <div class="absolute z-30 text-2xl font-bold ${isOwned ? 'text-white' : (canUnlock ? 'text-gray-300' : 'text-gray-600')} text-center w-96 cursor-help hover:text-yellow-200 pointer-events-auto transition-colors duration-200"
+                 style="left: ${nodeX}px; top: ${nodeY + 120}px; transform: translateX(-50%); text-shadow: 0 4px 8px black; background-color: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: 12px;"
+                 onclick="showSkillNodeTooltip('${id}', event); event.stopPropagation();"
+                 onmouseover="showSkillNodeTooltip('${id}', event)" 
+                 onmouseout="hideSimpleTooltip()">
+                ${nodeData.name}
+            </div>`;
+    }
+    
+    const sortedGroups = getDualSortedSkills(player.unlockedSkills);
+    
+    // 2. Generate HTML using GLOBAL helper (includes filter logic)
+    const listItemsHtml = generateSkillListHtml(sortedGroups);
+
+    // --- NEW: Generate Loadout HTML ---
+    const loadoutHtml = renderLoadoutUI(); 
+    // ----------------------------------
+
+    const mode = player.skillDescriptionMode || 'detailed';
+    const toggleBtnText = mode === 'simple' ? "Flavor" : "Stats";
+    const sortOptions = { 'branch': 'Branch (Detailed)', 'tier': 'Tier', 'type': 'Type', 'alpha': 'Name' };
+    const savedSearch = gameState.skillTreeSearchTerm || ''; // Retrieve saved search
+
+    // --- BUILD DUAL SELECTS ---
+    let primarySelectHtml = `<select onchange="setSkillTreeSortPrimary(this.value)" class="bg-slate-800 text-[10px] border border-slate-600 rounded px-1 py-1 text-gray-300 focus:outline-none w-1/2" title="Group By">`;
+    for (const [key, label] of Object.entries(sortOptions)) {
+        primarySelectHtml += `<option value="${key}" ${player.skillTreeSortPrimary === key ? 'selected' : ''}>Group: ${label}</option>`;
+    }
+    primarySelectHtml += `</select>`;
+
+    let secondarySelectHtml = `<select onchange="setSkillTreeSortSecondary(this.value)" class="bg-slate-800 text-[10px] border border-slate-600 rounded px-1 py-1 text-gray-300 focus:outline-none w-1/2" title="Sort Inside Group">`;
+    for (const [key, label] of Object.entries(sortOptions)) {
+        secondarySelectHtml += `<option value="${key}" ${player.skillTreeSortSecondary === key ? 'selected' : ''}>Sort: ${label}</option>`;
+    }
+    secondarySelectHtml += `</select>`;
+
+    // --- NEW: SEARCH INPUT HTML ---
+    const searchInputHtml = (id) => `
+        <input type="text" 
+               id="${id}" 
+               placeholder="Search skills..." 
+               value="${savedSearch}"
+               oninput="filterSkillTreeList(this.value)" 
+               class="w-full bg-slate-800 text-[10px] border border-slate-600 rounded px-2 py-1 text-gray-300 focus:outline-none focus:border-yellow-500 mt-1 placeholder-gray-600">
+    `;
+
+    const pcSidebarHtml = `
+        <div class="hidden md:flex absolute top-0 right-0 bottom-0 w-72 bg-slate-900 border-l border-slate-700 z-50 shadow-2xl flex-col pointer-events-auto">
+             <div class="p-3 border-b border-slate-700 bg-slate-900 flex-none z-30 flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-yellow-300 font-bold text-sm uppercase tracking-wide">Mastered Arts</h3>
+                    <button onclick="renderCharacterSheet()" class="btn btn-action text-[10px] py-1 px-2">Back</button>
+                </div>
+                <div class="flex gap-1 w-full">
+                    ${primarySelectHtml}
+                    ${secondarySelectHtml}
+                </div>
+                ${searchInputHtml('skill-search-pc')} 
+                
+                ${loadoutHtml}
+                
+                <div class="flex justify-between items-center mt-1">
+                    <div class="text-[10px] text-gray-500 italic">Sorting...</div>
+                    <div class="flex gap-1">
+                        <button onclick="handleUnequipAll()" class="btn btn-action text-[10px] py-0.5 px-2" title="Unequip All Skills">Clear</button>
+                        <button onclick="toggleSkillDescMode()" class="btn btn-secondary text-[10px] py-0.5 px-2">${toggleBtnText}</button>
+                    </div>
+                </div>
+            </div>
+            <div id="skill-tree-list-pc" class="flex-1 overflow-y-auto inventory-scrollbar space-y-4 p-2 pb-20 min-h-0">
+                ${listItemsHtml}
+            </div>
+        </div>`;
+
+    const drawerStateClass = isDrawerOpen ? '' : 'translate-y-full';
+
+    const mobileDrawerHtml = `
+        <div id="mobile-skill-drawer" class="absolute bottom-0 left-0 w-full h-[70%] bg-slate-900 border-t border-yellow-600 z-30 transform transition-transform duration-300 ${drawerStateClass} md:hidden flex flex-col rounded-t-xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+             <div class="w-full h-6 bg-slate-800 flex-none flex justify-center items-center cursor-pointer border-b border-slate-700 rounded-t-xl" onclick="document.getElementById('mobile-skill-drawer').classList.toggle('translate-y-full')">
+                <div class="w-12 h-1 bg-slate-500 rounded-full"></div>
+             </div>
+             <div class="p-3 border-b border-slate-700 bg-slate-900 flex-none flex flex-col gap-2">
+                <div class="flex gap-1 w-full">
+                    ${primarySelectHtml}
+                    ${secondarySelectHtml}
+                </div>
+                ${searchInputHtml('skill-search-mobile')}
+                
+                ${loadoutHtml}
+                
+                <div class="flex justify-end gap-2">
+                     <button onclick="handleUnequipAll()" class="btn btn-action text-[10px] py-1 px-2">Clear</button>
+                     <button onclick="toggleSkillDescMode()" class="btn btn-secondary text-[10px] py-1 px-2">${toggleBtnText}</button>
+                     <button onclick="document.getElementById('mobile-skill-drawer').classList.add('translate-y-full')" class="btn btn-action text-[10px] py-1 px-2">Close</button>
+                </div>
+            </div>
+             <div id="skill-tree-list-mobile" class="flex-1 overflow-y-auto inventory-scrollbar space-y-4 p-2 pb-20 min-h-0">
+                ${listItemsHtml}
+             </div>
+        </div>`;
+
+    const html = `
+        <div id="skill-tree-container" class="w-full h-full fixed inset-0 z-50 md:relative md:inset-auto md:z-auto bg-slate-950 flex flex-col overflow-hidden select-none transition-all duration-300">
+            <div class="absolute top-0 left-0 w-full z-20 p-2 pointer-events-none flex justify-between items-start">
+                <div class="bg-slate-900/90 backdrop-blur border border-slate-700 rounded px-3 py-2 pointer-events-auto shadow-lg flex flex-col gap-1">
+                    <div class="flex justify-between items-center gap-4">
+                         <h2 class="font-medieval text-lg text-white leading-none title-glow">Constellation</h2>
+                         <button onclick="toggleSkillTreeFullScreen()" class="hidden md:block text-gray-400 hover:text-white" title="Toggle Full Screen">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                         </button>
+                    </div>
+                    <p class="text-[10px] text-gray-400 mt-1">
+                        Skill Points: <span class="text-yellow-300 font-bold text-sm">${player.skillPoints}</span>
+                        ${player.masteryPoints > 0 ? `<br>Mastery Points: <span class="text-fuchsia-400 font-bold text-sm">${player.masteryPoints}</span>` : ''}
+                    </p>
+                </div>
+
+                <div class="flex flex-col gap-2 items-end pointer-events-auto md:hidden">
+                    <div class="bg-slate-900/90 backdrop-blur border border-slate-700 rounded px-2 py-1 text-right">
+                        <p class="text-[10px] text-gray-400 uppercase">Slots</p>
+                        <p class="text-xs text-white font-bold">${player.equippedSkills ? player.equippedSkills.length : 0}/${player.maxSkillCapacity}</p>
+                    </div>
+                    <button onclick="renderCharacterSheet()" class="btn btn-primary text-xs py-1 px-3 shadow-lg">Back</button>
+                </div>
+            </div>
+            
+            <div id="skill-tree-viewport" class="absolute inset-0 w-full h-full bg-slate-950 cursor-grab active:cursor-grabbing" style="touch-action: none; z-index: 1;">
+                <div id="skill-tree-content" style="width: ${width}px; height: ${height}px; position: absolute; transform-origin: 0 0; will-change: transform;">
+                    <svg width="${width}" height="${height}" class="absolute top-0 left-0 pointer-events-none z-0">${svgLines}</svg>
+                    ${nodesHtml}
+                </div>
+            </div>
+            ${pcSidebarHtml}
+            ${mobileDrawerHtml}
+            <button onclick="document.getElementById('mobile-skill-drawer').classList.remove('translate-y-full')" 
+                    class="md:hidden absolute bottom-4 right-4 w-12 h-12 bg-yellow-600 rounded-full shadow-xl flex items-center justify-center border-2 border-yellow-400 z-20 active:scale-95 transition-transform">
+                <span class="text-xl">⚔️</span>
+            </button>
+        </div>`;
+
+    mainView.className = "w-full h-full flex-grow flex flex-col relative overflow-hidden bg-slate-950 p-0"; 
+    mainView.style = "";
+    mainView.innerHTML = html;
+
+    // --- RESTORE SCROLL STATE ---
+    const newPcListEl = document.getElementById('skill-tree-list-pc');
+    const newMobileListEl = document.getElementById('skill-tree-list-mobile');
+    if (newPcListEl) newPcListEl.scrollTop = pcScrollTop;
+    if (newMobileListEl) newMobileListEl.scrollTop = mobileScrollTop;
+
+    initSkillTreeInteractions(centerX, centerY);
+}
+
+// --- INTERACTION LOGIC (Pan & Zoom) ---
+function initSkillTreeInteractions(centerX, centerY) {
+    const viewport = document.getElementById('skill-tree-viewport');
+    const content = document.getElementById('skill-tree-content');
+    if (!viewport || !content) return;
+
+    // Restore State
+    let state = {
+        x: gameState.skillTreeConfig.scrollLeft !== 0 ? -gameState.skillTreeConfig.scrollLeft : (viewport.clientWidth / 2) - centerX,
+        y: gameState.skillTreeConfig.scrollTop !== 0 ? -gameState.skillTreeConfig.scrollTop : (viewport.clientHeight / 2) - centerY,
+        scale: gameState.skillTreeConfig.zoom
+    };
+
+    const updateTransform = () => {
+        // [CHANGE] Min Zoom set to 0.005 for extreme zoom out
+        state.scale = Math.min(Math.max(0.05, state.scale), 3.0);
+        
+        content.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+        gameState.skillTreeConfig.scrollLeft = -state.x;
+        gameState.skillTreeConfig.scrollTop = -state.y;
+        gameState.skillTreeConfig.zoom = state.scale;
+    };
+    updateTransform();
+
+    // --- VARIABLES ---
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let initialPinchDist = 0, initialScale = 1;
+    const DRAG_THRESHOLD = 5;
+
+    // --- MOUSE/POINTER PANNING ---
+    const onPointerDown = (e) => {
+        if (e.button !== 0 && e.button !== -1 && e.button !== undefined) return;
+        if (!e.isPrimary) return;
+
+        startX = e.clientX;
+        startY = e.clientY;
+        isDragging = false;
+
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+    };
+
+    const onPointerMove = (e) => {
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+
+        if (!isDragging && (Math.abs(deltaX) > DRAG_THRESHOLD || Math.abs(deltaY) > DRAG_THRESHOLD)) {
+            isDragging = true;
+        }
+
+        if (isDragging) {
+            e.preventDefault();
+            state.x += deltaX;
+            state.y += deltaY;
+            startX = e.clientX;
+            startY = e.clientY;
+            updateTransform();
+        }
+    };
+
+    const onPointerUp = (e) => {
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+
+        if (isDragging) {
+            const preventClick = (clickEvent) => {
+                clickEvent.stopPropagation();
+                clickEvent.preventDefault(); 
+            };
+            window.addEventListener('click', preventClick, { capture: true, once: true });
+        } 
+        isDragging = false;
+    };
+
+    viewport.onpointerdown = onPointerDown;
+
+    // --- TOUCH PINCH ZOOM (Mobile) ---
+    viewport.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+            isDragging = false; 
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerUp);
+            
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            initialPinchDist = Math.sqrt(dx * dx + dy * dy);
+            initialScale = state.scale;
+        }
+    }, { passive: false });
+
+    viewport.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && initialPinchDist > 0) {
+            e.preventDefault();
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const currentDist = Math.sqrt(dx * dx + dy * dy);
+            const zoomFactor = currentDist / initialPinchDist;
+            state.scale = initialScale * zoomFactor;
+            updateTransform();
+        }
+    }, { passive: false });
+
+    viewport.addEventListener('touchend', (e) => {
+        if (e.touches.length < 2) initialPinchDist = 0;
+    });
+
+    // --- WHEEL ZOOM (PC) ---
+    viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomSpeed = 0.001;
+        const newScale = state.scale - (e.deltaY * zoomSpeed * state.scale);
+        
+        const rect = viewport.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const worldX = (mouseX - state.x) / state.scale;
+        const worldY = (mouseY - state.y) / state.scale;
+        
+        // [CHANGE] Apply min limit here too
+        state.scale = Math.min(Math.max(0.05, newScale), 3.0);
+        
+        state.x = mouseX - worldX * state.scale;
+        state.y = mouseY - worldY * state.scale;
+        
+        updateTransform();
+    }, { passive: false });
+}
+
+window.toggleLoadoutDetail = function(index) {
+    // If clicking the same slot, close it. Otherwise, open the new one.
+    if (gameState.skillLoadoutOpenSlot === index) {
+        gameState.skillLoadoutOpenSlot = null;
+    } else {
+        gameState.skillLoadoutOpenSlot = index;
+    }
+    // Re-render to show the change
+    renderSkillTree();
+}
+// --- INTERACTION LOGIC (Pan & Zoom) ---
+
+// --- Global Handlers ---
+window.toggleSkillDrawer = function() {
+    const drawer = document.getElementById('mobile-skill-drawer');
+    if (drawer) {
+        if (drawer.classList.contains('translate-y-full')) {
+            drawer.classList.remove('translate-y-full');
+        } else {
+            drawer.classList.add('translate-y-full');
+        }
+    }
+};
+
+window.handleNodeClick = function(skillId, canUnlock) {
+    if (canUnlock) {
+        hideSimpleTooltip(); // <--- Forces tooltip to close before unlock/re-render
+        player.unlockSkill(skillId);
+    } else {
+        // Keeps existing logic for locked nodes (showing tooltip on click)
+        const fakeEvent = {
+            clientX: window.innerWidth / 2,
+            clientY: window.innerHeight / 2
+        };
+        showSkillNodeTooltip(skillId, fakeEvent);
+    }
+};
 
 function renderCharacterCreation() {
     $('#start-screen').classList.add('hidden');
@@ -1683,42 +2992,156 @@ function renderTownSquare() {
 
 // MODIFICATION: New Housing functions
 function renderHouse() {
-    updateRealTimePalette();
-    lastViewBeforeInventory = 'town'; // Go back to town square from house
+    if (typeof updateRealTimePalette === 'function') updateRealTimePalette();
+    lastViewBeforeInventory = 'town';
     gameState.currentView = 'house';
 
-    let buttonsHtml = `
-        <button onclick="restAtHouse()" class="btn btn-primary w-full md:w-auto">Rest</button>
-        <button onclick="renderHouseStorage()" class="btn btn-primary w-full md:w-auto">Storage</button>
+    // Define the full floor plan of the house (7 Rooms)
+    const houseRooms = [
+        // --- BASE ROOMS (Always Unlocked) ---
+        {
+            id: 'bedroom',
+            name: 'Master Bedroom',
+            icon: '🛌',
+            desc: 'Rest & Recover',
+            action: 'restAtHouse()',
+            unlocked: true,
+            theme: 'indigo'
+        },
+        {
+            id: 'storage',
+            name: 'The Vault',
+            icon: '📦',
+            desc: 'Item Storage',
+            action: 'renderHouseStorage()',
+            unlocked: true,
+            theme: 'amber'
+        },
+        {
+            id: 'mirror',
+            name: 'Vanity Mirror',
+            icon: '🪞',
+            desc: 'Change Appearance',
+            action: 'openMirror()',
+            unlocked: true,
+            theme: 'purple'
+        },
+
+        // --- UPGRADEABLE ROOMS (Check player.house tiers) ---
+        {
+            id: 'kitchen',
+            name: 'Kitchen',
+            icon: '🍳',
+            desc: 'Cook Meals',
+            action: 'renderKitchen()',
+            unlocked: (player.house && player.house.kitchenTier > 0),
+            lockedName: 'Dusty Pantry',
+            lockedDesc: 'Build Kitchen',
+            theme: 'orange'
+        },
+        {
+            id: 'garden',
+            name: 'Garden',
+            icon: '🌿',
+            desc: 'Harvest Plants',
+            action: 'renderGarden()',
+            unlocked: (player.house && player.house.gardenTier > 0),
+            lockedName: 'Overgrown Yard',
+            lockedDesc: 'Build Garden',
+            theme: 'green'
+        },
+        {
+            id: 'alchemy',
+            name: 'Alchemy Lab',
+            icon: '⚗️',
+            desc: 'Brew Potions',
+            action: 'renderAlchemyLab()',
+            unlocked: (player.house && player.house.alchemyTier > 0),
+            lockedName: 'Damp Basement',
+            lockedDesc: 'Build Lab',
+            theme: 'teal'
+        },
+        {
+            id: 'training',
+            name: 'Training Grounds',
+            icon: '⚔️',
+            desc: 'Hone Skills',
+            action: 'renderTrainingGrounds()',
+            unlocked: (player.house && player.house.trainingTier > 0),
+            lockedName: 'Empty Courtyard',
+            lockedDesc: 'Build Arena',
+            theme: 'red'
+        }
+    ];
+
+    // Helper to generate color classes based on theme
+    const getThemeClasses = (theme, isLocked) => {
+        if (isLocked) return 'bg-slate-900/40 border-slate-800 text-slate-600 grayscale opacity-70 cursor-not-allowed';
+        
+        const colors = {
+            indigo: 'bg-indigo-900/30 border-indigo-500/50 hover:border-indigo-400 text-indigo-200 hover:bg-indigo-900/50',
+            amber:  'bg-amber-900/30 border-amber-500/50 hover:border-amber-400 text-amber-200 hover:bg-amber-900/50',
+            purple: 'bg-purple-900/30 border-purple-500/50 hover:border-purple-400 text-purple-200 hover:bg-purple-900/50',
+            orange: 'bg-orange-900/30 border-orange-500/50 hover:border-orange-400 text-orange-200 hover:bg-orange-900/50',
+            green:  'bg-green-900/30 border-green-500/50 hover:border-green-400 text-green-200 hover:bg-green-900/50',
+            teal:   'bg-teal-900/30 border-teal-500/50 hover:border-teal-400 text-teal-200 hover:bg-teal-900/50',
+            red:    'bg-red-900/30 border-red-500/50 hover:border-red-400 text-red-200 hover:bg-red-900/50',
+        };
+        return colors[theme] || colors.indigo;
+    };
+
+    // Generate HTML for the grid
+    let roomsHtml = houseRooms.map(room => {
+        const classes = getThemeClasses(room.theme, !room.unlocked);
+        const name = room.unlocked ? room.name : room.lockedName;
+        const desc = room.unlocked ? room.desc : `<span class="italic text-slate-600">(${room.lockedDesc})</span>`;
+        const onclick = room.unlocked ? `onclick="${room.action}"` : '';
+        const hoverEffect = room.unlocked ? 'group-hover:scale-110 group-hover:-translate-y-1' : '';
+
+        return `
+            <div ${onclick} class="group relative flex flex-col items-center justify-center p-3 h-28 rounded-xl border-2 transition-all duration-300 ${classes}">
+                <div class="text-3xl mb-1 transition-transform duration-300 ${hoverEffect}">${room.icon}</div>
+                <div class="font-medieval font-bold text-sm tracking-wide text-center leading-none mb-1">${name}</div>
+                <div class="text-[10px] uppercase tracking-wider text-center opacity-80">${desc}</div>
+                
+                ${!room.unlocked ? '<div class="absolute inset-0 bg-black/20 rounded-xl"></div>' : ''}
+            </div>
+        `;
+    }).join('');
+
+    const html = `
+        <div class="w-full h-full flex flex-col items-center p-4 overflow-y-auto inventory-scrollbar">
+            
+            <div class="text-center mb-6 flex-shrink-0">
+                <h2 class="font-medieval text-4xl text-amber-300 title-glow mb-1">My Estate</h2>
+                <div class="h-px w-32 bg-gradient-to-r from-transparent via-amber-500/50 to-transparent mx-auto"></div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 w-full max-w-4xl flex-grow content-start">
+                ${roomsHtml}
+            </div>
+
+            <div class="mt-6 w-full max-w-xs flex-shrink-0">
+                <button onclick="renderTownSquare()" class="btn w-full bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 py-3 rounded-lg font-medieval tracking-widest transition-all shadow-md">
+                    LEAVE HOUSE
+                </button>
+            </div>
+        </div>
     `;
 
-    if (player.house.gardenTier > 0) {
-        buttonsHtml += `<button onclick="renderGarden()" class="btn btn-primary w-full md:w-auto">Garden</button>`;
-    }
-    if (player.house.kitchenTier > 0) {
-        buttonsHtml += `<button onclick="renderKitchen()" class="btn btn-primary w-full md:w-auto">Kitchen</button>`;
-    }
-    if (player.house.alchemyTier > 0) {
-        buttonsHtml += `<button onclick="renderAlchemyLab()" class="btn btn-primary w-full md:w-auto">Alchemy Lab</button>`;
-    }
-    if (player.house.trainingTier > 0) {
-        buttonsHtml += `<button onclick="renderTrainingGrounds()" class="btn btn-primary w-full md:w-auto">Training Grounds</button>`;
-    }
-
-    let html = `
-        <div class="w-full text-center">
-            <h2 class="font-medieval text-3xl mb-4 text-center title-glow">Your House</h2>
-            <p class="mb-6 text-gray-400">A cozy, personal space to rest and prepare for your adventures.</p>
-            <div class="grid grid-cols-2 gap-4 w-full max-w-md mx-auto">
-                ${buttonsHtml}
-            </div>
-             <div class="mt-8">
-                <button onclick="renderTownSquare()" class="btn btn-action">Leave House</button>
-            </div>
-        </div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
-    render(container);
+    container.className = 'w-full h-full';
+    
+    if (typeof render === 'function') {
+        render(container);
+    } else {
+        const mainView = document.getElementById('main-view');
+        if (mainView) {
+            mainView.innerHTML = '';
+            mainView.appendChild(container);
+        }
+    }
 }
 
 function _renderStorageItemList(source, type, activeTab, moveAction) {
@@ -1788,23 +3211,37 @@ function _renderStorageItemList(source, type, activeTab, moveAction) {
                 const details = getItemDetails(key);
                 if (!details || details.rarity === 'Broken') return;
 
-                // If rendering player's inventory, check if equipped
                 if (type === 'inventory') {
                     const isEquipped = (activeTab === 'weapons' && details.name === player.equippedWeapon.name) ||
                                      (activeTab === 'catalysts' && details.name === player.equippedCatalyst.name) ||
                                      (activeTab === 'armor' && details.name === player.equippedArmor.name) ||
                                      (activeTab === 'shields' && details.name === player.equippedShield.name);
-                    if (!isEquipped) { // Only count unequipped items
+                    if (!isEquipped) {
                         equipCounts[key] = (equipCounts[key] || 0) + 1;
                     }
-                } else { // If rendering storage, count everything
+                } else {
                     equipCounts[key] = (equipCounts[key] || 0) + 1;
                 }
             });
             
+            // [MODIFICATION START] Sorted by Type for Weapons
             list = Object.keys(equipCounts)
-                .map(key => ({ key, details: getItemDetails(key), count: equipCounts[key] })) // Store the count
-                .sort((a, b) => a.details.name.localeCompare(b.details.name));
+                .map(key => ({ key, details: getItemDetails(key), count: equipCounts[key] }))
+                .sort((a, b) => {
+                    if (activeTab === 'weapons') {
+                        const typeOrder = ['Hand-to-Hand', 'Dagger', 'Thrusting Sword', 'Curved Sword', 'Longsword', 'Axe', 'Hammer', 'Lance', 'Reaper', 'Bow'];
+                        const typeA = a.details.class || '';
+                        const typeB = b.details.class || '';
+                        
+                        const idxA = typeOrder.indexOf(typeA);
+                        const idxB = typeOrder.indexOf(typeB);
+                        
+                        if (idxA !== -1 && idxB !== -1 && idxA !== idxB) return idxA - idxB;
+                        if (idxA !== -1 && idxB === -1) return -1;
+                        if (idxA === -1 && idxB !== -1) return 1;
+                    }
+                    return a.details.name.localeCompare(b.details.name);
+                });
             break;
     }
 
@@ -5604,25 +7041,21 @@ function renderWitchsCoven(subView = 'main') {
 
     if (subView === 'main') {
         html += `<p class="mb-6">The air is thick with incense and unspoken power. The witch offers her services... for a price.</p>
-            <div class="flex flex-col md:flex-row justify-center items-center gap-4">
+            <div class="flex flex-col md:flex-row justify-center items-center gap-4 flex-wrap">
                 <button onclick="renderWitchsCoven('transmute')" class="btn btn-magic w-full md:w-auto">Transmute Items</button>
                 <button onclick="renderWitchsCoven('brew')" class="btn btn-magic w-full md:w-auto">Brew Concoctions</button>
-                <button onclick="renderWitchsCoven('reset')" class="btn btn-magic w-full md:w-auto">Reset Fate</button>
-                <button onclick="renderWitchsCoven('rebirth')" class="btn btn-magic w-full md:w-auto">Rebirth</button>
+                <button onclick="renderWitchsCoven('reset')" class="btn btn-magic w-full md:w-auto">Reset Attributes</button>
+                <button onclick="renderWitchsCoven('reset_skills')" class="btn btn-magic w-full md:w-auto border-purple-500">Rebirth (Skills)</button>
+                <button onclick="renderWitchsCoven('rebirth')" class="btn btn-magic w-full md:w-auto">Reincarnation (Race/Class)</button>
             </div>`;
     } else if (subView === 'transmute') {
          html += `<h3 class="font-bold text-xl text-yellow-300 mb-4">Transmute Items</h3>
             <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3 text-left">`;
-        // *** MODIFIED FILTER: Check if hearts property is UNDEFINED ***
         Object.keys(WITCH_COVEN_RECIPES).filter(k => WITCH_COVEN_RECIPES[k].hearts === undefined).forEach(key => {
             const recipe = WITCH_COVEN_RECIPES[key];
             const product = getItemDetails(recipe.output);
-            // Check if product exists before trying to access name
-            if (!product) {
-                console.warn(`Missing item details for Witch Coven Transmute output: ${recipe.output}`);
-                return; // Skip rendering this recipe if output item is invalid
-            }
-            const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => `${val}x ${getItemDetails(key)?.name || key}`).join(', '); // Added fallback name
+            if (!product) return; 
+            const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => `${val}x ${getItemDetails(key)?.name || key}`).join(', '); 
             const canAfford = player.gold >= recipe.cost && Object.entries(recipe.ingredients).every(([key, val]) => (player.inventory.items[key] || 0) >= val);
             html += `<div class="p-3 bg-slate-800 rounded-lg">
                 <div class="flex justify-between items-center">
@@ -5637,19 +7070,13 @@ function renderWitchsCoven(subView = 'main') {
     } else if (subView === 'brew') {
         html += `<h3 class="font-bold text-xl text-yellow-300 mb-4">Brew Concoctions</h3>
             <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 space-y-3 text-left">`;
-        // *** MODIFIED FILTER: Check if hearts property EXISTS (is not undefined) ***
         Object.keys(WITCH_COVEN_RECIPES).filter(k => WITCH_COVEN_RECIPES[k].hearts !== undefined).forEach(key => {
             const recipe = WITCH_COVEN_RECIPES[key];
             const product = getItemDetails(recipe.output);
-            // Check if product exists before trying to access name
-             if (!product) {
-                console.warn(`Missing item details for Witch Coven Brew output: ${recipe.output}`);
-                return; // Skip rendering this recipe if output item is invalid
-            }
-            const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => `${val}x ${getItemDetails(key)?.name || key}`).join(', '); // Added fallback name
-            // Use recipe.hearts (which could be 0) for the check
+            if (!product) return;
+            const ingredients = Object.entries(recipe.ingredients).map(([key, val]) => `${val}x ${getItemDetails(key)?.name || key}`).join(', '); 
             const canAfford = player.gold >= recipe.cost && hearts >= recipe.hearts && Object.entries(recipe.ingredients).every(([key, val]) => (player.inventory.items[key] || 0) >= val);
-            const heartCostText = recipe.hearts > 0 ? `, ${recipe.hearts} Undying Hearts` : ''; // Only show heart cost if > 0
+            const heartCostText = recipe.hearts > 0 ? `, ${recipe.hearts} Undying Hearts` : ''; 
             html += `<div class="p-3 bg-slate-800 rounded-lg">
                 <div class="flex justify-between items-center">
                     <h4 class="font-bold text-lg text-yellow-300" onmouseover="showTooltip('${recipe.output}', event)" onmouseout="hideTooltip()">${product.name}</h4>
@@ -5663,22 +7090,48 @@ function renderWitchsCoven(subView = 'main') {
     } else if (subView === 'reset') {
         const cost = WITCH_COVEN_SERVICES.resetStats;
         const canAfford = player.gold >= cost.gold && hearts >= cost.hearts;
-        html += `<h3 class="font-bold text-xl text-yellow-300 mb-4">Reset Fate</h3>
-                 <p class="mb-4">This will refund all stat points you have allocated since level 1.</p>
-                 <p class="mb-6">This ritual requires <span class="font-bold text-yellow-400">${cost.gold} G</span> and <span class="font-bold text-purple-300">${cost.hearts} Undying Hearts</span>.</p>
+        html += `<h3 class="font-bold text-xl text-yellow-300 mb-4">Reset Attributes</h3>
+                 <p class="mb-4">This will refund all stat points allocated to Vigor, Focus, etc.</p>
+                 <p class="mb-6">Cost: <span class="font-bold text-yellow-400">${cost.gold} G</span> and <span class="font-bold text-purple-300">${cost.hearts} Hearts</span>.</p>
                  <button onclick="resetStatsCoven()" class="btn btn-action" ${!canAfford ? 'disabled' : ''}>Perform Ritual</button>`;
+    } else if (subView === 'reset_skills') {
+        // --- NEW: Skill Reset View ---
+        const service = WITCH_COVEN_SERVICES.resetSkills;
+        let spentMastery = 0;
+        // Calculate spent mastery to show dynamic cost
+        if (player.unlockedSkills) {
+            player.unlockedSkills.forEach(skillId => {
+                if (SKILL_TREE[skillId] && SKILL_TREE[skillId].costType === 'mastery') {
+                    spentMastery++;
+                }
+            });
+        }
+        
+        const totalGold = service.base.gold + (spentMastery * service.perMastery.gold);
+        const totalHearts = service.base.hearts + (spentMastery * service.perMastery.hearts);
+        const canAfford = player.gold >= totalGold && hearts >= totalHearts;
+
+        html += `<h3 class="font-bold text-xl text-yellow-300 mb-4">Rebirth (Skill Reset)</h3>
+                 <p class="mb-2">This will unlearn all skills and refund your Skill Points and Mastery Points.</p>
+                 <p class="mb-4 text-sm text-gray-400">The cost increases for every Mastery Art you have learned.</p>
+                 
+                 <div class="bg-slate-800 p-4 rounded-lg inline-block mb-6">
+                    <p class="text-gray-300">Mastery Skills Learned: <span class="text-fuchsia-400 font-bold">${spentMastery}</span></p>
+                    <div class="my-2 border-t border-slate-600"></div>
+                    <p>Total Cost: <span class="font-bold text-yellow-400">${totalGold} G</span> and <span class="font-bold text-purple-300">${totalHearts} Hearts</span></p>
+                 </div>
+                 
+                 <br>
+                 <button onclick="resetSkillsCoven()" class="btn btn-action" ${!canAfford ? 'disabled' : ''}>Sever the Thread</button>`;
     } else if (subView === 'rebirth') {
-        html += `<h3 class="font-bold text-xl text-yellow-300 mb-4">Rebirth</h3>
-                 <p class="mb-6">The witch can reshape your very being, but it will be costly.</p>
+        html += `<h3 class="font-bold text-xl text-yellow-300 mb-4">Reincarnation</h3>
+                 <p class="mb-6">The witch can reshape your very being, changing your Race, Class, or Background.</p>
                  <div class="space-y-4 max-w-lg mx-auto text-left">`;
+        
+        // ... (Race/Class/Background selector logic remains unchanged) ...
         const raceCost = WITCH_COVEN_SERVICES.changeRace;
-        // Build race options, pre-selecting current race
         const raceOptions = Object.keys(RACES).map(r => `<option value="${r}" ${player.race === r ? 'selected' : ''}>${r}</option>`).join('');
-        // Build element options
-        const elementOptions = Object.keys(ELEMENTS)
-            .filter(e => e !== 'none' && e !== 'healing')
-            .map(e => `<option value="${e}" ${player.elementalAffinity === e ? 'selected' : ''}>${capitalize(e)}</option>`)
-            .join('');
+        const elementOptions = Object.keys(ELEMENTS).filter(e => e !== 'none' && e !== 'healing').map(e => `<option value="${e}" ${player.elementalAffinity === e ? 'selected' : ''}>${capitalize(e)}</option>`).join('');
 
         html += `<div class="p-3 bg-slate-800 rounded-lg">
             <p class="font-bold">Change Race (Cost: ${raceCost.gold} G, ${raceCost.hearts} Hearts)</p>
@@ -5696,7 +7149,6 @@ function renderWitchsCoven(subView = 'main') {
         </div>`;
 
         const classCost = WITCH_COVEN_SERVICES.changeClass;
-        // Build class options, pre-selecting current class
         const classOptions = Object.keys(CLASSES).map(c => `<option value="${c}" ${player._classKey === c ? 'selected' : ''}>${CLASSES[c].name}</option>`).join('');
 
         html += `<div class="p-3 bg-slate-800 rounded-lg">
@@ -5708,7 +7160,6 @@ function renderWitchsCoven(subView = 'main') {
         </div>`;
 
         const bgCost = WITCH_COVEN_SERVICES.changeBackground;
-         // Build background options, pre-selecting current background
         const bgOptions = Object.keys(BACKGROUNDS).map(b => `<option value="${b}" ${player.backgroundKey === b ? 'selected' : ''}>${BACKGROUNDS[b].name}</option>`).join('');
 
         html += `<div class="p-3 bg-slate-800 rounded-lg">
@@ -5729,9 +7180,6 @@ function renderWitchsCoven(subView = 'main') {
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
-
-    // Also need to adjust the function call in the 'Brew' section to use brewWitchPotion
-    // (This was already done in the code block above)
 }
 
 // Helper function for Witch's Coven
@@ -6057,13 +7505,12 @@ function renderBlacksmithCraft() {
 
 function renderSell() {
     updateRealTimePalette();
-    const scrollable = mainView.querySelector(`#sell-${sellActiveTab}-list`); // Get active list
+    const scrollable = mainView.querySelector(`#sell-${sellActiveTab}-list`); 
     const scrollPos = scrollable ? scrollable.scrollTop : 0;
 
     lastViewBeforeInventory = 'sell';
     gameState.currentView = 'sell';
 
-    // --- NEW TABBED LAYOUT ---
     const tabs = [
         { key: 'consumables', icon: '🧪', title: 'Consumables' },
         { key: 'gardens', icon: '🌱', title: 'Gardens' },
@@ -6075,7 +7522,7 @@ function renderSell() {
         { key: 'lures', icon: '🎣', title: 'Lures' }
     ];
 
-    let tabHtml = '<div class="grid grid-cols-4 gap-1 mb-2">'; // 4 columns
+    let tabHtml = '<div class="grid grid-cols-4 gap-1 mb-2">'; 
     tabs.forEach(tab => {
         const isActive = sellActiveTab === tab.key;
         const bgColor = isActive ? 'bg-yellow-600 border-yellow-800' : 'bg-slate-700 hover:bg-slate-600 border-slate-900';
@@ -6084,7 +7531,7 @@ function renderSell() {
     tabHtml += '</div>';
 
     let rightPaneContent = '';
-    // Renaming 'items' to 'consumables' for clarity
+    // Map tab keys to category names expected by renderSellList
     switch (sellActiveTab) {
         case 'consumables': rightPaneContent = renderSellList('items', 'Consumables'); break;
         case 'gardens': rightPaneContent = renderSellList('gardens', 'Gardens'); break;
@@ -6108,7 +7555,6 @@ function renderSell() {
                 <button onclick="renderShop('store')" class="btn btn-primary">Back to Store</button>
             </div>
         </div>`;
-    // --- END NEW TABBED LAYOUT ---
 
     const container = document.createElement('div');
     container.innerHTML = html;
@@ -6121,33 +7567,18 @@ function renderSell() {
 const renderSellList = (category, title) => {
     let list = [];
     let itemCounts = {};
-    let html = ''; // Start empty
+    let html = ''; 
 
-    // --- START MODIFICATION: Dynamic Sell Price Logic ---
-    let sellMultiplier = 0.25; // Default to 1/4
+    // --- SELL PRICE MULTIPLIERS ---
+    let sellMultiplier = 0.25; 
     switch (category) {
-        case 'materials':
-            sellMultiplier = 0.2; // 1/5
-            break;
-        case 'gardens':
-        case 'consumables':
-        case 'lures':
-            sellMultiplier = 0.25; // 1/4
-            break;
-        case 'weapons':
-        case 'catalysts':
-        case 'armor':
-        case 'shields':
-            sellMultiplier = 0.5; // 1/2
-            break;
-        // 'items' category is handled by the 'consumables' tab,
-        // so we just need to make sure the tab calls it correctly (which it does).
+        case 'materials': sellMultiplier = 0.2; break; // Materials: 20%
+        case 'gardens': case 'items': case 'lures': sellMultiplier = 0.25; break; // Consumables: 25%
+        case 'weapons': case 'catalysts': case 'armor': case 'shields': sellMultiplier = 0.5; break; // Gear: 50%
     }
-    // --- END MODIFICATION ---
 
-
-    // Sorting/Type map logic
-    const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'experimental'];
+    // --- ITEM TYPES & SORTING ---
+    const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'trap', 'experimental'];
     const typeMapConsumables = {
         'healing': 'Healing Potions',
         'mana_restore': 'Mana Potions',
@@ -6157,31 +7588,23 @@ const renderSellList = (category, title) => {
         'buff_apply': 'Greases/Enhancements',
         'debuff_apply': 'Throwables (Debuff)',
         'debuff_special': 'Throwables (Special)',
-        // 'enchant': 'Essences (Combat Use)', // <-- REMOVED
+        'trap': 'Traps', 
         'experimental': 'Mysterious Concoctions'
     };
-    // --- END MODIFICATION ---
+    
     const materialOrder = ['food_ingredient', 'alchemy', 'enchant', 'special', 'junk'];
     const typeMapMaterials = {
-         'food_ingredient': 'Cooking Ingredients',
-         'alchemy': 'Alchemy Reagents',
-         'enchant': 'Essences (Crafting)', // <-- Essences live here now
-         'special': 'Special Items',
-         'junk': 'Junk & Trophies'
+         'food_ingredient': 'Cooking Ingredients', 'alchemy': 'Alchemy Reagents', 'enchant': 'Essences (Crafting)', 'special': 'Special Items', 'junk': 'Junk & Trophies'
     };
     const gardenOrder = ['seed', 'sapling'];
+    const typeMapGardens = { 'seed': 'Seeds', 'sapling': 'Saplings' };
 
-    const typeMapGardens = {
-        'seed': 'Seeds',
-        'sapling': 'Saplings'
-    };
-
-    // --- Populate 'list' based on category ---
-     if (category === 'items') { // Handling 'Consumables' Tab
+    // --- POPULATE LIST ---
+     if (category === 'items') { // Consumables Tab
         const allConsumableKeys = Object.keys(player.inventory.items).filter(key => {
             const details = getItemDetails(key);
-            // MODIFIED: Filter for sellable consumables
-            return details && consumableOrder.includes(details.type) && details.price > 0;
+            // Ensure item exists, is a consumable type, and has value
+            return details && consumableOrder.includes(details.type) && (details.price > 0 || details.sellPrice > 0);
         });
          const itemsWithDetails = allConsumableKeys.map(key => ({ key, details: getItemDetails(key) }));
          itemsWithDetails.sort((a, b) => {
@@ -6195,27 +7618,23 @@ const renderSellList = (category, title) => {
              return a.details.name.localeCompare(b.details.name);
          });
          list = itemsWithDetails;
-    } else if (category === 'gardens') { // Handling 'Gardens' Tab
+    } else if (category === 'gardens') { 
         const allGardenKeys = Object.keys(player.inventory.items).filter(key => {
             const details = getItemDetails(key);
-             // MODIFIED: Filter for sellable garden items
             return details && gardenOrder.includes(details.type) && (details.price > 0 || details.sellPrice > 0);
         });
         const itemsWithDetails = allGardenKeys.map(key => ({ key, details: getItemDetails(key) }));
         itemsWithDetails.sort((a, b) => {
              const typeAIndex = gardenOrder.indexOf(a.details.type);
              const typeBIndex = gardenOrder.indexOf(b.details.type);
-             if (typeAIndex !== typeBIndex) {
-                 return typeAIndex - typeBIndex;
-             }
+             if (typeAIndex !== typeBIndex) return typeAIndex - typeBIndex;
              return a.details.name.localeCompare(b.details.name);
         });
         list = itemsWithDetails;
-    } else if (category === 'materials') { // Handling 'Materials' Tab
+    } else if (category === 'materials') { 
         const allMaterialKeys = Object.keys(player.inventory.items).filter(key => {
             const details = getItemDetails(key);
-            // MODIFIED: Filter for sellable materials (excluding key items)
-            return details && materialOrder.includes(details.type) && details.price > 0 && details.type !== 'key';
+            return details && materialOrder.includes(details.type) && (details.price > 0 || details.sellPrice > 0) && details.type !== 'key';
         });
         const itemsWithDetails = allMaterialKeys.map(key => ({ key, details: getItemDetails(key) }));
         itemsWithDetails.sort((a, b) => {
@@ -6232,26 +7651,45 @@ const renderSellList = (category, title) => {
     } else if (category === 'lures') {
         list = Object.keys(player.inventory.lures).filter(key => {
             const details = getItemDetails(key);
-            return details && details.price > 0; // Filter for sellable lures
+            return details && details.price > 0; 
         }).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name));
-    } else { // Equipment
+    } else {
+        // Equipment (Non-stackable logic)
         if (!Array.isArray(player.inventory[category])) player.inventory[category] = [];
-        player.inventory[category] = player.inventory[category].filter(key => getItemDetails(key)); // Filter invalid keys
+        // Filter out invalid items
+        player.inventory[category] = player.inventory[category].filter(key => {
+            const d = getItemDetails(key);
+            return d && d.price > 0 && d.rarity !== 'Broken';
+        });
         player.inventory[category].forEach(key => itemCounts[key] = (itemCounts[key] || 0) + 1);
-        list = Object.keys(itemCounts).filter(key => {
-             const details = getItemDetails(key);
-             return details && details.price > 0 && details.rarity !== 'Broken'; // Filter for sellable, non-broken
-        }).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name));
+        
+        // [MODIFICATION START] Sorted by Type for Weapons
+        list = Object.keys(itemCounts).sort((a,b) => {
+            const dA = getItemDetails(a);
+            const dB = getItemDetails(b);
+            
+            if (category === 'weapons') {
+                const typeOrder = ['Hand-to-Hand', 'Dagger', 'Thrusting Sword', 'Curved Sword', 'Longsword', 'Axe', 'Hammer', 'Lance', 'Reaper', 'Bow'];
+                const idxA = typeOrder.indexOf(dA.class || '');
+                const idxB = typeOrder.indexOf(dB.class || '');
+                
+                if (idxA !== -1 && idxB !== -1 && idxA !== idxB) return idxA - idxB;
+                if (idxA !== -1 && idxB === -1) return -1;
+                if (idxA === -1 && idxB !== -1) return 1;
+            }
+            return dA.name.localeCompare(dB.name);
+        });
+        // [MODIFICATION END]
     }
 
-    // --- Render the List ---
      if (list.length === 0) {
         return `<p class="text-gray-400 text-center mt-4">No ${title.toLowerCase()} to sell.</p>`;
     }
 
-    html += `<div id="sell-${category}-list" class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-2">`; // Added space-y-2
+    html += `<div id="sell-${category}-list" class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-2">`; 
 
-    let currentSubType = ''; // Track the current sub-type for headers
+    // --- RENDER LIST ITEMS ---
+    let currentSubType = ''; 
     if (category === 'items' || category === 'materials' || category === 'gardens') {
         const typeMap = category === 'items' ? typeMapConsumables : (category === 'materials' ? typeMapMaterials : typeMapGardens);
 
@@ -6267,62 +7705,98 @@ const renderSellList = (category, title) => {
                  html += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2">${subHeader}</h4>`;
              }
 
-             let countStr = '';
-             let count = player.inventory.items[key] || 0;
-             if (count > 1) countStr = `(x${count})`;
+             let totalCount = player.inventory.items[key] || 0;
+             // Check for crafted items vs standard items
+             let craftedCount = (player.inventory.craftedCounts && player.inventory.craftedCounts[key]) || 0;
+             let standardCount = totalCount - craftedCount;
+             
+             let countStr = `(x${totalCount})`;
+             
+             let buttonsHtml = '';
 
-             // --- MODIFIED: Sell Button Logic ---
-             // const sellPrice = Math.floor(details.sellPrice || (details.price / 4)); // Use sellPrice if available, else 1/4
-             const sellPrice = Math.floor(details.sellPrice || (details.price * sellMultiplier)); // <-- Use new multiplier
-             if (sellPrice <= 0) return; // Don't show if not sellable
+             // --- A. SELL CRAFTED (Custom Price) ---
+             // --- CRAFTED ITEM BUTTON ---
+             if (craftedCount > 0) {
+                 let craftedPrice = 0;
+                 
+                 // 1. Try to use stored Average Cost (Actual Ingredient Cost)
+                 if (player.inventory.craftedAvgValues && player.inventory.craftedAvgValues[key]) {
+                     craftedPrice = Math.floor(player.inventory.craftedAvgValues[key] * 1.5);
+                 }
+                 
+                 // 2. Fallback to Recipe Calculation (Legacy Support or if avg missing)
+                 if (craftedPrice === 0 && typeof ALCHEMY_RECIPES !== 'undefined') {
+                     const recipeKey = Object.keys(ALCHEMY_RECIPES).find(rKey => ALCHEMY_RECIPES[rKey].output === key);
+                     if (recipeKey) {
+                         const recipe = ALCHEMY_RECIPES[recipeKey];
+                         let totalIngredientCost = 0;
+                         for (const [ingKey, amount] of Object.entries(recipe.ingredients)) {
+                             const ingDetails = getItemDetails(ingKey);
+                             if (ingDetails) totalIngredientCost += (ingDetails.price || 0) * amount;
+                         }
+                         craftedPrice = Math.floor(totalIngredientCost * 1.5);
+                     }
+                 }
+                 
+                 // 3. Final Fallback
+                 if (craftedPrice === 0) craftedPrice = Math.floor(details.price * 1.5);
 
-             let buttonHtml = `<button onclick="sellItem('items', '${key}', ${sellPrice})" class="btn btn-primary text-sm py-1 px-3">Sell (${sellPrice} G)</button>`;
-             // --- END MODIFIED ---
+                 buttonsHtml += `<button onclick="sellItem('items', '${key}', ${craftedPrice}, true)" class="btn btn-magic text-sm py-1 px-3 mb-1 w-full text-left">Sell Crafted (${craftedPrice} G) x${craftedCount}</button>`;
+             }
 
-             html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr}</span>${buttonHtml}</div>`;
+             // --- B. SELL STANDARD (Standard Price) ---
+             if (standardCount > 0) {
+                 const standardPrice = Math.floor(details.sellPrice || (details.price * sellMultiplier));
+                 if (standardPrice > 0) {
+                    buttonsHtml += `<button onclick="sellItem('items', '${key}', ${standardPrice}, false)" class="btn btn-primary text-sm py-1 px-3 w-full text-left">Sell Standard (${standardPrice} G) x${standardCount}</button>`;
+                 }
+             }
+
+             html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)">
+                        <span class="mr-2">${details.name} ${countStr}</span>
+                        <div class="flex flex-col gap-1 min-w-[140px]">
+                            ${buttonsHtml}
+                        </div>
+                      </div>`;
         });
-    } else { // Equipment or Lures
-         list.forEach(key => {
+    } else { // Equipment/Lures
+         list.forEach(key => { // list contains keys here
              const details = getItemDetails(key);
              if (!details) return;
 
              let countStr = '';
              let count = 0;
              let buttonHtml = '';
-             // const sellPrice = Math.floor(details.sellPrice || (details.price / 4)); // Use sellPrice if available, else 1/4
-             const sellPrice = Math.floor(details.sellPrice || (details.price * sellMultiplier)); // <-- Use new multiplier
-             if (sellPrice <= 0) return; // Don't show
+             const sellPrice = Math.floor(details.sellPrice || (details.price * sellMultiplier)); 
+             if (sellPrice <= 0) return; 
 
              if (category === 'lures') {
                  count = player.inventory.lures[key] || 0;
                  countStr = `(x${count} uses)`;
-                 // --- MODIFIED: Sell Button for Lures ---
                  buttonHtml = `<button onclick="sellItem('lures', '${key}', ${sellPrice})" class="btn btn-primary text-sm py-1 px-3">Sell (${sellPrice} G)</button>`;
-             } else { // Equipment
+             } else { 
                  count = itemCounts[key] || 0;
                  if (count > 1) countStr = `(x${count})`;
 
-                 // --- MODIFIED: Sell Button for Equipment (check equipped) ---
                  const isEquipped = (category === 'weapons' && WEAPONS[key]?.name === player.equippedWeapon?.name) ||
                                   (category === 'catalysts' && CATALYSTS[key]?.name === player.equippedCatalyst?.name) ||
                                   (category === 'armor' && ARMOR[key]?.name === player.equippedArmor?.name) ||
                                   (category === 'shields' && SHIELDS[key]?.name === player.equippedShield?.name);
                 
                 if (isEquipped) {
-                    // Show one equipped, and if count > 1, show a sell button for the rest
                     countStr = `(x${count-1} in bag)`;
                     buttonHtml = `<button class="btn btn-primary text-sm py-1 px-3" disabled>Equipped</button>`;
-                    if (count > 1) { // Have more than one
+                    if (count > 1) { 
                         buttonHtml += `<button onclick="sellItem('${category}', '${key}', ${sellPrice})" class="btn btn-primary text-sm py-1 px-3 ml-2">Sell (${sellPrice} G)</button>`;
                     }
-                } else { // Not equipped
+                } else { 
                      buttonHtml = `<button onclick="sellItem('${category}', '${key}', ${sellPrice})" class="btn btn-primary text-sm py-1 px-3">Sell (${sellPrice} G)</button>`;
                 }
              }
              html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr}</span>${buttonHtml}</div>`;
         });
     }
-    html += `</div>`; // Close scrollable div
+    html += `</div>`; 
     return html;
 };
 
@@ -6499,28 +7973,23 @@ window.setSellTab = function(tabName) {
 }
 
 function renderInventory() {
-    // Check if player can interact right now (added battle check)
-    const isInBattle = lastViewBeforeInventory === 'battle'; // Check based on where we came FROM
-    // Allow opening inventory even if not player's turn, but disable actions
+    // Check if player can interact right now
+    const isInBattle = lastViewBeforeInventory === 'battle'; 
     const canTakeActionInBattle = isInBattle && gameState.isPlayerTurn && !isProcessingAction;
 
-    // Store scroll position of the *active* list before re-rendering
+    // Store scroll position
     const activeList = mainView.querySelector(`#inventory-${inventoryActiveTab}-list`);
     const scrollPos = activeList ? activeList.scrollTop : 0;
 
-    // Set correct return view: If opened from battle, store 'battle', otherwise store the actual previous view
-    // Keep lastViewBeforeInventory consistent until we explicitly leave battle view
-    if (gameState.currentView !== 'inventory') { // Only update if not already in inventory
+    if (gameState.currentView !== 'inventory') { 
         if (gameState.currentView === 'battle') {
             lastViewBeforeInventory = 'battle';
         } else {
-            lastViewBeforeInventory = gameState.currentView; // Store actual previous view if not in battle
+            lastViewBeforeInventory = gameState.currentView; 
         }
     }
-    gameState.currentView = 'inventory'; // Set current view
+    gameState.currentView = 'inventory'; 
 
-    // --- Tab Definitions ---
-    // (Tab definitions remain the same)
     const tabs = [
         { key: 'spells', icon: '✨', title: 'Spells' },
         { key: 'key_items', icon: '🔑', title: 'Key Items' },
@@ -6534,16 +8003,26 @@ function renderInventory() {
         { key: 'lures', icon: '🎣', title: 'Lures' }
     ];
 
-    // --- Helper to Render Lists (Modified for Battle Context) ---
     const renderList = (category, title) => {
         let list = [];
         let itemCounts = {};
-        let html = ''; // Start empty
+        let html = '';
 
-        // (Sorting/Type map logic remains the same)
-        // --- MODIFICATION: Removed 'enchant' from consumables ---
-        const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'experimental'];
-        const typeMapConsumables = { /* ... */
+        // Helper to generate the colored element tag
+        const getElementHtml = (element) => {
+            if (!element || element === 'none') return '';
+            const colors = {
+                fire: 'text-red-400', water: 'text-blue-400', earth: 'text-stone-400',
+                wind: 'text-teal-400', lightning: 'text-yellow-400', nature: 'text-green-400',
+                light: 'text-yellow-100', void: 'text-purple-400'
+            };
+            const colorClass = colors[element] || 'text-cyan-300';
+            return ` <span class="font-bold ${colorClass} text-xs uppercase">[${capitalize(element)}]</span>`;
+        };
+
+        // --- CONSUMABLES CONFIG ---
+        const consumableOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'buff_apply', 'debuff_apply', 'debuff_special', 'trap', 'experimental'];
+        const typeMapConsumables = {
             'healing': 'Healing Potions',
             'mana_restore': 'Mana Potions',
             'buff': 'Buff Items',
@@ -6552,27 +8031,22 @@ function renderInventory() {
             'buff_apply': 'Greases/Enhancements',
             'debuff_apply': 'Throwables (Debuff)',
             'debuff_special': 'Throwables (Special)',
-            // 'enchant': 'Essences (Combat Use)', // <-- REMOVED
+            'trap': 'Traps',
             'experimental': 'Mysterious Concoctions'
         };
-        // --- END MODIFICATION ---
+
+        // --- MATERIALS CONFIG ---
         const materialOrder = ['food_ingredient', 'alchemy', 'enchant', 'special', 'junk'];
-        const typeMapMaterials = { /* ... */
+        const typeMapMaterials = {
              'food_ingredient': 'Cooking Ingredients',
              'alchemy': 'Alchemy Reagents',
-             'enchant': 'Essences (Crafting)', // <-- Essences live here now
+             'enchant': 'Essences (Crafting)', 
              'special': 'Special Items',
              'junk': 'Junk & Trophies'
         };
-        const gardenOrder = ['seed', 'sapling'];
-        const typeMapGardens = { /* ... */
-            'seed': 'Seeds',
-            'sapling': 'Saplings'
-        };
 
-        // --- Populate 'list' based on category ---
-        // (This population logic remains the same)
-         if (category === 'items') { // Handling 'Consumables' Tab
+        // --- 1. POPULATE LIST ---
+        if (category === 'items') { 
             const allConsumableKeys = Object.keys(player.inventory.items).filter(key => {
                 const details = getItemDetails(key);
                 return details && consumableOrder.includes(details.type);
@@ -6589,62 +8063,69 @@ function renderInventory() {
                  return a.details.name.localeCompare(b.details.name);
              });
              list = itemsWithDetails;
-        } else if (category === 'gardens') { // Handling 'Gardens' Tab
+        } else if (category === 'gardens') { 
             const allGardenKeys = Object.keys(player.inventory.items).filter(key => {
                 const details = getItemDetails(key);
-                return details && gardenOrder.includes(details.type); // Filter for seed/sapling
+                return details && ['seed', 'sapling'].includes(details.type); 
             });
             const itemsWithDetails = allGardenKeys.map(key => ({ key, details: getItemDetails(key) }));
-            itemsWithDetails.sort((a, b) => { // Sort by type (seed vs sapling), then name
-                 const typeAIndex = gardenOrder.indexOf(a.details.type);
-                 const typeBIndex = gardenOrder.indexOf(b.details.type);
-                 if (typeAIndex !== typeBIndex) {
-                     return typeAIndex - typeBIndex;
-                 }
-                 return a.details.name.localeCompare(b.details.name);
-            });
+            itemsWithDetails.sort((a, b) => a.details.name.localeCompare(b.details.name));
             list = itemsWithDetails;
-        } else if (category === 'materials') { // Handling 'Materials' Tab
+        } else if (category === 'materials') { 
             const allMaterialKeys = Object.keys(player.inventory.items).filter(key => {
                 const details = getItemDetails(key);
-                // Filter for material types (excluding seed/sapling now)
                 return details && materialOrder.includes(details.type);
             });
             const itemsWithDetails = allMaterialKeys.map(key => ({ key, details: getItemDetails(key) }));
-            itemsWithDetails.sort((a, b) => {
-                 const typeAIndex = materialOrder.indexOf(a.details.type);
-                 const typeBIndex = materialOrder.indexOf(b.details.type);
-                 if (typeAIndex !== typeBIndex) {
-                     const finalAIndex = typeAIndex === -1 ? materialOrder.length : typeAIndex;
-                     const finalBIndex = typeBIndex === -1 ? materialOrder.length : typeBIndex;
-                     return finalAIndex - finalBIndex;
-                 }
-                 return a.details.name.localeCompare(b.details.name);
-            });
+            itemsWithDetails.sort((a, b) => a.details.name.localeCompare(b.details.name));
             list = itemsWithDetails;
         } else if (category === 'lures') {
-            list = Object.keys(player.inventory.lures).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name)); // Sort lures alphabetically
-        } else { // Equipment
+            list = Object.keys(player.inventory.lures).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name)); 
+        } else {
+            // --- EQUIPMENT / NON-STACKABLES LOGIC ---
             if (!Array.isArray(player.inventory[category])) player.inventory[category] = [];
-            player.inventory[category] = player.inventory[category].filter(key => getItemDetails(key)); // Filter invalid keys
+            
+            player.inventory[category] = player.inventory[category].filter(key => getItemDetails(key));
             player.inventory[category].forEach(key => itemCounts[key] = (itemCounts[key] || 0) + 1);
-            list = Object.keys(itemCounts).sort((a,b) => getItemDetails(a).name.localeCompare(getItemDetails(b).name)); // Sort equipment alphabetically
+            
+            // [MODIFICATION START] Sorted by Type for Weapons
+            list = Object.keys(itemCounts).sort((a,b) => {
+                const dA = getItemDetails(a);
+                const dB = getItemDetails(b);
+                
+                if (category === 'weapons') {
+                    const typeOrder = ['Hand-to-Hand', 'Dagger', 'Thrusting Sword', 'Curved Sword', 'Longsword', 'Axe', 'Hammer', 'Lance', 'Reaper', 'Bow'];
+                    const typeA = dA.class || '';
+                    const typeB = dB.class || '';
+                    
+                    const idxA = typeOrder.indexOf(typeA);
+                    const idxB = typeOrder.indexOf(typeB);
+                    
+                    // If types are different, sort by predefined order
+                    if (idxA !== -1 && idxB !== -1 && idxA !== idxB) return idxA - idxB;
+                    // If one has a valid type and the other doesn't, valid comes first
+                    if (idxA !== -1 && idxB === -1) return -1;
+                    if (idxA === -1 && idxB !== -1) return 1;
+                }
+                // Fallback to name sort
+                return dA.name.localeCompare(dB.name);
+            });
+            // [MODIFICATION END]
+            // Removed the line that was overwriting 'list' here
         }
 
-        // --- Render the List ---
-        // (Empty list check remains the same)
-         if (['items', 'materials', 'gardens'].includes(category) && list.length === 0) {
-            return `<p class="text-gray-400 text-center mt-4">No ${title.toLowerCase()} found.</p>`;
-        } else if (!['items', 'materials', 'gardens'].includes(category) && (!list || list.length === 0)) {
+        // --- 2. RENDER EMPTY STATE ---
+        if (list.length === 0) {
             return `<p class="text-gray-400 text-center mt-4">No ${title.toLowerCase()} found.</p>`;
         }
 
-        html += `<div id="inventory-${category}-list" class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-2">`; // Added space-y-2
+        html += `<div id="inventory-${category}-list" class="h-full overflow-y-auto inventory-scrollbar pr-2 space-y-2">`; 
 
-        let currentSubType = ''; // Track the current sub-type for headers
+        let currentSubType = ''; 
+
+        // --- 3. RENDER LOOP (STACKABLES) ---
         if (category === 'items' || category === 'materials' || category === 'gardens') {
-            // Use appropriate type map based on category
-            const typeMap = category === 'items' ? typeMapConsumables : (category === 'materials' ? typeMapMaterials : typeMapGardens);
+            const typeMap = category === 'items' ? typeMapConsumables : (category === 'materials' ? typeMapMaterials : { 'seed': 'Seeds', 'sapling': 'Saplings' });
 
             list.forEach(itemObj => {
                 const key = itemObj.key;
@@ -6662,27 +8143,27 @@ function renderInventory() {
                  let count = player.inventory.items[key] || 0;
                  if (count > 1) countStr = `(x${count})`;
 
+                 const elementHtml = getElementHtml(details.element);
+
                  let buttonHtml = '';
-                 // --- BATTLE MODIFICATION: Disable 'Use' button in battle for items ---
-                 if (category === 'items' && !isInBattle) { // OUTSIDE BATTLE
+                 if (category === 'items' && !isInBattle) { 
                      let action = `useItem('${key}')`;
                      let buttonClass = 'btn-item';
                      let buttonText = 'Use';
-                      // Disable 'Use' for battle-only items outside combat
-                     if (['enchant', 'debuff_apply', 'debuff_special'].includes(details.type)) {
+                     if (['enchant', 'debuff_apply', 'debuff_special', 'trap'].includes(details.type)) {
                          action = '';
                          buttonText = 'Use (Battle)';
                      }
                      buttonHtml = `<button onclick="${action}" class="btn ${buttonClass} text-sm py-1 px-3" ${action === '' ? 'disabled' : ''}>${buttonText}</button>`;
-                 } else if (category === 'items' && isInBattle) { // INSIDE BATTLE
-                     // Show disabled 'Use' button in battle, prompt to use via action menu
+                 } else if (category === 'items' && isInBattle) { 
                      buttonHtml = `<button class="btn btn-item text-sm py-1 px-3" disabled title="Use via 'Item' action">Use</button>`;
                  }
-                 // --- END BATTLE MODIFICATION ---
 
-                 html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr}</span>${buttonHtml}</div>`;
+                 html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}${elementHtml} ${countStr}</span>${buttonHtml}</div>`;
             });
-        } else { // Equipment or Lures
+        } 
+        // --- 4. RENDER LOOP (EQUIPMENT/NON-STACKABLES) ---
+        else { 
              list.forEach(key => {
                  const details = getItemDetails(key);
                  if (!details) return;
@@ -6693,76 +8174,132 @@ function renderInventory() {
                  if (category === 'lures') {
                      count = player.inventory.lures[key] || 0;
                      countStr = `(x${count} uses)`;
-                 } else { // Equipment counts
+                 } else { 
                      count = itemCounts[key] || 0;
                      if (count > 1) countStr = `(x${count})`;
                  }
 
-                 // Determine if equipped
-                 const isEquipped = (category === 'weapons' && WEAPONS[key]?.name === player.equippedWeapon?.name) || // Added safety checks
+                 const isEquipped = (category === 'weapons' && WEAPONS[key]?.name === player.equippedWeapon?.name) || 
                                   (category === 'catalysts' && CATALYSTS[key]?.name === player.equippedCatalyst?.name) ||
                                   (category === 'armor' && ARMOR[key]?.name === player.equippedArmor?.name) ||
                                   (category === 'shields' && SHIELDS[key]?.name === player.equippedShield?.name) ||
                                   (category === 'lures' && key === player.equippedLure);
+                 
                  const equippedText = isEquipped ? "<span class='text-green-400 font-bold ml-2'>[E]</span>" : "";
-                 let buttonHtml = '';
-                 const canInteract = !isInBattle || canTakeActionInBattle; // Can interact if outside battle OR if it's player's turn in battle
+                 
+                 let activeElement = 'none';
+                 if (isEquipped) {
+                     if (category === 'weapons') activeElement = player.weaponElement;
+                     else if (category === 'armor') activeElement = player.armorElement;
+                     else if (category === 'shields') activeElement = player.shieldElement;
+                 }
+                 
+                 if ((!activeElement || activeElement === 'none') && details.element) {
+                     activeElement = details.element;
+                 }
+                 
+                 const elementHtml = getElementHtml(activeElement);
 
-                 // Equip/Unequip Buttons
+                 let buttonHtml = '';
+                 const canInteract = !isInBattle || canTakeActionInBattle; 
+
                  if (isEquipped) {
                      let itemType = category.slice(0, -1);
                      if (category === 'armor') itemType = 'armor';
                      if (category === 'lures') itemType = 'lure';
+                     
+                     // Helper to check if item is "default/starter" gear which often cannot be unequipped to nothing
                      const isDefaultItem = (itemType === 'weapon' && details.name === WEAPONS['fists'].name) ||
                                            (itemType === 'catalyst' && details.name === CATALYSTS['no_catalyst'].name) ||
                                            (itemType === 'armor' && details.name === ARMOR['travelers_garb'].name) ||
                                            (itemType === 'shield' && details.name === SHIELDS['no_shield'].name) ||
                                            (itemType === 'lure' && key === 'no_lure');
-                     // --- BATTLE MODIFICATION: Allow unequip in battle (except lures), check if can interact ---
+                     
                      if (!isDefaultItem && !(isInBattle && itemType === 'lure')) {
                          buttonHtml = `<button onclick="unequipItem('${itemType}', true, ${isInBattle})" class="btn btn-action text-sm py-1 px-3" ${!canInteract ? 'disabled title="Cannot change gear now"' : ''}>Unequip</button>`;
                      }
-                     // --- END BATTLE MODIFICATION ---
                  } else if (['weapons', 'catalysts', 'armor', 'shields', 'lures'].includes(category)) {
-                     // --- BATTLE MODIFICATION: Allow equip in battle (except lures), check if can interact ---
                      if (!(isInBattle && category === 'lures')) {
                         buttonHtml = `<button onclick="equipItem('${key}', ${isInBattle})" class="btn btn-primary text-sm py-1 px-3" ${!canInteract ? 'disabled title="Cannot change gear now"' : ''}>Equip</button>`;
-                     } else { // Lures cannot be equipped in battle
+                     } else { 
                          buttonHtml = `<button class="btn btn-primary text-sm py-1 px-3" disabled title="Cannot equip lures in battle">Equip</button>`;
                      }
-                     // --- END BATTLE MODIFICATION ---
                  }
-                 html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name} ${countStr} ${equippedText}</span>${buttonHtml}</div>`;
+                 html += `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}${elementHtml} ${countStr} ${equippedText}</span>${buttonHtml}</div>`;
             });
         }
-        html += `</div>`; // Close scrollable div
+        html += `</div>`; 
         return html;
     };
-
-    // --- Helper to Render Spellbook ---
-     const renderSpellbook = () => { /* ... existing code ... */
+    // ... (Spellbook, Key Items, Tabs logic remains unchanged) ...
+    const renderSpellbook = () => { 
         let html = '';
         const knownSpells = Object.keys(player.spells);
+        
+        // [MODIFICATION START] Define Element Sort Order
+        const elementOrder = ['fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'void', 'healing', 'none'];
+        // [MODIFICATION END]
+
         if (knownSpells.length === 0) {
             html += `<p class="text-gray-400 text-center mt-4">You have not learned any spells.</p>`;
         } else {
-             html += `<div id="inventory-spells-list" class="space-y-2 h-full overflow-y-auto inventory-scrollbar pr-2">`;
-            knownSpells.sort((a,b) => SPELLS[a].tiers[0].name.localeCompare(SPELLS[b].tiers[0].name)).forEach(key => {
+            html += `<div id="inventory-spells-list" class="space-y-2 h-full overflow-y-auto inventory-scrollbar pr-2">`;
+            
+            // [MODIFICATION START] Updated Sorting Logic
+            knownSpells.sort((a, b) => {
+                const spellA = SPELLS[a];
+                const spellB = SPELLS[b];
+                
+                if (!spellA || !spellB) return 0;
+
+                const elemA = spellA.element || 'none';
+                const elemB = spellB.element || 'none';
+
+                const idxA = elementOrder.indexOf(elemA);
+                const idxB = elementOrder.indexOf(elemB);
+
+                // 1. Sort by Element Index
+                if (idxA !== -1 && idxB !== -1 && idxA !== idxB) {
+                    return idxA - idxB;
+                }
+                // Handle unknown elements (push to end)
+                if (idxA !== -1 && idxB === -1) return -1;
+                if (idxA === -1 && idxB !== -1) return 1;
+
+                // 2. Sort Alphabetically by Name (Tier 1 name is usually the base name)
+                const nameA = spellA.tiers[0].name;
+                const nameB = spellB.tiers[0].name;
+                return nameA.localeCompare(nameB);
+            });
+            // [MODIFICATION END]
+
+            knownSpells.forEach(key => {
                 const spellTree = SPELLS[key];
                 if (!spellTree) return;
                 const playerSpell = player.spells[key];
                 const details = spellTree.tiers[playerSpell.tier - 1];
+                
                 let buttonHtml = '';
-                // Disable healing cast if in battle (must use Magic action)
-                if (spellTree.element === 'healing' && !isInBattle) { // OUTSIDE BATTLE
+                if (spellTree.element === 'healing' && !isInBattle) {
                     buttonHtml = `<button onclick="castHealingSpellOutsideCombat('${key}')" class="btn btn-item text-sm py-1 px-3" ${player.hp >= player.maxHp ? 'disabled' : ''}>Cast</button>`;
-                } else if (spellTree.element === 'healing' && isInBattle) { // INSIDE BATTLE
-                     buttonHtml = `<button class="btn btn-item text-sm py-1 px-3" disabled title="Use via 'Magic' action">Cast</button>`;
+                } else if (spellTree.element === 'healing' && isInBattle) {
+                    buttonHtml = `<button class="btn btn-item text-sm py-1 px-3" disabled title="Use via 'Magic' action">Cast</button>`;
                 }
 
-                html += `<div class="p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)">
+                // Optional: Add element tag or color for visual clarity
+                let textColor = 'text-purple-200';
+                if (spellTree.element === 'fire') textColor = 'text-red-300';
+                else if (spellTree.element === 'water') textColor = 'text-blue-300';
+                else if (spellTree.element === 'earth') textColor = 'text-stone-300';
+                else if (spellTree.element === 'wind') textColor = 'text-teal-300';
+                else if (spellTree.element === 'lightning') textColor = 'text-yellow-300';
+                else if (spellTree.element === 'nature') textColor = 'text-green-300';
+                else if (spellTree.element === 'light') textColor = 'text-yellow-100';
+                else if (spellTree.element === 'void') textColor = 'text-purple-400';
+
+                html += `<div class="p-2 bg-slate-800 rounded text-sm border border-transparent hover:border-white/10" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)">
                             <div class="flex justify-between items-center">
-                                <span class="font-bold text-purple-200">${details.name} (T${playerSpell.tier})</span>
+                                <span class="font-bold ${textColor}">${details.name} (T${playerSpell.tier})</span>
                                 <div class="flex items-center gap-2">
                                     <span class="text-blue-400 text-xs">${details.cost} MP</span>
                                     ${buttonHtml}
@@ -6770,14 +8307,12 @@ function renderInventory() {
                             </div>
                          </div>`;
             });
-             html += `</div>`;
+            html += `</div>`;
         }
         return html;
-     };
+    };
 
-    // --- Helper to Render Key Items (No changes needed for battle) ---
-    // (renderKeyItemsList function remains the same)
-     const renderKeyItemsList = () => { /* ... existing code ... */
+     const renderKeyItemsList = () => {
         const keyItems = Object.keys(player.inventory.items).filter(key => getItemDetails(key)?.type === 'key');
         let html = '';
         if (keyItems.length === 0) {
@@ -6789,7 +8324,6 @@ function renderInventory() {
                 if (!details) return '';
                 let buttonHtml = '';
                 if (key === 'bestiary_notebook') {
-                    // Disable bestiary button in battle? Might be okay to view. Keep enabled for now.
                     buttonHtml = `<button onclick="event.stopPropagation(); renderBestiaryMenu('inventory')" class="btn btn-primary text-sm py-1 px-3">Open</button>`;
                 }
                 return `<div class="flex justify-between items-center p-2 bg-slate-800 rounded text-sm" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()" onclick="showTooltip('${key}', event)"><span>${details.name}</span>${buttonHtml}</div>`;
@@ -6799,9 +8333,7 @@ function renderInventory() {
         return html;
      };
 
-    // --- Build Tab Buttons (remains the same) ---
-    // (Tab button HTML generation remains the same)
-    let tabHtml = '<div class="grid grid-cols-5 gap-1 mb-2">'; // Use grid, 5 columns
+    let tabHtml = '<div class="grid grid-cols-5 gap-1 mb-2">';
     tabs.forEach(tab => {
         const isActive = inventoryActiveTab === tab.key;
         const bgColor = isActive ? 'bg-yellow-600 border-yellow-800' : 'bg-slate-700 hover:bg-slate-600 border-slate-900';
@@ -6809,9 +8341,6 @@ function renderInventory() {
     });
     tabHtml += '</div>';
 
-
-    // --- Determine Content for Right Pane (remains the same) ---
-    // (Switch statement for rightPaneContent remains the same)
     let rightPaneContent = '';
     switch (inventoryActiveTab) {
         case 'spells': rightPaneContent = renderSpellbook(); break;
@@ -6824,13 +8353,10 @@ function renderInventory() {
         case 'armor': rightPaneContent = renderList('armor', 'Armor'); break;
         case 'shields': rightPaneContent = renderList('shields', 'Shields'); break;
         case 'lures': rightPaneContent = renderList('lures', 'Lures'); break;
-        default: rightPaneContent = renderList('items', 'Consumables'); // Default to consumables
+        default: rightPaneContent = renderList('items', 'Consumables'); 
     }
 
-    // --- Assemble Final HTML ---
-    // Added battle warning message
-    let battleWarning = isInBattle ? '<p class="text-center text-yellow-400 text-sm mb-2">Equipping gear consumes your turn! Use items via the Item action.</p>' : ''; // Updated warning
-    // Modified Back button action
+    let battleWarning = isInBattle ? '<p class="text-center text-yellow-400 text-sm mb-2">Equipping gear consumes your turn! Use items via the Item action.</p>' : '';
     const backAction = isInBattle ? 'returnToBattleFromInventory()' : 'returnFromInventory()';
 
     let html = `
@@ -6849,179 +8375,288 @@ function renderInventory() {
     container.innerHTML = html;
     render(container);
 
-    // Restore scroll position
     const newActiveList = mainView.querySelector(`#inventory-${inventoryActiveTab}-list`);
     if (newActiveList) {
         newActiveList.scrollTop = scrollPos;
     }
 }
 
+function battleAction(type, actionData = null) {
+    if (!player.isAlive()) { checkPlayerDeath(); return; }
+    if (!gameState.isPlayerTurn || isProcessingAction) return;
 
+    if (type !== 'attack') {
+        gameState.comboTarget = null;
+        gameState.comboCount = 0;
+    }
 
-function renderBattle(subView = 'main', actionData = null) {
-     if (gameState.battleEnded) return;
-     // Allow item use even if no enemies (e.g., healing potion)
-     // Modified: Allow buff items even if no enemies
-     if (currentEnemies.length === 0 && subView !== 'item' && subView !== 'buff') return; // Added buff check
+    gameState.action = type; 
+    const cells = document.querySelectorAll('.grid-cell');
+    cells.forEach(c => c.classList.remove('walkable', 'attackable', 'magic-attackable', 'splash-targetable', 'item-attackable'));
 
+    const isFlying = (player.race === 'Pinionfolk');
 
-     if (subView === 'main') {
-        renderBattleGrid();
-     // REMOVED 'item_target' from this condition. Grid highlighting handles it now.
-     } else if (subView === 'attack' || subView === 'magic_target') {
-        // ... existing code for attack/magic target selection (button list) ...
-        // This block remains unchanged as it's only for the old attack/magic button lists,
-        // which might still be used if we revert or for a different UI later.
-        // However, the item targeting logic that *was* here is now gone.
-        let html = `<h2 class="font-medieval text-3xl mb-4 text-center title-glow">Choose a Target</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
-        let buttonAction, buttonClass, titleText, backFunction;
+    if (gameState.isMovementOnlyTurn && type !== 'move') {
+        addToLog("You can only Move during a Swiftness turn!", "text-red-400");
+        return;
+    }
 
-        if (subView === 'attack') {
-             buttonAction = 'performAttack';
-             buttonClass = 'btn-action';
-             titleText = 'Attack';
-             backFunction = 'renderBattleGrid()'; // Back to main battle actions
-        } else { // magic_target
-            buttonAction = `castSpell('${actionData.spellKey}', index)`; // Need index placeholder
-             buttonClass = 'btn-magic';
-             titleText = `Cast ${SPELLS[actionData.spellKey]?.tiers[player.spells[actionData.spellKey]?.tier -1]?.name || 'Spell'}`;
-             backFunction = `renderBattle('magic')`; // Back to magic selection
-        }
+    switch (type) {
+        case 'move':
+            let moveDistance = 3;
+            if (player.skillToggles['iron_mountain']) moveDistance = 1;
+            const isUnarmored = !player.equippedArmor || player.equippedArmor.name === "Traveler's Garb";
+            if (player.hasSkill('flowing_water') && isUnarmored) moveDistance += 2;
+            if (player.race === 'Elf' && (!player.equippedArmor || !player.equippedArmor.metallic)) moveDistance += (player.level >= 20 ? 2 : 1);
+            if(player.statusEffects.bonus_speed) moveDistance += player.statusEffects.bonus_speed.move;
+            if(player.statusEffects.slowed) moveDistance = Math.max(1, moveDistance + player.statusEffects.slowed.move);
+            if (player.foodBuffs.movement_speed) moveDistance += player.foodBuffs.movement_speed.value;
 
-        html = `<h2 class="font-medieval text-3xl mb-4 text-center title-glow">${titleText}</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
+            const reachableCells = findReachableCells({x: player.x, y: player.y}, moveDistance);
+            
+            cells.forEach(c => {
+                const x = parseInt(c.dataset.x);
+                const y = parseInt(c.dataset.y);
+                if (reachableCells.some(p => p.x === x && p.y === y)) {
+                    c.classList.add('walkable');
+                }
+            });
+            break;
+            
+        case 'attack':
+            let weaponRange = player.equippedWeapon.range || 1;
+            if (isFlying && player.level >= 20) weaponRange += 2;
+            if(player.statusEffects.bonus_range) weaponRange += player.statusEffects.bonus_range.range;
+            if (player.equippedWeapon.class === 'Hammer' && player.hasSkill('titans_range')) weaponRange += 1;
+            if (player.equippedWeapon.class === 'Dagger' && player.skillToggles['daggershot_rune']) weaponRange += 2;
 
-        currentEnemies.forEach((enemy, index) => {
-            if (enemy.isAlive()) {
-                 const finalAction = buttonAction.replace('index', index); // Replace placeholder with actual index
-                 html += `<button onclick="${finalAction}" class="btn ${buttonClass}">${enemy.name}</button>`;
+            cells.forEach(c => {    
+                const x = parseInt(c.dataset.x);
+                const y = parseInt(c.dataset.y);
+                const dx = Math.abs(player.x - x);
+                const dy = Math.abs(player.y - y);
+                if (dx + dy <= weaponRange) {
+                    const enemy = currentEnemies.find(e => e.x === x && e.y === y);
+                    const obstacle = gameState.gridObjects.find(o => o.x === x && o.y === y && o.type === 'obstacle');
+                    if (enemy || obstacle) c.classList.add('attackable');
+                }
+            });
+            break;  
+        case 'magic':
+            renderBattle('magic');
+            break;
+        case 'magic_select':
+            const spellKey = actionData;
+            const spellData = SPELLS[spellKey];
+            if (!spellData) return;
+            const spell = spellData.tiers[player.spells[spellKey].tier - 1];
+            gameState.spellToCast = spellKey;
+
+            if (spellData.type === 'st' || spellData.type === 'aoe') {
+                gameState.action = 'magic_cast';
+                 renderBattleGrid(true, 'magic'); 
+            } else if (spellData.type === 'support' || spellData.type === 'healing') {
+                castSpell(spellKey, 0); 
             }
-        });
-        html += `</div><button onclick="${backFunction}" class="btn btn-primary">Back</button>`;
-        const container = document.createElement('div');
-        container.innerHTML = html;
-        render(container);
-
-     } else if (subView === 'magic') {
-        // ... existing code for magic selection ...
-        // This block remains unchanged.
-        let spellsHtml = Object.keys(player.spells).map(key => {
-            const spellTree = SPELLS[key];
-            if (!spellTree) {
-                console.warn(`Invalid spell key "${key}" found in player's spellbook. Skipping.`);
-                return ''; // Skip rendering this invalid spell
+            break;
+        case 'item':
+            renderBattle('item');
+            break;
+        
+        case 'item_select':
+            const itemKey = actionData.itemKey;
+            const itemDetails = ITEMS[itemKey];
+            if (!itemDetails) {
+                 gameState.action = null;
+                 return;
             }
-            const spell = spellTree.tiers[player.spells[key].tier - 1];
-
-            // Calculate cost with potential modifications (display only)
-            let displayCost = spell.cost;
-            const catalyst = player.equippedCatalyst;
-            const armor = player.equippedArmor;
-            if (catalyst.effect?.mana_discount) displayCost = Math.max(1, displayCost - catalyst.effect.mana_discount);
-            if (armor.effect?.mana_discount) displayCost = Math.max(1, displayCost - armor.effect.mana_discount);
-            if (player._classKey === 'warlock' && player.signatureAbilityToggleActive) displayCost = Math.ceil(displayCost * 1.25);
-            if (player._classKey === 'magus' && player.activeModeIndex > -1) displayCost = Math.ceil(displayCost * 1.30);
-            if (player.statusEffects.magic_dampen) displayCost = Math.floor(displayCost * (1 / player.statusEffects.magic_dampen.multiplier));
-
-
-            const canCast = player.mp >= displayCost; // Check against potentially modified cost
-
-            // Pass only the spell key string in onclick
-            return `<button onclick="battleAction('magic_select', '${key}')" class="btn btn-magic w-full text-left" ${!canCast ? 'disabled' : ''} onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()">
-                        <div class="flex justify-between"><span>${spell.name}</span><span>${displayCost} MP</span></div>
-                    </button>`;
-        }).join('');
-
-        let html = `<div class="w-full text-center">
-                        <h2 class="font-medieval text-3xl mb-4 title-glow">Cast a Spell</h2>
-                        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 mb-4">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">${spellsHtml}</div>
-                        </div>
-                        <button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>
-                    </div>`;
-
-        const container = document.createElement('div');
-        container.innerHTML = html;
-        render(container);
-     } else if (subView === 'item') {
-        // --- MODIFICATION START: Remove Weapons section ---
-        let itemsHtml = '';
-        // Removed: let weaponsHtml = ''; // New variable for weapons
-
-        // --- Process Usable Items ---
-        const usableItems = Object.keys(player.inventory.items)
-            .filter(key => {
-                const item = ITEMS[key];
-                // Filter for usable types IN BATTLE
-                return item && ['healing', 'mana_restore', 'buff', 'cleanse', 'enchant', 'experimental', 'cleanse_specific', 'debuff_apply', 'debuff_special'].includes(item.type);
-            })
-            .map(key => ({ key, details: ITEMS[key] }));
-
-        const typeOrder = ['healing', 'mana_restore', 'buff', 'cleanse', 'cleanse_specific', 'debuff_apply', 'debuff_special', 'enchant', 'experimental'];
-        const typeMap = { /* ... existing typeMap ... */
-            'healing': 'Healing Potions',
-            'mana_restore': 'Mana Potions',
-            'buff': 'Buff Items',
-            'cleanse': 'Cleansing Items',
-            'cleanse_specific': 'Antidotes/Needles',
-            'debuff_apply': 'Throwables (Debuff)',
-            'debuff_special': 'Throwables (Special)',
-            'enchant': 'Essences',
-            'experimental': 'Mysterious Concoctions'
-        };
-
-        // Sort items
-        usableItems.sort((a, b) => { /* ... existing sorting logic ... */
-            const typeAIndex = typeOrder.indexOf(a.details.type);
-            const typeBIndex = typeOrder.indexOf(b.details.type);
-            if (typeAIndex !== typeBIndex) {
-                const finalAIndex = typeAIndex === -1 ? typeOrder.length : typeAIndex;
-                const finalBIndex = typeBIndex === -1 ? typeOrder.length : typeBIndex;
-                return finalAIndex - finalBIndex;
+            // [FIX] Added 'trap' to the list of items that require targeting
+            if (['debuff_apply', 'debuff_special', 'enchant', 'trap'].includes(itemDetails.type)) {
+                gameState.action = 'item_target'; 
+                gameState.itemToUse = itemKey;   
+                addToLog(`Select a location for ${itemDetails.name}.`, 'text-yellow-400'); 
+                renderBattleGrid(true, 'item'); 
+            } else {
+                 useItem(itemKey, true); 
+                 gameState.action = null;
             }
-            return a.details.name.localeCompare(b.details.name);
-         });
+            break;
 
-        let currentType = '';
-        if (usableItems.length > 0) {
-            usableItems.forEach(itemObj => {
-                const key = itemObj.key;
-                const item = itemObj.details;
-                const count = player.inventory.items[key] || 0;
-                if (count <= 0) return;
+        case 'flee':
+            if (player.statusEffects.buff_final_horizon) {
+                addToLog("You cannot flee! You have committed to the Final Horizon!", "text-red-500 font-bold");
+                return;
+            }
+            gameState.isPlayerTurn = false;
+            if (player.statusEffects.buff_voidwalker || player.rollForEffect(0.8, 'Flee')) {
+                addToLog(`You successfully escaped!`, 'text-green-400');
+                if (preTrainingState !== null) {
+                    player.hp = preTrainingState.hp;
+                    player.mp = preTrainingState.mp;
+                    preTrainingState = null;
+                    updateStatsView();
+                    setTimeout(renderTrainingGrounds, 1000);
+                } else {
+                    setTimeout(() => endBiomeRun('flee'), 500);
+                }
+            } else {
+                addToLog(`You failed to escape!`, 'text-red-400');
+                finalizePlayerAction(); 
+            }
+            break;
+        case 'skills':
+            renderBattle('skills');
+            break;
 
-                if (item.type !== currentType) {
-                    currentType = item.type;
-                    const header = typeMap[currentType] || capitalize(currentType);
-                    itemsHtml += `<h4 class="font-semibold text-yellow-300 text-xs uppercase tracking-wider pt-2 col-span-1 md:col-span-2">${header}</h4>`;
+        case 'use_skill':
+            const skillId = actionData;
+            const skillNode = SKILL_TREE[skillId];
+            if (!skillNode) return;
+
+            const reqCheck = checkSkillRequirements(skillId);
+            if (!reqCheck.allowed) {
+                addToLog(`Requires a ${reqCheck.required}!`, "text-red-400");
+                return;
+            }
+
+            if (skillNode.type === 'toggle') {
+                const toggleKey = skillNode.effect.toggle;
+                if (toggleKey === 'lockdown') {
+                    const shield = player.equippedShield;
+                    if (!shield || !shield.blockChance || shield.blockChance <= 0) {
+                        addToLog("Immovable Object requires a Greatshield!", "text-red-400");
+                        return;
+                    }
+                }
+                if (toggleKey === 'world_turtle_formation' && !player.skillToggles[toggleKey]) {
+                    if (!player.skillToggles['phalanx_formation'] || !player.skillToggles['giant_hunt']) {
+                        addToLog("Aspidochelone Stance requires Iron Bastion and Behemoth Stalker!", "text-red-400");
+                        return;
+                    }
                 }
 
-                let action = `battleAction('item_select', { itemKey: '${key}' })`;
-                // Removed targeting logic for 'enchant', 'debuff_apply', 'debuff_special' here, handled in item_select case now
-                itemsHtml += `<button onclick="${action}" class="btn btn-item w-full text-left" onmouseover="showTooltip('${key}', event)" onmouseout="hideTooltip()"><div class="flex justify-between"><span>${item.name}</span><span>x${count}</span></div></button>`;
-            });
-        } else {
-            itemsHtml = `<p class="text-gray-400 text-center col-span-1 md:col-span-2">You have no usable items.</p>`;
-        }
+                player.skillToggles[toggleKey] = !player.skillToggles[toggleKey];
 
-        // --- REMOVED Weapons Processing Section ---
+                if ((toggleKey === 'phalanx_formation' || toggleKey === 'giant_hunt') && !player.skillToggles[toggleKey]) {
+                    if (player.skillToggles['world_turtle_formation']) {
+                        player.skillToggles['world_turtle_formation'] = false;
+                        addToLog("Aspidochelone Stance collapsed.", "text-yellow-300");
+                    }
+                }
+                addToLog(`${skillNode.name} is now ${player.skillToggles[toggleKey] ? 'Active' : 'Inactive'}.`, "text-yellow-300");
+                renderBattle('skills'); 
+            }
+            else if (skillNode.type === 'active') {
+                const cost = skillNode.effect.cost;
+                if (player.mp < cost) {
+                    addToLog("Not enough MP!", "text-red-400");
+                    return;
+                }
+                gameState.currentActiveSkill = skillId; 
+                gameState.action = 'skill_target';
+                addToLog(`Select a target for ${skillNode.name}.`, "text-cyan-300");
+                renderBattleGrid(true, 'skill'); 
+            }
+            break;
+        case 'signature_ability':
+            const ability = player.signatureAbilityData;
+            if (!ability) return;
 
-        // --- Combine HTML ---
-        let html = `<div class="w-full text-center">
-                        <div class="h-80 overflow-y-auto inventory-scrollbar pr-2 mb-4">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                ${itemsHtml}
-                            </div>
-                        </div>
-                        <button onclick="renderBattleGrid()" class="btn btn-primary">Back</button>
-                    </div>`;
-        // --- END MODIFICATION ---
+            if (ability.type === 'signature') {
+                if (player.signatureAbilityUsed) {
+                    addToLog(`${ability.name} has already been used this encounter!`, 'text-red-400');
+                    return;
+                }
+                if (player.mp < ability.cost) {
+                    addToLog(`Not enough MP!`, 'text-blue-400');
+                    return;
+                }
+                if (player._classKey === 'ranger') {
+                     addToLog("Select a target to mark.", 'text-yellow-400');
+                     gameState.action = 'mark_target'; 
+                     renderBattleGrid(true, 'mark'); 
+                     return; 
+                }
 
-        const container = document.createElement('div');
-        container.innerHTML = html;
-        render(container);
-     }
+                player.mp -= ability.cost;
+                player.signatureAbilityUsed = true;
+                updateStatsView();
+                addToLog(`You activate ${ability.name}!`, 'text-yellow-300 font-bold');
 
-}
+                if (player._classKey === 'barbarian') {
+                    player.statusEffects.buff_enrage = { duration: ability.duration };
+                    addToLog(`You fly into a rage!`, 'text-red-500');
+                }
+                else if (player._classKey === 'artificer') {
+                    const drone = new Drone(player);
+                    const potentialSpawns = [{x: player.x+1, y: player.y}, {x: player.x-1, y: player.y}, {x: player.x, y: player.y+1}, {x: player.x, y: player.y-1}];
+                    let spawnCell = null;
+                    for(const cell of potentialSpawns) {
+                        if (!isCellBlocked(cell.x, cell.y, false, false)) { spawnCell = cell; break; }
+                    }
+                    if (spawnCell) {
+                        drone.x = spawnCell.x; drone.y = spawnCell.y;
+                        gameState.activeDrone = drone;
+                        addToLog("A whirring drone materializes beside you!", "text-cyan-400");
+                        renderBattleGrid();
+                    } else {
+                        addToLog("No space to summon the drone!", 'text-red-400');
+                        player.mp += ability.cost;
+                        player.signatureAbilityUsed = false;
+                        return;
+                    }
+                }
+                else if (player._classKey === 'cleric') {
+                    // (Cleric Logic from previous steps)
+                     if (!player.equippedCatalyst || player.equippedCatalyst.name === 'None') {
+                        addToLog("You need a catalyst!", 'text-red-400');
+                        player.mp += ability.cost; player.signatureAbilityUsed = false; return;
+                    }
+                    const baseDice = 3;
+                    let healDiceCount = Math.min(7, baseDice + Math.floor(player.level / 10));
+                    const healAmount = rollDice(healDiceCount, 8, 'Holy Blessings Heal').total;
+                    player.hp = Math.min(player.maxHp, player.hp + healAmount);
+                    addToLog(`Divine light restores <span class="font-bold text-green-400">${healAmount}</span> HP!`, 'text-yellow-200');
+                    const debuffs = Object.keys(player.statusEffects).filter(key => ['poison', 'paralyzed', 'petrified', 'drenched', 'toxic', 'slowed'].includes(key));
+                    if (debuffs.length > 0) debuffs.forEach(key => delete player.statusEffects[key]);
+                    updateStatsView();
+                }
+                else if (player._classKey === 'cook') {
+                    renderOnFieldCookingUI();
+                    return; 
+                }
+
+                gameState.isPlayerTurn = false;
+                finalizePlayerAction(); 
+                gameState.action = null; 
+
+            } else if (ability.type === 'toggle') {
+                 if (player._classKey === 'magus' && ability.modes) {
+                     player.activeModeIndex++;
+                     if (player.activeModeIndex >= ability.modes.length) player.activeModeIndex = -1; 
+                     const currentModeName = player.activeModeIndex > -1 ? ability.modes[player.activeModeIndex] : "Off";
+                     addToLog(`Arcane Manipulation mode set to: ${currentModeName}`, 'text-yellow-300');
+                 }
+                 else if (player._classKey === 'paladin') {
+                     if (!player.signatureAbilityToggleActive && (!player.equippedCatalyst || player.equippedCatalyst.name === 'None')) {
+                         addToLog("Divine Smite requires a catalyst!", 'text-red-400');
+                         return; 
+                     }
+                     player.signatureAbilityToggleActive = !player.signatureAbilityToggleActive;
+                     addToLog(`${ability.name} ${player.signatureAbilityToggleActive ? 'activated!' : 'deactivated.'}`, 'text-yellow-300');
+                 }
+                 else {
+                     player.signatureAbilityToggleActive = !player.signatureAbilityToggleActive;
+                     addToLog(`${ability.name} ${player.signatureAbilityToggleActive ? 'activated!' : 'deactivated.'}`, 'text-yellow-300');
+                 }
+                renderBattleGrid(); 
+                gameState.action = null; 
+            }
+            break;
+        default:
+            gameState.action = null; 
+    }
+}       
 
 function renderPostBattleMenu() {
     $('#inventory-btn').disabled = false;
@@ -7415,6 +9050,12 @@ function renderGarden() {
         return;
     }
 
+    // Ensure HOME_IMPROVEMENTS is available
+    if (typeof HOME_IMPROVEMENTS === 'undefined') {
+        render(document.createTextNode("Error: Config data missing."));
+        return;
+    }
+
     const upgrade = HOME_IMPROVEMENTS.garden.upgrades[gardenTier - 1];
     if (!upgrade) {
         console.error(`Invalid garden tier or upgrade data for tier ${gardenTier}`);
@@ -7431,16 +9072,17 @@ function renderGarden() {
         const newGarden = Array(totalPlots).fill(null).map(() => ({ seed: null, plantedAt: 0, growthStage: 0 }));
         if(player.house.garden && Array.isArray(player.house.garden)) {
             for(let i = 0; i < player.house.garden.length; i++) {
-                if (i < newGarden.length) newGarden[i] = player.house.garden[i];
+                if (i < newGarden.length && player.house.garden[i]) newGarden[i] = player.house.garden[i];
             }
         }
         player.house.garden = newGarden;
     }
+    
     if (treePlotSize > 0 && (!player.house.treePlots || !Array.isArray(player.house.treePlots) || player.house.treePlots.length < treePlotSize)) {
          const newTreePlots = Array(treePlotSize).fill(null).map(() => ({ seed: null, plantedAt: 0, growthStage: 0 }));
          if(player.house.treePlots && Array.isArray(player.house.treePlots)) {
              for(let i = 0; i < player.house.treePlots.length; i++) {
-                 if (i < newTreePlots.length) newTreePlots[i] = player.house.treePlots[i];
+                 if (i < newTreePlots.length && player.house.treePlots[i]) newTreePlots[i] = player.house.treePlots[i];
              }
          }
          player.house.treePlots = newTreePlots;
@@ -7461,11 +9103,11 @@ function renderGarden() {
 
     if (upgrade.treeSize) {
         const treeWidth = upgrade.treeSize.width;
-        const treeHeight = upgrade.treeSize.height;
+        // const treeHeight = upgrade.treeSize.height; // Unused in this layout logic but available
         html += `<div class="p-4 bg-slate-900/50 rounded-lg">
                     <h3 class="font-bold text-yellow-300 mb-2">Tree Plot</h3>
                     <div class="inline-grid gap-1" style="grid-template-columns: repeat(${treeWidth}, 1fr);">`;
-        for(let i=0; i < treeWidth * treeHeight; i++) {
+        for(let i=0; i < treePlotSize; i++) {
             const plot = player.house.treePlots[i];
             html += renderPlot(plot, i, true);
         }
@@ -7480,8 +9122,7 @@ function renderGarden() {
              <button onclick="hideSeedSelection()" class="btn btn-action mt-3 text-sm">Cancel</button>
         </div>`;
     
-    // --- START MODIFICATION ---
-    // Add the new Seedmaker selection box
+    // Seedmaker Modal
     html += `<div id="seedmaker-selection-box" class="hidden mt-4 p-4 bg-slate-800 rounded-lg max-w-md mx-auto">
             <h3 id="seedmaker-selection-title" class="font-bold text-lg mb-2 text-yellow-300">Select Plant to Process</h3>
             <div id="plant-list" class="flex flex-wrap justify-center gap-2"></div>
@@ -7498,13 +9139,13 @@ function renderGarden() {
 
     html += `</div>
     </div>`;
-    // --- END MODIFICATION ---
 
     const container = document.createElement('div');
     container.innerHTML = html;
     render(container);
 }
 
+// [REVERTED] Render Plot - Original Style with Skill Logic Restored
 function renderPlot(plot, index, isTreePlot) {
     let content = '';
     let plotClass = 'garden-plot-dirt';
@@ -7513,35 +9154,68 @@ function renderPlot(plot, index, isTreePlot) {
     let timerHtml = '';
 
     if (plot && plot.seed) {
-        const seedInfo = SEEDS[plot.seed];
-        action = '';
-        title = `Planted: ${getItemDetails(plot.seed).name}`;
-        const timeRemaining = (plot.plantedAt + seedInfo.growthTime) - Date.now();
+        const seedInfo = (typeof SEEDS !== 'undefined') ? SEEDS[plot.seed] : null;
+        
+        if (seedInfo) {
+            action = '';
+            
+            // Safe Name Retrieval
+            let seedName = plot.seed;
+            try { 
+                const d = getItemDetails(plot.seed); 
+                if(d) seedName = d.name; 
+            } catch(e){}
+            
+            title = `Planted: ${seedName}`;
 
-        switch(plot.growthStage) {
-            case 0: content = '🌱'; title += ' (Seedling)'; break;
-            case 1: content = isTreePlot ? '🌳' : '🌿'; title += ' (Sprout)'; break;
-            case 2: content = isTreePlot ? '🌳' : '🌿'; plotClass='garden-plot-growing'; title += ' (Growing)'; break;
-            case 3:
-                // --- MODIFICATION START ---
-                // Use the custom harvestEmoji from SEEDS, fallback to old emojis
-                content = seedInfo.harvestEmoji || (isTreePlot ? '🌲' : '🌻');
-                // --- MODIFICATION END ---
-                plotClass='garden-plot-ready';
-                action = `harvestPlant(${index}, ${isTreePlot})`;
-                title = 'Ready to Harvest!';
-                break;
-        }
+            // --- SKILL LOGIC RESTORED HERE ---
+            let duration = seedInfo.growthTime || 60000;
+            
+            // 1. Check for Fertilizer (Accelerator)
+            if (plot.isAccelerated) {
+                duration *= 0.75; 
+            }
+            
+            // 2. Check for "Green-Thumb" / Verdant Touch Skill
+            if (typeof player !== 'undefined' && player.hasSkill('verdant_touch')) {
+                duration = Math.floor(duration * 0.90);
+            }
+            // ---------------------------------
 
-        if (plot.growthStage < 3 && timeRemaining > 0) {
-            timerHtml = `<div class="garden-timer">${formatTime(timeRemaining)}</div>`;
-            title += ` - ${formatTime(timeRemaining)} remaining`;
+            const timeRemaining = (plot.plantedAt + duration) - Date.now();
+
+            switch(plot.growthStage) {
+                case 0: content = '🌱'; title += ' (Seedling)'; break;
+                case 1: content = isTreePlot ? '🌳' : '🌿'; title += ' (Sprout)'; break;
+                case 2: content = isTreePlot ? '🌳' : '🌿'; plotClass='garden-plot-growing'; title += ' (Growing)'; break;
+                case 3:
+                    content = seedInfo.harvestEmoji || (isTreePlot ? '🌲' : '🌻');
+                    plotClass='garden-plot-ready';
+                    action = `harvestPlant(${index}, ${isTreePlot})`;
+                    title = 'Ready to Harvest!';
+                    break;
+                default: 
+                    // Fallback if stage 3 logic missed but time is up
+                    if (timeRemaining <= 0 && plot.growthStage < 3) {
+                         // Note: Usually logic loop handles stage update, but visual fallback is good
+                         title += ' (Waiting for update...)';
+                    }
+                    break;
+            }
+
+            if (plot.growthStage < 3 && timeRemaining > 0) {
+                timerHtml = `<div class="garden-timer">${formatTime(timeRemaining)}</div>`;
+                title += ` - ${formatTime(timeRemaining)} remaining`;
+            }
+        } else {
+            content = '?';
+            title = `Unknown Seed: ${plot.seed}`;
+            action = '';
         }
     }
 
     return `<div onclick="${action}" class="garden-plot ${isTreePlot ? 'tree-plot' : ''} ${plotClass}" title="${title}">${content}${timerHtml}</div>`;
 }
-
 
 function showSeedSelection(plotIndex, isTreePlot) {
     hideSeedSelection();
@@ -7781,7 +9455,9 @@ function renderAlchemyLab() {
     }).join('');
 
     const outputDetails = alchemyState.outputKey ? getItemDetails(alchemyState.outputKey) : null;
-    const allSlotsFilled = alchemyState.slots.every(s => s.length > 0);
+    
+    // [FIX] Changed logic: Enable button if ANY slot has content
+    const hasAnyIngredients = alchemyState.slots.some(s => s.length > 0);
 
     let html = `
         <div class="w-full text-left">
@@ -7798,7 +9474,7 @@ function renderAlchemyLab() {
             <div id="ingredient-picker-container" class="mt-6"></div>
 
             <div class="text-center mt-6 flex justify-center gap-4">
-                <button onclick="brewFromStation()" class="btn btn-primary" ${!allSlotsFilled || outputDetails ? 'disabled' : ''}>Brew Potion</button>
+                <button onclick="brewFromStation()" class="btn btn-primary" ${!hasAnyIngredients || outputDetails ? 'disabled' : ''}>Brew Potion</button>
                 <button onclick="resetAlchemyStation()" class="btn btn-action">Reset</button>
             </div>
              <div class="text-center mt-4">
@@ -7919,8 +9595,14 @@ function renderTrainingGrounds() {
     let html = `<div class="w-full text-center">
         <h2 class="font-medieval text-3xl mb-2 title-glow">Training Grounds</h2>`;
 
-    // --- Tier 2: Arena of Champions (Replaces Tier 1) ---
+    // --- Tier 2: Arena of Champions ---
     if (trainingTier >= 2) {
+        // Generate Grid Options (5x5 to 10x10)
+        let t2GridOptions = '';
+        for (let i = 5; i <= 10; i++) {
+            t2GridOptions += `<option value="${i}" ${i === 6 ? 'selected' : ''}>${i}x${i}</option>`;
+        }
+
         html += `<div class="max-w-2xl mx-auto text-left space-y-4 p-4 border border-yellow-600 rounded-lg mt-6">
             <h3 class="font-bold text-xl text-yellow-300 text-center">Arena of Champions (Tier 2)</h3>
             <p class="text-gray-400 text-center text-sm mb-4">Design your own custom encounter.</p>
@@ -7932,20 +9614,32 @@ function renderTrainingGrounds() {
 
             <div id="t2-enemy-configs" class="space-y-3"></div>
 
-            <div>
-                <label for="t2-grid-size-select" class="block font-bold text-lg mb-2">Arena Size</label>
-                <select id="t2-grid-size-select" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">
-                    <option value="5">5x5</option>
-                    <option value="6" selected>6x6</option>
-                </select>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label for="t2-grid-size-select" class="block font-bold text-lg mb-2">Arena Size</label>
+                    <select id="t2-grid-size-select" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">
+                        ${t2GridOptions}
+                    </select>
+                </div>
+                <div>
+                    <label for="t2-stat-mult" class="block font-bold text-lg mb-2">Stat Multiplier</label>
+                    <input type="number" id="t2-stat-mult" value="1.0" min="0.1" max="10.0" step="0.1" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1" title="Multiplies Enemy HP, Dmg, and Def">
+                </div>
             </div>
-             <div class="text-center">
+
+             <div class="text-center mt-4">
                 <button onclick="startTrainingBattle(2)" class="btn btn-primary" ${defeatedEnemies.length === 0 ? 'disabled' : ''}>Start Tier 2 Training</button>
             </div>
         </div>`;
     }
     // --- Tier 1: Sparring Circle ---
     else if (trainingTier >= 1) {
+        // Generate Grid Options (3x3 to 10x10)
+        let t1GridOptions = '';
+        for (let i = 3; i <= 10; i++) {
+            t1GridOptions += `<option value="${i}" ${i === 5 ? 'selected' : ''}>${i}x${i}</option>`;
+        }
+
         html += `<div class="max-w-lg mx-auto text-left space-y-4 p-4 border border-gray-700 rounded-lg">
             <h3 class="font-bold text-xl text-yellow-300 text-center">Sparring Circle (Tier 1)</h3>
             <p class="text-gray-400 text-center text-sm mb-4">Practice against a single foe to test your might.</p>
@@ -7967,10 +9661,7 @@ function renderTrainingGrounds() {
             <div>
                 <label for="t1-grid-size-select" class="block font-bold text-lg mb-2">Arena Size</label>
                 <select id="t1-grid-size-select" class="w-full bg-gray-800 text-white border border-gray-600 rounded px-2 py-1">
-                    <option value="3">3x3</option>
-                    <option value="4">4x4</option>
-                    <option value="5" selected>5x5</option>
-                    <option value="6">6x6</option>
+                    ${t1GridOptions}
                 </select>
             </div>
             <div class="text-center">
@@ -7990,12 +9681,15 @@ function renderTrainingGrounds() {
     // Add event listener for Tier 2 enemy count change
     if (trainingTier >= 2) {
         const enemyCountInput = document.getElementById('t2-enemy-count');
-        enemyCountInput.addEventListener('change', () => {
-            const count = Math.max(1, Math.min(5, parseInt(enemyCountInput.value) || 1));
-            enemyCountInput.value = count;
-            generateEnemyConfigRows(count);
-        });
-        generateEnemyConfigRows(1); // Initial row
+        // Ensure element exists before adding listener to prevent errors if render failed
+        if (enemyCountInput) {
+            enemyCountInput.addEventListener('change', () => {
+                const count = Math.max(1, Math.min(5, parseInt(enemyCountInput.value) || 1));
+                enemyCountInput.value = count;
+                generateEnemyConfigRows(count);
+            });
+            generateEnemyConfigRows(1); // Initial row
+        }
     }
 }
 
@@ -8006,16 +9700,28 @@ function generateEnemyConfigRows(count) {
     const defeatedEnemies = Object.keys(player.legacyQuestProgress || {});
     const enemyOptions = defeatedEnemies.map(key => `<option value="${key}">${MONSTER_SPECIES[key].name}</option>`).join('');
     const rarityOptions = Object.keys(MONSTER_RARITY).map(key => `<option value="${key}">${MONSTER_RARITY[key].name}</option>`).join('');
+    
+    // Generate Element Options
+    // Uses the global ELEMENTS object if available, otherwise falls back to a standard list
+    let elementOptions = `<option value="none">Neutral</option>`;
+    const elementList = (typeof ELEMENTS !== 'undefined') ? Object.keys(ELEMENTS) : ['fire', 'water', 'earth', 'wind', 'lightning', 'nature', 'light', 'void'];
+    
+    elementList.forEach(el => {
+        if (el !== 'none' && el !== 'healing') {
+            elementOptions += `<option value="${el}">${capitalize(el)}</option>`;
+        }
+    });
 
     let html = '';
     for (let i = 0; i < count; i++) {
         html += `<div class="p-2 border border-gray-700 rounded-md">
-            <p class="font-semibold mb-2">Enemy ${i + 1}</p>
-            <div class="grid grid-cols-2 gap-2">
-                <select id="t2-enemy-type-${i}" class="w-full bg-gray-700 text-white border border-gray-600 rounded px-2 py-1">${enemyOptions}</select>
-                <select id="t2-enemy-rarity-${i}" class="w-full bg-gray-700 text-white border border-gray-600 rounded px-2 py-1">${rarityOptions}</select>
-            </div>
-        </div>`;
+                    <p class="font-semibold mb-2 text-sm text-gray-400">Enemy ${i + 1}</p>
+                    <div class="grid grid-cols-3 gap-2">
+                        <select id="t2-enemy-type-${i}" class="w-full bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 text-xs" title="Species">${enemyOptions}</select>
+                        <select id="t2-enemy-rarity-${i}" class="w-full bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 text-xs" title="Rarity">${rarityOptions}</select>
+                        <select id="t2-enemy-element-${i}" class="w-full bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 text-xs" title="Elemental Infusion">${elementOptions}</select>
+                    </div>
+                 </div>`;
     }
     container.innerHTML = html;
 }
@@ -8026,43 +9732,50 @@ window.startTrainingBattle = function(tier) {
     if (tier === 1) {
         const enemyKey = document.getElementById('t1-enemy-select').value;
         const gridSize = parseInt(document.getElementById('t1-grid-size-select').value);
+
         if (!enemyKey) {
-            addToLog("You must select an enemy to train against.", "text-red-400");
+            addToLog("Select an enemy.", "text-red-400");
             return;
         }
+
         trainingConfig = {
             gridSize: gridSize,
-            enemies: [{ key: enemyKey, rarity: 'common' }]
+            enemies: [{ key: enemyKey, rarity: 'common', element: 'none' }],
+            statMultiplier: 1.0 
         };
+
     } else if (tier === 2) {
         const enemyCount = parseInt(document.getElementById('t2-enemy-count').value);
         const gridSize = parseInt(document.getElementById('t2-grid-size-select').value);
+        
+        let statMult = parseFloat(document.getElementById('t2-stat-mult').value) || 1.0;
+        statMult = Math.max(0.1, Math.min(10.0, statMult)); 
+
         const enemies = [];
         for (let i = 0; i < enemyCount; i++) {
             const key = document.getElementById(`t2-enemy-type-${i}`).value;
             const rarity = document.getElementById(`t2-enemy-rarity-${i}`).value;
+            // NEW: Capture the element value
+            const element = document.getElementById(`t2-enemy-element-${i}`).value;
+
             if (key) {
-                enemies.push({ key, rarity });
+                enemies.push({ key, rarity, element });
             }
         }
+
         if (enemies.length === 0) {
-            addToLog("You must select at least one enemy to train against.", "text-red-400");
+            addToLog("Select at least one enemy.", "text-red-400");
             return;
         }
+
         trainingConfig = {
             gridSize: gridSize,
-            enemies: enemies
+            enemies: enemies,
+            statMultiplier: statMult 
         };
     }
 
-    function enterBiomeMap(biomeKey) {
-    gameState.currentView = 'biome_map';
-    if (!gameState.currentMap) {
-        addToLog(`Starting expedition in ${BIOMES[biomeKey].name}...`, "text-green-300");
-        generateNewBiomeMap(biomeKey);
-    }
-    renderBiomeMap(biomeKey);
-}(null, trainingConfig);
+    startBattle(null, { trainingConfig: trainingConfig });
 }
 
 
@@ -8168,3 +9881,75 @@ function renderOnFieldCookingUI() {
     render(container); // Replace main view with this UI
 }
 
+
+function equipItem(itemKey, inBattle = false) {
+    if (inBattle) {
+        if (!gameState.isPlayerTurn || isProcessingAction) {
+            addToLog("Cannot change gear right now.", 'text-red-400');
+            return;
+        }
+    }
+
+    // Call Engine Logic (silent=false to let it log "Equipped X")
+    const unequippedKey = player.equipItem(itemKey, false);
+
+    const details = getItemDetails(itemKey);
+    // Check success by verifying what is currently equipped
+    const isEquipped = (
+        player.equippedWeapon.name === details.name ||
+        player.equippedArmor.name === details.name ||
+        player.equippedShield.name === details.name ||
+        player.equippedCatalyst.name === details.name ||
+        player.equippedLure === itemKey
+    );
+
+    if (isEquipped) {
+        if (inBattle) {
+            addToLog("Turn consumed.", "text-yellow-300 text-xs");
+            isProcessingAction = true;
+            gameState.isPlayerTurn = false;
+            updateStatsView();
+            returnToBattleFromInventory();
+        } else {
+            updateStatsView();
+            renderInventory();
+        }
+    } else {
+        if (inBattle) {
+            isProcessingAction = false;
+            gameState.isPlayerTurn = true;
+        }
+    }
+}
+
+function unequipItem(itemType, shouldRender = true, inBattle = false) {
+    if (!player) return;
+
+    if (inBattle) {
+        if (!gameState.isPlayerTurn || isProcessingAction) {
+            addToLog("Cannot change gear right now.", 'text-red-400');
+            return;
+        }
+    }
+
+    const unequippedKey = player.unequipItem(itemType, false);
+
+    if (unequippedKey) {
+        if (inBattle) {
+            addToLog("Turn consumed.", "text-yellow-300 text-xs");
+            isProcessingAction = true;
+            gameState.isPlayerTurn = false;
+            updateStatsView();
+            returnToBattleFromInventory();
+        } else {
+            updateStatsView();
+            if (shouldRender && gameState.currentView === 'inventory') {
+                renderInventory();
+            }
+        }
+    } else {
+        if (inBattle) {
+            addToLog("Nothing to unequip.", "text-gray-400");
+        }
+    }
+}
