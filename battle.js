@@ -10472,111 +10472,209 @@ function checkBattleStatus(isReaction = false) {
 
     const defeatedEnemiesThisCheck = [];
 
+    // Iterate backwards because we might remove elements
     for (let i = currentEnemies.length - 1; i >= 0; i--) {
         const enemy = currentEnemies[i];
 
+        // Check if HP is 0 or less
         if (enemy.hp <= 0) {
-            // --- 1. DIVINE SEAL CHECK ---
-            const sealIndex = gameState.gridObjects.findIndex(o => o.x === enemy.x && o.y === enemy.y && o.subtype === 'god_seal');
-            if (sealIndex > -1) {
-                enemy.hp = 1;
-                gameState.gridObjects.splice(sealIndex, 1); // Break the seal
-                addToLog(`The Divine Seal shatters, protecting ${enemy.name} from death!`, "text-cyan-300 font-bold");
-                renderBattleGrid(); // Visual update
-                continue; // Skip death processing for this enemy
-            }
-            // Revival Check
-            let revived = false;
-            let preventRevive = player.isSkillActive('divine_blessing') && enemy.killedByLight;
 
+            // --- Revival Logic ---
+            let revived = false;
+            
+            // Divine Blessing (Anti-Revive)
+            let preventRevive = false;
+            if (player.hasSkill('divine_blessing') && enemy.killedByLight) {
+
+                if (enemy.speciesData.class === 'Undead' && !enemy.revived && enemy.ability !== 'alive_again') {
+                     preventRevive = true;
+                     addToLog("Divine Blessing prevents the undead from rising!", "text-yellow-300");
+                }
+
+                if (enemy.ability === 'alive_again' && enemy.reviveChance < 1.0) {
+                     preventRevive = true;
+                     addToLog("Divine Blessing burns away the lingering soul!", "text-yellow-300");
+                }
+            }
+            
+            // Actual Revival Checks
             if (!preventRevive) {
                 if (enemy.speciesData.class === 'Undead' && !enemy.revived && enemy.ability !== 'alive_again') {
                     addToLog(`${enemy.name} reforms from shattered bones!`, 'text-gray-400 font-bold');
-                    enemy.hp = Math.floor(enemy.maxHp * 0.5); 
-                    enemy.revived = true; 
+                    enemy.hp = Math.floor(enemy.maxHp * 0.5); // Restore HP
+                    enemy.revived = true; // Mark as revived once
                     revived = true;
                 } else if (enemy.ability === 'alive_again' && Math.random() < enemy.reviveChance) {
                     addToLog(`${enemy.name} rises again!`, 'text-purple-600 font-bold');
-                    enemy.hp = Math.floor(enemy.maxHp * 0.5); 
+                    enemy.hp = Math.floor(enemy.maxHp * 0.5); // Restore HP
                     enemy.reviveChance /= 2;
                     revived = true;
                 }
-            } else if (preventRevive) {
-                addToLog("Divine Blessing prevents the resurrection!", "text-yellow-300");
             }
+            // --- End Revival Logic ---
 
+            // If not revived, mark for removal and processing
             if (!revived) {
                 defeatedEnemiesThisCheck.push(enemy);
-                if (enemy === gameState.markedTarget) gameState.markedTarget = null;
-                currentEnemies.splice(i, 1); 
+                // If the defeated enemy was the marked target, clear the mark state
+                if (enemy === gameState.markedTarget) {
+                    gameState.markedTarget = null;
+                }
+                currentEnemies.splice(i, 1); // Remove from the active list
             }
         }
-    }
+    } // End loop through enemies
 
+    // Process defeated enemies (XP, loot, quests)
     if (defeatedEnemiesThisCheck.length > 0) {
         defeatedEnemiesThisCheck.forEach(enemy => {
             addToLog(`You have defeated ${enemy.name}!`, 'text-green-400 font-bold');
+            
+            // --- NEW: Determine Quest/Reward Multiplier ---
             const questMultiplier = enemy.isBoss ? 5 : 1;
 
-            // --- FIXED: KEY DROP LOGIC ---
-            // Blacksmith Key (Level 4+)
-            if (player.level >= 4 && !player.unlocks.blacksmith && !player.unlocks.hasBlacksmithKey) {
+            // --- Added Kill Counters & Key Drop Logic ---
+            let droppedKey = null;
+            if (player.level >= 4) {
                 player.killsSinceLevel4++;
-                // Drop on 5th kill
-                if (player.killsSinceLevel4 >= 5) {
-                    player.addToInventory('blacksmith_key', 1);
+                if (player.killsSinceLevel4 >= 5) { 
+                    if (player._classKey === 'ranger' || player._classKey === 'cook') {
+                        const randomKey = Math.random() < 0.5 ? 'blacksmith_key' : 'tower_key';
+                        const alternateKey = randomKey === 'blacksmith_key' ? 'tower_key' : 'blacksmith_key';
+
+                        if (randomKey === 'blacksmith_key' && !player.unlocks.hasBlacksmithKey) {
+                            droppedKey = 'blacksmith_key';
+                        } else if (randomKey === 'tower_key' && !player.unlocks.hasTowerKey) {
+                            droppedKey = 'tower_key';
+                        } else if (alternateKey === 'blacksmith_key' && !player.unlocks.hasBlacksmithKey) {
+                            droppedKey = 'blacksmith_key';
+                        } else if (alternateKey === 'tower_key' && !player.unlocks.hasTowerKey) {
+                            droppedKey = 'tower_key';
+                        }
+                    } else {
+                        if (MARTIAL_CLASSES.includes(player._classKey) && !player.unlocks.hasBlacksmithKey) {
+                            droppedKey = 'blacksmith_key';
+                        } else if (MAGIC_CLASSES.includes(player._classKey) && !player.unlocks.hasTowerKey) {
+                            droppedKey = 'tower_key';
+                        }
+                    }
                 }
             }
-
-            // Sage Tower Key (Level 7+)
-            if (player.level >= 7 && !player.unlocks.sageTower && !player.unlocks.hasTowerKey) {
+            if (player.level >= 7) {
                 player.killsSinceLevel7++;
-                // Drop on 5th kill
-                if (player.killsSinceLevel7 >= 5) {
-                    player.addToInventory('tower_key', 1);
+                if (player.killsSinceLevel7 >= 5 && !droppedKey) { 
+                    if (!player.unlocks.hasBlacksmithKey) {
+                        droppedKey = 'blacksmith_key';
+                    } else if (!player.unlocks.hasTowerKey) {
+                        droppedKey = 'tower_key';
+                    }
                 }
             }
-            // -----------------------------
 
-            if (preTrainingState === null) {
-                // --- GOLD CALCULATION ---
-                let goldMult = 1.0;
-                // Utility Skills
-                if (player.isSkillActive('coin_counters_eye')) goldMult += 0.05;
-                if (player.isSkillActive('mercantile_intuition')) goldMult += 0.05;
-                if (player.isSkillActive('dwarven_battle_arts') && player.equippedWeapon.class === 'Hammer') goldMult += 0.10;
-                if (player.isSkillActive('head_hunters_discipline')) goldMult += 0.10;
+            if (droppedKey) {
+                 player.addToInventory(droppedKey, 1, false);
+                 addToLog(`The fallen ${enemy.name} dropped a ${getItemDetails(droppedKey).name}!`, 'text-yellow-400 font-bold');
+            }
 
-                // [FIX] Weapon Innate Gold Bonus (Generic Hook)
-                if (player.equippedWeapon.effect && player.equippedWeapon.effect.goldBonus) {
-                    goldMult += player.equippedWeapon.effect.goldBonus;
-                }
-
-                const finalGold = Math.floor((enemy.goldReward * questMultiplier) * goldMult);
-                player.gold += finalGold;
-                addToLog(`You found <span class="font-bold">${finalGold}</span> G.`, 'text-yellow-400');
+            // --- [INJECTED LOGIC STARTS HERE] ---
+            // Ensure we are NOT in the training dummy mode before giving rewards
+            if (typeof preTrainingState === 'undefined' || preTrainingState === null) {
                 
-                // --- XP CALCULATION ---
-                let xpMult = 1.0;
-                if (player.isSkillActive('head_hunters_discipline')) xpMult += 0.10;
-                if (player.isSkillActive('harvest_festival') && enemy.killedByDeadlyDance) xpMult += 0.20;
+                // 1. Gold Drop
+                player.gold += enemy.goldReward * questMultiplier;
+                addToLog(`You found <span class="font-bold">${enemy.goldReward * questMultiplier}</span> G.`, 'text-yellow-400');
                 
-                // Note: Food Buffs are handled inside player.gainXp() now
+                // 2. XP Drop
+                player.gainXp(enemy.xpReward * questMultiplier);
 
-                player.gainXp(Math.floor(enemy.xpReward * questMultiplier * xpMult));
-                
-                // Legacy Quest
+                // 3. Legacy Quest Progress
                 if (enemy.rarityData.name === 'Legendary') {
-                    if (!player.legacyQuestProgress[enemy.speciesData.key]) {
-                        player.legacyQuestProgress[enemy.speciesData.key] = true;
-                        addToLog(`*** LEGACY QUEST UPDATE: Legendary slain! ***`, 'text-purple-300 font-bold');
+                    const speciesKey = enemy.speciesData.key;
+                    if (!player.legacyQuestProgress[speciesKey]) {
+                        player.legacyQuestProgress[speciesKey] = true;
+                        addToLog(`*** LEGACY QUEST UPDATE: Legendary ${enemy.speciesData.name} slain! ***`, 'text-purple-300 font-bold');
                     }
                 }
 
-                // --- LOOT DROPS (INJECTED CHANGE) ---
-                generateLoot(enemy);
-                
-                // Quest Progress
+                // 4. Loot Drop Logic
+                for (const item in enemy.lootTable) {
+                    let baseDropChance = enemy.lootTable[item];
+                    const itemDetails = getItemDetails(item);
+                    const playerLuckBonus = Math.min(0.25, (player.luck * 0.5) / 100);
+                    let finalDropChance = baseDropChance + playerLuckBonus;
+
+                    if (player.foodBuffs.loot_chance) finalDropChance *= player.foodBuffs.loot_chance.value;
+                    if (player.race === 'Dwarf' && itemDetails && (WEAPONS[item] || ARMOR[item] || SHIELDS[item] || CATALYSTS[item])) {
+                        finalDropChance *= 1.25;
+                    }
+                    if (player.equippedWeapon.effect?.lootBonus && itemDetails && (itemDetails.class || ['Armor', 'Weapon'].includes(itemDetails.type))) {
+                        finalDropChance *= 2;
+                    }
+
+                    if (player.rollForEffect(finalDropChance, 'Loot Drop')) {
+                        player.addToInventory(item, 1, true);
+                    }
+                }
+
+                // 5. Recipe Drop Logic
+                const enemyTier = enemy.speciesData.tier;
+                const baseRecipeDropChance = 0.05 + (enemy.rarityData.rarityIndex * 0.005);
+                const recipeLuckBonus = Math.min(0.10, (player.luck * 0.5) / 100); 
+                const finalRecipeDropChance = baseRecipeDropChance + recipeLuckBonus;
+
+                if (player.rollForEffect(finalRecipeDropChance, 'Recipe Drop')) {
+                    const recipeType = Math.random() < 0.5 ? 'cooking' : 'alchemy';
+                    const allPossibleRecipes = RECIPE_DROPS_BY_TIER[recipeType]?.[enemyTier] || [];
+                    const availableRecipesForTier = allPossibleRecipes.filter(recipeKey => {
+                            const actualRecipeKey = ITEMS[recipeKey]?.recipeKey;
+                            if (!actualRecipeKey) return false;
+                            if (recipeType === 'cooking') return !player.knownCookingRecipes.includes(actualRecipeKey);
+                            else return !player.knownAlchemyRecipes.includes(actualRecipeKey);
+                        });
+
+                    if (availableRecipesForTier.length > 0) {
+                        const droppedRecipeItemKey = availableRecipesForTier[Math.floor(Math.random() * availableRecipesForTier.length)];
+                        player.addToInventory(droppedRecipeItemKey, 1, true);
+                    }
+                }
+
+                // 6. Seed Drop Logic
+                const baseSeedDropChance = 0.10;
+                const seedLuckBonus = Math.min(0.15, (player.luck * 0.5) / 100);
+                const finalSeedDropChance = baseSeedDropChance + seedLuckBonus;
+
+                if (player.rollForEffect(finalSeedDropChance, 'Seed Drop')) {
+                    let weights;
+                    if (enemyTier === 1) weights = [100, 0, 0];
+                    else if (enemyTier === 2) weights = [70, 30, 0];
+                    else if (enemyTier === 3) weights = [20, 80, 0];
+                    else if (enemyTier === 4) weights = [0, 70, 30];
+                    else if (enemyTier === 5) weights = [0, 30, 70];
+                    else weights = [100, 0, 0];
+
+                    const chosenRarity = choices(['Common', 'Uncommon', 'Rare'], weights);
+                    const availableSeeds = Object.keys(ITEMS).filter(key => {
+                        const details = ITEMS[key];
+                        return details && (details.type === 'seed' || details.type === 'sapling') && details.rarity === chosenRarity;
+                    });
+
+                    if (availableSeeds.length > 0) {
+                        const seedKey = availableSeeds[Math.floor(Math.random() * availableSeeds.length)];
+                        player.addToInventory(seedKey, 1, true);
+                    }
+                }
+
+                // 7. Casino Clue Drop Logic
+                if (player.unlocks.arcaneCasino) {
+                    const paperClues = ['ripped_paper_1', 'ripped_paper_2', 'ripped_paper_3', 'ripped_paper_4', 'ripped_paper_5'];
+                    const missingClues = paperClues.filter(clue => !player.inventory.items[clue]);
+                    if (missingClues.length > 0 && player.rollForEffect(0.05, 'Casino Clue Drop')) {
+                        const clueToDrop = missingClues[Math.floor(Math.random() * missingClues.length)];
+                        player.addToInventory(clueToDrop, 1, true);
+                    }
+                }
+
+                // 8. Extermination Quest Progress
                 if (player.activeQuest && player.activeQuest.category === 'extermination') {
                     const quest = getQuestDetails(player.activeQuest);
                     if (quest && quest.target === enemy.speciesData.key) {
@@ -10584,52 +10682,22 @@ function checkBattleStatus(isReaction = false) {
                         addToLog(`Quest progress: ${player.questProgress}/${quest.required}`, 'text-amber-300');
                     }
                 }
-                
-                // --- RECIPE DROPS ---
-                if (Math.random() < 0.05) { 
-                    const tier = enemy.speciesData.tier || 1;
-                    const type = Math.random() < 0.5 ? 'cooking' : 'alchemy';
-                    
-                    if (RECIPE_DROPS_BY_TIER[type] && RECIPE_DROPS_BY_TIER[type][tier]) {
-                        const pool = RECIPE_DROPS_BY_TIER[type][tier];
-                        if (pool && pool.length > 0) {
-                            const recipeKey = pool[Math.floor(Math.random() * pool.length)];
-                            player.addToInventory(recipeKey, 1, true);
-                        }
-                    }
-                }
-
-                // --- GLOBAL DROPS: SEEDS ---
-                if (Math.random() < 0.05) {
-                    const seedPool = Object.keys(ITEMS).filter(k => ITEMS[k].type === 'seed');
-                    if (seedPool.length > 0) {
-                        const seedKey = seedPool[Math.floor(Math.random() * seedPool.length)];
-                        player.addToInventory(seedKey, 1, true);
-                    }
-                }
             }
+            // --- [INJECTED LOGIC ENDS HERE] ---
         });
     }
 
+    // Check victory
     if (checkVictory()) {
-         isProcessingAction = false; 
-         return; 
+         isProcessingAction = false; // Ensure actions unlocked on victory
+         return; // Stop further processing if victory occurred
     }
 
+    // NPC Ally Flee Check
     if (player.npcAlly && player.npcAlly.hp <= 0) {
-        // --- DIVINE SEAL CHECK (ALLY) ---
-        const sealIndex = gameState.gridObjects.findIndex(o => o.x === player.npcAlly.x && o.y === player.npcAlly.y && o.subtype === 'god_seal');
-        if (sealIndex > -1) {
-            player.npcAlly.hp = 1;
-            gameState.gridObjects.splice(sealIndex, 1);
-            addToLog(`The Divine Seal shatters, saving ${player.npcAlly.name}!`, "text-cyan-300 font-bold");
-            renderBattleGrid();
-            return; // Ally saved
-        }
-        // --------------------------------
-
         const allyName = player.npcAlly.name; 
-        addToLog(`<span class="font-bold text-red-500">${allyName} has fled!</span>`, "text-red-500");
+        addToLog(`<span class="font-bold text-red-500">${allyName} has been defeated and fled the battle!</span>`, "text-red-500");
+        addToLog(`<span class="font-bold text-red-700">${allyName} is gone for good, taking all their equipment...</span>`, "text-red-700");
         player.npcAlly = null; 
         player.encountersSinceLastPay = 0;
         renderBattleGrid(); 
