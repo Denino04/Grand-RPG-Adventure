@@ -44,7 +44,8 @@ let gardenInterval = null;
 let isTutorialEnabled = true;
 const IDLE_TIMEOUT_MS = 60000; 
 let lastUserActivity = Date.now();
-
+window.skillTreeOffset = { x: 0, y: 0 };
+window.skillTreeZoom = 1.0;
 // Fallback Config (Local Dev)
 const fallbackFirebaseConfig = {
     apiKey: "AIzaSyD4exnjoWEpKGkrGeiRe4A8dvX74-tjdyk",

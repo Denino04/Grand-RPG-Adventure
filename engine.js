@@ -6601,7 +6601,7 @@ function buyItem(itemKey, shopType, priceOverride = null) {
 
     if (player.gold >= finalPrice) {
         player.gold -= finalPrice;
-        player.addItem(itemKey);
+        player.addToInventory(itemKey);
         playSound('buy');
         addToLog(`Bought ${details.name} for ${finalPrice} G.`, "text-yellow-400");
         

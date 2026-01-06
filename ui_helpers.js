@@ -25,12 +25,16 @@ function playSound(soundName) {
 
 const $ = (selector) => document.querySelector(selector);
 let logElement;
-let mainView;
+let mainView;       
 let characterSheetOriginalStats = null;
 
 function initUIElements() {
     logElement = $('#game-log');
     mainView = $('#main-view');
+    characterSheetOriginalStats = null; // Ensure this exists from your original file
+
+    // [FIX] Initialize the listener immediately
+    setupSkillTreeDoubleTap();
 }
 
 function capitalize(str) {
@@ -1373,51 +1377,76 @@ function toggleDebugMinimize() {
 }
 
 function setupSkillTreeDoubleTap() {
-    // 1. Target the Skill Tree Container (Ensure this ID matches your HTML)
-    const container = document.getElementById('skill-tree-view') || document.getElementById('skill-tree-canvas'); 
-    if (!container) return;
+    const container = document.getElementById('main-view');
 
-    let lastTap = 0;
-    
+    if (!container) {
+        console.warn("Setup Failed: 'main-view' container not found.");
+        return;
+    }
+
+    // [IMPORTANT] This CSS property tells mobile browsers: 
+    // "Don't zoom on double tap, let the app handle it."
+    container.style.touchAction = 'none';
+
+    let lastTapTime = 0;
+
+    // Handler 1: Touch Events (Mobile)
     container.addEventListener('touchend', (e) => {
+        // Only run if looking at skill tree
+        if (typeof gameState === 'undefined' || gameState.currentView !== 'skill_tree') return;
+
         const currentTime = new Date().getTime();
-        const tapLength = currentTime - lastTap;
-        
-        // 2. Detect Double Tap (Typical threshold is 300ms)
+        const tapLength = currentTime - lastTapTime;
+
+        // Check for double tap (within 300ms)
         if (tapLength < 300 && tapLength > 0) {
-            e.preventDefault(); // Prevent browser zoom behavior
+            if (e.cancelable) e.preventDefault(); // Stop browser zoom
+            e.stopPropagation(); // Stop click from passing through
             
-            // 3. Reset Logic
-            centerSkillTreeOnRoot();
+            // Visual feedback in log
+            addToLog("Double-tap detected: Centering Tree...", "text-green-300 text-xs");
+            resetSkillTreeView();
         }
-        lastTap = currentTime;
+        lastTapTime = currentTime;
+    });
+
+    // Handler 2: Standard Double Click (PC / Mouse / Some Hybrids)
+    container.addEventListener('dblclick', (e) => {
+        if (typeof gameState === 'undefined' || gameState.currentView !== 'skill_tree') return;
+        
+        e.preventDefault();
+        addToLog("Double-click detected: Centering Tree...", "text-green-300 text-xs");
+        resetSkillTreeView();
     });
 }
 
-function centerSkillTreeOnRoot() {
-    // RESET COORDINATES
-    // Assuming you use 'skillTreeOffset' or 'treePan' variables. 
-    // Since 'the_root' is usually at (0,0), we center (0,0) on the screen.
+function resetSkillTreeView() {
+    // 1. Reset Zoom
+    if (typeof window.skillTreeZoom !== 'undefined') {
+        window.skillTreeZoom = 1.0;
+    }
+
+    // 2. Center the Tree
+    // We set the offset to center of screen (assuming Root is at 0,0)
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+
+    if (!window.skillTreeOffset) window.skillTreeOffset = { x: 0, y: 0 };
     
-    if (typeof skillTreeOffset !== 'undefined') {
-        skillTreeOffset.x = window.innerWidth / 2;
-        skillTreeOffset.y = window.innerHeight / 2;
-    } else if (typeof treePanX !== 'undefined') {
-        // Fallback variable names if you use distinct X/Y vars
-        treePanX = window.innerWidth / 2;
-        treePanY = window.innerHeight / 2;
-    }
+    window.skillTreeOffset.x = centerX;
+    window.skillTreeOffset.y = centerY;
 
-    // RESET ZOOM (Optional)
-    if (typeof skillTreeZoom !== 'undefined') {
-        skillTreeZoom = 1.0; 
-    }
+    console.log("Resetting View to:", centerX, centerY);
 
-    // RE-RENDER
+    // 3. Force Re-render
+    // We try all likely function names for your game loop
     if (typeof renderSkillTree === 'function') {
         renderSkillTree();
+    } else if (typeof drawSkillTree === 'function') {
+        drawSkillTree();
+    } else if (typeof window.renderSkillTree === 'function') {
+        window.renderSkillTree();
+    } else {
+        addToLog("Error: Could not find renderSkillTree function.", "text-red-500");
     }
-    
-    // Feedback
-    addToLog("View reset to Start.", "text-cyan-300 text-xs");
 }
