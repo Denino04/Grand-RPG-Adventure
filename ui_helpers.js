@@ -1371,3 +1371,53 @@ function toggleDebugMinimize() {
         btn.textContent = '_';
     }
 }
+
+function setupSkillTreeDoubleTap() {
+    // 1. Target the Skill Tree Container (Ensure this ID matches your HTML)
+    const container = document.getElementById('skill-tree-view') || document.getElementById('skill-tree-canvas'); 
+    if (!container) return;
+
+    let lastTap = 0;
+    
+    container.addEventListener('touchend', (e) => {
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTap;
+        
+        // 2. Detect Double Tap (Typical threshold is 300ms)
+        if (tapLength < 300 && tapLength > 0) {
+            e.preventDefault(); // Prevent browser zoom behavior
+            
+            // 3. Reset Logic
+            centerSkillTreeOnRoot();
+        }
+        lastTap = currentTime;
+    });
+}
+
+function centerSkillTreeOnRoot() {
+    // RESET COORDINATES
+    // Assuming you use 'skillTreeOffset' or 'treePan' variables. 
+    // Since 'the_root' is usually at (0,0), we center (0,0) on the screen.
+    
+    if (typeof skillTreeOffset !== 'undefined') {
+        skillTreeOffset.x = window.innerWidth / 2;
+        skillTreeOffset.y = window.innerHeight / 2;
+    } else if (typeof treePanX !== 'undefined') {
+        // Fallback variable names if you use distinct X/Y vars
+        treePanX = window.innerWidth / 2;
+        treePanY = window.innerHeight / 2;
+    }
+
+    // RESET ZOOM (Optional)
+    if (typeof skillTreeZoom !== 'undefined') {
+        skillTreeZoom = 1.0; 
+    }
+
+    // RE-RENDER
+    if (typeof renderSkillTree === 'function') {
+        renderSkillTree();
+    }
+    
+    // Feedback
+    addToLog("View reset to Start.", "text-cyan-300 text-xs");
+}

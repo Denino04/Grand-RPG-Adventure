@@ -876,6 +876,7 @@ window.addEventListener('load', async () => {
     if(toggle) toggle.checked = isTutorialEnabled;
 
     setupEventListeners();
+    setupSkillTreeDoubleTap();
     
     document.addEventListener('mousemove', resetActivityTimer, { passive: true });
     document.addEventListener('keydown', resetActivityTimer, { passive: true });
